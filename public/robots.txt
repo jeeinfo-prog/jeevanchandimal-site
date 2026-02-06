@@ -4,4 +4,4 @@ Disallow: /nogooglebot/
 User-agent: *
 Allow: /
 
-Sitemap: https://firm-these-stork-6nk3lv.teleporthq.app/sitemap.xml
+Sitemap: https://jeevanchandimal.com/sitemap.xml
