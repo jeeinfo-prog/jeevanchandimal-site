@@ -1,0 +1,7 @@
+User-agent: Googlebot
+Disallow: /nogooglebot/
+
+User-agent: *
+Allow: /
+
+Sitemap: https://firm-these-stork-6nk3lv.teleporthq.app/sitemap.xml
