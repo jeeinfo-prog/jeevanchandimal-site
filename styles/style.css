@@ -734,3 +734,21 @@ nav ul ul {
   position: absolute !important;
   z-index: 99999 !important;
 }
+/* =====================================================
+   ICON COLOR FIX (FAQ / ACCORDION / TOGGLE)
+   ===================================================== */
+
+svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+/* Force white icons inside dark sections */
+.faq svg,
+.thq-faq svg,
+.accordion svg,
+.toggle svg,
+[data-faq] svg {
+  fill: #F5F4F4 !important;
+  stroke: #F5F4F4 !important;
+}
