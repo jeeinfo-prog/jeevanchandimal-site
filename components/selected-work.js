@@ -1,7 +1,5 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const SelectedWork = (props) => {
   return (
@@ -30,51 +28,53 @@ const SelectedWork = (props) => {
               )}
             </span>
           </div>
+
           <div className="selected-work-thq-content-elm1">
             <div className="selected-work-thq-row-elm1 thq-flex-row">
               <div className="selected-work-thq-feature1-elm1 thq-flex-column">
                 <img
                   alt={props.feature1ImageAlt}
-                  src={props.feature1ImageSrc}
+                  src={props.feature1ImageSrc || '/BTS/58415_107800565946853_7668083_n-1400w.jpg'}
                   className="thq-img-ratio-4-3 selected-work-thq-feature1-image-elm1"
                 />
               </div>
               <div className="selected-work-thq-feature2-elm1 thq-flex-column">
                 <img
                   alt={props.feature2ImageAlt}
-                  src={props.feature2ImageSrc}
+                  src={props.feature2ImageSrc || '/BTS/16905000_1391539670906263_5044795706700183659_o-300h.jpg'}
                   className="thq-img-ratio-4-3 selected-work-thq-feature2-image-elm1"
                 />
               </div>
               <div className="selected-work-thq-feature3-elm1 thq-flex-column">
                 <img
                   alt={props.feature3ImageAlt}
-                  src={props.feature3ImageSrc}
+                  src={props.feature3ImageSrc || '/BTS/16716053_1374388602621370_5959989464476088896_o-300h.jpg'}
                   className="thq-img-ratio-4-3 selected-work-thq-feature3-image-elm1"
                 />
               </div>
             </div>
           </div>
+
           <div className="selected-work-thq-content-elm2">
             <div className="selected-work-thq-row-elm2 thq-flex-row">
               <div className="selected-work-thq-feature1-elm2 thq-flex-column">
                 <img
                   alt={props.feature1ImageAlt1}
-                  src={props.feature1ImageSrc1}
+                  src={props.feature1ImageSrc1 || '/BTS/241864_383625518364355_691940775_o-1400w.jpg'}
                   className="thq-img-ratio-4-3 selected-work-thq-feature1-image-elm2"
                 />
               </div>
               <div className="selected-work-thq-feature2-elm2 thq-flex-column">
                 <img
                   alt={props.feature2ImageAlt1}
-                  src={props.feature2ImageSrc1}
+                  src={props.feature2ImageSrc1 || '/BTS/41348474_2037791082947782_5867092503643029504_o-300h.jpg'}
                   className="thq-img-ratio-4-3 selected-work-thq-feature2-image-elm2"
                 />
               </div>
               <div className="selected-work-thq-feature3-elm2 thq-flex-column">
                 <img
                   alt={props.feature3ImageAlt1}
-                  src={props.feature3ImageSrc1}
+                  src={props.feature3ImageSrc1 || '/BTS/43645067_2079243978802492_1981101150438424576_o-300h.jpg'}
                   className="thq-img-ratio-4-3 selected-work-thq-feature3-image-elm2"
                 />
               </div>
@@ -82,6 +82,7 @@ const SelectedWork = (props) => {
           </div>
         </div>
       </div>
+
       <style jsx>
         {`
           .selected-work-thq-layout251-elm {
@@ -115,12 +116,8 @@ const SelectedWork = (props) => {
           .selected-work-thq-row-elm1 {
             align-items: flex-start;
           }
-          .selected-work-thq-feature1-elm1 {
-            flex: 1;
-          }
-          .selected-work-thq-feature2-elm1 {
-            flex: 1;
-          }
+          .selected-work-thq-feature1-elm1,
+          .selected-work-thq-feature2-elm1,
           .selected-work-thq-feature3-elm1 {
             flex: 1;
           }
@@ -134,18 +131,12 @@ const SelectedWork = (props) => {
           .selected-work-thq-row-elm2 {
             align-items: flex-start;
           }
-          .selected-work-thq-feature1-elm2 {
-            flex: 1;
-          }
-          .selected-work-thq-feature2-elm2 {
-            flex: 1;
-          }
+          .selected-work-thq-feature1-elm2,
+          .selected-work-thq-feature2-elm2,
           .selected-work-thq-feature3-elm2 {
             flex: 1;
           }
-          .selected-work-text1 {
-            display: inline-block;
-          }
+          .selected-work-text1,
           .selected-work-text2 {
             display: inline-block;
           }
@@ -154,21 +145,11 @@ const SelectedWork = (props) => {
               align-items: flex-start;
               flex-direction: column;
             }
-            .selected-work-thq-feature1-image-elm1 {
-              height: 260px;
-            }
-            .selected-work-thq-feature2-image-elm1 {
-              height: 260px;
-            }
-            .selected-work-thq-feature3-image-elm1 {
-              height: 260px;
-            }
-            .selected-work-thq-feature1-image-elm2 {
-              height: 260px;
-            }
-            .selected-work-thq-feature2-image-elm2 {
-              height: 260px;
-            }
+            .selected-work-thq-feature1-image-elm1,
+            .selected-work-thq-feature2-image-elm1,
+            .selected-work-thq-feature3-image-elm1,
+            .selected-work-thq-feature1-image-elm2,
+            .selected-work-thq-feature2-image-elm2,
             .selected-work-thq-feature3-image-elm2 {
               height: 260px;
             }
@@ -180,35 +161,25 @@ const SelectedWork = (props) => {
             .selected-work-thq-text-elm1 {
               text-align: center;
             }
-            .selected-work-thq-row-elm1 {
-              flex-direction: column;
-            }
-            .selected-work-thq-feature1-image-elm1 {
-              width: 100%;
-            }
-            .selected-work-thq-feature2-elm1 {
-              width: auto;
-            }
-            .selected-work-thq-feature2-image-elm1 {
-              width: 100%;
-            }
-            .selected-work-thq-feature3-elm1 {
-              width: auto;
-            }
+            .selected-work-thq-row-elm1,
             .selected-work-thq-row-elm2 {
               flex-direction: column;
             }
-            .selected-work-thq-feature1-image-elm2 {
-              width: 100%;
-            }
-            .selected-work-thq-feature2-elm2 {
-              width: auto;
-            }
+            .selected-work-thq-feature1-image-elm1,
+            .selected-work-thq-feature2-image-elm1,
+            .selected-work-thq-feature1-image-elm2,
             .selected-work-thq-feature2-image-elm2 {
               width: 100%;
             }
+            .selected-work-thq-feature2-elm1,
+            .selected-work-thq-feature3-elm1,
+            .selected-work-thq-feature2-elm2,
             .selected-work-thq-feature3-elm2 {
               width: auto;
+            }
+            .selected-work-thq-feature3-image-elm1,
+            .selected-work-thq-feature3-image-elm2 {
+              width: 100%;
             }
           }
         `}
@@ -220,24 +191,21 @@ const SelectedWork = (props) => {
 SelectedWork.defaultProps = {
   feature2ImageAlt: 'Sound Design Image',
   feature1ImageAlt1: 'Film & Photography Image',
-  feature3ImageSrc:
-    'https://images.unsplash.com/photo-1589194837860-045b276a7d49?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc2OTgwNTI1OXw&ixlib=rb-4.1.0&q=80&w=1080',
-  feature2ImageSrc:
-    'https://images.unsplash.com/photo-1683006641917-3b36e4121292?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc2OTgwNTI1OHw&ixlib=rb-4.1.0&q=80&w=1080',
-  feature1ImageSrc1:
-    'https://images.unsplash.com/photo-1765891521839-99dc556853bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc2OTgwNTI1OXw&ixlib=rb-4.1.0&q=80&w=1080',
-  feature3ImageSrc1:
-    'https://images.unsplash.com/photo-1589194837860-045b276a7d49?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc2OTgwNTI1OXw&ixlib=rb-4.1.0&q=80&w=1080',
-  sectionTitle: undefined,
   feature3ImageAlt1: 'Animation Image',
   feature1ImageAlt: 'Film & Photography Image',
-  feature2ImageSrc1:
-    'https://images.unsplash.com/photo-1683006641917-3b36e4121292?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc2OTgwNTI1OHw&ixlib=rb-4.1.0&q=80&w=1080',
   feature2ImageAlt1: 'Sound Design Image',
-  sectionDescription: undefined,
-  feature1ImageSrc:
-    'https://images.unsplash.com/photo-1765891521839-99dc556853bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc2OTgwNTI1OXw&ixlib=rb-4.1.0&q=80&w=1080',
   feature3ImageAlt: 'Animation Image',
+
+  // Your real local BTS images (make sure these exist in /public/BTS/)
+  feature1ImageSrc: '/BTS/58415_107800565946853_7668083_n-1400w.jpg',
+  feature2ImageSrc: '/BTS/16905000_1391539670906263_5044795706700183659_o-300h.jpg',
+  feature3ImageSrc: '/BTS/16716053_1374388602621370_5959989464476088896_o-300h.jpg',
+  feature1ImageSrc1: '/BTS/241864_383625518364355_691940775_o-1400w.jpg',
+  feature2ImageSrc1: '/BTS/41348474_2037791082947782_5867092503643029504_o-300h.jpg',
+  feature3ImageSrc1: '/BTS/43645067_2079243978802492_1981101150438424576_o-300h.jpg',
+
+  sectionTitle: undefined,
+  sectionDescription: undefined,
 }
 
 SelectedWork.propTypes = {
