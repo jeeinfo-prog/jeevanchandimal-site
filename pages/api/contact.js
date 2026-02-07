@@ -1,34 +1,30 @@
 import nodemailer from 'nodemailer'
 
 export default async function handler(req, res) {
-  // Allow only POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' })
   }
 
   const { name, email, message } = req.body || {}
 
-  // Validate fields
   if (!name || !email || !message) {
     return res.status(400).json({ message: 'Missing fields' })
   }
 
-  // Check environment variables (ONLY ONCE)
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     return res.status(500).json({
-      message: 'EMAIL_USER / EMAIL_PASS missing in Vercel Environment Variables',
+      message: 'EMAIL_USER / EMAIL_PASS missing in Vercel',
     })
   }
 
   try {
-    // Titan SMTP configuration
     const transporter = nodemailer.createTransport({
-      host: 'smtp.titan.email',
+      host: 'smtpout.secureserver.net',
       port: 587,
       secure: false, // STARTTLS
       auth: {
         user: process.env.EMAIL_USER, // info@jeevanchandimal.com
-        pass: process.env.EMAIL_PASS, // Titan mailbox password
+        pass: process.env.EMAIL_PASS, // GoDaddy email password
       },
     })
 
@@ -45,9 +41,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Message sent successfully' })
   } catch (error) {
     console.error('CONTACT EMAIL ERROR:', error)
-
     return res.status(500).json({
-      message: error?.message || 'Email sending failed',
+      message: error.message || 'Email sending failed',
     })
   }
 }
