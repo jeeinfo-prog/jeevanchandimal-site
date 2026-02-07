@@ -1,8 +1,6 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
 
-import { useTranslations } from 'next-intl'
-
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import HomePageHero from '../components/home-page-hero'
 import HomeIntro from '../components/home-intro'
@@ -12,7 +10,7 @@ import Process01 from '../components/process-01'
 import HomeFinalCTA from '../components/home-final-cta'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
-const Home = (props) => {
+const Home = () => {
   return (
     <>
       <div className="home-container">
@@ -22,9 +20,14 @@ const Home = (props) => {
             name="description"
             content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound. Cinematic work shaped with intention and restraint."
           />
+
+          {/* Canonical (IMPORTANT: use your real domain) */}
+          <link rel="canonical" href="https://jeevanchandimal.com/" />
+
+          {/* Open Graph */}
           <meta
             property="og:title"
-            content="Jeevan Chandimal | Filmmaker &amp; Visual Storyteller"
+            content="Jeevan Chandimal | Filmmaker & Visual Storyteller"
           />
           <meta
             property="og:description"
@@ -32,13 +35,27 @@ const Home = (props) => {
           />
           <meta
             property="og:image"
-            content="https://aheioqhobo.cloudimg.io/v7/_playground-bucket-v2.teleporthq.io_/1e052279-2879-4d4a-b576-0d545df1baa9/f8b288cf-c33a-4971-b301-c944c3ca6c1f?org_if_sml=1&amp;force_format=original"
+            content="https://aheioqhobo.cloudimg.io/v7/_playground-bucket-v2.teleporthq.io_/1e052279-2879-4d4a-b576-0d545df1baa9/f8b288cf-c33a-4971-b301-c944c3ca6c1f?org_if_sml=1&force_format=original"
           />
-          <link
-            rel="canonical"
-            href="https://firm-these-stork-6nk3lv.teleporthq.app/"
+          <meta property="og:url" content="https://jeevanchandimal.com/" />
+          <meta property="og:type" content="website" />
+
+          {/* Twitter */}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta
+            name="twitter:title"
+            content="Jeevan Chandimal | Filmmaker & Visual Storyteller"
+          />
+          <meta
+            name="twitter:description"
+            content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound."
+          />
+          <meta
+            name="twitter:image"
+            content="https://aheioqhobo.cloudimg.io/v7/_playground-bucket-v2.teleporthq.io_/1e052279-2879-4d4a-b576-0d545df1baa9/f8b288cf-c33a-4971-b301-c944c3ca6c1f?org_if_sml=1&force_format=original"
           />
         </Head>
+
         <JeevanChandimalNavi
           link1={
             <Fragment>
@@ -126,6 +143,7 @@ const Home = (props) => {
             </Fragment>
           }
         ></JeevanChandimalNavi>
+
         <HomePageHero
           action3={
             <Fragment>
@@ -146,12 +164,11 @@ const Home = (props) => {
           }
           heading11={
             <Fragment>
-              <span className="home-text30">
-                Filmmaker · Visual Storyteller
-              </span>
+              <span className="home-text30">Filmmaker · Visual Storyteller</span>
             </Fragment>
           }
         ></HomePageHero>
+
         <HomeIntro
           heading={
             <Fragment>
@@ -161,12 +178,10 @@ const Home = (props) => {
           content2={
             <Fragment>
               <span className="home-text32">
+                <span>End-to-end visual production, built with cinematic intent.</span>
                 <span>
-                  End-to-end visual production, built with cinematic intent. 
-                </span>
-                <span>
-                  Film, photography, sound, and animation - from concept to
-                  final delivery.
+                  Film, photography, sound, and animation - from concept to final
+                  delivery.
                 </span>
                 <br></br>
                 <span>
@@ -183,6 +198,7 @@ const Home = (props) => {
           }
           rootClassName="home-introroot-class-name"
         ></HomeIntro>
+
         <SelectedWork
           sectionTitle={
             <Fragment>
@@ -199,6 +215,7 @@ const Home = (props) => {
             </Fragment>
           }
         ></SelectedWork>
+
         <HomeWork01
           feature1Title={
             <Fragment>
@@ -270,6 +287,7 @@ const Home = (props) => {
             </Fragment>
           }
         ></HomeWork01>
+
         <Process01
           feature3Title={
             <Fragment>
@@ -319,6 +337,7 @@ const Home = (props) => {
             </Fragment>
           }
         ></Process01>
+
         <HomeFinalCTA
           action2={
             <Fragment>
@@ -340,6 +359,7 @@ const Home = (props) => {
           }
           rootClassName="home-final-ct-aroot-class-name"
         ></HomeFinalCTA>
+
         <JeevanChandimalNewFooter
           link11={
             <Fragment>
@@ -434,6 +454,7 @@ const Home = (props) => {
           rootClassName="jeevan-chandimal-new-footerroot-class-name1"
         ></JeevanChandimalNewFooter>
       </div>
+
       <style jsx>
         {`
           .home-container {
@@ -443,201 +464,71 @@ const Home = (props) => {
             align-items: center;
             flex-direction: column;
           }
-          .home-text10 {
-            display: inline-block;
-          }
-          .home-text11 {
-            display: inline-block;
-          }
-          .home-text12 {
-            display: inline-block;
-          }
-          .home-text13 {
-            display: inline-block;
-          }
-          .home-text14 {
-            display: inline-block;
-          }
-          .home-text15 {
-            display: inline-block;
-          }
-          .home-text16 {
-            display: inline-block;
-          }
-          .home-text17 {
-            display: inline-block;
-          }
-          .home-text18 {
-            display: inline-block;
-          }
-          .home-text19 {
-            display: inline-block;
-          }
-          .home-text20 {
-            display: inline-block;
-          }
-          .home-text21 {
-            display: inline-block;
-          }
-          .home-text22 {
-            display: inline-block;
-          }
-          .home-text23 {
-            display: inline-block;
-          }
-          .home-text24 {
-            display: inline-block;
-          }
-          .home-text25 {
-            display: inline-block;
-          }
-          .home-text26 {
-            display: inline-block;
-          }
-          .home-text27 {
-            display: inline-block;
-          }
-          .home-text28 {
-            display: inline-block;
-          }
-          .home-text29 {
-            display: inline-block;
-          }
-          .home-text30 {
-            display: inline-block;
-          }
-          .home-text31 {
-            display: inline-block;
-          }
-          .home-text32 {
-            display: inline-block;
-          }
-          .home-text37 {
-            display: inline-block;
-          }
-          .home-text38 {
-            display: inline-block;
-          }
-          .home-text39 {
-            display: inline-block;
-          }
-          .home-text40 {
-            display: inline-block;
-          }
-          .home-text41 {
-            display: inline-block;
-          }
-          .home-text42 {
-            display: inline-block;
-          }
-          .home-text43 {
-            display: inline-block;
-          }
-          .home-text44 {
-            display: inline-block;
-          }
-          .home-text45 {
-            display: inline-block;
-          }
-          .home-text46 {
-            display: inline-block;
-          }
-          .home-text47 {
-            display: inline-block;
-          }
-          .home-text48 {
-            display: inline-block;
-          }
-          .home-text49 {
-            display: inline-block;
-          }
-          .home-text50 {
-            display: inline-block;
-          }
-          .home-text51 {
-            display: inline-block;
-          }
-          .home-text52 {
-            display: inline-block;
-          }
-          .home-text53 {
-            display: inline-block;
-          }
-          .home-text54 {
-            display: inline-block;
-          }
-          .home-text55 {
-            display: inline-block;
-          }
-          .home-text56 {
-            display: inline-block;
-          }
-          .home-text57 {
-            display: inline-block;
-          }
-          .home-text58 {
-            display: inline-block;
-          }
-          .home-text59 {
-            display: inline-block;
-          }
-          .home-text60 {
-            display: inline-block;
-          }
-          .home-text61 {
-            display: inline-block;
-          }
-          .home-text62 {
-            display: inline-block;
-          }
-          .home-text63 {
-            display: inline-block;
-          }
-          .home-text64 {
-            display: inline-block;
-          }
-          .home-text65 {
-            display: inline-block;
-          }
-          .home-text66 {
-            display: inline-block;
-          }
-          .home-text67 {
-            display: inline-block;
-          }
-          .home-text68 {
-            display: inline-block;
-          }
-          .home-text69 {
-            display: inline-block;
-          }
-          .home-text70 {
-            display: inline-block;
-          }
-          .home-text71 {
-            display: inline-block;
-          }
-          .home-text72 {
-            display: inline-block;
-          }
-          .home-text73 {
-            display: inline-block;
-          }
-          .home-text74 {
-            display: inline-block;
-          }
-          .home-text75 {
-            display: inline-block;
-          }
-          .home-text76 {
-            display: inline-block;
-          }
-          .home-text77 {
-            display: inline-block;
-          }
-          .home-text78 {
-            display: inline-block;
-          }
+          .home-text10,
+          .home-text11,
+          .home-text12,
+          .home-text13,
+          .home-text14,
+          .home-text15,
+          .home-text16,
+          .home-text17,
+          .home-text18,
+          .home-text19,
+          .home-text20,
+          .home-text21,
+          .home-text22,
+          .home-text23,
+          .home-text24,
+          .home-text25,
+          .home-text26,
+          .home-text27,
+          .home-text28,
+          .home-text29,
+          .home-text30,
+          .home-text31,
+          .home-text32,
+          .home-text37,
+          .home-text38,
+          .home-text39,
+          .home-text40,
+          .home-text41,
+          .home-text42,
+          .home-text43,
+          .home-text44,
+          .home-text45,
+          .home-text46,
+          .home-text47,
+          .home-text48,
+          .home-text49,
+          .home-text50,
+          .home-text51,
+          .home-text52,
+          .home-text53,
+          .home-text54,
+          .home-text55,
+          .home-text56,
+          .home-text57,
+          .home-text58,
+          .home-text59,
+          .home-text60,
+          .home-text61,
+          .home-text62,
+          .home-text63,
+          .home-text64,
+          .home-text65,
+          .home-text66,
+          .home-text67,
+          .home-text68,
+          .home-text69,
+          .home-text70,
+          .home-text71,
+          .home-text72,
+          .home-text73,
+          .home-text74,
+          .home-text75,
+          .home-text76,
+          .home-text77,
+          .home-text78,
           .home-text79 {
             display: inline-block;
           }
