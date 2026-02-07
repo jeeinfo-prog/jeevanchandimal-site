@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
   const ownerEmail = 'info@jeevanchandimal.com'
   const fromEmail = process.env.EMAIL_USER // should be info@jeevanchandimal.com
-  const logoUrl = 'https://www.jeevanchandimal.com/logo.png'
+  const logoUrl = 'https://www.jeevanchandimal.com/jclogo05.png'
 
   const safeName = (name || '').trim() || 'there'
   const safeEmail = (email || '').trim()
