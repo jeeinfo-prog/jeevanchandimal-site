@@ -1,88 +1,86 @@
 import Head from "next/head"
 
-// Strip HTML tags for clean meta descriptions
-function stripHtml(html = "") {
-  return html
-    .replace(/<[^>]*>?/gm, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-}
+export async function getServerSideProps({ params }) {
+  const base = process.env.NEXT_PUBLIC_WP_BASE_URL || ""
+  const slug = params?.slug || ""
 
-export async function getServerSideProps({ params, req }) {
-  const base = process.env.NEXT_PUBLIC_WP_BASE_URL
-  if (!base) return { notFound: true }
+  if (!base) {
+    return { props: { debug: "BASE_MISSING" } }
+  }
 
-  const slug = params?.slug
-  const postUrl = `${base}/wp-json/wp/v2/posts?slug=${encodeURIComponent(slug)}&_embed=1`
+  if (!slug) {
+    return { props: { debug: "SLUG_MISSING" } }
+  }
 
-  const res = await fetch(postUrl)
-  if (!res.ok) return { notFound: true }
+  const postUrl = `${base.replace(/\/$/, "")}/wp-json/wp/v2/projects?slug=${encodeURIComponent(
+    slug
+  )}&_embed=1`
 
-  const data = await res.json()
-  const post = data?.[0]
-  if (!post) return { notFound: true }
+  try {
+    const res = await fetch(postUrl)
 
-  const title = post.title?.rendered ?? ""
-  const excerptHtml = post.excerpt?.rendered ?? ""
-  const contentHtml = post.content?.rendered ?? ""
+    if (!res.ok) {
+      return {
+        props: {
+          debug: `FETCH_FAILED_${res.status}`,
+          postUrl,
+        },
+      }
+    }
 
-  // Prefer excerpt; fallback to first part of content
-  const descriptionRaw =
-    stripHtml(excerptHtml) || stripHtml(contentHtml).slice(0, 160)
+    const data = await res.json()
+    const post = data?.[0]
 
-  // Try to pull featured image via _embed
-  const featured =
-    post?._embedded?.["wp:featuredmedia"]?.[0]?.source_url ?? ""
+    if (!post) {
+      return {
+        props: {
+          debug: "NO_PROJECT_FOUND",
+          postUrl,
+        },
+      }
+    }
 
-  // Canonical URL (use your real domain)
-  const canonical = `https://jeevanchandimal.com/project/${post.slug}`
-
-  return {
-    props: {
-      post: {
-        id: post.id,
-        slug: post.slug,
-        title,
-        description: descriptionRaw,
-        content: contentHtml,
-        featuredImage: featured,
-        canonical,
+    return {
+      props: {
+        debug: "OK_PROJECT_FOUND",
+        slug,
+        postUrl,
+        projectId: post.id,
+        projectSlug: post.slug,
+        title: post.title?.rendered || "",
       },
-    },
+    }
+  } catch (error) {
+    return {
+      props: {
+        debug: "FETCH_EXCEPTION",
+        postUrl,
+        error: String(error),
+      },
+    }
   }
 }
 
-export default function ProjectSlugPage({ post }) {
+export default function ProjectSlugPage(props) {
   return (
     <>
       <Head>
-        <title>{stripHtml(post.title) || "Project"}</title>
-        <meta name="description" content={post.description || "Project details"} />
-        <link rel="canonical" href={post.canonical} />
-
-        {/* Open Graph */}
-        <meta property="og:type" content="article" />
-        <meta property="og:title" content={stripHtml(post.title)} />
-        <meta property="og:description" content={post.description || ""} />
-        <meta property="og:url" content={post.canonical} />
-        {post.featuredImage ? (
-          <meta property="og:image" content={post.featuredImage} />
-        ) : null}
-
-        {/* Twitter */}
-        <meta name="twitter:card" content={post.featuredImage ? "summary_large_image" : "summary"} />
-        <meta name="twitter:title" content={stripHtml(post.title)} />
-        <meta name="twitter:description" content={post.description || ""} />
-        {post.featuredImage ? (
-          <meta name="twitter:image" content={post.featuredImage} />
-        ) : null}
+        <title>Debug – Project</title>
       </Head>
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-        <h1 style={{ marginBottom: 12 }}>{stripHtml(post.title)}</h1>
-
-        {/* WordPress HTML */}
-        <div dangerouslySetInnerHTML={{ __html: post.content }} />
+        <h1>Debug Output</h1>
+        <pre
+          style={{
+            background: "#111",
+            color: "#0f0",
+            padding: 16,
+            borderRadius: 8,
+            overflowX: "auto",
+          }}
+        >
+          {JSON.stringify(props, null, 2)}
+        </pre>
       </main>
     </>
   )
