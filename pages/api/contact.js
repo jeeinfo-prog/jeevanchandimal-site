@@ -13,10 +13,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'Missing fields' })
   }
 
-  // Check environment variables
+  // Check environment variables (ONLY ONCE)
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     return res.status(500).json({
-      message: 'Email credentials not configured on server',
+      message: 'EMAIL_USER / EMAIL_PASS missing in Vercel Environment Variables',
     })
   }
 
@@ -28,14 +28,12 @@ export default async function handler(req, res) {
       secure: false, // STARTTLS
       auth: {
         user: process.env.EMAIL_USER, // info@jeevanchandimal.com
-        pass: process.env.EMAIL_PASS, // Titan email password
+        pass: process.env.EMAIL_PASS, // Titan mailbox password
       },
     })
 
-    // Verify SMTP connection
     await transporter.verify()
 
-    // Send email
     await transporter.sendMail({
       from: `"Website Contact" <${process.env.EMAIL_USER}>`,
       to: 'info@jeevanchandimal.com',
@@ -49,7 +47,7 @@ export default async function handler(req, res) {
     console.error('CONTACT EMAIL ERROR:', error)
 
     return res.status(500).json({
-      message: error.message || 'Email sending failed',
+      message: error?.message || 'Email sending failed',
     })
   }
 }
