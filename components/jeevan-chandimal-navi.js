@@ -12,12 +12,20 @@ const JeevanChandimalNavi = (props) => {
     const toggleDropdown1 = (e) => {
       // Allow clicking the link to navigate; clicking elsewhere toggles the menu
       if (e?.target?.closest && e.target.closest('a')) return
-      setDropdown1Open((v) => !v)
+      setDropdown1Open((v) => {
+        const next = !v
+        if (next) setDropdown2Open(false)
+        return next
+      })
     }
   
     const toggleDropdown2 = (e) => {
       if (e?.target?.closest && e.target.closest('a')) return
-      setDropdown2Open((v) => !v)
+      setDropdown2Open((v) => {
+        const next = !v
+        if (next) setDropdown1Open(false)
+        return next
+      })
     }
   
   return (
@@ -90,7 +98,6 @@ const JeevanChandimalNavi = (props) => {
                   >
                     <div
                       data-thq="thq-dropdown-toggle"
-                  onClick={toggleDropdown2}
                   className="jeevan-chandimal-navi-thq-dropdown-toggle-elm11"
                     >
                       <Link href="/work-film">
@@ -178,6 +185,7 @@ const JeevanChandimalNavi = (props) => {
                 <div
                   data-thq="thq-dropdown-toggle"
                   className="jeevan-chandimal-navi-thq-dropdown-toggle-elm15"
+                  onClick={toggleDropdown2}
                 >
                   <Link href="/services">
                     <a className="jeevan-chandimal-navi-link16 thq-link thq-body-small">
