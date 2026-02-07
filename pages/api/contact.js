@@ -30,12 +30,29 @@ export default async function handler(req, res) {
 
     await transporter.verify()
 
+    // 1) Send message to you (site owner)
     await transporter.sendMail({
       from: `"Website Contact" <${process.env.EMAIL_USER}>`,
       to: 'info@jeevanchandimal.com',
       replyTo: email,
       subject: `New Contact Message from ${name}`,
       text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+    })
+
+    // 2) Auto-reply to the sender
+    await transporter.sendMail({
+      from: `"Jeevan Chandimal" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: `Thanks for contacting Jeevan Chandimal`,
+      text: `Hi ${name},
+
+Thanks for reaching out to Jeevan Chandimal.
+
+I’ve received your message and will get back to you as soon as possible.
+
+— Jeevan Chandimal
+www.jeevanchandimal.com
+`,
     })
 
     return res.status(200).json({ message: 'Message sent successfully' })
