@@ -1,6 +1,6 @@
 import Head from "next/head"
 
-// Strip HTML tags for clean meta descriptions
+// Strip HTML tags for clean text
 function stripHtml(html = "") {
   return String(html)
     .replace(/<[^>]*>?/gm, " ")
@@ -14,7 +14,7 @@ export async function getServerSideProps({ params }) {
 
   if (!base || !slug) return { notFound: true }
 
-  // IMPORTANT: projects endpoint (not posts)
+  // Fetch PROJECT (not post) with embedded media
   const postUrl = `${base.replace(/\/$/, "")}/wp-json/wp/v2/projects?slug=${encodeURIComponent(
     slug
   )}&_embed=1`
@@ -32,14 +32,21 @@ export async function getServerSideProps({ params }) {
 
   const title = stripHtml(titleHtml)
 
-  // Prefer excerpt; fallback to first part of content
   const description =
     stripHtml(excerptHtml) || stripHtml(contentHtml).slice(0, 160)
 
-  // Featured image: prefer large size for performance, fallback to full
+  // Featured media
   const fm = post?._embedded?.["wp:featuredmedia"]?.[0]
-  const featuredImage =
+
+  // Image for page (fast)
+  const pageImage =
     fm?.media_details?.sizes?.large?.source_url ||
+    fm?.source_url ||
+    ""
+
+  // Image for social previews (best quality)
+  const ogImage =
+    fm?.media_details?.sizes?.full?.source_url ||
     fm?.source_url ||
     ""
 
@@ -53,7 +60,8 @@ export async function getServerSideProps({ params }) {
         title,
         description,
         content: contentHtml,
-        featuredImage,
+        pageImage,
+        ogImage,
         canonical,
       },
     },
@@ -76,32 +84,31 @@ export default function ProjectSlugPage({ post }) {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDesc} />
         <meta property="og:url" content={post.canonical} />
-        {post.featuredImage ? (
+        {post.ogImage && (
           <>
-            <meta property="og:image" content={post.featuredImage} />
-            {/* Optional hints (platforms may ignore, but helps sometimes) */}
+            <meta property="og:image" content={post.ogImage} />
             <meta property="og:image:width" content="1200" />
             <meta property="og:image:height" content="630" />
           </>
-        ) : null}
+        )}
 
         {/* Twitter */}
         <meta
           name="twitter:card"
-          content={post.featuredImage ? "summary_large_image" : "summary"}
+          content={post.ogImage ? "summary_large_image" : "summary"}
         />
         <meta name="twitter:title" content={pageTitle} />
         <meta name="twitter:description" content={pageDesc} />
-        {post.featuredImage ? (
-          <meta name="twitter:image" content={post.featuredImage} />
-        ) : null}
+        {post.ogImage && (
+          <meta name="twitter:image" content={post.ogImage} />
+        )}
       </Head>
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-        {/* Featured image on the page */}
-        {post.featuredImage ? (
+        {/* Page featured image */}
+        {post.pageImage && (
           <img
-            src={post.featuredImage}
+            src={post.pageImage}
             alt={pageTitle}
             style={{
               width: "100%",
@@ -111,11 +118,11 @@ export default function ProjectSlugPage({ post }) {
               display: "block",
             }}
           />
-        ) : null}
+        )}
 
         <h1 style={{ marginBottom: 12 }}>{pageTitle}</h1>
 
-        {/* WordPress HTML */}
+        {/* WordPress content */}
         <div dangerouslySetInnerHTML={{ __html: post.content }} />
       </main>
     </>
