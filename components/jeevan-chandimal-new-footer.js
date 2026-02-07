@@ -1,13 +1,84 @@
-import React, { Fragment } from 'react'
+import React, { Fragment, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 import PropTypes from 'prop-types'
 import { useTranslations } from 'next-intl'
 
 const JeevanChandimalNewFooter = (props) => {
-  return (
+  
+
+const footerRef = useRef(null)
+
+useEffect(() => {
+  const root = footerRef.current
+  if (!root) return
+
+  const dropdowns = Array.from(root.querySelectorAll('[data-thq="thq-dropdown"]'))
+
+  const closeAllExcept = (exceptList) => {
+    dropdowns.forEach((dd) => {
+      const list = dd.querySelector('[data-thq="thq-dropdown-list"]')
+      if (list && list !== exceptList) {
+        list.classList.remove('teleport-show')
+      }
+    })
+  }
+
+  const handlers = []
+
+  dropdowns.forEach((dd) => {
+    const list = dd.querySelector('[data-thq="thq-dropdown-list"]')
+    const arrow = dd.querySelector('[data-thq="thq-dropdown-arrow"]')
+    const toggle = dd.querySelector('[data-thq="thq-dropdown-toggle"]')
+
+    if (!list) return
+
+    const onToggle = (e) => {
+      // Allow clicking the link text to navigate; only the arrow toggles.
+      e.preventDefault()
+      e.stopPropagation()
+
+      const willOpen = !list.classList.contains('teleport-show')
+      closeAllExcept(list)
+      if (willOpen) list.classList.add('teleport-show')
+      else list.classList.remove('teleport-show')
+    }
+
+    if (arrow) {
+      arrow.style.cursor = 'pointer'
+      arrow.addEventListener('click', onToggle)
+      handlers.push(() => arrow.removeEventListener('click', onToggle))
+    } else if (toggle) {
+      // Fallback: toggle container click (but don't block link navigation)
+      const fallback = (e) => {
+        const target = e.target
+        if (target && target.closest && target.closest('a')) return
+        onToggle(e)
+      }
+      toggle.style.cursor = 'pointer'
+      toggle.addEventListener('click', fallback)
+      handlers.push(() => toggle.removeEventListener('click', fallback))
+    }
+  })
+
+  const onDocClick = (e) => {
+    // click outside closes all
+    if (!root.contains(e.target)) {
+      closeAllExcept(null)
+    }
+  }
+  document.addEventListener('click', onDocClick)
+  handlers.push(() => document.removeEventListener('click', onDocClick))
+
+  return () => {
+    handlers.forEach((fn) => fn())
+  }
+}, [])
+
+return (
     <>
       <footer
+        ref={footerRef}
         className={`jeevan-chandimal-new-footer-thq-footer4-elm thq-section-padding ${props.rootClassName} `}
       >
         <div className="jeevan-chandimal-new-footer-thq-max-width-elm thq-section-max-width">
