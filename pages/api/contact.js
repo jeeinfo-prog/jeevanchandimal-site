@@ -13,20 +13,20 @@ export default async function handler(req, res) {
 
   try {
     const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
+      host: 'smtp.titan.email',
       port: 587,
       secure: false,
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.EMAIL_USER, // info@jeevanchandimal.com
+        pass: process.env.EMAIL_PASS, // Titan email password
       },
     })
 
     await transporter.sendMail({
-      from: `"Website Contact" <${process.env.EMAIL_USER}>`,
+      from: `"Website Contact" <info@jeevanchandimal.com>`,
       to: 'info@jeevanchandimal.com',
-      subject: `New Contact Message from ${name}`,
       replyTo: email,
+      subject: `New Contact Message from ${name}`,
       text: `
 Name: ${name}
 Email: ${email}
@@ -38,7 +38,10 @@ ${message}
 
     return res.status(200).json({ message: 'Message sent successfully' })
   } catch (error) {
-    console.error(error)
-    return res.status(500).json({ message: 'Email failed' })
+    console.error('TITAN EMAIL ERROR:', error)
+
+    return res.status(500).json({
+      message: 'Email sending failed. Please try again later.',
+    })
   }
 }
