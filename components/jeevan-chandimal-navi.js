@@ -1,10 +1,25 @@
-import React, { Fragment } from 'react'
+import React, { Fragment, useState } from 'react'
 import Link from 'next/link'
 
 import PropTypes from 'prop-types'
 import { useTranslations } from 'next-intl'
 
 const JeevanChandimalNavi = (props) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const [dropdown1Open, setDropdown1Open] = useState(false)
+    const [dropdown2Open, setDropdown2Open] = useState(false)
+  
+    const toggleDropdown1 = (e) => {
+      // Allow clicking the link to navigate; clicking elsewhere toggles the menu
+      if (e?.target?.closest && e.target.closest('a')) return
+      setDropdown1Open((v) => !v)
+    }
+  
+    const toggleDropdown2 = (e) => {
+      if (e?.target?.closest && e.target.closest('a')) return
+      setDropdown2Open((v) => !v)
+    }
+  
   return (
     <>
       <header
@@ -39,6 +54,7 @@ const JeevanChandimalNavi = (props) => {
               >
                 <div
                   data-thq="thq-dropdown-toggle"
+                  onClick={toggleDropdown1}
                   className="jeevan-chandimal-navi-thq-dropdown-toggle-elm10"
                 >
                   <Link href="/work">
@@ -66,7 +82,7 @@ const JeevanChandimalNavi = (props) => {
                 </div>
                 <ul
                   data-thq="thq-dropdown-list"
-                  className="jeevan-chandimal-navi-thq-dropdown-list-elm1"
+                  className={`jeevan-chandimal-navi-thq-dropdown-list-elm1 ${dropdown1Open ? "teleport-show" : ""}`}
                 >
                   <li
                     data-thq="thq-dropdown"
@@ -74,7 +90,8 @@ const JeevanChandimalNavi = (props) => {
                   >
                     <div
                       data-thq="thq-dropdown-toggle"
-                      className="jeevan-chandimal-navi-thq-dropdown-toggle-elm11"
+                  onClick={toggleDropdown2}
+                  className="jeevan-chandimal-navi-thq-dropdown-toggle-elm11"
                     >
                       <Link href="/work-film">
                         <a className="jeevan-chandimal-navi-link12 thq-link thq-body-small">
@@ -187,7 +204,7 @@ const JeevanChandimalNavi = (props) => {
                 </div>
                 <ul
                   data-thq="thq-dropdown-list"
-                  className="jeevan-chandimal-navi-thq-dropdown-list-elm2"
+                  className={`jeevan-chandimal-navi-thq-dropdown-list-elm2 ${dropdown2Open ? "teleport-show" : ""}`}
                 >
                   <li
                     data-thq="thq-dropdown"
@@ -362,6 +379,7 @@ const JeevanChandimalNavi = (props) => {
           </div>
           <div
             data-thq="thq-burger-menu"
+            onClick={() => setMobileMenuOpen(true)}
             className="jeevan-chandimal-navi-thq-burger-menu-elm"
           >
             <svg
@@ -373,7 +391,7 @@ const JeevanChandimalNavi = (props) => {
           </div>
           <div
             data-thq="thq-mobile-menu"
-            className="jeevan-chandimal-navi-thq-mobile-menu-elm"
+            className={`jeevan-chandimal-navi-thq-mobile-menu-elm ${mobileMenuOpen ? "teleport-show" : ""}`}
           >
             <div className="jeevan-chandimal-navi-thq-nav-elm">
               <div className="jeevan-chandimal-navi-thq-top-elm">
@@ -384,6 +402,7 @@ const JeevanChandimalNavi = (props) => {
                 />
                 <div
                   data-thq="thq-close-menu"
+                  onClick={() => setMobileMenuOpen(false)}
                   className="jeevan-chandimal-navi-thq-close-menu-elm"
                 >
                   <svg
