@@ -752,3 +752,47 @@ svg {
   fill: #F5F4F4 !important;
   stroke: #F5F4F4 !important;
 }
+/* =====================================================
+   PERMANENT DARK THEME LOCK (WP + TeleportHQ safe)
+   ===================================================== */
+
+/* 1) Force base page colors */
+html, body {
+  background: #222222 !important;
+  color: #F5F4F4 !important;
+}
+
+/* 2) Force common text elements to inherit the light text */
+body, p, span, div, li, label, small, strong, em, b, i, h1, h2, h3, h4, h5, h6 {
+  color: inherit;
+}
+
+/* 3) Links */
+a, a:visited {
+  color: inherit;
+}
+
+/* 4) Kill unwanted white backgrounds from WP blocks/components */
+section, main, header, footer,
+.wp-block, .wp-block-group, .wp-site-blocks,
+[class*="wp-"], [class*="woocommerce"] {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+/* 5) Form fields - match dark theme */
+input, textarea, select {
+  background-color: #222222 !important;
+  color: #F5F4F4 !important;
+  border-color: #F5F4F4 !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgba(245, 244, 244, 0.65) !important;
+}
+
+/* 6) SVG icons (FAQ +/-, menu icons, etc.) */
+.faq svg, .accordion svg, [data-faq] svg, nav svg, button svg {
+  fill: #F5F4F4 !important;
+  stroke: #F5F4F4 !important;
+}
