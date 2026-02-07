@@ -628,3 +628,109 @@
     grid-template-columns: 1fr;
   }
 }
+/* =====================================================
+   FORCE DARK THEME (WP SAFE OVERRIDE)
+   ===================================================== */
+
+html,
+body {
+  background-color: #222222 !important;
+  color: #F5F4F4 !important;
+}
+
+/* Ensure text inherits correctly */
+p, span, div, li, label {
+  color: inherit;
+}
+
+/* =====================================================
+   NAVIGATION & DROPDOWN FIX (TeleportHQ + WP)
+   ===================================================== */
+
+header,
+nav,
+.navbar,
+.thq-navbar,
+.thq-menu {
+  overflow: visible !important;
+}
+
+/* Parent items */
+.dropdown,
+.menu-item,
+.thq-dropdown {
+  position: relative;
+}
+
+/* Dropdown menus */
+.dropdown-menu,
+.submenu,
+.thq-dropdown-content {
+  position: absolute !important;
+  z-index: 9999 !important;
+  background-color: #222222 !important;
+  color: #F5F4F4 !important;
+}
+
+/* =====================================================
+   WORDPRESS CONTENT NORMALIZATION
+   ===================================================== */
+
+.wp-block,
+.wp-block-group,
+.wp-site-blocks {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+/* =====================================================
+   LINK SAFETY
+   ===================================================== */
+
+a,
+a:visited {
+  color: inherit;
+}
+/* =====================================================
+   DROPDOWN: FORCE SHOW ON HOVER / FOCUS (NO JS NEEDED)
+   ===================================================== */
+
+/* Ensure dropdown containers can overlay */
+header, nav, .navbar, .thq-navbar, .thq-menu {
+  overflow: visible !important;
+}
+
+/* Default hidden dropdowns */
+.dropdown-menu,
+.dropdown-content,
+.submenu,
+.thq-dropdown-content,
+nav ul ul {
+  display: none;
+}
+
+/* Show on hover (desktop) */
+.dropdown:hover .dropdown-menu,
+.dropdown:hover .dropdown-content,
+.menu-item:hover .submenu,
+nav li:hover > ul {
+  display: block !important;
+}
+
+/* Show on keyboard focus (accessibility + some mobile) */
+.dropdown:focus-within .dropdown-menu,
+.dropdown:focus-within .dropdown-content,
+.menu-item:focus-within .submenu,
+nav li:focus-within > ul {
+  display: block !important;
+}
+
+/* Keep dropdown above everything */
+.dropdown-menu,
+.dropdown-content,
+.submenu,
+.thq-dropdown-content,
+nav ul ul {
+  position: absolute !important;
+  z-index: 99999 !important;
+}
