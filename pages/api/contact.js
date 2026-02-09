@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer'
+import fs from 'fs'
+import path from 'path'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,12 +20,24 @@ export default async function handler(req, res) {
   }
 
   const ownerEmail = 'info@jeevanchandimal.com'
-  const fromEmail = process.env.EMAIL_USER // should be info@jeevanchandimal.com
-  const logoUrl = 'https://www.jeevanchandimal.com/jclogo05.png'
+  const fromEmail = process.env.EMAIL_USER
 
-  const safeName = (name || '').trim() || 'there'
-  const safeEmail = (email || '').trim()
-  const safeMessage = (message || '').trim()
+  const safeName = String(name || '').trim() || 'there'
+  const safeEmail = String(email || '').trim()
+  const safeMessage = String(message || '').trim()
+
+  // ✅ Inline logo (CID) — best compatibility
+  // Put your logo here: /public/JC/jclogo05.png
+  const logoPublicPath = path.join(process.cwd(), 'public', 'JC', 'jclogo05.png')
+
+  let logoAttachment = null
+  if (fs.existsSync(logoPublicPath)) {
+    logoAttachment = {
+      filename: 'jclogo05.png',
+      content: fs.readFileSync(logoPublicPath),
+      cid: 'jc-logo', // used in HTML: src="cid:jc-logo"
+    }
+  }
 
   try {
     const transporter = nodemailer.createTransport({
@@ -33,6 +47,10 @@ export default async function handler(req, res) {
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
+      },
+      // (Optional but helps some SMTP setups)
+      tls: {
+        rejectUnauthorized: false,
       },
     })
 
@@ -58,7 +76,7 @@ export default async function handler(req, res) {
       `,
     })
 
-    // 2) Auto-reply to sender (HTML + logo)
+    // 2) Auto-reply to sender (HTML + inline logo)
     const autoReplySubject = 'Thanks for contacting Jeevan Chandimal'
     const autoReplyText = `Hi ${safeName},
 
@@ -67,8 +85,12 @@ Thanks for reaching out to Jeevan Chandimal.
 I’ve received your message and will get back to you as soon as possible.
 
 — Jeevan Chandimal
-www.jeevanchandimal.com
+https://www.jeevanchandimal.com
 `
+
+    const logoImgHtml = logoAttachment
+      ? `<img src="cid:jc-logo" alt="Jeevan Chandimal" width="140" style="display:inline-block; max-width:140px; height:auto;" />`
+      : `<div style="color:#F5F4F4; font-family: Arial, Helvetica, sans-serif; font-size:18px; font-weight:bold;">Jeevan Chandimal</div>`
 
     const autoReplyHtml = `
       <div style="margin:0; padding:0; background:#222222;">
@@ -76,12 +98,7 @@ www.jeevanchandimal.com
           <div style="background:#1b1b1b; border:1px solid rgba(245,244,244,0.12); border-radius:16px; padding:22px;">
 
             <div style="text-align:center; margin-bottom:18px;">
-              <img
-                src="${logoUrl}"
-                alt="Jeevan Chandimal"
-                width="140"
-                style="display:inline-block; max-width:140px; height:auto;"
-              />
+              ${logoImgHtml}
             </div>
 
             <h2 style="margin:0 0 10px; color:#F5F4F4; font-family: Arial, Helvetica, sans-serif; font-size:22px;">
@@ -123,6 +140,7 @@ www.jeevanchandimal.com
       subject: autoReplySubject,
       text: autoReplyText,
       html: autoReplyHtml,
+      attachments: logoAttachment ? [logoAttachment] : [],
     })
 
     return res.status(200).json({ message: 'Message sent successfully' })
