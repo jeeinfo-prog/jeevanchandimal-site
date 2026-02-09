@@ -35,12 +35,8 @@ class CustomDocument extends Document {
 
           {/* ✅ FIXED FAVICON (no spaces) */}
           {/* Make sure this file exists in /public/JC/jclogo05.png */}
-          <link
-            rel="icon"
-            href="/JC/jclogo05.png"
-            type="image/png"
-            sizes="32x32"
-          />
+          <link rel="icon" href="/favicon.ico" />
+
 
           {/* TeleportHQ styles */}
           <link
