@@ -33,10 +33,11 @@ class CustomDocument extends Document {
             href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,700;1,400&display=swap"
           />
 
-          {/* Favicon */}
+          {/* ✅ FIXED FAVICON (no spaces) */}
+          {/* Make sure this file exists in /public/JC/jclogo05.png */}
           <link
-            rel="shortcut icon"
-            href="/jc logo web 05.png"
+            rel="icon"
+            href="/JC/jclogo05.png"
             type="image/png"
             sizes="32x32"
           />
