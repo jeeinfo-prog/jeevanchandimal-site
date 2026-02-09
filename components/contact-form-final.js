@@ -3,6 +3,9 @@ import PropTypes from 'prop-types'
 import { useTranslations } from 'next-intl'
 
 const ContactFormFinal = (props) => {
+  // ✅ Time-trap: record when the form was first shown
+  const [formStartTs] = React.useState(() => Date.now())
+
   return (
     <>
       <div className="contact-form-final-thq-contact9-elm thq-section-padding">
@@ -53,16 +56,22 @@ const ContactFormFinal = (props) => {
               </div>
             </div>
 
-            {/* ✅ FORM – FIXED */}
+            {/* ✅ FORM – with lightweight spam protection fields */}
             <form
               className="contact-form-form"
               onSubmit={async (e) => {
                 e.preventDefault()
 
+                const form = e.target
+
                 const data = {
-                  name: e.target['contact-form-3-name']?.value || '',
-                  email: e.target['contact-form-3-email']?.value || '',
-                  message: e.target['contact-form-3-message']?.value || '',
+                  name: form['contact-form-3-name']?.value || '',
+                  email: form['contact-form-3-email']?.value || '',
+                  message: form['contact-form-3-message']?.value || '',
+
+                  // ✅ anti-spam fields (API checks these)
+                  company: form['company']?.value || '',
+                  formStartTs,
                 }
 
                 const res = await fetch('/api/contact', {
@@ -73,12 +82,24 @@ const ContactFormFinal = (props) => {
 
                 if (res.ok) {
                   alert('Message sent successfully!')
-                  e.target.reset()
+                  form.reset()
+                  // NOTE: we do not reset formStartTs on purpose (time trap)
                 } else {
-                  alert('Something went wrong. Please try again.')
+                  const err = await res.json().catch(() => null)
+                  alert(err?.message || 'Something went wrong. Please try again.')
                 }
               }}
             >
+              {/* ✅ Honeypot (hidden) – bots fill this, humans never see it */}
+              <input
+                type="text"
+                name="company"
+                tabIndex="-1"
+                autoComplete="off"
+                aria-hidden="true"
+                className="contact-form-final-honeypot"
+              />
+
               <div className="contact-form-final-thq-input-elm1">
                 <label htmlFor="contact-form-3-name" className="thq-body-small">
                   Name
@@ -150,9 +171,7 @@ const ContactFormFinal = (props) => {
                 <span className="thq-body-small">
                   {props.action ?? (
                     <Fragment>
-                      <span className="contact-form-final-text3">
-                        Submit
-                      </span>
+                      <span className="contact-form-final-text3">Submit</span>
                     </Fragment>
                   )}
                 </span>
@@ -162,7 +181,6 @@ const ContactFormFinal = (props) => {
         </div>
       </div>
 
-      {/* styles unchanged */}
       <style jsx>{`
         .contact-form-final-thq-contact9-elm {
           display: flex;
@@ -208,6 +226,19 @@ const ContactFormFinal = (props) => {
         .contact-form-final-thq-button-elm {
           align-self: flex-start;
         }
+
+        /* ✅ Honeypot hidden safely */
+        .contact-form-final-honeypot {
+          position: absolute;
+          left: -5000px;
+          top: auto;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          opacity: 0;
+          pointer-events: none;
+        }
+
         @media (max-width: 991px) {
           .contact-form-final-thq-max-width-elm {
             flex-direction: column;
