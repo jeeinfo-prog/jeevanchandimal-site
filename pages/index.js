@@ -1,7 +1,6 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
 
-import { useTranslations } from 'next-intl'
 
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import HomePageHero from '../components/home-page-hero'
