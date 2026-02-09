@@ -2,18 +2,29 @@ import '../styles/style.css'
 
 import { GlobalProvider } from '../global-context'
 import { NextIntlProvider } from 'next-intl'
+import { useRouter } from 'next/router'
 
-// ✅ REAL components that exist
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 export default function MyApp({ Component, pageProps }) {
+  const router = useRouter()
+
+  const LEGAL_ROUTES = ['/privacy-policy', '/terms-and-conditions', '/cookies-policy']
+  const isLegalPage = LEGAL_ROUTES.includes(router.pathname)
+
   return (
     <NextIntlProvider messages={pageProps?.messages}>
       <GlobalProvider>
-        <JeevanChandimalNavi />
-        <Component {...pageProps} />
-        <JeevanChandimalNewFooter />
+        {isLegalPage ? (
+          <>
+            <JeevanChandimalNavi />
+            <Component {...pageProps} />
+            <JeevanChandimalNewFooter />
+          </>
+        ) : (
+          <Component {...pageProps} />
+        )}
       </GlobalProvider>
     </NextIntlProvider>
   )
