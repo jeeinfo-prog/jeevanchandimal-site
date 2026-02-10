@@ -2,7 +2,6 @@
 
 import React from "react";
 import Head from "next/head";
-import Link from "next/link";
 import { useRouter } from "next/router";
 
 import JeevanChandimalNavi from "../../components/jeevan-chandimal-navi";
@@ -14,7 +13,6 @@ export default function StoreReturn() {
     typeof router.query.order_id === "string" ? router.query.order_id : "";
 
   const [status, setStatus] = React.useState("PENDING");
-  const [order, setOrder] = React.useState(null);
   const [msg, setMsg] = React.useState("");
 
   React.useEffect(() => {
@@ -39,22 +37,28 @@ export default function StoreReturn() {
           if (r.status === 404) {
             if (!cancelled) {
               setStatus("NOT_FOUND");
-              setMsg("Order not found. Please refresh or contact support.");
+              setMsg("Order not found.");
             }
             return;
           }
-          throw new Error("Failed to fetch order");
+          throw new Error("Order lookup failed");
         }
 
         const data = await r.json();
         if (cancelled) return;
 
-        setOrder(data);
         setStatus(data.status || "PENDING");
 
-        // Stop polling once final
+        // ✅ AUTO REDIRECT WHEN PAID
+        if (data.status === "PAID") {
+          router.replace(
+            `/store/download?order_id=${encodeURIComponent(orderId)}`
+          );
+          return;
+        }
+
+        // Stop polling on final failure states
         if (
-          data.status === "PAID" ||
           data.status === "FAILED" ||
           data.status === "CANCELED"
         ) {
@@ -63,7 +67,7 @@ export default function StoreReturn() {
       } catch (e) {
         if (!cancelled) {
           setStatus("ERROR");
-          setMsg("Something went wrong while checking payment.");
+          setMsg("Something went wrong while confirming payment.");
         }
         return;
       }
@@ -71,7 +75,7 @@ export default function StoreReturn() {
       if (!cancelled && tries < maxTries) {
         setTimeout(poll, 2000);
       } else if (!cancelled) {
-        setMsg("Still waiting for payment confirmation. You may refresh.");
+        setMsg("Still waiting for confirmation. You may refresh.");
       }
     }
 
@@ -79,12 +83,12 @@ export default function StoreReturn() {
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, router]);
 
   return (
     <>
       <Head>
-        <title>Payment Status | Store</title>
+        <title>Confirming Payment | Store</title>
         <meta name="robots" content="noindex,nofollow" />
       </Head>
 
@@ -92,15 +96,10 @@ export default function StoreReturn() {
 
       <main className="wrap">
         <div className="card">
-          <h1 className="title">Payment Status</h1>
+          <h1 className="title">Confirming payment</h1>
 
           {!orderId && (
-            <p className="p">
-              Missing order ID. Go back to the{" "}
-              <Link href="/store">
-                <a className="link">store</a>
-              </Link>.
-            </p>
+            <p className="p">Missing order ID.</p>
           )}
 
           {orderId && (
@@ -110,76 +109,40 @@ export default function StoreReturn() {
               </p>
 
               {status === "PENDING" && (
-                <div className="state">
-                  <span className="badge pending">Pending…</span>
+                <>
+                  <div className="badge pending">Processing…</div>
                   <p className="p2">
-                    Waiting for PayHere confirmation. This usually takes a few
-                    seconds.
+                    Please wait while we confirm your payment.
                   </p>
-                  {msg && <p className="p2 warn">{msg}</p>}
-                </div>
-              )}
-
-              {status === "PAID" && (
-                <div className="state">
-                  <span className="badge paid">Payment confirmed ✅</span>
-                  <p className="p2">Your download is ready.</p>
-
-                  <Link
-                    href={`/store/download?order_id=${encodeURIComponent(
-                      orderId
-                    )}`}
-                  >
-                    <a className="btn">Download file</a>
-                  </Link>
-
-                  <p className="p2 fine">
-                    The download link will expire for security. You can generate
-                    a new one if needed.
-                  </p>
-                </div>
+                </>
               )}
 
               {status === "FAILED" && (
-                <div className="state">
-                  <span className="badge fail">Payment failed</span>
-                  <p className="p2">
-                    The payment was not successful. Please try again.
-                  </p>
-                  <Link href="/store">
-                    <a className="link">Back to store</a>
-                  </Link>
-                </div>
+                <>
+                  <div className="badge fail">Payment failed</div>
+                  <p className="p2">Please try again.</p>
+                </>
               )}
 
               {status === "CANCELED" && (
-                <div className="state">
-                  <span className="badge cancel">Payment canceled</span>
+                <>
+                  <div className="badge cancel">Payment canceled</div>
                   <p className="p2">You canceled the payment.</p>
-                  <Link href="/store">
-                    <a className="link">Back to store</a>
-                  </Link>
-                </div>
+                </>
               )}
 
               {status === "NOT_FOUND" && (
-                <div className="state">
-                  <span className="badge cancel">Order not found</span>
+                <>
+                  <div className="badge cancel">Order not found</div>
                   <p className="p2">{msg}</p>
-                  <Link href="/store">
-                    <a className="link">Back to store</a>
-                  </Link>
-                </div>
+                </>
               )}
 
               {status === "ERROR" && (
-                <div className="state">
-                  <span className="badge cancel">Error</span>
+                <>
+                  <div className="badge cancel">Error</div>
                   <p className="p2">{msg}</p>
-                  <Link href="/store">
-                    <a className="link">Back to store</a>
-                  </Link>
-                </div>
+                </>
               )}
             </>
           )}
@@ -219,54 +182,17 @@ export default function StoreReturn() {
             "Liberation Mono", "Courier New", monospace;
           font-size: 13px;
         }
-        .state {
-          margin-top: 16px;
-          padding-top: 14px;
-          border-top: 1px solid rgba(245, 244, 244, 0.12);
-        }
         .badge {
           display: inline-block;
+          margin-top: 12px;
           padding: 6px 12px;
           border-radius: 999px;
           font-size: 12px;
           border: 1px solid rgba(245, 244, 244, 0.18);
         }
-        .pending {
-          opacity: 0.9;
-        }
-        .paid {
-          opacity: 0.95;
-        }
-        .fail {
-          opacity: 0.95;
-        }
-        .cancel {
-          opacity: 0.95;
-        }
-        .btn {
-          display: inline-block;
-          margin-top: 14px;
-          padding: 12px 16px;
-          border-radius: 999px;
-          background: #f5f4f4;
-          color: #222222;
-          font-weight: 700;
-          text-decoration: none;
-        }
-        .btn:hover {
-          opacity: 0.95;
-        }
-        .link {
-          text-decoration: underline;
-          text-underline-offset: 3px;
-        }
-        .warn {
-          opacity: 0.85;
-        }
-        .fine {
-          opacity: 0.7;
-          font-size: 12px;
-        }
+        .pending { opacity: 0.9; }
+        .fail { opacity: 0.95; }
+        .cancel { opacity: 0.95; }
       `}</style>
     </>
   );
