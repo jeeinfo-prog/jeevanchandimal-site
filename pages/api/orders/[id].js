@@ -1,6 +1,6 @@
 // pages/api/orders/[id].js
 
-import { supabaseAdmin } from "../../../lib/supabase-admin";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
 
 export default async function handler(req, res) {
   // HARD no-cache (Vercel/CDN/browser)

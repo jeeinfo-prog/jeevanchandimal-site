@@ -1,6 +1,6 @@
 // pages/api/download/file.js
 
-import { supabaseAdmin } from "../../../lib/supabase-admin";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
 import { verifyDownloadToken } from "../../../lib/download-token";
 import { getPhotoById } from "../../../lib/photos";
 

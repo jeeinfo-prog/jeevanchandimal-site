@@ -1,6 +1,6 @@
 // pages/api/payhere/create-checkout.js
 
-import { supabaseAdmin } from "../../../lib/supabase-admin";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
 import { payhereInitHash } from "../../../lib/payhere";
 import { getPhotoById } from "../../../lib/photos";
 

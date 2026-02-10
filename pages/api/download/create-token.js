@@ -1,6 +1,6 @@
 // pages/api/download/create-token.js
 
-import { supabaseAdmin } from "../../../lib/supabase-admin";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
 import { signDownloadToken } from "../../../lib/download-token";
 
 export default async function handler(req, res) {
