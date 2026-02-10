@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       country = "Sri Lanka",
     } = req.body || {};
 
-    // Basic validation
+    // Validate request
     if (!photoId || !license || !format || !currency) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -65,10 +65,10 @@ export default async function handler(req, res) {
     const merchantId = process.env.PAYHERE_MERCHANT_ID;
     const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
 
-    // User-facing base URL (return/cancel)
+    // Where users are redirected after payment
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
-    // Webhook base URL (notify) - use Vercel domain to avoid redirects
+    // Where PayHere webhook posts (use .vercel.app to avoid redirects)
     const webhookBase = process.env.WEBHOOK_BASE_URL || siteUrl;
 
     const sandbox = String(process.env.PAYHERE_SANDBOX || "false") === "true";
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Create order
+    // Create order in Supabase
     const orderId = uid();
 
     const { error: insertError } = await supabaseAdmin.from("orders").insert({
@@ -104,7 +104,7 @@ export default async function handler(req, res) {
       ? "https://sandbox.payhere.lk/pay/checkout"
       : "https://www.payhere.lk/pay/checkout";
 
-    // Hash for checkout
+    // Hash for PayHere init
     const hash = payhereInitHash({
       merchantId,
       merchantSecret,
@@ -113,15 +113,15 @@ export default async function handler(req, res) {
       currency,
     });
 
-    // Form fields PayHere expects
+    // PayHere form fields
     const fields = {
       merchant_id: merchantId,
 
-      // User returns to your real site:
+      // Redirect user back to your website
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
 
-      // PayHere webhook posts to vercel.app (no redirects):
+      // PayHere server-to-server webhook (no redirects)
       notify_url: `${webhookBase}/api/payhere/notify`,
 
       first_name: firstName,
@@ -138,6 +138,7 @@ export default async function handler(req, res) {
       amount: Number(amount).toFixed(2),
       hash,
 
+      // Optional debug / metadata
       custom_1: String(photoId),
       custom_2: `${license}:${format}`,
     };
