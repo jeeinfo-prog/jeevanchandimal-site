@@ -12,6 +12,7 @@
   "author": "TeleportHQ",
   "license": "MIT",
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "@teleporthq/react-components": "latest",
     "dangerous-html": "0.1.13",
     "jsonwebtoken": "^9.0.3",
