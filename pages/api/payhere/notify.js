@@ -1,105 +1,110 @@
-// pages/api/payhere/notify.js
+import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
+import { sendDownloadEmail } from "../../../lib/email";
 
-import { payhereVerifyMd5Sig } from "../../../lib/payhere";
-import { supabaseAdmin } from "../../../lib/supabase-admin";
-
-export const config = {
-  api: { bodyParser: false }, // PayHere sends x-www-form-urlencoded
-};
-
-function parseFormUrlEncoded(raw) {
-  const s = raw.toString("utf8");
-  const obj = {};
-  for (const pair of s.split("&")) {
-    const [k, v] = pair.split("=");
-    if (!k) continue;
-    obj[decodeURIComponent(k)] = decodeURIComponent((v || "").replace(/\+/g, " "));
-  }
-  return obj;
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
-  // PayHere will POST here. We return OK for GET too (browser checks).
-  if (req.method !== "POST") return res.status(200).send("OK");
+  // PayHere may call with GET or POST
+  const data = req.method === "POST" ? req.body : req.query;
 
   try {
-    // Read raw body
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const body = parseFormUrlEncoded(Buffer.concat(chunks));
+    const {
+      order_id,
+      payment_id,
+      status_code,
+      status_message,
+      md5sig,
+      merchant_id,
+      payhere_amount,
+      payhere_currency,
+    } = data;
 
-    // Quick log (optional but useful)
-    console.log("PAYHERE_NOTIFY_HIT", {
-      order_id: body.order_id,
-      status_code: body.status_code,
-      status_message: body.status_message,
-      payment_id: body.payment_id,
-      payhere_amount: body.payhere_amount,
-      payhere_currency: body.payhere_currency,
-    });
-
-    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
-    if (!merchantSecret) return res.status(500).send("Missing merchant secret");
-
-    // Verify signature (md5sig)
-    const ok = payhereVerifyMd5Sig({
-      merchantSecret,
-      merchant_id: body.merchant_id,
-      order_id: body.order_id,
-      payhere_amount: body.payhere_amount,
-      payhere_currency: body.payhere_currency,
-      status_code: body.status_code,
-      md5sig: body.md5sig,
-    });
-
-    console.log("PAYHERE_NOTIFY_SIG_OK?", ok, "order_id:", body.order_id);
-
-    if (!ok) {
-      console.error("PayHere notify: invalid signature", body.order_id);
-      return res.status(400).send("Invalid signature");
+    if (!order_id) {
+      return res.status(200).json({ ok: true });
     }
 
-    const orderId = String(body.order_id || "");
-    if (!orderId) return res.status(400).send("Missing order_id");
-
-    const statusCode = Number(body.status_code);
-
-    // Map PayHere status codes
-    // 2 = success
-    // -1 = canceled
-    // -2 = failed
-    // -3 = reversed/charged back (treat as failed)
-    let status = "PENDING";
-    if (statusCode === 2) status = "PAID";
-    else if (statusCode === -1) status = "CANCELED";
-    else if (statusCode === -2 || statusCode === -3) status = "FAILED";
-
-    const updatePayload = {
-      status,
-      payhere_payment_id: body.payment_id || null,
-      payhere_status_code: statusCode,
-      payhere_status_message: body.status_message || null,
-    };
-
-    if (status === "PAID") {
-      updatePayload.paid_at = new Date().toISOString();
-    }
-
-    const { error } = await supabaseAdmin
+    // Fetch order
+    const { data: order, error } = await supabase
       .from("orders")
-      .update(updatePayload)
-      .eq("id", orderId);
+      .select("*")
+      .eq("id", order_id)
+      .single();
 
-    if (error) {
-      console.error("Supabase update error (notify):", error, orderId);
-      // Respond OK so PayHere doesn't keep retrying forever
-      return res.status(200).send("OK");
+    if (error || !order) {
+      console.error("Order not found:", order_id);
+      return res.status(200).json({ ok: true });
     }
 
-    return res.status(200).send("OK");
-  } catch (e) {
-    console.error("notify.js error:", e);
-    // Respond OK to avoid repeated retries; log for debugging
-    return res.status(200).send("OK");
+    // Verify signature (PayHere security)
+    if (process.env.PAYHERE_MERCHANT_SECRET) {
+      const secret = process.env.PAYHERE_MERCHANT_SECRET;
+      const localSig = crypto
+        .createHash("md5")
+        .update(
+          merchant_id +
+            order_id +
+            payhere_amount +
+            payhere_currency +
+            status_code +
+            secret
+        )
+        .digest("hex")
+        .toUpperCase();
+
+      if (md5sig && md5sig !== localSig) {
+        console.error("MD5 signature mismatch");
+        return res.status(200).json({ ok: true });
+      }
+    }
+
+    // ✅ PAYMENT SUCCESS
+    if (Number(status_code) === 2 && order.status !== "PAID") {
+      await supabase
+        .from("orders")
+        .update({
+          status: "PAID",
+          paid_at: new Date().toISOString(),
+          payhere_payment_id: payment_id,
+          payhere_status_code: status_code,
+          payhere_status_message: status_message,
+        })
+        .eq("id", order_id);
+
+      // Send email (only once)
+      if (order.email) {
+        await sendDownloadEmail({
+          to: order.email,
+          orderId: order.id,
+          photoTitle: order.photo_id,
+        });
+      }
+
+      console.log("Order marked PAID:", order_id);
+    }
+
+    // ❌ PAYMENT FAILED / CANCELED
+    if (Number(status_code) < 0) {
+      await supabase
+        .from("orders")
+        .update({
+          status: "FAILED",
+          payhere_payment_id: payment_id || "0",
+          payhere_status_code: status_code,
+          payhere_status_message: status_message,
+        })
+        .eq("id", order_id);
+
+      console.log("Order marked FAILED:", order_id);
+    }
+
+    // Always respond 200 to PayHere
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error("PayHere notify error:", err);
+    return res.status(200).json({ ok: true });
   }
 }
