@@ -64,12 +64,19 @@ export default async function handler(req, res) {
     // Env vars
     const merchantId = process.env.PAYHERE_MERCHANT_ID;
     const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
+
+    // User-facing base URL (return/cancel)
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+    // Webhook base URL (notify) - use Vercel domain to avoid redirects
+    const webhookBase = process.env.WEBHOOK_BASE_URL || siteUrl;
+
     const sandbox = String(process.env.PAYHERE_SANDBOX || "false") === "true";
 
     if (!merchantId || !merchantSecret || !siteUrl) {
       return res.status(500).json({
-        error: "Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, NEXT_PUBLIC_SITE_URL)",
+        error:
+          "Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, NEXT_PUBLIC_SITE_URL)",
       });
     }
 
@@ -109,9 +116,13 @@ export default async function handler(req, res) {
     // Form fields PayHere expects
     const fields = {
       merchant_id: merchantId,
+
+      // User returns to your real site:
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
-      notify_url: `${siteUrl}/api/payhere/notify`,
+
+      // PayHere webhook posts to vercel.app (no redirects):
+      notify_url: `${webhookBase}/api/payhere/notify`,
 
       first_name: firstName,
       last_name: lastName,
@@ -127,7 +138,6 @@ export default async function handler(req, res) {
       amount: Number(amount).toFixed(2),
       hash,
 
-      // Optional custom fields (handy for debugging)
       custom_1: String(photoId),
       custom_2: `${license}:${format}`,
     };
