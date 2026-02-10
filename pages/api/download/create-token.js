@@ -1,30 +1,41 @@
 // pages/api/download/create-token.js
-import jwt from 'jsonwebtoken'
-import { getOrder } from '../../../lib/orders-memory'
 
-export default function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+import { supabaseAdmin } from "../../../lib/supabase-admin";
+import { signDownloadToken } from "../../../lib/download-token";
 
-  const { orderId } = req.body || {}
-  if (!orderId) return res.status(400).json({ error: 'Missing orderId' })
+export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
 
-  const order = getOrder(String(orderId))
-  if (!order) return res.status(404).json({ error: 'Order not found' })
-  if (order.status !== 'PAID') return res.status(403).json({ error: 'Not paid' })
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const secret = process.env.DOWNLOAD_TOKEN_SECRET
-  if (!secret) return res.status(500).json({ error: 'Missing DOWNLOAD_TOKEN_SECRET' })
+  const { orderId } = req.body || {};
+  if (!orderId) return res.status(400).json({ error: "Missing orderId" });
 
-  const token = jwt.sign(
+  const secret = process.env.DOWNLOAD_TOKEN_SECRET;
+  if (!secret) return res.status(500).json({ error: "Missing DOWNLOAD_TOKEN_SECRET" });
+
+  const { data, error } = await supabaseAdmin
+    .from("orders")
+    .select("id,status,photo_id,license,format")
+    .eq("id", String(orderId))
+    .single();
+
+  if (error || !data) return res.status(404).json({ error: "Order not found" });
+  if (data.status !== "PAID") return res.status(403).json({ error: "Order is not paid" });
+
+  const exp = Math.floor(Date.now() / 1000) + 10 * 60; // 10 minutes
+
+  const token = signDownloadToken(
     {
-      orderId: order.id,
-      photoId: order.photoId,
-      license: order.license,
-      format: order.format,
+      orderId: data.id,
+      photoId: data.photo_id,
+      license: data.license,
+      format: data.format,
+      exp,
     },
-    secret,
-    { expiresIn: '10m' }
-  )
+    secret
+  );
 
-  return res.status(200).json({ token })
+  const url = `/api/download/file?token=${encodeURIComponent(token)}`;
+  return res.status(200).json({ url, exp });
 }
