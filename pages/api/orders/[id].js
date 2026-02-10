@@ -3,13 +3,17 @@
 import { supabaseAdmin } from "../../../lib/supabase-admin";
 
 export default async function handler(req, res) {
-  res.setHeader("Cache-Control", "no-store, max-age=0");
+  // HARD no-cache (Vercel/CDN/browser)
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
 
   const { id } = req.query;
 
   const { data, error } = await supabaseAdmin
     .from("orders")
-    .select("id,status,email,currency,amount,photo_id,license,format,paid_at,payhere_payment_id")
+    .select("id,status,photo_id,license,format,currency,amount,paid_at,payhere_payment_id")
     .eq("id", String(id))
     .single();
 
@@ -17,7 +21,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     id: data.id,
-    status: data.status,
+    status: data.status, // "PAID" / "PENDING" ...
     photoId: data.photo_id,
     license: data.license,
     format: data.format,
