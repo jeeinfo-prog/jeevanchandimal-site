@@ -36,6 +36,62 @@ export default function StoreDetail() {
   const [license, setLicense] = React.useState('personal') // personal | commercial | editorial
   const [format, setFormat] = React.useState('jpg') // jpg | raw
 
+  // Optional: basic loading state for checkout click
+  const [isCheckingOut, setIsCheckingOut] = React.useState(false)
+
+  // ✅ PayHere checkout starter (replaces alert)
+  async function startCheckout() {
+    if (!photo) return
+
+    try {
+      setIsCheckingOut(true)
+
+      const r = await fetch('/api/payhere/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photoId: photo.id,
+          license,
+          format,
+          currency,
+          email: prompt('Enter email to receive receipt (optional):') || '',
+          firstName: 'Customer',
+          lastName: 'Guest',
+          phone: '0000000000',
+          address: 'N/A',
+          city: 'N/A',
+          country: 'Sri Lanka',
+        }),
+      })
+
+      const data = await r.json()
+      if (!r.ok) {
+        alert(data?.error || 'Checkout failed')
+        return
+      }
+
+      // Build an auto-submitting form to PayHere (required flow)
+      const formEl = document.createElement('form')
+      formEl.method = 'POST'
+      formEl.action = data.actionUrl
+
+      Object.entries(data.fields).forEach(([k, v]) => {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = k
+        input.value = String(v)
+        formEl.appendChild(input)
+      })
+
+      document.body.appendChild(formEl)
+      formEl.submit()
+    } catch (e) {
+      alert('Checkout error. Please try again.')
+    } finally {
+      setIsCheckingOut(false)
+    }
+  }
+
   if (!photo) {
     return (
       <>
@@ -59,7 +115,10 @@ export default function StoreDetail() {
     <>
       <Head>
         <title>{photo.title} | Store</title>
-        <meta name="description" content={`License "${photo.title}" for Personal, Commercial, or Editorial use.`} />
+        <meta
+          name="description"
+          content={`License "${photo.title}" for Personal, Commercial, or Editorial use.`}
+        />
       </Head>
 
       <JeevanChandimalNavi />
@@ -175,9 +234,11 @@ export default function StoreDetail() {
             <button
               type="button"
               className="buyBtn"
-              onClick={() => alert('Next step: connect PayHere checkout (single purchase)')}
+              onClick={startCheckout}
+              disabled={isCheckingOut}
+              aria-busy={isCheckingOut ? 'true' : 'false'}
             >
-              Buy license
+              {isCheckingOut ? 'Redirecting…' : 'Buy license'}
             </button>
 
             <p className="fine">
@@ -369,6 +430,11 @@ export default function StoreDetail() {
         .buyBtn:hover {
           transform: translateY(-1px);
           opacity: 0.95;
+        }
+        .buyBtn:disabled {
+          cursor: not-allowed;
+          opacity: 0.6;
+          transform: none;
         }
         .fine {
           margin: 12px 0 0;

@@ -14,6 +14,7 @@
   "dependencies": {
     "@teleporthq/react-components": "latest",
     "dangerous-html": "0.1.13",
+    "jsonwebtoken": "^9.0.3",
     "next": "^12.1.10",
     "next-intl": "2.10.0",
     "node-fetch": "^2.7.0",
