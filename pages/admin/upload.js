@@ -141,6 +141,7 @@ export default function AdminUploadPage() {
 
       const { photoId, objectKey, uploadUrl } = createJson
       log(`✅ create-upload OK — photoId=${photoId}`)
+      log(`Object key: ${objectKey}`)
       log(`Uploading to R2 URL: ${uploadUrl}`)
 
       // 2) PUT to R2
@@ -156,12 +157,12 @@ export default function AdminUploadPage() {
         const txt = await putResp.text().catch(() => '')
         log(`❌ R2 PUT failed: ${putResp.status} ${putResp.statusText}`)
         log(`❌ R2 response: ${txt || '(empty body)'}`)
-        throw new Error(`R2 upload failed`)
+        throw new Error('R2 upload failed')
       }
 
       log(`✅ R2 PUT OK (${putResp.status})`)
 
-      // 3) commit
+      // 3) commit (THIS PART IS THE IMPORTANT FIX)
       log('Committing…')
       const commitResp = await fetch('/api/admin/photos/commit', {
         method: 'POST',
@@ -181,15 +182,18 @@ export default function AdminUploadPage() {
       }
 
       if (!commitResp.ok) {
+        log(`❌ Commit HTTP ${commitResp.status} ${commitResp.statusText}`)
+        log(`❌ Commit response: ${commitText || '(empty body)'}`)
+
         const msg =
           commitJson?.error ||
           commitJson?.message ||
           commitText ||
           `commit failed (HTTP ${commitResp.status})`
+
         throw new Error(msg)
       }
 
-      // ✅ CHANGE: print full commit response text
       log(`✅ Commit OK — response: ${commitText}`)
     } catch (e) {
       log(`❌ Error: ${e.message}`)
