@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "postinstall": "npm rebuild sharp --verbose"
+    "start": "next start"
   },
   "author": "TeleportHQ",
   "license": "MIT",
@@ -27,6 +26,10 @@
     "react-dom": "^17.0.2",
     "resend": "^6.9.1",
     "sharp": "0.34.5"
+  },
+  "optionalDependencies": {
+    "@img/sharp-linux-x64": "0.34.5",
+    "@img/sharp-libvips-linux-x64": "0.34.5"
   },
   "engines": {
     "node": "20.x"
