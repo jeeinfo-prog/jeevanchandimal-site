@@ -21,6 +21,11 @@ async function requireAdmin(req) {
   return { ok: true, user: userData.user }
 }
 
+function sanitizeFilename(filename) {
+  // keep letters/numbers/._- only
+  return String(filename).replace(/[^\w.\-]+/g, '_')
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -28,33 +33,71 @@ export default async function handler(req, res) {
   if (!admin.ok) return res.status(admin.status).json({ error: admin.error })
 
   try {
-    const { filename, contentType } = req.body || {}
+    const body = req.body || {}
+    const filename = body.filename
+    const contentType = body.contentType
+
     if (!filename || !contentType) {
       return res.status(400).json({ error: 'filename + contentType required' })
     }
 
+    const safeName = sanitizeFilename(filename)
+
+    // 1) Create photo row (requires public.photos.status)
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .insert([{ status: 'draft' }])
       .select('id')
       .single()
 
-    if (photoErr) throw photoErr
+    if (photoErr) {
+      console.error('photos insert error:', photoErr)
+      return res.status(500).json({
+        error: 'DB error inserting into photos',
+        code: photoErr.code || null,
+        hint: photoErr.hint || null,
+        details: photoErr.details || null,
+        message: photoErr.message || null,
+      })
+    }
 
-    const safeName = String(filename).replace(/[^\w.\-]+/g, '_')
+    // 2) Create object key
     const objectKey = `photos/original/${photo.id}/${safeName}`
 
-    const uploadUrl = await getPresignedPutUrl({ key: objectKey, contentType })
+    // 3) Create presigned PUT URL (R2)
+    const uploadUrl = await getPresignedPutUrl({
+      key: objectKey,
+      contentType,
+    })
 
+    // 4) Save asset row (requires public.photo_assets.photo_id + original_key)
     const { error: assetErr } = await supabaseAdmin
       .from('photo_assets')
       .insert([{ photo_id: photo.id, original_key: objectKey }])
 
-    if (assetErr) throw assetErr
+    if (assetErr) {
+      console.error('photo_assets insert error:', assetErr)
+      return res.status(500).json({
+        error: 'DB error inserting into photo_assets',
+        code: assetErr.code || null,
+        hint: assetErr.hint || null,
+        details: assetErr.details || null,
+        message: assetErr.message || null,
+      })
+    }
 
-    return res.status(200).json({ photoId: photo.id, objectKey, uploadUrl })
+    return res.status(200).json({
+      photoId: photo.id,
+      objectKey,
+      uploadUrl,
+    })
   } catch (e) {
-    console.error(e)
-    return res.status(500).json({ error: 'Server error' })
+    console.error('create-upload fatal error:', e)
+    return res.status(500).json({
+      error: e?.message || 'Server error',
+      code: e?.code || null,
+      hint: e?.hint || null,
+      details: e?.details || null,
+    })
   }
 }
