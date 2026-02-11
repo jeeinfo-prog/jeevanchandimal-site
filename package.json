@@ -4,11 +4,10 @@
   "description": "A next project generated based on a UIDL document",
   "main": "index.js",
   "scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start"
-}
-
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
   "author": "TeleportHQ",
   "license": "MIT",
   "dependencies": {
