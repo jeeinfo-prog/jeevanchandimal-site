@@ -1,158 +1,191 @@
-import sharp from 'sharp'
-import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
-import { getObjectBuffer, putObject } from '../../../../lib/r2'
+import { createClient } from '@supabase/supabase-js'
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 
-async function requireAdmin(req) {
-  const authHeader = req.headers.authorization || ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-  if (!token) return { ok: false, status: 401, error: 'Missing token' }
-
-  const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
-  if (userErr || !userData?.user) return { ok: false, status: 401, error: 'Invalid token' }
-
-  const { data: profile, error: profErr } = await supabaseAdmin
-    .from('profiles')
-    .select('role')
-    .eq('id', userData.user.id)
-    .single()
-
-  if (profErr || !profile) return { ok: false, status: 403, error: `No profile: ${profErr?.message || ''}` }
-  if (profile.role !== 'admin') return { ok: false, status: 403, error: 'Not admin' }
-
-  return { ok: true, user: userData.user }
+export const config = {
+  api: { bodyParser: { sizeLimit: '2mb' } },
 }
 
-function safeName(name) {
-  return String(name || 'photo').replace(/[^\w.\-]+/g, '_')
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
-// Basic watermark (text) – you can upgrade later to image watermark
-async function applyWatermark(imageBuffer, text = 'jeevanchandimal.com') {
-  const img = sharp(imageBuffer)
-  const meta = await img.metadata()
+const s3 = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+})
 
-  const width = meta.width || 2000
-  const height = meta.height || 1500
-
-  const fontSize = Math.max(18, Math.floor(Math.min(width, height) * 0.02))
-  const padding = Math.floor(fontSize * 0.8)
-
-  const svg = Buffer.from(`
-    <svg width="${width}" height="${height}">
-      <style>
-        .wm {
-          font-family: Inter, Arial, sans-serif;
-          font-size: ${fontSize}px;
-          fill: rgba(255,255,255,0.55);
-        }
-      </style>
-      <text x="${width - padding}" y="${height - padding}"
-            text-anchor="end" class="wm">${text}</text>
-    </svg>
-  `)
-
-  return img
-    .composite([{ input: svg, top: 0, left: 0 }])
-    .jpeg({ quality: 82 })
-    .toBuffer()
+async function streamToBuffer(stream) {
+  return await new Promise((resolve, reject) => {
+    const chunks = []
+    stream.on('data', (chunk) => chunks.push(chunk))
+    stream.on('end', () => resolve(Buffer.concat(chunks)))
+    stream.on('error', reject)
+  })
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-
-  const admin = await requireAdmin(req)
-  if (!admin.ok) return res.status(admin.status).json({ error: admin.error })
+  // ✅ Always respond JSON for non-POST (proves route is being hit)
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
 
   try {
-    const { photoId, objectKey } = req.body || {}
-    if (!photoId || !objectKey) return res.status(400).json({ error: 'photoId + objectKey required' })
+    // ✅ Import sharp only when needed (avoids crashing before handler)
+    const sharp = (await import('sharp')).default
 
-    // 1) Fetch original from R2
-    const originalBuf = await getObjectBuffer(objectKey)
-    if (!originalBuf || !originalBuf.length) {
-      return res.status(400).json({ error: 'Original file not found in R2' })
+    const { photoId } = req.body || {}
+    if (!photoId) return res.status(400).json({ error: 'photoId required' })
+
+    // 0) Basic env sanity checks (helps debugging)
+    const requiredEnv = [
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'SUPABASE_SERVICE_ROLE_KEY',
+      'R2_ENDPOINT',
+      'R2_BUCKET',
+      'R2_ACCESS_KEY_ID',
+      'R2_SECRET_ACCESS_KEY',
+      'NEXT_PUBLIC_SITE_URL',
+    ]
+    const missing = requiredEnv.filter((k) => !process.env[k])
+    if (missing.length) {
+      return res.status(500).json({
+        error: 'Missing environment variables',
+        missing,
+      })
     }
 
-    // 2) Generate thumbnail + preview
-    const thumbBuf = await sharp(originalBuf)
-      .rotate()
-      .resize({ width: 480, withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer()
+    // 1) Fetch photo row
+    const { data: photo, error: photoErr } = await supabase
+      .from('photos')
+      .select('id, original_jpg_key, original_raw_key, status')
+      .eq('id', photoId)
+      .single()
 
-    const previewBuf = await sharp(originalBuf)
+    if (photoErr) return res.status(400).json({ error: photoErr.message })
+
+    const originalKey = photo.original_jpg_key || photo.original_raw_key
+    if (!originalKey) {
+      return res.status(400).json({ error: 'No original key found in photos row' })
+    }
+
+    // 2) Download original from R2
+    const getObj = await s3.send(
+      new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: originalKey,
+      })
+    )
+
+    if (!getObj?.Body) {
+      return res.status(500).json({ error: 'R2 GetObject returned empty Body' })
+    }
+
+    const originalBuffer = await streamToBuffer(getObj.Body)
+
+    // 3) Process with Sharp
+    // thumb: smaller, no watermark
+    const thumbBuffer = await sharp(originalBuffer)
       .rotate()
-      .resize({ width: 1600, withoutEnlargement: true })
+      .resize({ width: 600, withoutEnlargement: true })
       .jpeg({ quality: 82 })
       .toBuffer()
 
-    // 3) Watermarked image (for customer preview)
-    const watermarkedBuf = await applyWatermark(previewBuf, 'jeevanchandimal.com')
+    // preview: larger + watermark
+    const watermarkSvg = Buffer.from(`
+      <svg width="800" height="140" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.35"/>
+          </filter>
+        </defs>
+        <rect x="0" y="0" width="800" height="140" fill="none"/>
+        <text x="50%" y="55%"
+              font-family="Arial, Helvetica, sans-serif"
+              font-size="64"
+              fill="white"
+              text-anchor="middle"
+              filter="url(#shadow)"
+              opacity="0.42">
+          jeevanchandimal.com
+        </text>
+      </svg>
+    `)
 
-    const baseName = safeName(objectKey.split('/').pop())
-    const thumbKey = `photos/thumb/${photoId}/${baseName}.jpg`
-    const previewKey = `photos/preview/${photoId}/${baseName}.jpg`
-    const wmKey = `photos/watermark/${photoId}/${baseName}.jpg`
+    const previewBase = sharp(originalBuffer)
+      .rotate()
+      .resize({ width: 2000, withoutEnlargement: true })
 
-    // 4) Upload generated files to R2
-    await putObject(thumbKey, thumbBuf, 'image/jpeg')
-    await putObject(previewKey, previewBuf, 'image/jpeg')
-    await putObject(wmKey, watermarkedBuf, 'image/jpeg')
+    const previewMeta = await previewBase.metadata()
 
-    // 5) Update DB (photos + photo_assets)
-    // photos table columns in your screenshot:
-    // - original_jpg_key, preview_url, thumb_url, status, title...
-    const { error: photosErr } = await supabaseAdmin
+    const previewBuffer = await previewBase
+      .composite([{ input: watermarkSvg, gravity: 'south' }])
+      .jpeg({ quality: 84 })
+      .toBuffer()
+
+    // 4) Upload processed images back to R2
+    const previewKey = `photos/preview/${photoId}.jpg`
+    const thumbKey = `photos/thumb/${photoId}.jpg`
+
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: previewKey,
+        Body: previewBuffer,
+        ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000, immutable',
+      })
+    )
+
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: thumbKey,
+        Body: thumbBuffer,
+        ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000, immutable',
+      })
+    )
+
+    // 5) Update DB
+    const base = process.env.NEXT_PUBLIC_SITE_URL
+    const previewUrl = `${base}/api/photo/${photoId}/preview`
+    const thumbUrl = `${base}/api/photo/${photoId}/thumb`
+
+    const { error: updateErr } = await supabase
       .from('photos')
       .update({
-        original_jpg_key: objectKey,
-        preview_url: previewKey,
-        thumb_url: thumbKey,
+        preview_url: previewUrl,
+        thumb_url: thumbUrl,
         status: 'published',
       })
       .eq('id', photoId)
 
-    if (photosErr) {
-      return res.status(500).json({
-        error: 'DB error updating photos',
-        details: photosErr,
-      })
-    }
-
-    const { error: assetsErr } = await supabaseAdmin
-      .from('photo_assets')
-      .upsert(
-        {
-          photo_id: photoId,
-          original_key: objectKey,
-          preview_key: previewKey,
-          thumb_key: thumbKey,
-          watermark_key: wmKey,
-        },
-        { onConflict: 'photo_id' }
-      )
-
-    if (assetsErr) {
-      return res.status(500).json({
-        error: 'DB error updating photo_assets',
-        details: assetsErr,
-      })
-    }
+    if (updateErr) return res.status(400).json({ error: updateErr.message })
 
     return res.status(200).json({
       ok: true,
       photoId,
-      objectKey,
-      thumbKey,
+      originalKey,
       previewKey,
-      watermarkKey: wmKey,
+      thumbKey,
+      meta: { width: previewMeta.width, height: previewMeta.height },
     })
-  } catch (e) {
-    console.error('COMMIT_ERROR', e)
+  } catch (err) {
+    console.error('commit error:', {
+      name: err?.name,
+      message: err?.message,
+      stack: err?.stack,
+      cause: err?.cause,
+    })
+
     return res.status(500).json({
       error: 'Commit failed',
-      message: e?.message || String(e),
-      stack: e?.stack || null,
+      detail: err?.message || String(err),
     })
   }
 }
