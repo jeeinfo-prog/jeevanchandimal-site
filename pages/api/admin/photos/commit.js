@@ -1,27 +1,17 @@
+// pages/api/admin/photos/commit.js
+
 import { createClient } from '@supabase/supabase-js'
-import {
-  S3Client,
-  GetObjectCommand,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3'
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
-const s3 = new S3Client({
-  region: 'auto',
-  endpoint: process.env.R2_ENDPOINT,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-  },
-})
+function must(name) {
+  const v = process.env[name]
+  if (!v) throw new Error(`Missing env: ${name}`)
+  return v
+}
 
 async function streamToBuffer(stream) {
   return await new Promise((resolve, reject) => {
@@ -32,20 +22,36 @@ async function streamToBuffer(stream) {
   })
 }
 
+function makeWatermarkSvg({ w, h, text, fontSize, opacity, align = 'center' }) {
+  const x = align === 'right' ? '96%' : align === 'left' ? '4%' : '50%'
+  const anchor = align === 'right' ? 'end' : align === 'left' ? 'start' : 'middle'
+  const y = '92%'
+
+  return Buffer.from(
+    `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        .wm {
+          fill: white;
+          opacity: ${opacity};
+          font-family: Arial, sans-serif;
+          font-weight: 700;
+          letter-spacing: 1px;
+        }
+      </style>
+      <text x="${x}" y="${y}" text-anchor="${anchor}" class="wm" font-size="${fontSize}">
+        ${text}
+      </text>
+    </svg>`,
+    'utf-8'
+  )
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
   try {
-    // 🔥 Dynamic sharp import (Vercel safe)
-    const sharp = (await import('sharp')).default
-
-    const { photoId } = req.body || {}
-    if (!photoId) {
-      return res.status(400).json({ error: 'photoId required' })
-    }
-
     // ---------- ENV CHECK ----------
     const requiredEnv = [
       'NEXT_PUBLIC_SUPABASE_URL',
@@ -59,9 +65,34 @@ export default async function handler(req, res) {
     const missing = requiredEnv.filter((k) => !process.env[k])
     if (missing.length) {
       return res.status(500).json({
+        ok: false,
         error: 'Missing environment variables',
         missing,
       })
+    }
+
+    // Clients AFTER env check
+    const supabase = createClient(
+      must('NEXT_PUBLIC_SUPABASE_URL'),
+      must('SUPABASE_SERVICE_ROLE_KEY')
+    )
+
+    const s3 = new S3Client({
+      region: 'auto',
+      endpoint: must('R2_ENDPOINT'),
+      credentials: {
+        accessKeyId: must('R2_ACCESS_KEY_ID'),
+        secretAccessKey: must('R2_SECRET_ACCESS_KEY'),
+      },
+    })
+
+    // 🔥 Dynamic Sharp import (Vercel safe)
+    const sharp = (await import('sharp')).default
+    sharp.cache(false)
+
+    const { photoId } = req.body || {}
+    if (!photoId) {
+      return res.status(400).json({ ok: false, error: 'photoId required' })
     }
 
     // ---------- FETCH PHOTO ----------
@@ -71,13 +102,14 @@ export default async function handler(req, res) {
       .eq('id', photoId)
       .single()
 
-    if (photoErr) {
-      return res.status(400).json({ error: photoErr.message })
+    if (photoErr || !photo) {
+      return res.status(400).json({ ok: false, error: photoErr?.message || 'Photo not found' })
     }
 
     const originalKey = photo.original_jpg_key || photo.original_raw_key
     if (!originalKey) {
       return res.status(400).json({
+        ok: false,
         error: 'No original key found in photos row',
       })
     }
@@ -85,91 +117,86 @@ export default async function handler(req, res) {
     // ---------- DOWNLOAD ORIGINAL ----------
     const getObj = await s3.send(
       new GetObjectCommand({
-        Bucket: process.env.R2_BUCKET,
+        Bucket: must('R2_BUCKET'),
         Key: originalKey,
       })
     )
 
     if (!getObj?.Body) {
       return res.status(500).json({
+        ok: false,
         error: 'R2 GetObject returned empty Body',
       })
     }
 
     const originalBuffer = await streamToBuffer(getObj.Body)
 
-    // ---------- THUMB ----------
-    const thumbBuffer = await sharp(originalBuffer)
+    // ---------- THUMB (4:3 GRID SAFE) ----------
+    const thumbBuffer = await sharp(originalBuffer, { failOn: 'none' })
       .rotate()
-      .resize({ width: 600, withoutEnlargement: true })
-      .jpeg({ quality: 82 })
+      .resize(600, 450, { fit: 'cover', position: 'attention' })
+      .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer()
 
     // ---------- PREVIEW BASE ----------
-    const previewBase = sharp(originalBuffer)
+    const previewBase = sharp(originalBuffer, { failOn: 'none' })
       .rotate()
       .resize({ width: 2000, withoutEnlargement: true })
 
     const previewMeta = await previewBase.metadata()
+    const W = previewMeta.width || 2000
+    const H = previewMeta.height || 1200
 
-    // ---------- WATERMARK SVGs ----------
+    // ---------- WATERMARK GENERATION ----------
+    const text = 'jeevanchandimal.com'
+    const fontStandard = Math.max(28, Math.round(W * 0.04))
+    const fontStrong = Math.max(34, Math.round(W * 0.05))
+    const fontCorner = Math.max(22, Math.round(W * 0.032))
 
-    const watermarkStandard = Buffer.from(`
-      <svg width="1200" height="180" xmlns="http://www.w3.org/2000/svg">
-        <text x="50%" y="60%"
-              font-family="Arial"
-              font-size="72"
-              fill="white"
-              text-anchor="middle"
-              opacity="0.35">
-          jeevanchandimal.com
-        </text>
-      </svg>
-    `)
+    const watermarkStandard = makeWatermarkSvg({
+      w: W,
+      h: H,
+      text,
+      fontSize: fontStandard,
+      opacity: 0.35,
+      align: 'center',
+    })
 
-    const watermarkStrong = Buffer.from(`
-      <svg width="1400" height="220" xmlns="http://www.w3.org/2000/svg">
-        <text x="50%" y="60%"
-              font-family="Arial"
-              font-size="92"
-              fill="white"
-              text-anchor="middle"
-              opacity="0.5">
-          jeevanchandimal.com
-        </text>
-      </svg>
-    `)
+    const watermarkStrong = makeWatermarkSvg({
+      w: W,
+      h: H,
+      text,
+      fontSize: fontStrong,
+      opacity: 0.5,
+      align: 'center',
+    })
 
-    const watermarkCorner = Buffer.from(`
-      <svg width="600" height="120" xmlns="http://www.w3.org/2000/svg">
-        <text x="95%" y="70%"
-              font-family="Arial"
-              font-size="56"
-              fill="white"
-              text-anchor="end"
-              opacity="0.35">
-          jeevanchandimal.com
-        </text>
-      </svg>
-    `)
+    const watermarkCorner = makeWatermarkSvg({
+      w: W,
+      h: H,
+      text,
+      fontSize: fontCorner,
+      opacity: 0.35,
+      align: 'right',
+    })
 
-    // ---------- GENERATE VARIANTS ----------
+    // ---------- PREVIEW VARIANTS ----------
     const previewStandard = await previewBase
       .clone()
-      .composite([{ input: watermarkStandard, gravity: 'south' }])
-      .jpeg({ quality: 84 })
+      .composite([{ input: watermarkStandard, top: 0, left: 0 }])
+      .jpeg({ quality: 84, mozjpeg: true })
       .toBuffer()
 
     const previewStrong = await previewBase
       .clone()
-      .composite([{ input: watermarkStrong, gravity: 'south' }])
-      .jpeg({ quality: 84 })
+      .composite([{ input: watermarkStrong, top: 0, left: 0 }])
+      .jpeg({ quality: 84, mozjpeg: true })
       .toBuffer()
 
     const previewCorner = await previewBase
       .clone()
-      .composite([{ input: watermarkCorner, gravity: 'southeast' }])
-      .jpeg({ quality: 84 })
+      .composite([{ input: watermarkCorner, top: 0, left: 0 }])
+      .jpeg({ quality: 84, mozjpeg: true })
       .toBuffer()
 
     // ---------- R2 KEYS ----------
@@ -189,7 +216,7 @@ export default async function handler(req, res) {
     for (const file of uploads) {
       await s3.send(
         new PutObjectCommand({
-          Bucket: process.env.R2_BUCKET,
+          Bucket: must('R2_BUCKET'),
           Key: file.key,
           Body: file.body,
           ContentType: 'image/jpeg',
@@ -199,43 +226,55 @@ export default async function handler(req, res) {
     }
 
     // ---------- UPDATE DB ----------
-    const base = process.env.NEXT_PUBLIC_SITE_URL
+    const base = must('NEXT_PUBLIC_SITE_URL').replace(/\/$/, '')
+
+    const thumb_url = `${base}/api/photo/${photoId}/thumb`
+    const preview_url = `${base}/api/photo/${photoId}/preview`
 
     const { error: updateErr } = await supabase
       .from('photos')
       .update({
-        preview_url: `${base}/api/photo/${photoId}/preview`,
-        thumb_url: `${base}/api/photo/${photoId}/thumb`,
+        preview_url,
+        thumb_url,
         status: 'published',
       })
       .eq('id', photoId)
 
     if (updateErr) {
-      return res.status(400).json({ error: updateErr.message })
+      return res.status(400).json({ ok: false, error: updateErr.message })
     }
 
     // ---------- SUCCESS ----------
     return res.status(200).json({
       ok: true,
       photoId,
-      originalKey,
-      thumbKey,
-      previewKey,
-      previewStrongKey,
-      previewCornerKey,
+      status: 'published',
+
+      // DB format
+      thumb_url,
+      preview_url,
+
+      // frontend-friendly
+      thumbUrl: thumb_url,
+      previewUrl: preview_url,
+
+      keys: {
+        thumbKey,
+        previewKey,
+        previewStrongKey,
+        previewCornerKey,
+      },
+
       meta: {
-        width: previewMeta.width,
-        height: previewMeta.height,
+        width: W,
+        height: H,
       },
     })
   } catch (err) {
-    console.error('commit error:', {
-      name: err?.name,
-      message: err?.message,
-      stack: err?.stack,
-    })
+    console.error('commit error:', err)
 
     return res.status(500).json({
+      ok: false,
       error: 'Commit failed',
       detail: err?.message || String(err),
     })
