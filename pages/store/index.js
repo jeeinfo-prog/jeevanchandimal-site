@@ -5,20 +5,72 @@ import Link from 'next/link'
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
-import { PHOTOS } from '../../lib/photos'
-
 export default function StoreIndex() {
   const [query, setQuery] = React.useState('')
   const [currency, setCurrency] = React.useState('LKR') // LKR | USD
 
+  const [photos, setPhotos] = React.useState([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState('')
+
+  React.useEffect(() => {
+    let alive = true
+
+    async function run() {
+      try {
+        setLoading(true)
+        setError('')
+
+        const r = await fetch('/api/store/photos')
+        const data = await r.json()
+
+        if (!alive) return
+
+        if (!data?.ok) {
+          setError(data?.error || 'Failed to load photos')
+          setPhotos([])
+          return
+        }
+
+        // Normalize DB rows -> UI shape your store already expects
+        const normalized = (data.photos || []).map((row) => {
+          const orientation = 'photo' // optional: compute if you have width/height later
+          return {
+            id: row.id,
+            title: row.title || 'Untitled', // if you don’t have title in DB, keep fallback
+            tags: row.tags || [], // if you don’t have tags in DB, keep []
+            orientation,
+            thumbUrl: row.thumb_url,
+            previewUrl: row.preview_url,
+            created_at: row.created_at,
+          }
+        })
+
+        setPhotos(normalized)
+      } catch (e) {
+        if (!alive) return
+        setError('Failed to load photos')
+        setPhotos([])
+      } finally {
+        if (!alive) return
+        setLoading(false)
+      }
+    }
+
+    run()
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return PHOTOS
-    return PHOTOS.filter((p) => {
-      const haystack = `${p.title} ${p.tags.join(' ')} ${p.orientation}`.toLowerCase()
+    if (!q) return photos
+    return photos.filter((p) => {
+      const haystack = `${p.title} ${(p.tags || []).join(' ')} ${p.orientation}`.toLowerCase()
       return haystack.includes(q)
     })
-  }, [query])
+  }, [query, photos])
 
   return (
     <>
@@ -30,7 +82,6 @@ export default function StoreIndex() {
         />
       </Head>
 
-      {/* Keep consistent with your Teleport pages */}
       <JeevanChandimalNavi />
 
       <main className="store-wrap">
@@ -71,34 +122,41 @@ export default function StoreIndex() {
           </div>
         </header>
 
-        <section className="grid">
-          {filtered.map((p) => (
-            <Link key={p.id} href={`/store/${p.id}`}>
-              <a className="card">
-                <div className="thumb">
-                  <img src={p.thumbUrl} alt={p.title} loading="lazy" />
-                </div>
-                <div className="meta">
-                  <div className="meta-top">
-                    <h3 className="name">{p.title}</h3>
-                    <span className="pill">{p.orientation}</span>
-                  </div>
-                  <p className="tags">{p.tags.slice(0, 3).join(' · ')}</p>
+        {/* Loading / Error */}
+        {loading && <div className="empty">Loading photos…</div>}
+        {!loading && error && <div className="empty">{error}</div>}
 
-                  {/* Placeholder price preview (real prices on detail page) */}
-                  <p className="priceHint">
-                    From <strong>{currency === 'LKR' ? 'LKR 2,500' : '$8'}</strong>
-                  </p>
-                </div>
-              </a>
-            </Link>
-          ))}
-        </section>
+        {!loading && !error && (
+          <>
+            <section className="grid">
+              {filtered.map((p) => (
+                <Link key={p.id} href={`/store/${p.id}`}>
+                  <a className="card">
+                    <div className="thumb">
+                      <img src={p.thumbUrl} alt={p.title} loading="lazy" />
+                    </div>
+                    <div className="meta">
+                      <div className="meta-top">
+                        <h3 className="name">{p.title}</h3>
+                        <span className="pill">{p.orientation}</span>
+                      </div>
+                      <p className="tags">{(p.tags || []).slice(0, 3).join(' · ')}</p>
 
-        {filtered.length === 0 && (
-          <div className="empty">
-            No results for <strong>{query}</strong>
-          </div>
+                      <p className="priceHint">
+                        From <strong>{currency === 'LKR' ? 'LKR 2,500' : '$8'}</strong>
+                      </p>
+                    </div>
+                  </a>
+                </Link>
+              ))}
+            </section>
+
+            {filtered.length === 0 && (
+              <div className="empty">
+                No results for <strong>{query}</strong>
+              </div>
+            )}
+          </>
         )}
       </main>
 

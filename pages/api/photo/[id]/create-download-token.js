@@ -17,17 +17,18 @@ export default async function handler(req, res) {
     if (!secret) return res.status(500).json({ error: 'DOWNLOAD_TOKEN_SECRET not configured' })
 
     const body = req.body || {}
-    const scope = body.scope || 'original' // "original" | "preview" (optional)
-    const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : 300 // default 5 min
+    const scope = body.scope || 'original' // original | preview (optional)
+    const ttlSecondsRaw = Number(body.ttlSeconds)
+    const ttlSeconds = Number.isFinite(ttlSecondsRaw) ? ttlSecondsRaw : 300
+    const ttlClamped = Math.max(10, Math.min(ttlSeconds, 3600)) // 10s..1h
 
-    // Optional: lock width in token (prevents users from requesting huge sizes)
-    // If provided, resize.js should enforce payload.w === width
+    // Optional: lock width in token
     const w = body.w ? parseInt(body.w, 10) : null
     if (w && (Number.isNaN(w) || w < 50 || w > 6000)) {
       return res.status(400).json({ error: 'Invalid w' })
     }
 
-    // ✅ Confirm photo exists
+    // Confirm photo exists
     const { data: photo, error: photoErr } = await supabase
       .from('photos')
       .select('id, status')
@@ -36,27 +37,17 @@ export default async function handler(req, res) {
 
     if (photoErr || !photo) return res.status(404).json({ error: 'Photo not found' })
 
-    // Optional: only allow published
-    // if (photo.status !== 'published') return res.status(403).json({ error: 'Not published' })
-
-    // 🔐 TODO (later): purchase check / logged-in user check
-    // For now it issues tokens openly (you can restrict it any time)
-
     const token = signDownloadToken(
-      {
-        photoId: id,
-        scope,       // "original"
-        ...(w ? { w } : {}),
-      },
+      { photoId: id, scope, ...(w ? { w } : {}) },
       secret,
-      { ttlSeconds }
+      { ttlSeconds: ttlClamped }
     )
 
     return res.status(200).json({
       ok: true,
       photoId: id,
       scope,
-      ttlSeconds,
+      ttlSeconds: ttlClamped,
       token,
     })
   } catch (err) {
