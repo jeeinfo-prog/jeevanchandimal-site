@@ -1,13 +1,24 @@
+// pages/api/admin/photos/create-upload.js
+
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { getPresignedPutUrl } from '../../../../lib/r2'
 
 async function requireAdmin(req) {
   const authHeader = req.headers.authorization || ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-  if (!token) return { ok: false, status: 401, error: 'Missing token' }
+  const token = authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : null
 
-  const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
-  if (userErr || !userData?.user) return { ok: false, status: 401, error: 'Invalid token' }
+  if (!token) {
+    return { ok: false, status: 401, error: 'Missing token' }
+  }
+
+  const { data: userData, error: userErr } =
+    await supabaseAdmin.auth.getUser(token)
+
+  if (userErr || !userData?.user) {
+    return { ok: false, status: 401, error: 'Invalid token' }
+  }
 
   const { data: profile, error: profErr } = await supabaseAdmin
     .from('profiles')
@@ -15,8 +26,13 @@ async function requireAdmin(req) {
     .eq('id', userData.user.id)
     .single()
 
-  if (profErr || !profile) return { ok: false, status: 403, error: 'No profile' }
-  if (profile.role !== 'admin') return { ok: false, status: 403, error: 'Not admin' }
+  if (profErr || !profile) {
+    return { ok: false, status: 403, error: 'No profile' }
+  }
+
+  if (profile.role !== 'admin') {
+    return { ok: false, status: 403, error: 'Not admin' }
+  }
 
   return { ok: true, user: userData.user }
 }
@@ -26,23 +42,28 @@ function sanitizeFilename(filename) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  }
 
   const admin = await requireAdmin(req)
-  if (!admin.ok) return res.status(admin.status).json({ error: admin.error })
+  if (!admin.ok) {
+    return res.status(admin.status).json({ ok: false, error: admin.error })
+  }
 
   try {
-    const body = req.body || {}
-    const filename = body.filename
-    const contentType = body.contentType
+    const { filename } = req.body || {}
 
-    if (!filename || !contentType) {
-      return res.status(400).json({ error: 'filename + contentType required' })
+    if (!filename) {
+      return res.status(400).json({
+        ok: false,
+        error: 'filename required',
+      })
     }
 
     const safeName = sanitizeFilename(filename)
 
-    // 1) Create photo row first to get ID
+    // 1️⃣ Create draft photo row
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .insert([{ status: 'draft' }])
@@ -52,41 +73,34 @@ export default async function handler(req, res) {
     if (photoErr) {
       console.error('photos insert error:', photoErr)
       return res.status(500).json({
-        error: 'DB error inserting into photos',
-        code: photoErr.code || null,
-        hint: photoErr.hint || null,
-        details: photoErr.details || null,
-        message: photoErr.message || null,
+        ok: false,
+        error: photoErr.message,
       })
     }
 
-    // 2) Create object key
     const objectKey = `photos/original/${photo.id}/${safeName}`
 
-    // ✅ 2.5) Save key directly on photos row so commit.js can find it
-    const { error: photoUpdateErr } = await supabaseAdmin
+    // 2️⃣ Save original key to photos table
+    const { error: updateErr } = await supabaseAdmin
       .from('photos')
       .update({ original_jpg_key: objectKey })
       .eq('id', photo.id)
 
-    if (photoUpdateErr) {
-      console.error('photos update error:', photoUpdateErr)
+    if (updateErr) {
+      console.error('photos update error:', updateErr)
       return res.status(500).json({
-        error: 'DB error updating photos original_jpg_key',
-        code: photoUpdateErr.code || null,
-        hint: photoUpdateErr.hint || null,
-        details: photoUpdateErr.details || null,
-        message: photoUpdateErr.message || null,
+        ok: false,
+        error: updateErr.message,
       })
     }
 
-    // 3) Create presigned PUT URL (R2)
+    // 3️⃣ Generate presigned PUT URL
+    // NOTE: ContentType is NOT signed anymore (important fix)
     const uploadUrl = await getPresignedPutUrl({
       key: objectKey,
-      contentType,
     })
 
-    // 4) Save asset row (keep this for audit/history)
+    // 4️⃣ Save asset row (optional but good practice)
     const { error: assetErr } = await supabaseAdmin
       .from('photo_assets')
       .insert([{ photo_id: photo.id, original_key: objectKey }])
@@ -94,26 +108,23 @@ export default async function handler(req, res) {
     if (assetErr) {
       console.error('photo_assets insert error:', assetErr)
       return res.status(500).json({
-        error: 'DB error inserting into photo_assets',
-        code: assetErr.code || null,
-        hint: assetErr.hint || null,
-        details: assetErr.details || null,
-        message: assetErr.message || null,
+        ok: false,
+        error: assetErr.message,
       })
     }
 
     return res.status(200).json({
+      ok: true,
       photoId: photo.id,
       objectKey,
       uploadUrl,
     })
-  } catch (e) {
-    console.error('create-upload fatal error:', e)
+  } catch (err) {
+    console.error('create-upload fatal error:', err)
+
     return res.status(500).json({
-      error: e?.message || 'Server error',
-      code: e?.code || null,
-      hint: e?.hint || null,
-      details: e?.details || null,
+      ok: false,
+      error: err?.message || 'Server error',
     })
   }
 }
