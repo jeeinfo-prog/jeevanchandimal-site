@@ -1,6 +1,7 @@
 // pages/api/admin/photos/commit.js
 
-import { createClient } from ' @supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
+
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 
 export const config = {
