@@ -22,7 +22,6 @@ async function requireAdmin(req) {
 }
 
 function sanitizeFilename(filename) {
-  // keep letters/numbers/._- only
   return String(filename).replace(/[^\w.\-]+/g, '_')
 }
 
@@ -43,7 +42,7 @@ export default async function handler(req, res) {
 
     const safeName = sanitizeFilename(filename)
 
-    // 1) Create photo row (requires public.photos.status)
+    // 1) Create photo row first to get ID
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .insert([{ status: 'draft' }])
@@ -64,13 +63,30 @@ export default async function handler(req, res) {
     // 2) Create object key
     const objectKey = `photos/original/${photo.id}/${safeName}`
 
+    // ✅ 2.5) Save key directly on photos row so commit.js can find it
+    const { error: photoUpdateErr } = await supabaseAdmin
+      .from('photos')
+      .update({ original_jpg_key: objectKey })
+      .eq('id', photo.id)
+
+    if (photoUpdateErr) {
+      console.error('photos update error:', photoUpdateErr)
+      return res.status(500).json({
+        error: 'DB error updating photos original_jpg_key',
+        code: photoUpdateErr.code || null,
+        hint: photoUpdateErr.hint || null,
+        details: photoUpdateErr.details || null,
+        message: photoUpdateErr.message || null,
+      })
+    }
+
     // 3) Create presigned PUT URL (R2)
     const uploadUrl = await getPresignedPutUrl({
       key: objectKey,
       contentType,
     })
 
-    // 4) Save asset row (requires public.photo_assets.photo_id + original_key)
+    // 4) Save asset row (keep this for audit/history)
     const { error: assetErr } = await supabaseAdmin
       .from('photo_assets')
       .insert([{ photo_id: photo.id, original_key: objectKey }])
