@@ -1,15 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
-import {
-  S3Client,
-  GetObjectCommand,
-  PutObjectCommand,
-  HeadObjectCommand,
-} from '@aws-sdk/client-s3'
-import sharp from 'sharp'
-
-// ✅ Use your existing token verifier
-// (You already used this in pages/api/download.js earlier)
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 import { verifyDownloadToken } from '../../../../lib/secureDownload'
+
+export const config = {
+  api: { bodyParser: false },
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -28,184 +23,210 @@ const s3 = new S3Client({
 async function streamToBuffer(stream) {
   return await new Promise((resolve, reject) => {
     const chunks = []
-    stream.on('data', (c) => chunks.push(c))
+    stream.on('data', (chunk) => chunks.push(chunk))
     stream.on('end', () => resolve(Buffer.concat(chunks)))
     stream.on('error', reject)
   })
 }
 
-function clampInt(v, min, max, fallback) {
-  const n = parseInt(v, 10)
-  if (!Number.isFinite(n)) return fallback
-  return Math.max(min, Math.min(max, n))
-}
-
-async function getOriginalKey(photoId) {
-  // Prefer photo_assets (your create-upload saves original_key there)
-  const { data: asset, error: assetErr } = await supabase
-    .from('photo_assets')
-    .select('original_key')
-    .eq('photo_id', photoId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!assetErr && asset?.original_key) return asset.original_key
-
-  // Fallback: photos table (if you store original_jpg_key/original_raw_key there)
-  const { data: photo, error: photoErr } = await supabase
-    .from('photos')
-    .select('original_jpg_key, original_raw_key')
-    .eq('id', photoId)
-    .maybeSingle()
-
-  if (!photoErr) return photo?.original_jpg_key || photo?.original_raw_key || null
-
-  return null
-}
-
 export default async function handler(req, res) {
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
+  if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
-    const id = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id
+    const sharp = (await import('sharp')).default
+
+    const { id } = req.query
+    const src = req.query.src || 'preview'
+    const width = parseInt(req.query.w || '0', 10)
+    const format = req.query.format === 'webp' ? 'webp' : 'jpeg'
+    const quality = parseInt(req.query.q || '82', 10)
+    const variant = req.query.variant || null
+    const token = typeof req.query.token === 'string' ? req.query.token : null
+
     if (!id) return res.status(400).json({ error: 'Missing id' })
 
-    const src = typeof req.query.src === 'string' ? req.query.src : 'preview'
-    const variant = typeof req.query.variant === 'string' ? req.query.variant : 'standard'
-
-    // size
-    const w = clampInt(req.query.w, 50, 3000, 1200)
-    const h = req.query.h ? clampInt(req.query.h, 50, 3000, undefined) : undefined
-
-    // output
-    const format = (typeof req.query.format === 'string' ? req.query.format : 'jpg').toLowerCase()
-    const q = clampInt(req.query.q, 50, 90, 82)
-
-    const isWebp = format === 'webp'
-    const outExt = isWebp ? 'webp' : 'jpg'
-    const outType = isWebp ? 'image/webp' : 'image/jpeg'
-
-    // ✅ decide if this response should be public-cacheable
-    const isProtected = src === 'original'
-
-    // ---------- TOKEN CHECK FOR ORIGINAL ----------
-    if (isProtected) {
-      const token = typeof req.query.token === 'string' ? req.query.token : null
-      if (!token) return res.status(401).json({ error: 'Missing token' })
-
-      const payload = verifyDownloadToken(token) // uses DOWNLOAD_TOKEN_SECRET internally in your lib
-      if (!payload) return res.status(401).json({ error: 'Invalid token' })
-
-      // Require token photoId match
-      const tokenPhotoId = payload.photoId || payload.id
-      if (tokenPhotoId !== id) {
-        return res.status(403).json({ error: 'Token does not match photoId' })
-      }
-
-      // Optional: enforce scope/type if you include it in token payload
-      // if (payload.scope && payload.scope !== 'original') {
-      //   return res.status(403).json({ error: 'Token scope not allowed' })
-      // }
+    if (!width || width < 50 || width > 6000) {
+      return res.status(400).json({ error: 'Invalid width' })
     }
 
-    // ---------- SOURCE KEY ----------
-    let sourceKey
+    // ==============================
+    // 🔐 PROTECT ORIGINAL
+    // ==============================
+    if (src === 'original') {
+      if (!token) {
+        return res.status(401).json({ error: 'Missing token' })
+      }
+
+      let payload = null
+      try {
+        payload = verifyDownloadToken(token)
+      } catch {
+        payload = null
+      }
+
+      if (!payload) {
+        return res.status(401).json({ error: 'Invalid token' })
+      }
+
+      if (payload.photoId !== id) {
+        return res.status(403).json({ error: 'Token mismatch' })
+      }
+
+      if (payload.scope && payload.scope !== 'original') {
+        return res.status(403).json({ error: 'Invalid token scope' })
+      }
+    }
+
+    // ==============================
+    // 🔎 FETCH PHOTO KEYS
+    // ==============================
+    const { data: photo, error } = await supabase
+      .from('photos')
+      .select(
+        `
+        id,
+        original_jpg_key,
+        original_raw_key
+      `
+      )
+      .eq('id', id)
+      .single()
+
+    if (error || !photo) {
+      return res.status(404).json({ error: 'Photo not found' })
+    }
+
+    let sourceKey = null
+
     if (src === 'thumb') {
       sourceKey = `photos/thumb/${id}.jpg`
     } else if (src === 'preview') {
-      sourceKey =
-        variant === 'strong'
-          ? `photos/preview_wm-strong/${id}.jpg`
-          : variant === 'corner'
-            ? `photos/preview_wm-corner/${id}.jpg`
-            : `photos/preview/${id}.jpg`
+      if (variant === 'strong') {
+        sourceKey = `photos/preview_wm-strong/${id}.jpg`
+      } else if (variant === 'corner') {
+        sourceKey = `photos/preview_wm-corner/${id}.jpg`
+      } else {
+        sourceKey = `photos/preview/${id}.jpg`
+      }
     } else if (src === 'original') {
-      const originalKey = await getOriginalKey(id)
-      if (!originalKey) return res.status(404).json({ error: 'Original not found' })
-      sourceKey = originalKey
-    } else {
-      return res.status(400).json({ error: 'Invalid src (use thumb|preview|original)' })
+      sourceKey = photo.original_jpg_key || photo.original_raw_key
     }
 
-    // ---------- DERIVED KEY (R2 cache) ----------
-    const derivedPrefix = isProtected ? 'photos/derived_protected' : 'photos/derived'
-    const derivedKey = `${derivedPrefix}/${id}/${src}-${variant}/w${w}${h ? `_h${h}` : ''}_q${q}.${outExt}`
+    if (!sourceKey) {
+      return res.status(400).json({ error: 'Invalid src' })
+    }
 
-    // ---------- FAST PATH (already generated) ----------
+    // ==============================
+    // 📦 DERIVATIVE CACHE KEY
+    // ==============================
+    const derivativeKey =
+      src === 'original'
+        ? `photos/protected/original/${id}_${width}.${format}`
+        : `photos/derived/${id}_${src}_${variant || 'none'}_${width}.${format}`
+
+    // ==============================
+    // 🧠 TRY CACHE FIRST
+    // ==============================
     try {
-      const head = await s3.send(
-        new HeadObjectCommand({ Bucket: process.env.R2_BUCKET, Key: derivedKey })
+      const cached = await s3.send(
+        new GetObjectCommand({
+          Bucket: process.env.R2_BUCKET,
+          Key: derivativeKey,
+        })
       )
 
-      res.setHeader('Content-Type', outType)
-      res.setHeader(
-        'Cache-Control',
-        isProtected
-          ? 'private, max-age=86400'
-          : 'public, max-age=31536000, immutable'
-      )
-      if (head.ETag) res.setHeader('ETag', head.ETag)
+      if (cached?.Body) {
+        const buffer = await streamToBuffer(cached.Body)
 
-      if (req.method === 'HEAD') return res.status(200).end()
+        res.setHeader(
+          'Cache-Control',
+          src === 'original'
+            ? 'private, max-age=86400'
+            : 'public, max-age=31536000, immutable'
+        )
+        res.setHeader(
+          'Content-Type',
+          format === 'webp' ? 'image/webp' : 'image/jpeg'
+        )
 
-      const obj = await s3.send(
-        new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: derivedKey })
-      )
-      obj.Body.pipe(res)
-      return
+        return res.status(200).send(buffer)
+      }
     } catch {
-      // not found -> generate
+      // Not cached yet — continue
     }
 
-    // ---------- FETCH SOURCE ----------
-    const srcObj = await s3.send(
-      new GetObjectCommand({ Bucket: process.env.R2_BUCKET, Key: sourceKey })
-    )
-    const srcBuf = await streamToBuffer(srcObj.Body)
-
-    // ---------- RESIZE ----------
-    const pipeline = sharp(srcBuf)
-      .rotate()
-      .resize({
-        width: w,
-        height: h,
-        fit: 'inside',
-        withoutEnlargement: true,
+    // ==============================
+    // 📥 DOWNLOAD SOURCE
+    // ==============================
+    const originalObj = await s3.send(
+      new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET,
+        Key: sourceKey,
       })
+    )
 
-    const outBuf = isWebp
-      ? await pipeline.webp({ quality: q }).toBuffer()
-      : await pipeline.jpeg({ quality: q }).toBuffer()
+    if (!originalObj?.Body) {
+      return res.status(500).json({ error: 'Source image missing' })
+    }
 
-    // ---------- STORE DERIVED ----------
+    const originalBuffer = await streamToBuffer(originalObj.Body)
+
+    // ==============================
+    // 🖼 RESIZE
+    // ==============================
+    let image = sharp(originalBuffer).rotate().resize({
+      width,
+      withoutEnlargement: true,
+    })
+
+    if (format === 'webp') {
+      image = image.webp({ quality })
+    } else {
+      image = image.jpeg({ quality })
+    }
+
+    const outputBuffer = await image.toBuffer()
+
+    // ==============================
+    // 💾 SAVE DERIVATIVE
+    // ==============================
     await s3.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET,
-        Key: derivedKey,
-        Body: outBuf,
-        ContentType: outType,
-        CacheControl: isProtected
-          ? 'private, max-age=86400'
-          : 'public, max-age=31536000, immutable',
+        Key: derivativeKey,
+        Body: outputBuffer,
+        ContentType:
+          format === 'webp' ? 'image/webp' : 'image/jpeg',
+        CacheControl:
+          src === 'original'
+            ? 'private, max-age=86400'
+            : 'public, max-age=31536000, immutable',
       })
     )
 
-    // ---------- RESPOND ----------
-    res.setHeader('Content-Type', outType)
+    // ==============================
+    // 📤 RESPONSE
+    // ==============================
     res.setHeader(
       'Cache-Control',
-      isProtected
+      src === 'original'
         ? 'private, max-age=86400'
         : 'public, max-age=31536000, immutable'
     )
 
-    if (req.method === 'HEAD') return res.status(200).end()
-    return res.status(200).send(outBuf)
+    res.setHeader(
+      'Content-Type',
+      format === 'webp' ? 'image/webp' : 'image/jpeg'
+    )
+
+    return res.status(200).send(outputBuffer)
   } catch (err) {
     console.error('resize error:', err)
-    return res.status(500).json({ error: 'Resize failed', detail: err?.message || String(err) })
+    return res.status(500).json({
+      error: 'Resize failed',
+      detail: err?.message || String(err),
+    })
   }
 }
