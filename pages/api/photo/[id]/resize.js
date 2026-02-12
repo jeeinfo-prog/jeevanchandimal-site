@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
-import { verifyDownloadToken } from '../../../../lib/secureDownload'
+import { verifyDownloadToken } from '../../../../lib/download-token'
 
 export const config = {
   api: { bodyParser: false },
@@ -38,11 +38,11 @@ export default async function handler(req, res) {
     const sharp = (await import('sharp')).default
 
     const { id } = req.query
-    const src = req.query.src || 'preview'
-    const width = parseInt(req.query.w || '0', 10)
+    const src = typeof req.query.src === 'string' ? req.query.src : 'preview'
+    const width = parseInt(typeof req.query.w === 'string' ? req.query.w : '0', 10)
     const format = req.query.format === 'webp' ? 'webp' : 'jpeg'
-    const quality = parseInt(req.query.q || '82', 10)
-    const variant = req.query.variant || null
+    const quality = parseInt(typeof req.query.q === 'string' ? req.query.q : '82', 10)
+    const variant = typeof req.query.variant === 'string' ? req.query.variant : null
     const token = typeof req.query.token === 'string' ? req.query.token : null
 
     if (!id) return res.status(400).json({ error: 'Missing id' })
@@ -52,29 +52,33 @@ export default async function handler(req, res) {
     }
 
     // ==============================
-    // 🔐 PROTECT ORIGINAL
+    // 🔐 PROTECT ORIGINAL (EXPIRING TOKEN)
     // ==============================
     if (src === 'original') {
-      if (!token) {
+      const secret = process.env.DOWNLOAD_TOKEN_SECRET
+      if (!secret) {
+        return res.status(500).json({ error: 'DOWNLOAD_TOKEN_SECRET not configured' })
+      }
+
+      if (!token || token === 'YOUR_TOKEN') {
         return res.status(401).json({ error: 'Missing token' })
       }
 
-      let payload = null
-      try {
-        payload = verifyDownloadToken(token)
-      } catch {
-        payload = null
+      const result = verifyDownloadToken(token, secret)
+
+      if (!result?.ok) {
+        return res.status(401).json({ error: result?.error || 'Token expired or invalid' })
       }
 
-      if (!payload) {
-        return res.status(401).json({ error: 'Invalid token' })
-      }
+      const payload = result.payload
 
-      if (payload.photoId !== id) {
+      if (!payload || payload.photoId !== id) {
         return res.status(403).json({ error: 'Token mismatch' })
       }
 
-      if (payload.scope && payload.scope !== 'original') {
+      // strongly enforce scope/type
+      const scope = payload.scope || payload.type
+      if (scope && scope !== 'original') {
         return res.status(403).json({ error: 'Invalid token scope' })
       }
     }
@@ -84,13 +88,7 @@ export default async function handler(req, res) {
     // ==============================
     const { data: photo, error } = await supabase
       .from('photos')
-      .select(
-        `
-        id,
-        original_jpg_key,
-        original_raw_key
-      `
-      )
+      .select('id, original_jpg_key, original_raw_key')
       .eq('id', id)
       .single()
 
@@ -146,15 +144,12 @@ export default async function handler(req, res) {
             ? 'private, max-age=86400'
             : 'public, max-age=31536000, immutable'
         )
-        res.setHeader(
-          'Content-Type',
-          format === 'webp' ? 'image/webp' : 'image/jpeg'
-        )
+        res.setHeader('Content-Type', format === 'webp' ? 'image/webp' : 'image/jpeg')
 
         return res.status(200).send(buffer)
       }
     } catch {
-      // Not cached yet — continue
+      // not cached — continue
     }
 
     // ==============================
@@ -192,35 +187,26 @@ export default async function handler(req, res) {
     // ==============================
     // 💾 SAVE DERIVATIVE
     // ==============================
+    const cacheHeader =
+      src === 'original'
+        ? 'private, max-age=86400'
+        : 'public, max-age=31536000, immutable'
+
     await s3.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET,
         Key: derivativeKey,
         Body: outputBuffer,
-        ContentType:
-          format === 'webp' ? 'image/webp' : 'image/jpeg',
-        CacheControl:
-          src === 'original'
-            ? 'private, max-age=86400'
-            : 'public, max-age=31536000, immutable',
+        ContentType: format === 'webp' ? 'image/webp' : 'image/jpeg',
+        CacheControl: cacheHeader,
       })
     )
 
     // ==============================
     // 📤 RESPONSE
     // ==============================
-    res.setHeader(
-      'Cache-Control',
-      src === 'original'
-        ? 'private, max-age=86400'
-        : 'public, max-age=31536000, immutable'
-    )
-
-    res.setHeader(
-      'Content-Type',
-      format === 'webp' ? 'image/webp' : 'image/jpeg'
-    )
-
+    res.setHeader('Cache-Control', cacheHeader)
+    res.setHeader('Content-Type', format === 'webp' ? 'image/webp' : 'image/jpeg')
     return res.status(200).send(outputBuffer)
   } catch (err) {
     console.error('resize error:', err)

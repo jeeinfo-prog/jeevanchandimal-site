@@ -22,14 +22,8 @@ export default function AdminUploadPage() {
   }
 
   React.useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data?.session || null)
-    })
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s)
-    })
-
+    supabase.auth.getSession().then(({ data }) => setSession(data?.session || null))
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
     return () => sub?.subscription?.unsubscribe?.()
   }, [])
 
@@ -52,9 +46,9 @@ export default function AdminUploadPage() {
         return
       }
 
-      setIsAdmin(data?.role === 'admin')
-      if (data?.role === 'admin') log('✅ Admin verified')
-      else log('❌ You are not admin (profiles.role != admin)')
+      const ok = data?.role === 'admin'
+      setIsAdmin(ok)
+      log(ok ? '✅ Admin verified' : '❌ Not admin (profiles.role != admin)')
     }
 
     checkAdmin()
@@ -89,27 +83,28 @@ export default function AdminUploadPage() {
     }
   }
 
+  async function safeJson(resp) {
+    const text = await resp.text()
+    try {
+      return { json: JSON.parse(text), text }
+    } catch {
+      return { json: null, text }
+    }
+  }
+
   async function upload() {
-    if (!session?.access_token) {
-      log('❌ Not logged in')
-      return
-    }
-    if (!isAdmin) {
-      log('❌ Not admin')
-      return
-    }
-    if (!file) {
-      log('❌ Select a file first')
-      return
-    }
+    if (!session?.access_token) return log('❌ Not logged in')
+    if (!isAdmin) return log('❌ Not admin')
+    if (!file) return log('❌ Select a file first')
 
     setBusy(true)
     setLogs([])
+
     try {
       const token = session.access_token
 
       // 1) create-upload
-      log(`Creating upload… (${file.name})`)
+      log(`Preparing upload: ${file.name}`)
       const createResp = await fetch('/api/admin/photos/create-upload', {
         method: 'POST',
         headers: {
@@ -122,48 +117,35 @@ export default function AdminUploadPage() {
         }),
       })
 
-      const createText = await createResp.text()
-      let createJson = null
-      try {
-        createJson = JSON.parse(createText)
-      } catch {
-        // ignore
-      }
+      const { json: createJson, text: createText } = await safeJson(createResp)
 
       if (!createResp.ok) {
-        const msg =
-          createJson?.error ||
-          createJson?.message ||
-          createText ||
-          `create-upload failed (HTTP ${createResp.status})`
-        throw new Error(msg)
+        throw new Error(createJson?.error || createJson?.message || createText || `create-upload failed (${createResp.status})`)
       }
 
       const { photoId, objectKey, uploadUrl } = createJson
       log(`✅ create-upload OK — photoId=${photoId}`)
       log(`Object key: ${objectKey}`)
-      log(`Uploading to R2 URL: ${uploadUrl}`)
 
       // 2) PUT to R2
+      log(`Uploading to R2: ${file.name}`)
       const putResp = await fetch(uploadUrl, {
         method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
         body: file,
       })
 
       if (!putResp.ok) {
-        const txt = await putResp.text().catch(() => '')
-        log(`❌ R2 PUT failed: ${putResp.status} ${putResp.statusText}`)
-        log(`❌ R2 response: ${txt || '(empty body)'}`)
+        const t = await putResp.text().catch(() => '')
+        log(`❌ R2 PUT failed: ${putResp.status}`)
+        log(`❌ R2 response: ${t || '(empty body)'}`)
         throw new Error('R2 upload failed')
       }
 
-      log(`✅ R2 PUT OK (${putResp.status})`)
+      log('✅ R2 PUT OK')
 
-      // 3) commit (THIS PART IS THE IMPORTANT FIX)
-      log('Committing…')
+      // 3) commit
+      log(`Commit: ${file.name}`)
       const commitResp = await fetch('/api/admin/photos/commit', {
         method: 'POST',
         headers: {
@@ -173,28 +155,17 @@ export default function AdminUploadPage() {
         body: JSON.stringify({ photoId, objectKey }),
       })
 
-      const commitText = await commitResp.text()
-      let commitJson = null
-      try {
-        commitJson = JSON.parse(commitText)
-      } catch {
-        // ignore
-      }
+      const { json: commitJson, text: commitText } = await safeJson(commitResp)
 
       if (!commitResp.ok) {
-        log(`❌ Commit HTTP ${commitResp.status} ${commitResp.statusText}`)
+        log(`❌ Commit HTTP ${commitResp.status}`)
         log(`❌ Commit response: ${commitText || '(empty body)'}`)
-
-        const msg =
-          commitJson?.error ||
-          commitJson?.message ||
-          commitText ||
-          `commit failed (HTTP ${commitResp.status})`
-
-        throw new Error(msg)
+        throw new Error(commitJson?.error || commitJson?.message || 'Commit failed')
       }
 
-      log(`✅ Commit OK — response: ${commitText}`)
+      log('✅ Done: commit complete')
+      log(`thumbUrl: ${commitJson?.thumbUrl || '(none)'}`)
+      log(`previewUrl: ${commitJson?.previewUrl || '(none)'}`)
     } catch (e) {
       log(`❌ Error: ${e.message}`)
     } finally {
@@ -213,41 +184,18 @@ export default function AdminUploadPage() {
         <p style={{ opacity: 0.8, marginTop: 8 }}>Supabase login required.</p>
 
         {!session ? (
-          <div
-            style={{
-              marginTop: 18,
-              padding: 16,
-              border: '1px solid rgba(245,244,244,0.16)',
-              borderRadius: 14,
-            }}
-          >
+          <div style={{ marginTop: 18, padding: 16, border: '1px solid rgba(245,244,244,0.16)', borderRadius: 14 }}>
             <h3 style={{ marginTop: 0 }}>Login</h3>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              style={{ width: '100%', padding: 10, marginBottom: 10 }}
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              style={{ width: '100%', padding: 10, marginBottom: 10 }}
-            />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
+              style={{ width: '100%', padding: 10, marginBottom: 10 }} />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password"
+              style={{ width: '100%', padding: 10, marginBottom: 10 }} />
             <button onClick={signIn} disabled={busy} style={{ padding: '10px 14px' }}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </div>
         ) : (
-          <div
-            style={{
-              marginTop: 18,
-              padding: 16,
-              border: '1px solid rgba(245,244,244,0.16)',
-              borderRadius: 14,
-            }}
-          >
+          <div style={{ marginTop: 18, padding: 16, border: '1px solid rgba(245,244,244,0.16)', borderRadius: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700 }}>Signed in</div>
@@ -259,7 +207,6 @@ export default function AdminUploadPage() {
                   </strong>
                 </div>
               </div>
-
               <button onClick={signOut} disabled={busy} style={{ padding: '10px 14px' }}>
                 Sign out
               </button>
@@ -274,19 +221,13 @@ export default function AdminUploadPage() {
               />
               <div style={{ marginTop: 10, opacity: 0.85, fontSize: 13 }}>
                 {file ? (
-                  <>
-                    Selected: <strong>{file.name}</strong> ({Math.round(file.size / 1024)} KB)
-                  </>
+                  <>Selected: <strong>{file.name}</strong> ({Math.round(file.size / 1024)} KB)</>
                 ) : (
                   'No file selected'
                 )}
               </div>
 
-              <button
-                onClick={upload}
-                disabled={busy || !isAdmin || !file}
-                style={{ marginTop: 12, padding: '10px 14px' }}
-              >
+              <button onClick={upload} disabled={busy || !isAdmin || !file} style={{ marginTop: 12, padding: '10px 14px' }}>
                 {busy ? 'Working…' : 'Upload'}
               </button>
             </div>
