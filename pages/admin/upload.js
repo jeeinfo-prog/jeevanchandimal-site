@@ -1,3 +1,5 @@
+// pages/admin/upload.js
+
 import React from 'react'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -17,7 +19,7 @@ export default function AdminUploadPage() {
   const [busy, setBusy] = React.useState(false)
   const [logs, setLogs] = React.useState([])
 
-  // ✅ Safe default concurrency
+  // ✅ Safe default concurrency (stable on Vercel)
   const concurrency = 4
   const runningRef = React.useRef(false)
 
@@ -36,6 +38,14 @@ export default function AdminUploadPage() {
 
   function setItem(id, patch) {
     setQueue((q) => q.map((it) => (it.id === id ? { ...it, ...patch } : it)))
+  }
+
+  function retryFailed() {
+    setQueue((q) =>
+      q.map((it) =>
+        it.status === 'ERROR' ? { ...it, status: 'QUEUED', error: '' } : it
+      )
+    )
   }
 
   // --------------------------
@@ -196,7 +206,6 @@ export default function AdminUploadPage() {
     if (runningRef.current) return
     if (!session?.access_token) return log('❌ Not logged in')
     if (!isAdmin) return log('❌ Not admin')
-    if (!queue.some((q) => q.status === 'QUEUED')) return log('❌ No queued files')
 
     runningRef.current = true
     setBusy(true)
@@ -207,9 +216,20 @@ export default function AdminUploadPage() {
       log(`📦 Upload queue started (concurrency=${concurrency})`)
 
       while (true) {
-        // get next batch up to concurrency
+        // IMPORTANT: compute batch from latest queue snapshot
+        const snapshot = (() => {
+          // take a snapshot without mutating state
+          // eslint-disable-next-line no-unused-vars
+          let s = null
+          setQueue((q) => {
+            s = q
+            return q
+          })
+          return s || []
+        })()
+
         const next = []
-        for (const it of queue) {
+        for (const it of snapshot) {
           if (next.length >= concurrency) break
           if (it.status === 'QUEUED') next.push(it)
         }
@@ -228,9 +248,9 @@ export default function AdminUploadPage() {
           })
         )
 
-        // refresh queue snapshot
+        // small yield so React applies state updates
         // eslint-disable-next-line no-await-in-loop
-        await new Promise((r) => setTimeout(r, 10))
+        await new Promise((r) => setTimeout(r, 20))
       }
 
       log('🏁 Queue finished')
@@ -253,10 +273,19 @@ export default function AdminUploadPage() {
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '40px 20px' }}>
         <h1 style={{ margin: 0 }}>Admin Upload</h1>
-        <p style={{ opacity: 0.8, marginTop: 8 }}>Supabase login required.</p>
+        <p style={{ opacity: 0.8, marginTop: 8 }}>
+          Multi-file uploader with queue + retry (4 concurrent).
+        </p>
 
         {!session ? (
-          <div style={{ marginTop: 18, padding: 16, border: '1px solid rgba(245,244,244,0.16)', borderRadius: 14 }}>
+          <div
+            style={{
+              marginTop: 18,
+              padding: 16,
+              border: '1px solid rgba(245,244,244,0.16)',
+              borderRadius: 14,
+            }}
+          >
             <h3 style={{ marginTop: 0 }}>Login</h3>
 
             <input
@@ -272,12 +301,20 @@ export default function AdminUploadPage() {
               placeholder="Password"
               style={{ width: '100%', padding: 10, marginBottom: 10 }}
             />
+
             <button onClick={signIn} disabled={busy} style={{ padding: '10px 14px' }}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </div>
         ) : (
-          <div style={{ marginTop: 18, padding: 16, border: '1px solid rgba(245,244,244,0.16)', borderRadius: 14 }}>
+          <div
+            style={{
+              marginTop: 18,
+              padding: 16,
+              border: '1px solid rgba(245,244,244,0.16)',
+              borderRadius: 14,
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700 }}>Signed in</div>
@@ -324,6 +361,15 @@ export default function AdminUploadPage() {
 
                 <button
                   type="button"
+                  onClick={retryFailed}
+                  disabled={busy || countErr === 0}
+                  style={{ padding: '10px 14px' }}
+                >
+                  Retry failed ({countErr})
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setQueue([])}
                   disabled={busy}
                   style={{ padding: '10px 14px' }}
@@ -335,6 +381,7 @@ export default function AdminUploadPage() {
               {queue.length > 0 && (
                 <div style={{ marginTop: 14, fontSize: 13, opacity: 0.9 }}>
                   <div style={{ fontWeight: 700, marginBottom: 6 }}>Queue</div>
+
                   <div style={{ display: 'grid', gap: 6 }}>
                     {queue.slice(-12).map((it) => (
                       <div
@@ -350,13 +397,34 @@ export default function AdminUploadPage() {
                       >
                         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {it.file.name}
+                          {it.status === 'ERROR' && it.error ? (
+                            <span style={{ opacity: 0.75 }}> — {it.error}</span>
+                          ) : null}
                         </div>
-                        <div style={{ whiteSpace: 'nowrap', opacity: 0.9 }}>
-                          {it.status === 'ERROR' ? `ERROR` : it.status}
+
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ opacity: 0.9 }}>{it.status === 'ERROR' ? 'ERROR' : it.status}</span>
+
+                          {it.status === 'ERROR' && !busy && (
+                            <button
+                              onClick={() => setItem(it.id, { status: 'QUEUED', error: '' })}
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: 11,
+                                borderRadius: 8,
+                                border: '1px solid rgba(245,244,244,0.18)',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Retry
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
+
                   {queue.length > 12 && (
                     <div style={{ marginTop: 8, opacity: 0.75 }}>
                       Showing last 12 items (total {queue.length})
