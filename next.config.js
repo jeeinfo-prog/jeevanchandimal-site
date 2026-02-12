@@ -1,11 +1,13 @@
+/** @type {import('next').NextConfig} */
 module.exports = {
   i18n: {
     locales: ['en'],
     defaultLocale: 'en',
+    localeDetection: false,
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Don't bundle sharp; keep it as a runtime dependency in node_modules
+      // Keep sharp external so it loads native binary at runtime (Vercel Linux)
       config.externals = config.externals || []
       config.externals.push('sharp')
     }
