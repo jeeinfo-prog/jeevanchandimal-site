@@ -103,21 +103,61 @@ export default function StoreDetail() {
   }, [router.isReady, id])
 
   async function startCheckout() {
-    if (!photo) return
-    try {
-      setIsCheckingOut(true)
+  if (!photo) return
 
-      // TODO: connect your real checkout here
-      alert(
-        `Checkout placeholder\n\nPhoto: ${photo.id}\nLicense: ${license}\nFormat: ${format}\nPrice: ${formatMoney(
-          currency,
-          PRICES[currency][license][format]
-        )}`
-      )
-    } finally {
-      setIsCheckingOut(false)
+  try {
+    setIsCheckingOut(true)
+
+    const r = await fetch('/api/payhere/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        photoId: photo.id,
+        license,
+        format,
+        currency,
+
+        // optional customer details (can keep simple for now)
+        email: null,
+        firstName: 'Customer',
+        lastName: 'Guest',
+        phone: '0000000000',
+        address: 'N/A',
+        city: 'N/A',
+        country: 'Sri Lanka',
+      }),
+    })
+
+    const data = await r.json()
+
+    if (!r.ok || !data?.actionUrl || !data?.fields) {
+      alert(data?.error || 'Checkout init failed')
+      return
     }
+
+    // ✅ Auto-submit PayHere form (redirect user to payment)
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = data.actionUrl
+
+    Object.entries(data.fields).forEach(([k, v]) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = k
+      input.value = String(v ?? '')
+      form.appendChild(input)
+    })
+
+    document.body.appendChild(form)
+    form.submit()
+  } catch (e) {
+    console.error(e)
+    alert('Checkout failed')
+  } finally {
+    setIsCheckingOut(false)
   }
+}
+
 
   const price = PRICES[currency][license][format]
 
