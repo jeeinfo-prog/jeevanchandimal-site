@@ -1,3 +1,5 @@
+// pages/admin/upload.js
+
 import React from 'react'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
@@ -10,17 +12,61 @@ const supabase = createClient(
 function fmtMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(2)
 }
-
 function fmtSpeed(bps) {
   if (!bps || bps <= 0) return '—'
   return `${(bps / (1024 * 1024)).toFixed(2)} MB/s`
 }
-
 function fmtEta(sec) {
   if (!sec || sec <= 0 || !Number.isFinite(sec)) return '—'
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
+
+function stripExt(name) {
+  const n = String(name || '')
+  const i = n.lastIndexOf('.')
+  return i > 0 ? n.slice(0, i) : n
+}
+
+function toTitleCase(s) {
+  return String(s)
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
+    .join(' ')
+}
+
+function autoTitleFromFile(file) {
+  const base = stripExt(file?.name || '')
+  return toTitleCase(base)
+}
+
+function autoTagsFromFile(file) {
+  const base = stripExt(file?.name || '')
+  const raw = base
+    .replace(/[_\-]+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+    .toLowerCase()
+
+  const stop = new Set(['the','a','an','and','or','of','to','in','on','at','for','with','by','from'])
+  const words = raw.split(/\s+/g).filter(Boolean)
+
+  const tags = []
+  const seen = new Set()
+
+  for (const w of words) {
+    if (w.length < 3) continue
+    if (stop.has(w)) continue
+    if (/^\d+$/.test(w)) continue
+    if (seen.has(w)) continue
+    seen.add(w)
+    tags.push(w)
+    if (tags.length >= 10) break
+  }
+  return tags
 }
 
 export default function AdminUploadPage() {
@@ -33,21 +79,26 @@ export default function AdminUploadPage() {
   const [logs, setLogs] = React.useState([])
   const [busy, setBusy] = React.useState(false)
 
+  // Pro controls
   const [autoStart, setAutoStart] = React.useState(true)
   const [paused, setPaused] = React.useState(false)
   const [stopAfterCurrent, setStopAfterCurrent] = React.useState(false)
+
+  // Folder behavior
+  const [keepFolderStructure, setKeepFolderStructure] = React.useState(true)
+
+  // Bulk presets (sent to backend create-upload)
+  const [licensePreset, setLicensePreset] = React.useState('personal') // personal | commercial | editorial
+  const [priceLkr, setPriceLkr] = React.useState(2500)
+  const [priceUsd, setPriceUsd] = React.useState(8)
 
   const concurrency = 4
   const runningRef = React.useRef(false)
   const queueRef = React.useRef([])
   const xhrMapRef = React.useRef(new Map())
-  const countWorkingRef = React.useRef(0)
 
   React.useEffect(() => {
     queueRef.current = queue
-    countWorkingRef.current = queue.filter(
-      (x) => x.status === 'UPLOADING' || x.status === 'COMMITTING'
-    ).length
   }, [queue])
 
   function log(line) {
@@ -70,10 +121,29 @@ export default function AdminUploadPage() {
     setQueue((q) =>
       q.map((it) =>
         it.status === 'ERROR'
-          ? { ...it, status: 'QUEUED', error: '', progress: 0, speedBps: 0, etaSec: 0 }
+          ? { ...it, status: 'QUEUED', error: '', errorType: '', progress: 0, speedBps: 0, etaSec: 0 }
           : it
       )
     )
+  }
+
+  function applyBulkPresetToQueued() {
+    setQueue((q) =>
+      q.map((it) =>
+        it.status === 'QUEUED' || it.status === 'ERROR'
+          ? {
+              ...it,
+              meta: {
+                ...(it.meta || {}),
+                licensePreset,
+                priceLkr: Number(priceLkr) || 0,
+                priceUsd: Number(priceUsd) || 0,
+              },
+            }
+          : it
+      )
+    )
+    log(`✅ Applied bulk preset to queued items (${licensePreset}, LKR ${priceLkr}, USD ${priceUsd})`)
   }
 
   async function safeJson(resp) {
@@ -85,7 +155,9 @@ export default function AdminUploadPage() {
     }
   }
 
+  // --------------------------
   // Auth
+  // --------------------------
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data?.session || null))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
@@ -114,6 +186,7 @@ export default function AdminUploadPage() {
     }
 
     checkAdmin()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id])
 
   async function signIn() {
@@ -146,15 +219,32 @@ export default function AdminUploadPage() {
     }
   }
 
-  // XHR upload with progress
+  // --------------------------
+  // Drag & Drop
+  // --------------------------
+  const [dragOver, setDragOver] = React.useState(false)
+
+  function onDrop(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+
+    // Note: dragging folders reliably requires File System Access API or webkitGetAsEntry traversal,
+    // which is inconsistent across browsers. Folder upload is handled via the folder picker input.
+    const files = e.dataTransfer?.files
+    if (files && files.length) addFiles(files)
+  }
+
+  // --------------------------
+  // XHR PUT with progress + speed + ETA
+  // --------------------------
   function putToR2WithProgress(itemId, uploadUrl, file, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open('PUT', uploadUrl, true)
       xhrMapRef.current.set(itemId, xhr)
 
-      const startedAt = Date.now()
-      let lastAt = startedAt
+      let lastAt = Date.now()
       let lastLoaded = 0
 
       xhr.upload.onprogress = (evt) => {
@@ -184,7 +274,8 @@ export default function AdminUploadPage() {
           onProgress({ pct: 100, loaded: file.size, total: file.size, speedBps: 0, etaSec: 0 })
           resolve()
         } else {
-          reject(Object.assign(new Error(`R2 PUT failed: ${xhr.status}`), { _type: 'R2' }))
+          const err = Object.assign(new Error(`R2 PUT failed: ${xhr.status}`), { _type: 'R2' })
+          reject(err)
         }
       }
 
@@ -206,10 +297,57 @@ export default function AdminUploadPage() {
     const picked = Array.from(fileList || [])
     if (!picked.length) return
 
-    const items = picked.map((file) => ({
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      file,
-      status: 'QUEUED',
+    const items = picked.map((file) => {
+      const rel = file.webkitRelativePath || ''
+      const relPath = keepFolderStructure && rel ? rel : ''
+
+      const title = autoTitleFromFile(file)
+      const tags = autoTagsFromFile(file)
+
+      return {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        file,
+        relativePath: relPath, // sent to backend (optional)
+        status: 'QUEUED', // QUEUED | UPLOADING | COMMITTING | DONE | ERROR
+        error: '',
+        errorType: '',
+        progress: 0,
+        loaded: 0,
+        total: file.size || 0,
+        speedBps: 0,
+        etaSec: 0,
+        photoId: null,
+        meta: {
+          title,
+          tags,
+          licensePreset,
+          priceLkr: Number(priceLkr) || 0,
+          priceUsd: Number(priceUsd) || 0,
+        },
+      }
+    })
+
+    setQueue((q) => [...q, ...items])
+  }
+
+  // Auto-start when new queued items appear
+  React.useEffect(() => {
+    if (!autoStart) return
+    if (paused) return
+    if (busy) return
+    if (stopAfterCurrent) return
+    if (!session?.access_token || !isAdmin) return
+
+    const hasQueued = queue.some((x) => x.status === 'QUEUED')
+    if (hasQueued) runQueue()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue.length, autoStart, paused, busy, stopAfterCurrent, session?.access_token, isAdmin])
+
+  async function uploadSingleItem(item, token) {
+    const file = item.file
+
+    setItem(item.id, {
+      status: 'UPLOADING',
       error: '',
       errorType: '',
       progress: 0,
@@ -217,45 +355,42 @@ export default function AdminUploadPage() {
       total: file.size || 0,
       speedBps: 0,
       etaSec: 0,
-      photoId: null,
-    }))
-
-    setQueue((q) => [...q, ...items])
-  }
-
-  // Auto-start
-  React.useEffect(() => {
-    if (!autoStart || paused || busy || stopAfterCurrent) return
-    if (!session?.access_token || !isAdmin) return
-    if (queue.some((x) => x.status === 'QUEUED')) runQueue()
-  }, [queue.length, autoStart, paused, busy, stopAfterCurrent, session?.access_token, isAdmin])
-
-  async function uploadSingleItem(item, token) {
-    const file = item.file
-
-    setItem(item.id, { status: 'UPLOADING', error: '', progress: 0 })
+    })
 
     log(`Preparing upload: ${file.name}`)
 
-    // CREATE
-    let photoId, objectKey, uploadUrl
+    // 1) create-upload
+    let photoId, uploadUrl
     try {
       const createResp = await fetch('/api/admin/photos/create-upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ filename: file.name }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          relativePath: item.relativePath || '',
+          title: item?.meta?.title || '',
+          tags: item?.meta?.tags || [],
+          licensePreset: item?.meta?.licensePreset || '',
+          priceLkr: item?.meta?.priceLkr ?? null,
+          priceUsd: item?.meta?.priceUsd ?? null,
+        }),
       })
+
       const { json, text } = await safeJson(createResp)
-      if (!createResp.ok) throw new Error(json?.error || text)
+      if (!createResp.ok) throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
+
       photoId = json.photoId
-      objectKey = json.objectKey
       uploadUrl = json.uploadUrl
       log(`✅ create-upload OK — photoId=${photoId}`)
+      setItem(item.id, { photoId })
     } catch (e) {
-      throw Object.assign(new Error(e.message), { _type: 'CREATE' })
+      throw Object.assign(new Error(e.message), { _type: e?._type || 'CREATE' })
     }
 
-    // PUT
+    // 2) PUT to R2 with progress
     try {
       log(`Uploading to R2: ${file.name}`)
       await putToR2WithProgress(item.id, uploadUrl, file, ({ pct, loaded, total, speedBps, etaSec }) => {
@@ -263,24 +398,32 @@ export default function AdminUploadPage() {
       })
       log('✅ R2 PUT OK')
     } catch (e) {
-      if (e.message.includes('aborted')) throw e
-      throw Object.assign(new Error(e.message), { _type: 'R2' })
+      if (String(e?.message || '').toLowerCase().includes('aborted')) throw e
+      throw Object.assign(new Error(e.message), { _type: e?._type || 'R2' })
     }
 
-    // COMMIT
+    // 3) commit
     try {
       setItem(item.id, { status: 'COMMITTING', speedBps: 0, etaSec: 0 })
+      log(`Commit: ${file.name}`)
+
       const commitResp = await fetch('/api/admin/photos/commit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ photoId }),
       })
+
       const { json, text } = await safeJson(commitResp)
-      if (!commitResp.ok) throw new Error(json?.detail || json?.error || text)
+      if (!commitResp.ok) throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
+
       log('✅ Done: commit complete')
-      setItem(item.id, { photoId })
+      log(`thumbUrl: ${json?.thumbUrl || json?.thumb_url || '(none)'}`)
+      log(`previewUrl: ${json?.previewUrl || json?.preview_url || '(none)'}`)
     } catch (e) {
-      throw Object.assign(new Error(e.message), { _type: 'COMMIT' })
+      throw Object.assign(new Error(e.message), { _type: e?._type || 'COMMIT' })
     }
   }
 
@@ -300,8 +443,10 @@ export default function AdminUploadPage() {
   }
 
   async function runQueue() {
-    if (runningRef.current || paused) return
-    if (!session?.access_token || !isAdmin) return
+    if (runningRef.current) return
+    if (paused) return
+    if (!session?.access_token) return log('❌ Not logged in')
+    if (!isAdmin) return log('❌ Not admin')
 
     runningRef.current = true
     setBusy(true)
@@ -309,7 +454,7 @@ export default function AdminUploadPage() {
     const token = session.access_token
 
     try {
-      log(`📦 Queue started (concurrency=${concurrency})`)
+      log(`📦 Upload queue started (concurrency=${concurrency})`)
 
       while (true) {
         if (paused) break
@@ -319,12 +464,15 @@ export default function AdminUploadPage() {
             (x) => x.status === 'UPLOADING' || x.status === 'COMMITTING'
           )
           if (!anyWorking) break
+          // Wait for current work to finish
+          // eslint-disable-next-line no-await-in-loop
           await new Promise((r) => setTimeout(r, 200))
           continue
         }
 
+        const snapshot = queueRef.current
         const next = []
-        for (const it of queueRef.current) {
+        for (const it of snapshot) {
           if (next.length >= concurrency) break
           if (it.status === 'QUEUED') next.push(it)
         }
@@ -335,25 +483,23 @@ export default function AdminUploadPage() {
           next.map(async (it) => {
             try {
               await uploadSingleItem(it, token)
-              setItem(it.id, { status: 'DONE', error: '', progress: 100, speedBps: 0, etaSec: 0 })
+              setItem(it.id, { status: 'DONE', error: '', errorType: '', progress: 100, speedBps: 0, etaSec: 0 })
             } catch (e) {
               const msg = e?.message || String(e)
+
+              // If paused, aborted uploads become QUEUED again
               if (paused && msg.toLowerCase().includes('aborted')) {
-                setItem(it.id, { status: 'QUEUED', error: '' })
+                setItem(it.id, { status: 'QUEUED', error: '', errorType: '' })
                 return
               }
-              setItem(it.id, {
-                status: 'ERROR',
-                error: msg,
-                errorType: e?._type || 'UNKNOWN',
-                speedBps: 0,
-                etaSec: 0,
-              })
+
+              setItem(it.id, { status: 'ERROR', error: msg, errorType: e?._type || 'UNKNOWN', speedBps: 0, etaSec: 0 })
               log(`❌ Failed: ${it.file.name} — ${msg}`)
             }
           })
         )
 
+        // eslint-disable-next-line no-await-in-loop
         await new Promise((r) => setTimeout(r, 30))
       }
 
@@ -370,6 +516,7 @@ export default function AdminUploadPage() {
   const countWorking = queue.filter((x) => x.status === 'UPLOADING' || x.status === 'COMMITTING').length
   const countDone = queue.filter((x) => x.status === 'DONE').length
   const countErr = queue.filter((x) => x.status === 'ERROR').length
+  const workingItems = queue.filter((x) => x.status === 'UPLOADING' || x.status === 'COMMITTING')
 
   const canStart = !busy && !paused && isAdmin && countQueued > 0
   const canPause = busy && !paused && countWorking > 0
@@ -377,71 +524,434 @@ export default function AdminUploadPage() {
 
   return (
     <>
-      <Head><title>Admin Upload</title></Head>
+      <Head>
+        <title>Admin Upload</title>
+      </Head>
 
-      <main style={{ maxWidth: 980, margin: '0 auto', padding: '40px 20px' }}>
-        <h1>Admin Upload</h1>
+      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px' }}>
+        <h1 style={{ margin: 0 }}>Admin Upload</h1>
+        <p style={{ opacity: 0.8, marginTop: 8 }}>
+          Drag & drop + folder upload + auto title/tags + bulk presets.
+        </p>
 
         {!session ? (
-          <div>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" />
-            <button onClick={signIn}>Sign in</button>
+          <div
+            style={{
+              marginTop: 18,
+              padding: 16,
+              border: '1px solid rgba(245,244,244,0.16)',
+              borderRadius: 14,
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Login</h3>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              style={{ width: '100%', padding: 10, marginBottom: 10 }}
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              style={{ width: '100%', padding: 10, marginBottom: 10 }}
+            />
+            <button onClick={signIn} disabled={busy} style={{ padding: '10px 14px' }}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
           </div>
         ) : (
-          <>
-            <div>
-              <strong>{session.user.email}</strong> — {isAdmin ? 'admin' : 'not admin'}
-              <button onClick={signOut}>Sign out</button>
+          <div
+            style={{
+              marginTop: 18,
+              padding: 16,
+              border: '1px solid rgba(245,244,244,0.16)',
+              borderRadius: 14,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>Signed in</div>
+                <div style={{ opacity: 0.8, fontSize: 13 }}>{session.user.email}</div>
+                <div style={{ marginTop: 6, fontSize: 13 }}>
+                  Role:{' '}
+                  <strong style={{ color: isAdmin ? '#7CFF9B' : '#FF7C7C' }}>
+                    {isAdmin ? 'admin' : 'not admin'}
+                  </strong>
+                </div>
+              </div>
+              <button onClick={signOut} disabled={busy} style={{ padding: '10px 14px' }}>
+                Sign out
+              </button>
             </div>
 
-            <input type="file" multiple accept="image/*" onChange={(e) => addFiles(e.target.files)} />
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(245,244,244,0.12)' }}>
+              <h3 style={{ marginTop: 0 }}>Bulk preset</h3>
 
-            <div>Queued: {countQueued} | Working: {countWorking} | Done: {countDone} | Errors: {countErr}</div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                <label style={{ fontSize: 13, opacity: 0.9 }}>
+                  License:{' '}
+                  <select value={licensePreset} onChange={(e) => setLicensePreset(e.target.value)} disabled={busy}>
+                    <option value="personal">personal</option>
+                    <option value="commercial">commercial</option>
+                    <option value="editorial">editorial</option>
+                  </select>
+                </label>
 
-            <button onClick={runQueue} disabled={!canStart}>Start</button>
-            <button onClick={pauseQueue} disabled={!canPause}>Pause</button>
-            <button onClick={resumeQueue} disabled={!canResume}>Resume</button>
+                <label style={{ fontSize: 13, opacity: 0.9 }}>
+                  Price LKR:{' '}
+                  <input
+                    type="number"
+                    value={priceLkr}
+                    onChange={(e) => setPriceLkr(e.target.value)}
+                    style={{ width: 120 }}
+                    disabled={busy}
+                  />
+                </label>
 
-            <button onClick={() => { setStopAfterCurrent(true); log('🛑 Will stop after current uploads finish') }}
-              disabled={!busy || paused}>
-              Stop after current
-            </button>
+                <label style={{ fontSize: 13, opacity: 0.9 }}>
+                  Price USD:{' '}
+                  <input
+                    type="number"
+                    value={priceUsd}
+                    onChange={(e) => setPriceUsd(e.target.value)}
+                    style={{ width: 90 }}
+                    disabled={busy}
+                  />
+                </label>
 
-            <button onClick={retryFailed} disabled={busy || countErr === 0}>Retry failed</button>
-            <button onClick={() => setQueue([])} disabled={busy}>Clear queue</button>
-
-            {queue.map((it) => (
-              <div key={it.id} style={{ marginTop: 10, border: '1px solid #444', padding: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{it.file.name}</span>
-                  <span>{it.status}</span>
-                </div>
-
-                <div style={{ height: 6, background: '#333', marginTop: 4 }}>
-                  <div style={{ width: `${it.progress}%`, height: '100%', background: '#aaa' }} />
-                </div>
-
-                <div style={{ fontSize: 12 }}>
-                  {it.status === 'UPLOADING' && `${it.progress}% • ${fmtSpeed(it.speedBps)} • ETA ${fmtEta(it.etaSec)}`}
-                  {it.status === 'COMMITTING' && 'Committing…'}
-                  {it.status === 'ERROR' && `${it.errorType}: ${it.error}`}
-                  {it.status === 'DONE' && it.photoId && (
-                    <a href={`/store/${it.photoId}`} target="_blank" rel="noreferrer">Open in Store</a>
-                  )}
-                </div>
-
-                <button onClick={() => removeItem(it.id)}
-                  disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}>
-                  Remove
+                <button type="button" onClick={applyBulkPresetToQueued} disabled={busy || queue.length === 0} style={{ padding: '8px 12px' }}>
+                  Apply to queued
                 </button>
               </div>
-            ))}
-          </>
+
+              <div style={{ marginTop: 12, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
+                  <input
+                    type="checkbox"
+                    checked={keepFolderStructure}
+                    onChange={(e) => setKeepFolderStructure(e.target.checked)}
+                    disabled={busy}
+                  />
+                  Keep folder structure (R2 keys use webkitRelativePath)
+                </label>
+
+                <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
+                  <input
+                    type="checkbox"
+                    checked={autoStart}
+                    onChange={(e) => setAutoStart(e.target.checked)}
+                    disabled={busy}
+                  />
+                  Auto-start
+                </label>
+
+                {busy && (
+                  <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', opacity: 0.9 }}>
+                    <span className="spinner" /> Uploading…
+                  </span>
+                )}
+
+                {paused && <span style={{ opacity: 0.9 }}>⏸ Paused</span>}
+                {stopAfterCurrent && <span style={{ opacity: 0.9 }}>🛑 Will stop after current</span>}
+              </div>
+
+              <h3 style={{ marginTop: 18 }}>Add files</h3>
+
+              {/* Drag & drop zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={(e) => { e.preventDefault(); setDragOver(false) }}
+                onDrop={onDrop}
+                style={{
+                  border: `1px dashed ${dragOver ? 'rgba(245,244,244,0.55)' : 'rgba(245,244,244,0.25)'}`,
+                  borderRadius: 14,
+                  padding: 18,
+                  background: dragOver ? 'rgba(245,244,244,0.06)' : 'rgba(255,255,255,0.02)',
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>Drag & drop files here</div>
+                <div style={{ opacity: 0.75, marginTop: 6, fontSize: 13 }}>
+                  Tip: use the folder picker below for real folder selection.
+                </div>
+
+                <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'inline-block' }}>
+                    <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>Select files</div>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.tif,.tiff"
+                      onChange={(e) => { addFiles(e.target.files); e.target.value = '' }}
+                    />
+                  </label>
+
+                  <label style={{ display: 'inline-block' }}>
+                    <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>Select folder</div>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.jpg,.jpeg,.png,.webp,.tif,.tiff"
+                      // React doesn’t officially type these, but browsers support it:
+                      {...{ webkitdirectory: 'true', directory: 'true' }}
+                      onChange={(e) => { addFiles(e.target.files); e.target.value = '' }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, opacity: 0.85, fontSize: 13 }}>
+                Queued: <strong>{countQueued}</strong> | Working: <strong>{countWorking}</strong> | Done:{' '}
+                <strong>{countDone}</strong> | Errors: <strong>{countErr}</strong>
+              </div>
+
+              {workingItems.length > 0 && (
+                <div style={{ marginTop: 10, padding: 12, border: '1px solid rgba(245,244,244,0.12)', borderRadius: 12 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Now processing</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, opacity: 0.9 }}>
+                    {workingItems.slice(0, 4).map((x) => (
+                      <li key={x.id}>
+                        {x.file.name} — <strong>{x.status}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                <button onClick={runQueue} disabled={!canStart} style={{ padding: '10px 14px' }}>
+                  Start Uploads (4 at a time)
+                </button>
+
+                <button onClick={pauseQueue} disabled={!canPause} style={{ padding: '10px 14px' }}>
+                  Pause
+                </button>
+
+                <button onClick={resumeQueue} disabled={!canResume} style={{ padding: '10px 14px' }}>
+                  Resume
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStopAfterCurrent(true)
+                    log('🛑 Will stop after current uploads finish')
+                  }}
+                  disabled={!busy || paused}
+                  style={{ padding: '10px 14px' }}
+                >
+                  Stop after current
+                </button>
+
+                <button onClick={retryFailed} disabled={busy || countErr === 0} style={{ padding: '10px 14px' }}>
+                  Retry failed ({countErr})
+                </button>
+
+                <button onClick={() => setQueue([])} disabled={busy} style={{ padding: '10px 14px' }}>
+                  Clear queue
+                </button>
+              </div>
+
+              {/* Queue list */}
+              {queue.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 10 }}>Queue</div>
+
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {queue.map((it) => (
+                      <div
+                        key={it.id}
+                        style={{
+                          padding: 12,
+                          border: '1px solid rgba(245,244,244,0.12)',
+                          borderRadius: 14,
+                          background: 'rgba(255,255,255,0.02)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {it.file.name}
+                            {it.relativePath ? (
+                              <span style={{ marginLeft: 8, opacity: 0.7, fontSize: 12 }}>
+                                ({it.relativePath})
+                              </span>
+                            ) : null}
+                            <span style={{ marginLeft: 8, opacity: 0.7, fontSize: 12 }}>
+                              ({fmtMB(it.total || it.file.size)} MB)
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 10, alignItems: 'center', whiteSpace: 'nowrap' }}>
+                            <span style={{ opacity: 0.9 }}>
+                              {it.status === 'ERROR' ? 'ERROR' : it.status}
+                            </span>
+
+                            {it.status === 'ERROR' && !busy && (
+                              <button
+                                onClick={() =>
+                                  setItem(it.id, { status: 'QUEUED', error: '', errorType: '', progress: 0, speedBps: 0, etaSec: 0 })
+                                }
+                                style={{
+                                  padding: '2px 8px',
+                                  fontSize: 11,
+                                  borderRadius: 8,
+                                  border: '1px solid rgba(245,244,244,0.18)',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Retry
+                              </button>
+                            )}
+
+                            {it.status === 'DONE' && it.photoId && (
+                              <a
+                                href={`/store/${it.photoId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ fontSize: 11, textDecoration: 'underline', opacity: 0.9 }}
+                              >
+                                Open in Store
+                              </a>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => removeItem(it.id)}
+                              disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: 11,
+                                borderRadius: 8,
+                                border: '1px solid rgba(245,244,244,0.18)',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                opacity: busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING') ? 0.5 : 1,
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Auto title/tags preview */}
+                        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+                          <div>
+                            <strong>Title:</strong> {it?.meta?.title || '(auto)'}
+                          </div>
+                          <div>
+                            <strong>Tags:</strong>{' '}
+                            {(it?.meta?.tags || []).length ? (it.meta.tags.slice(0, 10).join(', ')) : '(auto)'}
+                          </div>
+                          <div>
+                            <strong>Preset:</strong> {it?.meta?.licensePreset || licensePreset} • LKR {it?.meta?.priceLkr ?? priceLkr} • USD {it?.meta?.priceUsd ?? priceUsd}
+                          </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div
+                          style={{
+                            marginTop: 8,
+                            height: 7,
+                            background: 'rgba(245,244,244,0.12)',
+                            borderRadius: 999,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${it.progress || 0}%`,
+                              height: '100%',
+                              background: 'rgba(245,244,244,0.65)',
+                              transition: 'width 120ms linear',
+                            }}
+                          />
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 6,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                            fontSize: 12,
+                            opacity: 0.85,
+                          }}
+                        >
+                          <div>
+                            {it.status === 'UPLOADING' ? (
+                              <>
+                                {it.progress || 0}% • {fmtMB(it.loaded || 0)}/{fmtMB(it.total || it.file.size)} MB
+                              </>
+                            ) : it.status === 'COMMITTING' ? (
+                              <>100% • Committing…</>
+                            ) : it.status === 'DONE' ? (
+                              <>100% • Done</>
+                            ) : it.status === 'ERROR' ? (
+                              <>
+                                <strong>{it.errorType || 'ERROR'}:</strong> {it.error || 'Unknown error'}
+                              </>
+                            ) : (
+                              <>Waiting…</>
+                            )}
+                          </div>
+
+                          <div style={{ whiteSpace: 'nowrap' }}>
+                            {it.status === 'UPLOADING' ? (
+                              <>
+                                {fmtSpeed(it.speedBps)} • ETA {fmtEta(it.etaSec)}
+                              </>
+                            ) : (
+                              ' '
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
-        <pre style={{ marginTop: 20 }}>{logs.join('\n')}</pre>
+        {/* Logs */}
+        <div style={{ marginTop: 18 }}>
+          <h3 style={{ marginBottom: 10 }}>Logs</h3>
+          <div
+            style={{
+              padding: 14,
+              border: '1px solid rgba(245,244,244,0.16)',
+              borderRadius: 14,
+              minHeight: 80,
+              whiteSpace: 'pre-wrap',
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              fontSize: 12,
+            }}
+          >
+            {logs.length ? logs.join('\n') : <span style={{ opacity: 0.7 }}>No logs yet.</span>}
+          </div>
+        </div>
       </main>
+
+      <style jsx global>{`
+        .spinner {
+          display: inline-block;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: rgba(245, 244, 244, 0.95);
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </>
   )
 }
