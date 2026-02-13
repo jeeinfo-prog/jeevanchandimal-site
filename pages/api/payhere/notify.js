@@ -1,43 +1,60 @@
+// pages/api/payhere/notify.js
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
 import { sendDownloadEmail } from '../../../lib/email'
 
+export const config = {
+  api: { bodyParser: false }, // ✅ IMPORTANT: PayHere posts form-encoded
+}
+
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.on('data', (chunk) => (data += chunk))
+    req.on('end', () => resolve(data))
+    req.on('error', reject)
+  })
+}
+
+function parseForm(body) {
+  const params = new URLSearchParams(body)
+  const obj = {}
+  for (const [k, v] of params.entries()) obj[k] = v
+  return obj
+}
+
+function md5Upper(str) {
+  return crypto.createHash('md5').update(String(str)).digest('hex').toUpperCase()
+}
+
+// ✅ PayHere signature = MD5( merchant_id + order_id + amount + currency + status_code + MD5(secret) )
+function makePayhereSig({ merchant_id, order_id, payhere_amount, payhere_currency, status_code, secret }) {
+  return md5Upper(
+    String(merchant_id) +
+      String(order_id) +
+      String(payhere_amount) +
+      String(payhere_currency) +
+      String(status_code) +
+      md5Upper(secret)
+  )
+}
+
 function buildDownloadUrl(token, req) {
   const base =
     process.env.NEXT_PUBLIC_SITE_URL ||
     `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`
-
   return `${base}/api/download?token=${encodeURIComponent(token)}`
 }
 
-function makeLocalSig({
-  merchant_id,
-  order_id,
-  payhere_amount,
-  payhere_currency,
-  status_code,
-  secret,
-}) {
-  return crypto
-    .createHash('md5')
-    .update(
-      String(merchant_id) +
-        String(order_id) +
-        String(payhere_amount) +
-        String(payhere_currency) +
-        String(status_code) +
-        String(secret)
-    )
-    .digest('hex')
-    .toUpperCase()
-}
-
 export default async function handler(req, res) {
-  // PayHere may call with GET or POST
-  const data = req.method === 'POST' ? req.body : req.query
+  // PayHere should POST. (Some tools may call GET; we ignore safely.)
+  if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
+    const raw = await readRawBody(req)
+    const data = parseForm(raw)
+
     const {
       order_id,
       payment_id,
@@ -49,9 +66,7 @@ export default async function handler(req, res) {
       payhere_currency,
     } = data
 
-    if (!order_id) {
-      return res.status(200).json({ ok: true })
-    }
+    if (!order_id) return res.status(200).send('OK')
 
     // 1) Fetch order
     const { data: order, error: orderErr } = await supabaseAdmin
@@ -62,13 +77,13 @@ export default async function handler(req, res) {
 
     if (orderErr || !order) {
       console.error('Order not found:', order_id, orderErr?.message)
-      return res.status(200).json({ ok: true })
+      return res.status(200).send('OK')
     }
 
-    // 2) Verify PayHere MD5 signature
+    // 2) Verify signature (CRITICAL)
     const secret = process.env.PAYHERE_MERCHANT_SECRET
     if (secret) {
-      const localSig = makeLocalSig({
+      const localSig = makePayhereSig({
         merchant_id,
         order_id,
         payhere_amount,
@@ -77,27 +92,39 @@ export default async function handler(req, res) {
         secret,
       })
 
-      if (md5sig && String(md5sig).toUpperCase() !== localSig) {
+      if (!md5sig || String(md5sig).toUpperCase() !== localSig) {
         console.error('MD5 signature mismatch for order:', order_id)
-        return res.status(200).json({ ok: true })
+
+        // Optional: mark order as invalid signature (helps debugging)
+        await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'INVALID_SIG',
+            payhere_payment_id: payment_id || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
+          .eq('id', order_id)
+
+        return res.status(200).send('OK') // PayHere expects 200
       }
     }
 
     const statusCodeNum = Number(status_code)
 
     // =========================
-    // ✅ PAYMENT SUCCESS
+    // ✅ PAYMENT SUCCESS (status_code === 2)
     // =========================
     if (statusCodeNum === 2 && order.status !== 'PAID') {
-      // Mark order as PAID
+      // Mark PAID
       await supabaseAdmin
         .from('orders')
         .update({
           status: 'PAID',
           paid_at: new Date().toISOString(),
-          payhere_payment_id: payment_id,
-          payhere_status_code: status_code,
-          payhere_status_message: status_message,
+          payhere_payment_id: payment_id || null,
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
         })
         .eq('id', order_id)
 
@@ -105,7 +132,7 @@ export default async function handler(req, res) {
       const objectKey = order.delivery_object_key
       if (!objectKey) {
         console.error('Missing delivery_object_key for order:', order_id)
-        return res.status(200).json({ ok: true })
+        return res.status(200).send('OK')
       }
 
       // Create secure download token (10 minutes)
@@ -139,8 +166,8 @@ export default async function handler(req, res) {
           .eq('id', order_id)
       }
 
-      console.log('Order PAID + download email sent:', order_id)
-      return res.status(200).json({ ok: true })
+      console.log('Order PAID + email sent:', order_id)
+      return res.status(200).send('OK')
     }
 
     // =========================
@@ -151,20 +178,19 @@ export default async function handler(req, res) {
         .from('orders')
         .update({
           status: 'FAILED',
-          payhere_payment_id: payment_id || '0',
-          payhere_status_code: status_code,
-          payhere_status_message: status_message,
+          payhere_payment_id: payment_id || null,
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
         })
         .eq('id', order_id)
 
       console.log('Order FAILED:', order_id)
-      return res.status(200).json({ ok: true })
+      return res.status(200).send('OK')
     }
 
-    // Always respond 200 to PayHere
-    return res.status(200).json({ ok: true })
+    return res.status(200).send('OK')
   } catch (err) {
     console.error('PayHere notify error:', err)
-    return res.status(200).json({ ok: true })
+    return res.status(200).send('OK') // Always 200 for PayHere
   }
 }
