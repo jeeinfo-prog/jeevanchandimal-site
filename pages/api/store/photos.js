@@ -12,11 +12,9 @@ export default async function handler(req, res) {
       .from('photos')
       .select('id, title, tags, preview_url, thumb_url, created_at')
       .eq('status', 'published')
-
       // ✅ ONLY show photos that actually have generated derivatives
       .not('thumb_url', 'is', null)
       .not('preview_url', 'is', null)
-
       .order('created_at', { ascending: false })
 
     if (error) {
