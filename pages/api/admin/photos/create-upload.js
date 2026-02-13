@@ -24,13 +24,10 @@ async function requireAdmin(req) {
 }
 
 function sanitizeFilename(name) {
-  // Keep extension, replace spaces/special chars safely.
   return String(name).replace(/[^\w.\-]+/g, '_')
 }
 
 function sanitizePath(pathLike) {
-  // Convert "Trip/Sigiriya/IMG 1.jpg" => "Trip/Sigiriya/IMG_1.jpg"
-  // Remove leading slashes, collapse .., keep simple folder structure
   const raw = String(pathLike || '').replace(/\\/g, '/').replace(/^\/+/, '')
   const parts = raw
     .split('/')
@@ -40,9 +37,13 @@ function sanitizePath(pathLike) {
   return parts.join('/')
 }
 
-function isMissingColumnError(err) {
-  // Postgres undefined_column is 42703 (Supabase usually forwards this)
-  return err?.code === '42703' || /column .* does not exist/i.test(err?.message || '')
+function isUnknownColumn(err) {
+  const msg = (err?.message || '').toLowerCase()
+  return (
+    err?.code === '42703' ||
+    msg.includes('does not exist') ||
+    msg.includes('schema cache')
+  )
 }
 
 export default async function handler(req, res) {
@@ -53,123 +54,88 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {}
-
-    // filename is always required (base file name)
     const filename = body.filename
     if (!filename) return res.status(400).json({ ok: false, error: 'filename required' })
 
-    // Optional: preserve folder structure from browser folder upload
-    // Example: "Trip/Sigiriya/IMG_123.jpg"
+    const safeName = sanitizeFilename(filename)
+
+    // Optional: folder structure
     const relativePath = body.relativePath ? sanitizePath(body.relativePath) : ''
+    const pathPart = relativePath && relativePath.includes('/') ? relativePath : safeName
 
-    // Optional metadata (safe: we’ll attempt to store; if columns missing, we retry without them)
+    // Optional metadata (ONLY title/tags are attempted; pricing/licensing skipped unless you add columns later)
     const title = typeof body.title === 'string' ? body.title.trim() : ''
-    const tags = Array.isArray(body.tags) ? body.tags.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim()) : null
-    const license_preset = typeof body.licensePreset === 'string' ? body.licensePreset.trim() : ''
-    const price_lkr = Number.isFinite(body.priceLkr) ? body.priceLkr : (typeof body.priceLkr === 'number' ? body.priceLkr : null)
-    const price_usd = Number.isFinite(body.priceUsd) ? body.priceUsd : (typeof body.priceUsd === 'number' ? body.priceUsd : null)
+    const tags = Array.isArray(body.tags)
+      ? body.tags.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim())
+      : null
 
-    const baseInsert = { status: 'draft' }
+    // 1) Insert draft photo row (try with title/tags; fallback if columns missing)
+    let photoId = null
 
-    const metaInsert = {
-      ...(title ? { title } : {}),
-      ...(tags ? { tags } : {}),
-      ...(license_preset ? { license_preset } : {}),
-      ...(typeof price_lkr === 'number' ? { price_lkr } : {}),
-      ...(typeof price_usd === 'number' ? { price_usd } : {}),
-    }
-
-    // 1) Create photo row first to get ID
-    let photo
     {
-      // Try with metadata first; fallback to minimal if your table doesn't have those columns yet
+      const insertPayload = { status: 'draft' }
+      if (title) insertPayload.title = title
+      if (tags) insertPayload.tags = tags
+
       const first = await supabaseAdmin
         .from('photos')
-        .insert([{ ...baseInsert, ...metaInsert }])
+        .insert([insertPayload])
         .select('id')
         .single()
 
       if (first.error) {
-        if (!isMissingColumnError(first.error)) {
-          console.error('photos insert error:', first.error)
+        if (!isUnknownColumn(first.error)) {
           return res.status(500).json({ ok: false, error: first.error.message })
         }
 
+        // fallback minimal insert
         const fallback = await supabaseAdmin
           .from('photos')
-          .insert([{ ...baseInsert }])
+          .insert([{ status: 'draft' }])
           .select('id')
           .single()
 
         if (fallback.error) {
-          console.error('photos insert fallback error:', fallback.error)
           return res.status(500).json({ ok: false, error: fallback.error.message })
         }
-        photo = fallback.data
+        photoId = fallback.data.id
       } else {
-        photo = first.data
+        photoId = first.data.id
       }
     }
 
-    const safeName = sanitizeFilename(filename)
-
     // 2) Object key
-    // If relativePath includes folders, keep them under the photoId namespace.
-    // Example:
-    // photos/original/{photoId}/Trip/Sigiriya/IMG_123.jpg
-    const pathPart = relativePath && relativePath.includes('/') ? relativePath : safeName
-    const objectKey = `photos/original/${photo.id}/${pathPart}`
+    const objectKey = `photos/original/${photoId}/${pathPart}`
 
-    // 3) Save original key on photos row (commit.js relies on this)
+    // 3) Update photos row with original_jpg_key (always exists)
     {
-      const updatePatch = { original_jpg_key: objectKey }
-
-      // If table supports these, keep them synced too (best-effort)
-      if (title) updatePatch.title = title
-      if (tags) updatePatch.tags = tags
-      if (license_preset) updatePatch.license_preset = license_preset
-      if (typeof price_lkr === 'number') updatePatch.price_lkr = price_lkr
-      if (typeof price_usd === 'number') updatePatch.price_usd = price_usd
-
-      const up = await supabaseAdmin.from('photos').update(updatePatch).eq('id', photo.id)
+      const up = await supabaseAdmin
+        .from('photos')
+        .update({ original_jpg_key: objectKey })
+        .eq('id', photoId)
 
       if (up.error) {
-        // If missing columns, retry with only original_jpg_key
-        if (isMissingColumnError(up.error)) {
-          const up2 = await supabaseAdmin
-            .from('photos')
-            .update({ original_jpg_key: objectKey })
-            .eq('id', photo.id)
-
-          if (up2.error) {
-            console.error('photos update fallback error:', up2.error)
-            return res.status(500).json({ ok: false, error: up2.error.message })
-          }
-        } else {
-          console.error('photos update error:', up.error)
-          return res.status(500).json({ ok: false, error: up.error.message })
-        }
+        return res.status(500).json({ ok: false, error: up.error.message })
       }
     }
 
     // 4) Presigned PUT URL (ContentType NOT bound)
     const uploadUrl = await getPresignedPutUrl({ key: objectKey })
 
-    // 5) Save asset row (audit/history)
+    // 5) Asset row (audit)
     {
-      const asset = await supabaseAdmin.from('photo_assets').insert([
-        { photo_id: photo.id, original_key: objectKey },
-      ])
+      const asset = await supabaseAdmin
+        .from('photo_assets')
+        .insert([{ photo_id: photoId, original_key: objectKey }])
+
       if (asset.error) {
-        console.error('photo_assets insert error:', asset.error)
-        // Not fatal for upload, but better to fail loudly (your choice)
         return res.status(500).json({ ok: false, error: asset.error.message })
       }
     }
 
     return res.status(200).json({
       ok: true,
-      photoId: photo.id,
+      photoId,
       objectKey,
       uploadUrl,
     })
