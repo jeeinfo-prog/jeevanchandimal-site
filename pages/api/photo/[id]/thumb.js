@@ -1,10 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
+// pages/api/photo/[id]/thumb.js
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3'
 
 const s3 = new S3Client({
   region: 'auto',
@@ -17,37 +14,46 @@ const s3 = new S3Client({
 
 function sendStream(res, body) {
   if (!body) return res.end()
-  if (typeof body.pipe === 'function') {
-    body.pipe(res)
-  } else {
-    res.end(Buffer.from(body))
-  }
+  if (typeof body.pipe === 'function') return body.pipe(res)
+  return res.end(Buffer.from(body))
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+  if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
     const id = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id
-    if (!id) return res.status(400).json({ error: 'Missing id' })
+    if (!id) return res.status(400).json({ ok: false, error: 'Missing id' })
 
-    const { data: photo, error } = await supabase
+    // ✅ Only allow published photos publicly
+    const { data: photo, error: dbErr } = await supabaseAdmin
       .from('photos')
       .select('id, status')
       .eq('id', id)
       .single()
 
-    if (error || !photo) return res.status(404).json({ error: 'Not found' })
-    // if (photo.status !== 'published') return res.status(404).json({ error: 'Not found' })
+    if (dbErr || !photo || photo.status !== 'published') {
+      return res.status(404).json({ ok: false, error: 'Not found' })
+    }
 
     const key = `photos/thumb/${id}.jpg`
 
-    const obj = await s3.send(
-      new GetObjectCommand({
-        Bucket: process.env.R2_BUCKET,
-        Key: key,
-      })
-    )
+    let obj
+    try {
+      obj = await s3.send(
+        new GetObjectCommand({
+          Bucket: process.env.R2_BUCKET,
+          Key: key,
+        })
+      )
+    } catch (err) {
+      const code = err?.Code || err?.name || ''
+      if (code === 'NoSuchKey' || code === 'NotFound') {
+        // ✅ Missing derivative should be a 404, not a 500
+        return res.status(404).json({ ok: false, error: 'Thumb not found' })
+      }
+      throw err
+    }
 
     res.setHeader('Content-Type', obj.ContentType || 'image/jpeg')
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
@@ -57,6 +63,10 @@ export default async function handler(req, res) {
     return sendStream(res, obj.Body)
   } catch (err) {
     console.error('thumb error:', err)
-    return res.status(500).json({ error: 'Thumb failed', detail: err?.message || String(err) })
+    return res.status(500).json({
+      ok: false,
+      error: 'Thumb failed',
+      detail: err?.message || String(err),
+    })
   }
 }
