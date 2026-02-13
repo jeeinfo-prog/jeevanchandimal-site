@@ -20,8 +20,22 @@ const PRICES = {
   },
 }
 
+/**
+ * IMPORTANT:
+ * Your previews/thumbs are flat keys like: photos/preview/<id>.jpg
+ * For paid delivery we will use flat keys too:
+ *  - JPG: photos/original/<id>.jpg
+ *  - RAW: photos/original/<id>.zip   (adjust if you store raw somewhere else)
+ *
+ * If later you add DB columns (original_key/raw_key), we can switch to DB-driven keys.
+ */
+function getDeliveryObjectKey(photoId, format) {
+  if (format === 'raw') return `photos/original/${photoId}.zip`
+  return `photos/original/${photoId}.jpg`
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
     const {
@@ -40,20 +54,20 @@ export default async function handler(req, res) {
 
     // ✅ Validate request
     if (!photoId || !license || !format || !currency) {
-      return res.status(400).json({ error: 'Missing required fields' })
+      return res.status(400).json({ ok: false, error: 'Missing required fields' })
     }
     if (!['personal', 'commercial', 'editorial'].includes(license)) {
-      return res.status(400).json({ error: 'Invalid license' })
+      return res.status(400).json({ ok: false, error: 'Invalid license' })
     }
     if (!['jpg', 'raw'].includes(format)) {
-      return res.status(400).json({ error: 'Invalid format' })
+      return res.status(400).json({ ok: false, error: 'Invalid format' })
     }
     if (!['LKR', 'USD'].includes(currency)) {
-      return res.status(400).json({ error: 'Invalid currency' })
+      return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
     const amount = PRICES?.[currency]?.[license]?.[format]
-    if (!amount) return res.status(400).json({ error: 'Invalid pricing selection' })
+    if (!amount) return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
 
     // ✅ Env vars
     const merchantId = process.env.PAYHERE_MERCHANT_ID
@@ -64,44 +78,28 @@ export default async function handler(req, res) {
 
     if (!merchantId || !merchantSecret || !siteUrl) {
       return res.status(500).json({
+        ok: false,
         error: 'Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, NEXT_PUBLIC_SITE_URL)',
       })
     }
 
-    // ✅ Fetch photo (select ONLY columns that exist)
-    // IMPORTANT: You must have 'original_key' in photos table to deliver paid JPG securely.
+    // ✅ Fetch photo (ONLY fields that actually exist)
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
-      .select('id, title, status, original_key')
+      .select('id, title, status')
       .eq('id', String(photoId))
       .eq('status', 'published')
       .single()
 
     if (photoErr || !photo) {
-      console.error('Photo lookup failed:', { photoId: String(photoId), photoErr })
-      return res.status(404).json({ error: 'Photo not found' })
+      console.error('Photo lookup failed:', { photoId, photoErr })
+      return res.status(404).json({ ok: false, error: 'Photo not found' })
     }
 
-    // ✅ Decide delivery key
-    // - JPG uses photos.original_key
-    // - RAW not supported unless you add photos.raw_zip_key (or similar)
-    let deliveryKey = null
+    // ✅ Delivery key (stored into orders so notify.js can deliver)
+    const delivery_object_key = getDeliveryObjectKey(String(photoId), format)
 
-    if (format === 'jpg') {
-      deliveryKey = photo.original_key
-      if (!deliveryKey) {
-        return res.status(500).json({
-          error: 'Missing photos.original_key (required for paid JPG delivery)',
-        })
-      }
-    } else {
-      // RAW path not ready (you can change this later when you add a RAW key column)
-      return res.status(400).json({
-        error: 'RAW delivery not configured yet. Please purchase JPG for now.',
-      })
-    }
-
-    // ✅ Create order in Supabase (store delivery_object_key!)
+    // ✅ Create order in Supabase
     const orderId = uid()
 
     const { error: insertError } = await supabaseAdmin.from('orders').insert({
@@ -113,12 +111,12 @@ export default async function handler(req, res) {
       photo_id: String(photoId),
       license,
       format,
-      delivery_object_key: deliveryKey, // ✅ FIX
+      delivery_object_key,
     })
 
     if (insertError) {
       console.error('Supabase insert error:', insertError)
-      return res.status(500).json({ error: 'Failed to create order' })
+      return res.status(500).json({ ok: false, error: 'Failed to create order' })
     }
 
     // ✅ PayHere checkout URL
@@ -133,9 +131,6 @@ export default async function handler(req, res) {
       currency,
     })
 
-    const notifyUrl = `${webhookBase}/api/payhere/notify`
-    console.log('PAYHERE notify_url =', notifyUrl)
-
     // ✅ PayHere form fields
     const fields = {
       merchant_id: merchantId,
@@ -143,7 +138,8 @@ export default async function handler(req, res) {
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
 
-      notify_url: notifyUrl,
+      // PayHere webhook (set WEBHOOK_BASE_URL to your *.vercel.app domain)
+      notify_url: `${webhookBase}/api/payhere/notify`,
 
       first_name: firstName,
       last_name: lastName,
@@ -163,9 +159,9 @@ export default async function handler(req, res) {
       custom_2: `${license}:${format}`,
     }
 
-    return res.status(200).json({ actionUrl, fields, orderId })
+    return res.status(200).json({ ok: true, actionUrl, fields, orderId })
   } catch (e) {
     console.error('create-checkout error:', e)
-    return res.status(500).json({ error: 'Server error', detail: e?.message || String(e) })
+    return res.status(500).json({ ok: false, error: 'Server error', detail: e?.message || String(e) })
   }
 }
