@@ -49,15 +49,18 @@ export default function StoreDetail() {
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
 
   React.useEffect(() => {
+    if (!router.isReady) return
+    if (!id) return
+
     let alive = true
 
     async function run() {
-      if (!id) return
       try {
         setLoading(true)
         setError('')
         setPhoto(null)
 
+        // ✅ Metadata endpoint (JSON)
         const r = await fetch(`/api/store/photo?id=${encodeURIComponent(id)}`, {
           headers: { 'Cache-Control': 'no-store' },
         })
@@ -72,12 +75,14 @@ export default function StoreDetail() {
         }
 
         const row = json.photo
+
+        // ✅ Normalize into UI shape
         setPhoto({
           id: row.id,
           title: row.title || 'Untitled',
           tags: Array.isArray(row.tags) ? row.tags : [],
           thumbUrl: row.thumb_url,
-          previewUrl: row.preview_url,
+          previewUrl: row.preview_url, // kept for fallback / debugging
           createdAt: row.created_at,
         })
 
@@ -93,7 +98,7 @@ export default function StoreDetail() {
     return () => {
       alive = false
     }
-  }, [id])
+  }, [router.isReady, id])
 
   async function startCheckout() {
     if (!photo) return
@@ -113,6 +118,11 @@ export default function StoreDetail() {
   }
 
   const price = PRICES[currency][license][format]
+
+  // ✅ This is the real preview image URL (streamed from R2 via your API)
+  const previewSrc = photo?.id
+    ? `/api/store/preview?id=${encodeURIComponent(photo.id)}&variant=standard`
+    : ''
 
   return (
     <>
@@ -162,8 +172,20 @@ export default function StoreDetail() {
           <div className="layout">
             <section className="imageCard">
               <div className="imageFrame">
-                {/* show preview from API route */}
-                <img src={photo.previewUrl} alt={photo.title} />
+                {/* ✅ Preview streamed via API (R2 -> Next.js) */}
+                <img
+                  src={previewSrc}
+                  alt={photo.title}
+                  loading="eager"
+                  onError={(e) => {
+                    // Fallback: try DB previewUrl, then thumb
+                    if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                      e.currentTarget.src = photo.previewUrl
+                      return
+                    }
+                    if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+                  }}
+                />
               </div>
 
               <p className="watermarkHint">Preview image shown. Purchased file will be delivered without watermark.</p>
@@ -243,9 +265,7 @@ export default function StoreDetail() {
                 {isCheckingOut ? 'Working…' : 'Buy license'}
               </button>
 
-              <p className="fine">
-                After payment, you’ll receive a secure download link (expires). (Checkout wiring next.)
-              </p>
+              <p className="fine">After payment, you’ll receive a secure download link (expires). (Checkout wiring next.)</p>
             </aside>
           </div>
         )}
