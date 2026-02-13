@@ -7,19 +7,16 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).json({ ok: false, error: 'Missing id' })
 
   try {
-    // First fetch by ID only
     const { data, error } = await supabaseAdmin
       .from('photos')
       .select('id, title, tags, preview_url, thumb_url, created_at, status')
       .eq('id', id)
+      .eq('status', 'published')
+      .not('thumb_url', 'is', null)
+      .not('preview_url', 'is', null)
       .single()
 
     if (error || !data) return res.status(404).json({ ok: false, error: 'Photo not found' })
-
-    // Then enforce published for public
-    if (data.status !== 'published') {
-      return res.status(403).json({ ok: false, error: 'Photo not published yet' })
-    }
 
     return res.status(200).json({ ok: true, photo: data })
   } catch (e) {
