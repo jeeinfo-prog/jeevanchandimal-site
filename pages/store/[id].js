@@ -37,7 +37,12 @@ async function safeJson(resp) {
 
 export default function StoreDetail() {
   const router = useRouter()
-  const id = typeof router.query.id === 'string' ? router.query.id : ''
+
+  // ✅ Avoid hydration mismatch by reading id only when router is ready
+  const id = React.useMemo(() => {
+    if (!router.isReady) return ''
+    return typeof router.query.id === 'string' ? router.query.id : ''
+  }, [router.isReady, router.query.id])
 
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
@@ -60,7 +65,6 @@ export default function StoreDetail() {
         setError('')
         setPhoto(null)
 
-        // ✅ Metadata endpoint (JSON)
         const r = await fetch(`/api/store/photo?id=${encodeURIComponent(id)}`, {
           headers: { 'Cache-Control': 'no-store' },
         })
@@ -76,13 +80,12 @@ export default function StoreDetail() {
 
         const row = json.photo
 
-        // ✅ Normalize into UI shape
         setPhoto({
           id: row.id,
           title: row.title || 'Untitled',
           tags: Array.isArray(row.tags) ? row.tags : [],
           thumbUrl: row.thumb_url,
-          previewUrl: row.preview_url, // kept for fallback / debugging
+          previewUrl: row.preview_url, // fallback
           createdAt: row.created_at,
         })
 
@@ -104,8 +107,6 @@ export default function StoreDetail() {
     if (!photo) return
     try {
       setIsCheckingOut(true)
-
-      // TODO: connect your real checkout here
       alert(
         `Checkout placeholder\n\nPhoto: ${photo.id}\nLicense: ${license}\nFormat: ${format}\nPrice: ${formatMoney(
           currency,
@@ -119,10 +120,8 @@ export default function StoreDetail() {
 
   const price = PRICES[currency][license][format]
 
-  // ✅ This is the real preview image URL (streamed from R2 via your API)
-  const previewSrc = photo?.id
-    ? `/api/store/preview?id=${encodeURIComponent(photo.id)}&variant=standard`
-    : ''
+  // ✅ Correct preview endpoint (matches: pages/api/photo/[id]/preview.js)
+  const previewSrc = photo?.id ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=standard` : ''
 
   return (
     <>
@@ -172,13 +171,12 @@ export default function StoreDetail() {
           <div className="layout">
             <section className="imageCard">
               <div className="imageFrame">
-                {/* ✅ Preview streamed via API (R2 -> Next.js) */}
                 <img
+                  key={previewSrc} // ✅ ensures image refreshes when navigating between photos
                   src={previewSrc}
                   alt={photo.title}
                   loading="eager"
                   onError={(e) => {
-                    // Fallback: try DB previewUrl, then thumb
                     if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
                       e.currentTarget.src = photo.previewUrl
                       return
@@ -192,9 +190,9 @@ export default function StoreDetail() {
 
               <div className="tags">
                 {(photo.tags || []).map((t) => (
-                  <span key={t} className="tag">
-                    {t}
-                  </span>
+                  <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`}>
+                    <a className="tag">{t}</a>
+                  </Link>
                 ))}
               </div>
             </section>
@@ -371,6 +369,12 @@ export default function StoreDetail() {
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.14);
           opacity: 0.85;
+          text-decoration: none;
+          cursor: pointer;
+        }
+        .tag:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.08);
         }
 
         .buyCard {

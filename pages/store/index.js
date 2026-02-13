@@ -1,17 +1,28 @@
 import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
 export default function StoreIndex() {
+  const router = useRouter()
+
   const [query, setQuery] = React.useState('')
-  const [currency, setCurrency] = React.useState('LKR') // LKR | USD
+  const [currency, setCurrency] = React.useState('LKR')
 
   const [photos, setPhotos] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
+
+  // ✅ Read q or tag from URL on load
+  React.useEffect(() => {
+    if (!router.isReady) return
+    const q = typeof router.query.q === 'string' ? router.query.q : ''
+    const tag = typeof router.query.tag === 'string' ? router.query.tag : ''
+    setQuery(q || tag || '')
+  }, [router.isReady])
 
   React.useEffect(() => {
     let alive = true
@@ -32,19 +43,15 @@ export default function StoreIndex() {
           return
         }
 
-        // Normalize DB rows -> UI shape your store already expects
-        const normalized = (data.photos || []).map((row) => {
-          const orientation = 'photo' // optional: compute if you have width/height later
-          return {
-            id: row.id,
-            title: row.title || 'Untitled', // if you don’t have title in DB, keep fallback
-            tags: row.tags || [], // if you don’t have tags in DB, keep []
-            orientation,
-            thumbUrl: row.thumb_url,
-            previewUrl: row.preview_url,
-            created_at: row.created_at,
-          }
-        })
+        const normalized = (data.photos || []).map((row) => ({
+          id: row.id,
+          title: row.title || 'Untitled',
+          tags: Array.isArray(row.tags) ? row.tags : [],
+          orientation: 'photo',
+          thumbUrl: row.thumb_url,
+          previewUrl: row.preview_url,
+          created_at: row.created_at,
+        }))
 
         setPhotos(normalized)
       } catch (e) {
@@ -66,6 +73,7 @@ export default function StoreIndex() {
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return photos
+
     return photos.filter((p) => {
       const haystack = `${p.title} ${(p.tags || []).join(' ')} ${p.orientation}`.toLowerCase()
       return haystack.includes(q)
@@ -89,8 +97,7 @@ export default function StoreIndex() {
           <div>
             <h1 className="store-title">Photo Store</h1>
             <p className="store-sub">
-              License images in <strong>Personal</strong>, <strong>Commercial</strong>, or{' '}
-              <strong>Editorial</strong>.
+              License images in <strong>Personal</strong>, <strong>Commercial</strong>, or <strong>Editorial</strong>.
             </p>
           </div>
 
@@ -98,7 +105,16 @@ export default function StoreIndex() {
             <input
               className="store-search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value
+                setQuery(val)
+
+                router.replace(
+                  { pathname: '/store', query: val ? { q: val } : {} },
+                  undefined,
+                  { shallow: true }
+                )
+              }}
               placeholder="Search (e.g. Sigiriya, night, portrait)…"
               aria-label="Search photos"
             />
@@ -122,9 +138,25 @@ export default function StoreIndex() {
           </div>
         </header>
 
-        {/* Loading / Error */}
         {loading && <div className="empty">Loading photos…</div>}
         {!loading && error && <div className="empty">{error}</div>}
+
+        {/* ✅ Active filter banner */}
+        {!loading && !error && query && (
+          <div className="activeFilter">
+            Showing results for <strong>{query}</strong>
+            <button
+              type="button"
+              className="clearBtn"
+              onClick={() => {
+                setQuery('')
+                router.replace('/store', undefined, { shallow: true })
+              }}
+            >
+              ✕ Clear
+            </button>
+          </div>
+        )}
 
         {!loading && !error && (
           <>
@@ -140,6 +172,7 @@ export default function StoreIndex() {
                         <h3 className="name">{p.title}</h3>
                         <span className="pill">{p.orientation}</span>
                       </div>
+
                       <p className="tags">{(p.tags || []).slice(0, 3).join(' · ')}</p>
 
                       <p className="priceHint">
@@ -218,14 +251,35 @@ export default function StoreIndex() {
           border: 0;
           cursor: pointer;
           opacity: 0.75;
-          transition: opacity 180ms ease, background 180ms ease;
-        }
-        .store-toggle-btn:hover {
-          opacity: 1;
         }
         .store-toggle-btn.active {
           opacity: 1;
           background: rgba(245, 244, 244, 0.12);
+        }
+
+        .activeFilter {
+          margin-bottom: 14px;
+          padding: 10px 14px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 13px;
+          opacity: 0.9;
+        }
+
+        .clearBtn {
+          border: 0;
+          background: transparent;
+          color: inherit;
+          cursor: pointer;
+          font-size: 13px;
+          opacity: 0.7;
+        }
+
+        .clearBtn:hover {
+          opacity: 1;
         }
 
         .grid {
@@ -241,11 +295,6 @@ export default function StoreIndex() {
           border-radius: 18px;
           overflow: hidden;
           background: rgba(255, 255, 255, 0.02);
-          transition: transform 180ms ease, border-color 180ms ease;
-        }
-        .card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(245, 244, 244, 0.22);
         }
         .thumb {
           width: 100%;
@@ -257,7 +306,6 @@ export default function StoreIndex() {
           height: 100%;
           object-fit: cover;
           display: block;
-          transform: scale(1.01);
         }
         .meta {
           padding: 14px 14px 16px;
@@ -301,17 +349,6 @@ export default function StoreIndex() {
         @media (max-width: 991px) {
           .grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-          .store-header {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .store-controls {
-            justify-content: flex-start;
-          }
-          .store-search {
-            width: 100%;
-            min-width: 0;
           }
         }
         @media (max-width: 520px) {
