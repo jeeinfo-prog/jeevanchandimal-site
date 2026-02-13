@@ -68,17 +68,32 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ Fetch photo from DB (only published)
+    // ✅ Fetch photo from DB (only published) + paid delivery keys
+    // IMPORTANT: these columns must exist in your photos table:
+    // - original_key (paid JPG key in R2)
+    // - raw_key (paid RAW/ZIP key in R2)
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
-      .select('id, title, status')
+      .select('id, title, status, original_key, raw_key')
       .eq('id', String(photoId))
       .eq('status', 'published')
       .single()
 
     if (photoErr || !photo) return res.status(404).json({ error: 'Photo not found' })
 
-    // ✅ Create order in Supabase
+    // ✅ Choose which paid file to deliver
+    const deliveryKey = format === 'raw' ? photo.raw_key : photo.original_key
+
+    if (!deliveryKey) {
+      return res.status(500).json({
+        error:
+          format === 'raw'
+            ? 'Missing raw_key in photos table for this photo'
+            : 'Missing original_key in photos table for this photo',
+      })
+    }
+
+    // ✅ Create order in Supabase (STORE delivery_object_key!)
     const orderId = uid()
 
     const { error: insertError } = await supabaseAdmin.from('orders').insert({
@@ -90,6 +105,7 @@ export default async function handler(req, res) {
       photo_id: String(photoId),
       license,
       format,
+      delivery_object_key: deliveryKey, // ✅ FIX: required for secure download
     })
 
     if (insertError) {
@@ -109,6 +125,9 @@ export default async function handler(req, res) {
       currency,
     })
 
+    const notifyUrl = `${webhookBase}/api/payhere/notify`
+    console.log('PAYHERE notify_url =', notifyUrl)
+
     // ✅ PayHere form fields
     const fields = {
       merchant_id: merchantId,
@@ -116,8 +135,8 @@ export default async function handler(req, res) {
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
 
-      // IMPORTANT: ideally set WEBHOOK_BASE_URL to your *.vercel.app domain
-      notify_url: `${webhookBase}/api/payhere/notify`,
+      // IMPORTANT: set WEBHOOK_BASE_URL to your *.vercel.app domain (you already did)
+      notify_url: notifyUrl,
 
       first_name: firstName,
       last_name: lastName,
