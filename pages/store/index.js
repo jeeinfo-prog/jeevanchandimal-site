@@ -109,11 +109,7 @@ export default function StoreIndex() {
                 const val = e.target.value
                 setQuery(val)
 
-                router.replace(
-                  { pathname: '/store', query: val ? { q: val } : {} },
-                  undefined,
-                  { shallow: true }
-                )
+                router.replace({ pathname: '/store', query: val ? { q: val } : {} }, undefined, { shallow: true })
               }}
               placeholder="Search (e.g. Sigiriya, night, portrait)…"
               aria-label="Search photos"
@@ -167,13 +163,30 @@ export default function StoreIndex() {
                     <div className="thumb">
                       <img src={p.thumbUrl} alt={p.title} loading="lazy" />
                     </div>
+
                     <div className="meta">
                       <div className="meta-top">
                         <h3 className="name">{p.title}</h3>
                         <span className="pill">{p.orientation}</span>
                       </div>
 
-                      <p className="tags">{(p.tags || []).slice(0, 3).join(' · ')}</p>
+                      {/* ✅ clickable tag chips */}
+                      <div className="tagRow">
+                        {(p.tags || []).slice(0, 3).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            className="tagChip"
+                            onClick={(e) => {
+                              e.preventDefault() // prevent card navigation
+                              router.replace({ pathname: '/store', query: { tag: t } }, undefined, { shallow: true })
+                              setQuery(t)
+                            }}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
 
                       <p className="priceHint">
                         From <strong>{currency === 'LKR' ? 'LKR 2,500' : '$8'}</strong>
@@ -268,7 +281,6 @@ export default function StoreIndex() {
           font-size: 13px;
           opacity: 0.9;
         }
-
         .clearBtn {
           border: 0;
           background: transparent;
@@ -277,7 +289,6 @@ export default function StoreIndex() {
           font-size: 13px;
           opacity: 0.7;
         }
-
         .clearBtn:hover {
           opacity: 1;
         }
@@ -328,11 +339,28 @@ export default function StoreIndex() {
           border: 1px solid rgba(245, 244, 244, 0.16);
           opacity: 0.85;
         }
-        .tags {
+
+        .tagRow {
           margin: 8px 0 0;
-          opacity: 0.7;
-          font-size: 13px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
         }
+        .tagChip {
+          font-size: 11px;
+          padding: 4px 8px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: transparent;
+          color: inherit;
+          cursor: pointer;
+          opacity: 0.8;
+        }
+        .tagChip:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.08);
+        }
+
         .priceHint {
           margin: 10px 0 0;
           font-size: 13px;
@@ -349,6 +377,17 @@ export default function StoreIndex() {
         @media (max-width: 991px) {
           .grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .store-header {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .store-controls {
+            justify-content: flex-start;
+          }
+          .store-search {
+            width: 100%;
+            min-width: 0;
           }
         }
         @media (max-width: 520px) {
