@@ -39,11 +39,7 @@ function sanitizePath(pathLike) {
 
 function isUnknownColumn(err) {
   const msg = (err?.message || '').toLowerCase()
-  return (
-    err?.code === '42703' ||
-    msg.includes('does not exist') ||
-    msg.includes('schema cache')
-  )
+  return err?.code === '42703' || msg.includes('does not exist') || msg.includes('schema cache')
 }
 
 export default async function handler(req, res) {
@@ -54,16 +50,17 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {}
+
     const filename = body.filename
     if (!filename) return res.status(400).json({ ok: false, error: 'filename required' })
 
     const safeName = sanitizeFilename(filename)
 
-    // Optional: folder structure
+    // Optional: preserve folder structure from folder picker (webkitdirectory)
     const relativePath = body.relativePath ? sanitizePath(body.relativePath) : ''
     const pathPart = relativePath && relativePath.includes('/') ? relativePath : safeName
 
-    // Optional metadata (ONLY title/tags are attempted; pricing/licensing skipped unless you add columns later)
+    // Optional metadata (ONLY title/tags; pricing/license columns not in your table yet)
     const title = typeof body.title === 'string' ? body.title.trim() : ''
     const tags = Array.isArray(body.tags)
       ? body.tags.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim())
@@ -71,24 +68,19 @@ export default async function handler(req, res) {
 
     // 1) Insert draft photo row (try with title/tags; fallback if columns missing)
     let photoId = null
-
     {
       const insertPayload = { status: 'draft' }
       if (title) insertPayload.title = title
       if (tags) insertPayload.tags = tags
 
-      const first = await supabaseAdmin
-        .from('photos')
-        .insert([insertPayload])
-        .select('id')
-        .single()
+      const first = await supabaseAdmin.from('photos').insert([insertPayload]).select('id').single()
 
       if (first.error) {
         if (!isUnknownColumn(first.error)) {
+          console.error('photos insert error:', first.error)
           return res.status(500).json({ ok: false, error: first.error.message })
         }
 
-        // fallback minimal insert
         const fallback = await supabaseAdmin
           .from('photos')
           .insert([{ status: 'draft' }])
@@ -96,6 +88,7 @@ export default async function handler(req, res) {
           .single()
 
         if (fallback.error) {
+          console.error('photos insert fallback error:', fallback.error)
           return res.status(500).json({ ok: false, error: fallback.error.message })
         }
         photoId = fallback.data.id
@@ -104,17 +97,14 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2) Object key
+    // 2) Object key (folder structure is kept under the photoId namespace)
     const objectKey = `photos/original/${photoId}/${pathPart}`
 
-    // 3) Update photos row with original_jpg_key (always exists)
+    // 3) Update photos row with original_jpg_key (always exists in your schema)
     {
-      const up = await supabaseAdmin
-        .from('photos')
-        .update({ original_jpg_key: objectKey })
-        .eq('id', photoId)
-
+      const up = await supabaseAdmin.from('photos').update({ original_jpg_key: objectKey }).eq('id', photoId)
       if (up.error) {
+        console.error('photos update error:', up.error)
         return res.status(500).json({ ok: false, error: up.error.message })
       }
     }
@@ -122,13 +112,14 @@ export default async function handler(req, res) {
     // 4) Presigned PUT URL (ContentType NOT bound)
     const uploadUrl = await getPresignedPutUrl({ key: objectKey })
 
-    // 5) Asset row (audit)
+    // 5) Asset row (audit/history)
     {
       const asset = await supabaseAdmin
         .from('photo_assets')
         .insert([{ photo_id: photoId, original_key: objectKey }])
 
       if (asset.error) {
+        console.error('photo_assets insert error:', asset.error)
         return res.status(500).json({ ok: false, error: asset.error.message })
       }
     }
