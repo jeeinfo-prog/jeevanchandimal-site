@@ -68,32 +68,41 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ Fetch photo from DB (only published) + paid delivery keys
-    // IMPORTANT: these columns must exist in your photos table:
-    // - original_key (paid JPG key in R2)
-    // - raw_key (paid RAW/ZIP key in R2)
+    // ✅ Fetch photo by id (DO NOT hard-filter status here; we validate after)
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, title, status, original_key, raw_key')
       .eq('id', String(photoId))
-      .eq('status', 'published')
       .single()
 
-    if (photoErr || !photo) return res.status(404).json({ error: 'Photo not found' })
+    if (photoErr || !photo) {
+      console.error('Photo lookup failed:', { photoId, photoErr })
+      return res.status(404).json({ error: 'Photo not found', photoId: String(photoId) })
+    }
 
-    // ✅ Choose which paid file to deliver
+    // ✅ Enforce published (clear error message if mismatch)
+    if (String(photo.status) !== 'published') {
+      return res.status(400).json({
+        error: `Photo not published`,
+        status: photo.status,
+        photoId: String(photoId),
+      })
+    }
+
+    // ✅ Determine paid delivery key (required for secure download)
     const deliveryKey = format === 'raw' ? photo.raw_key : photo.original_key
 
     if (!deliveryKey) {
       return res.status(500).json({
         error:
           format === 'raw'
-            ? 'Missing raw_key in photos table for this photo'
-            : 'Missing original_key in photos table for this photo',
+            ? 'Missing raw_key for this photo (set photos.raw_key)'
+            : 'Missing original_key for this photo (set photos.original_key)',
+        photoId: String(photoId),
       })
     }
 
-    // ✅ Create order in Supabase (STORE delivery_object_key!)
+    // ✅ Create order in Supabase
     const orderId = uid()
 
     const { error: insertError } = await supabaseAdmin.from('orders').insert({
@@ -105,7 +114,7 @@ export default async function handler(req, res) {
       photo_id: String(photoId),
       license,
       format,
-      delivery_object_key: deliveryKey, // ✅ FIX: required for secure download
+      delivery_object_key: deliveryKey, // ✅ FIX: needed by notify.js
     })
 
     if (insertError) {
@@ -126,7 +135,13 @@ export default async function handler(req, res) {
     })
 
     const notifyUrl = `${webhookBase}/api/payhere/notify`
-    console.log('PAYHERE notify_url =', notifyUrl)
+    console.log('create-checkout:', {
+      orderId,
+      photoId: String(photoId),
+      status: photo.status,
+      notifyUrl,
+      sandbox,
+    })
 
     // ✅ PayHere form fields
     const fields = {
@@ -135,7 +150,6 @@ export default async function handler(req, res) {
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
 
-      // IMPORTANT: set WEBHOOK_BASE_URL to your *.vercel.app domain (you already did)
       notify_url: notifyUrl,
 
       first_name: firstName,
