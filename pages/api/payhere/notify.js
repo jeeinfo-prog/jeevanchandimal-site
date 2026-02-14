@@ -5,7 +5,7 @@ import { createDownloadToken } from '../../../lib/secureDownload'
 import { sendDownloadEmail } from '../../../lib/email'
 
 export const config = {
-  api: { bodyParser: false }, // ✅ IMPORTANT: PayHere posts form-encoded
+  api: { bodyParser: false }, // ✅ PayHere posts x-www-form-urlencoded
 }
 
 function readRawBody(req) {
@@ -28,7 +28,7 @@ function md5Upper(str) {
   return crypto.createHash('md5').update(String(str)).digest('hex').toUpperCase()
 }
 
-// ✅ PayHere signature = MD5( merchant_id + order_id + amount + currency + status_code + MD5(secret) )
+// PayHere signature = MD5( merchant_id + order_id + amount + currency + status_code + MD5(secret) )
 function makePayhereSig({ merchant_id, order_id, payhere_amount, payhere_currency, status_code, secret }) {
   return md5Upper(
     String(merchant_id) +
@@ -47,8 +47,18 @@ function buildDownloadUrl(token, req) {
   return `${base}/api/download?token=${encodeURIComponent(token)}`
 }
 
+// ✅ fallback: where your originals live in R2
+function fallbackObjectKey(order) {
+  // JPG originals: photos/original/<photoId>.jpg
+  if (!order?.photo_id) return null
+  if ((order.format || 'jpg') === 'raw') {
+    // if you later store RAW as zip, adjust this path if needed
+    return `photos/original/${order.photo_id}.zip`
+  }
+  return `photos/original/${order.photo_id}.jpg`
+}
+
 export default async function handler(req, res) {
-  // PayHere should POST. (Some tools may call GET; we ignore safely.)
   if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
@@ -80,7 +90,7 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
-    // 2) Verify signature (CRITICAL)
+    // 2) Verify signature
     const secret = process.env.PAYHERE_MERCHANT_SECRET
     if (secret) {
       const localSig = makePayhereSig({
@@ -95,7 +105,6 @@ export default async function handler(req, res) {
       if (!md5sig || String(md5sig).toUpperCase() !== localSig) {
         console.error('MD5 signature mismatch for order:', order_id)
 
-        // Optional: mark order as invalid signature (helps debugging)
         await supabaseAdmin
           .from('orders')
           .update({
@@ -106,67 +115,89 @@ export default async function handler(req, res) {
           })
           .eq('id', order_id)
 
-        return res.status(200).send('OK') // PayHere expects 200
+        return res.status(200).send('OK')
       }
     }
 
     const statusCodeNum = Number(status_code)
 
     // =========================
-    // ✅ PAYMENT SUCCESS (status_code === 2)
+    // ✅ PAYMENT SUCCESS
     // =========================
-    if (statusCodeNum === 2 && order.status !== 'PAID') {
-      // Mark PAID
-      await supabaseAdmin
-        .from('orders')
-        .update({
-          status: 'PAID',
-          paid_at: new Date().toISOString(),
-          payhere_payment_id: payment_id || null,
-          payhere_status_code: status_code || null,
-          payhere_status_message: status_message || null,
-        })
-        .eq('id', order_id)
+    if (statusCodeNum === 2) {
+      // Mark as PAID if not already
+      if (order.status !== 'PAID') {
+        await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'PAID',
+            paid_at: new Date().toISOString(),
+            payhere_payment_id: payment_id || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
+          .eq('id', order_id)
+      }
 
-      // Must exist to deliver file
-      const objectKey = order.delivery_object_key
+      // IMPORTANT: Always try to send email if not sent yet
+      // Re-fetch latest order (in case delivery_object_key/email was updated)
+      const { data: fresh, error: freshErr } = await supabaseAdmin
+        .from('orders')
+        .select('*')
+        .eq('id', order_id)
+        .single()
+
+      const o = freshErr || !fresh ? order : fresh
+
+      // Need objectKey to deliver
+      const objectKey = o.delivery_object_key || fallbackObjectKey(o)
       if (!objectKey) {
-        console.error('Missing delivery_object_key for order:', order_id)
+        console.error('Missing delivery_object_key (and fallback failed) for order:', order_id)
         return res.status(200).send('OK')
       }
 
-      // Create secure download token (10 minutes)
+      // Create token (10 minutes)
       const token = createDownloadToken(
         {
-          orderId: order.id,
-          photoId: order.photo_id,
-          format: order.format || 'jpg',
+          orderId: o.id,
+          photoId: o.photo_id,
+          format: o.format || 'jpg',
           objectKey,
-          userId: order.user_id || null,
-          guestEmail: order.email || null,
-          filename: `${order.photo_id}.${order.format === 'raw' ? 'zip' : 'jpg'}`,
+          userId: o.user_id || null,
+          guestEmail: o.email || null,
+          filename: `${o.photo_id}.${(o.format || 'jpg') === 'raw' ? 'zip' : 'jpg'}`,
         },
         '10m'
       )
 
       const downloadUrl = buildDownloadUrl(token, req)
 
-      // Send email ONLY ONCE
-      if (order.email && !order.download_email_sent_at) {
+      // ✅ Send email ONCE (even if already PAID)
+      if (o.email && !o.download_email_sent_at) {
         await sendDownloadEmail({
-          to: order.email,
-          orderId: order.id,
-          photoTitle: order.photo_id,
+          to: o.email,
+          orderId: o.id,
+          photoTitle: o.photo_id,
           downloadUrl,
         })
 
         await supabaseAdmin
           .from('orders')
-          .update({ download_email_sent_at: new Date().toISOString() })
+          .update({
+            download_email_sent_at: new Date().toISOString(),
+            // keep a copy (optional but useful)
+            delivery_object_key: o.delivery_object_key || objectKey,
+          })
           .eq('id', order_id)
+
+        console.log('Order PAID + email sent:', order_id)
+      } else {
+        console.log('Order PAID (email skipped):', order_id, {
+          hasEmail: !!o.email,
+          alreadySent: !!o.download_email_sent_at,
+        })
       }
 
-      console.log('Order PAID + email sent:', order_id)
       return res.status(200).send('OK')
     }
 
@@ -191,6 +222,6 @@ export default async function handler(req, res) {
     return res.status(200).send('OK')
   } catch (err) {
     console.error('PayHere notify error:', err)
-    return res.status(200).send('OK') // Always 200 for PayHere
+    return res.status(200).send('OK')
   }
 }
