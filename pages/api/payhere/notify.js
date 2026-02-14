@@ -199,11 +199,14 @@ export default async function handler(req, res) {
 
         const downloadUrl = buildDownloadUrl(token, req)
 
+        // ✅ PASS license + format into email template
         await sendDownloadEmail({
           to: o.email,
           orderId: o.id,
           photoTitle: o.photo_id,
           downloadUrl,
+          license: o.license,
+          format: o.format,
         })
 
         await supabaseAdmin
