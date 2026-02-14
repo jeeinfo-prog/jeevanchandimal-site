@@ -10,7 +10,6 @@ export default function StoreIndex() {
   const router = useRouter()
 
   const [query, setQuery] = React.useState('')
-  const [currency, setCurrency] = React.useState('LKR')
 
   const [photos, setPhotos] = React.useState([])
   const [loading, setLoading] = React.useState(true)
@@ -114,23 +113,6 @@ export default function StoreIndex() {
               placeholder="Search (e.g. Sigiriya, night, portrait)…"
               aria-label="Search photos"
             />
-
-            <div className="store-toggle" role="group" aria-label="Currency toggle">
-              <button
-                type="button"
-                className={`store-toggle-btn ${currency === 'LKR' ? 'active' : ''}`}
-                onClick={() => setCurrency('LKR')}
-              >
-                LKR
-              </button>
-              <button
-                type="button"
-                className={`store-toggle-btn ${currency === 'USD' ? 'active' : ''}`}
-                onClick={() => setCurrency('USD')}
-              >
-                USD
-              </button>
-            </div>
           </div>
         </header>
 
@@ -178,7 +160,7 @@ export default function StoreIndex() {
                             type="button"
                             className="tagChip"
                             onClick={(e) => {
-                              e.preventDefault() // prevent card navigation
+                              e.preventDefault()
                               router.replace({ pathname: '/store', query: { tag: t } }, undefined, { shallow: true })
                               setQuery(t)
                             }}
@@ -188,8 +170,9 @@ export default function StoreIndex() {
                         ))}
                       </div>
 
+                      {/* ✅ Price hidden → show text only */}
                       <p className="priceHint">
-                        From <strong>{currency === 'LKR' ? 'LKR 2,500' : '$8'}</strong>
+                        <strong>Price at checkout</strong>
                       </p>
                     </div>
                   </a>
@@ -250,24 +233,6 @@ export default function StoreIndex() {
         }
         .store-search::placeholder {
           opacity: 0.6;
-        }
-        .store-toggle {
-          display: inline-flex;
-          border: 1px solid rgba(245, 244, 244, 0.18);
-          border-radius: 999px;
-          overflow: hidden;
-        }
-        .store-toggle-btn {
-          padding: 10px 14px;
-          background: transparent;
-          color: inherit;
-          border: 0;
-          cursor: pointer;
-          opacity: 0.75;
-        }
-        .store-toggle-btn.active {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.12);
         }
 
         .activeFilter {
@@ -366,6 +331,7 @@ export default function StoreIndex() {
           font-size: 13px;
           opacity: 0.9;
         }
+
         .empty {
           margin-top: 28px;
           padding: 14px 16px;
