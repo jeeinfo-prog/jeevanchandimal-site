@@ -52,7 +52,7 @@ export default function StoreDetail() {
   const [format, setFormat] = React.useState('jpg')
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
 
-  // ✅ Watermark variant
+  // ✅ Watermark variant (now controls logo styling too)
   const [variant, setVariant] = React.useState('standard')
 
   // ✅ Zoom modal
@@ -198,6 +198,7 @@ export default function StoreDetail() {
 
   const price = PRICES[currency][license][format]
   const previewSrc = photo?.id ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}` : ''
+  const watermarkLogoSrc = '/watermark-logo/watermark-logo.png'
 
   return (
     <>
@@ -272,10 +273,14 @@ export default function StoreDetail() {
                       if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
                     }}
                   />
+
+                  {/* ✅ Logo watermark overlay (visual only) */}
+                  <div className={`wmLogo wmLogo-${variant}`} aria-hidden="true">
+                    <img src={watermarkLogoSrc} alt="" draggable={false} />
+                  </div>
+
                   <span className="zoomPill">Zoom</span>
                 </button>
-
-                <span className={`wmText wmText-${variant}`}>JEEVAN CHANDIMAL</span>
               </div>
 
               <div className="wmSelector" role="group" aria-label="Watermark selector">
@@ -340,13 +345,25 @@ export default function StoreDetail() {
               <div className="block">
                 <span className="label">License</span>
                 <div className="options options3">
-                  <button type="button" className={`opt ${license === 'personal' ? 'active' : ''}`} onClick={() => setLicense('personal')}>
+                  <button
+                    type="button"
+                    className={`opt ${license === 'personal' ? 'active' : ''}`}
+                    onClick={() => setLicense('personal')}
+                  >
                     Personal
                   </button>
-                  <button type="button" className={`opt ${license === 'commercial' ? 'active' : ''}`} onClick={() => setLicense('commercial')}>
+                  <button
+                    type="button"
+                    className={`opt ${license === 'commercial' ? 'active' : ''}`}
+                    onClick={() => setLicense('commercial')}
+                  >
                     Commercial
                   </button>
-                  <button type="button" className={`opt ${license === 'editorial' ? 'active' : ''}`} onClick={() => setLicense('editorial')}>
+                  <button
+                    type="button"
+                    className={`opt ${license === 'editorial' ? 'active' : ''}`}
+                    onClick={() => setLicense('editorial')}
+                  >
                     Editorial
                   </button>
                 </div>
@@ -358,10 +375,18 @@ export default function StoreDetail() {
               <div className="block">
                 <span className="label">Format</span>
                 <div className="options options2">
-                  <button type="button" className={`opt ${format === 'jpg' ? 'active' : ''}`} onClick={() => setFormat('jpg')}>
+                  <button
+                    type="button"
+                    className={`opt ${format === 'jpg' ? 'active' : ''}`}
+                    onClick={() => setFormat('jpg')}
+                  >
                     JPG
                   </button>
-                  <button type="button" className={`opt ${format === 'raw' ? 'active' : ''}`} onClick={() => setFormat('raw')}>
+                  <button
+                    type="button"
+                    className={`opt ${format === 'raw' ? 'active' : ''}`}
+                    onClick={() => setFormat('raw')}
+                  >
                     RAW
                   </button>
                 </div>
@@ -389,7 +414,21 @@ export default function StoreDetail() {
               ✕
             </button>
 
-            <img src={previewSrc} alt={photo.title} draggable={false} onContextMenu={preventSave} onDragStart={preventSave} />
+            <div className="zoomImgWrap">
+              <img
+                src={previewSrc}
+                alt={photo.title}
+                draggable={false}
+                onContextMenu={preventSave}
+                onDragStart={preventSave}
+              />
+
+              {/* ✅ Logo watermark overlay inside zoom */}
+              <div className={`zoomWm wmLogo wmLogo-${variant}`} aria-hidden="true">
+                <img src={watermarkLogoSrc} alt="" draggable={false} />
+              </div>
+            </div>
+
             <div className="zoomHint">ESC to close</div>
           </div>
         </div>
@@ -413,8 +452,14 @@ export default function StoreDetail() {
         .imageFrame { width: 100%; aspect-ratio: 16/10; background: rgba(255,255,255,0.02); position: relative; }
         .zoomBtn { all: unset; cursor: zoom-in; display: block; width: 100%; height: 100%; position: relative; z-index: 2; }
         .imageFrame img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag:none; user-select:none; -webkit-touch-callout:none; }
-        .zoomPill { position: absolute; right: 12px; top: 12px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
-          background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); color: rgba(245,244,244,0.95); pointer-events:none; }
+
+        .zoomPill {
+          position: absolute; right: 12px; top: 12px;
+          padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+          background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14);
+          color: rgba(245,244,244,0.95); pointer-events:none;
+        }
+
         .watermarkHint { margin: 10px 14px 0; opacity: 0.7; font-size: 13px; }
         .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
         .tag { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.14); opacity: 0.85; text-decoration: none; color: inherit; }
@@ -423,12 +468,38 @@ export default function StoreDetail() {
         .wmBtn { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.18); background: transparent; color: inherit; cursor: pointer; opacity: 0.8; text-transform: lowercase; font-size: 12px; }
         .wmBtn.active { opacity: 1; background: rgba(245,244,244,0.12); }
 
-        .wm { position: relative; }
-        .wmText { position: absolute; z-index: 5; pointer-events: none; user-select: none; font-weight: 800; letter-spacing: 6px;
-          text-shadow: 0 2px 10px rgba(0,0,0,0.6); color: rgba(255,255,255,0.14); white-space: nowrap; }
-        .wmText-standard { top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-20deg); font-size: 38px; }
-        .wmText-corner { right: 14px; bottom: 14px; transform: rotate(0deg); font-size: 14px; letter-spacing: 2px; color: rgba(255,255,255,0.2); }
-        .wmText-strong { top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-20deg); font-size: 46px; color: rgba(255,255,255,0.2); }
+        /* ✅ LOGO watermark overlay */
+        .wmLogo {
+          position: absolute;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          pointer-events: none;
+          z-index: 4;
+          user-select: none;
+        }
+        .wmLogo img {
+          width: 46%;
+          max-width: 260px;
+          opacity: 0.14;
+          transform: rotate(-12deg);
+          filter: grayscale(100%);
+        }
+        .wmLogo-corner { place-items: end; padding: 14px; }
+        .wmLogo-corner img {
+          width: 140px;
+          max-width: 42%;
+          opacity: 0.22;
+          transform: rotate(0deg);
+          filter: grayscale(100%);
+        }
+        .wmLogo-strong img {
+          width: 56%;
+          max-width: 320px;
+          opacity: 0.22;
+          transform: rotate(-12deg);
+          filter: grayscale(100%);
+        }
 
         .buyCard { padding: 16px; position: sticky; top: 18px; }
         .title { margin: 0; font-size: 22px; line-height: 1.2; }
@@ -455,8 +526,10 @@ export default function StoreDetail() {
         .zoomModal { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.78);
           display: flex; align-items: center; justify-content: center; padding: 18px; cursor: zoom-out; }
         .zoomInner { position: relative; max-width: 1200px; width: 100%; cursor: default; }
-        .zoomInner img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);
+        .zoomImgWrap { position: relative; }
+        .zoomImgWrap img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);
           -webkit-user-drag:none; user-select:none; -webkit-touch-callout:none; }
+        .zoomWm { border-radius: 14px; }
         .zoomClose { position: absolute; top: -10px; right: -10px; width: 36px; height: 36px; border-radius: 999px;
           border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.55); color: #f5f4f4; cursor: pointer; font-size: 16px; }
         .zoomHint { margin-top: 10px; text-align: center; font-size: 12px; opacity: 0.75; color: rgba(245,244,244,0.9); }
