@@ -52,7 +52,7 @@ export default function StoreDetail() {
   const [format, setFormat] = React.useState('jpg')
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
 
-  // ✅ Watermark variant (now controls logo styling too)
+  // ✅ Watermark variant (controls tiled watermark density)
   const [variant, setVariant] = React.useState('standard')
 
   // ✅ Zoom modal
@@ -198,7 +198,6 @@ export default function StoreDetail() {
 
   const price = PRICES[currency][license][format]
   const previewSrc = photo?.id ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}` : ''
-  const watermarkLogoSrc = '/watermark-logo/watermark-logo.png'
 
   return (
     <>
@@ -274,10 +273,8 @@ export default function StoreDetail() {
                     }}
                   />
 
-                  {/* ✅ Logo watermark overlay (visual only) */}
-                  <div className={`wmLogo wmLogo-${variant}`} aria-hidden="true">
-                    <img src={watermarkLogoSrc} alt="" draggable={false} />
-                  </div>
+                  {/* ✅ TILED logo watermark overlay (visual only) */}
+                  <div className={`wmTile wmTile-${variant}`} aria-hidden="true" />
 
                   <span className="zoomPill">Zoom</span>
                 </button>
@@ -408,7 +405,13 @@ export default function StoreDetail() {
       </main>
 
       {zoomOpen && photo && (
-        <div className="zoomModal" role="dialog" aria-modal="true" onClick={() => setZoomOpen(false)} onContextMenu={preventSave}>
+        <div
+          className="zoomModal"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setZoomOpen(false)}
+          onContextMenu={preventSave}
+        >
           <div className="zoomInner" onClick={(e) => e.stopPropagation()}>
             <button className="zoomClose" type="button" onClick={() => setZoomOpen(false)} aria-label="Close zoom">
               ✕
@@ -423,10 +426,8 @@ export default function StoreDetail() {
                 onDragStart={preventSave}
               />
 
-              {/* ✅ Logo watermark overlay inside zoom */}
-              <div className={`zoomWm wmLogo wmLogo-${variant}`} aria-hidden="true">
-                <img src={watermarkLogoSrc} alt="" draggable={false} />
-              </div>
+              {/* ✅ TILED logo watermark overlay inside zoom */}
+              <div className={`zoomWm wmTile wmTile-${variant}`} aria-hidden="true" />
             </div>
 
             <div className="zoomHint">ESC to close</div>
@@ -453,12 +454,8 @@ export default function StoreDetail() {
         .zoomBtn { all: unset; cursor: zoom-in; display: block; width: 100%; height: 100%; position: relative; z-index: 2; }
         .imageFrame img { width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag:none; user-select:none; -webkit-touch-callout:none; }
 
-        .zoomPill {
-          position: absolute; right: 12px; top: 12px;
-          padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
-          background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14);
-          color: rgba(245,244,244,0.95); pointer-events:none;
-        }
+        .zoomPill { position: absolute; right: 12px; top: 12px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+          background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); color: rgba(245,244,244,0.95); pointer-events:none; }
 
         .watermarkHint { margin: 10px 14px 0; opacity: 0.7; font-size: 13px; }
         .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
@@ -468,38 +465,24 @@ export default function StoreDetail() {
         .wmBtn { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.18); background: transparent; color: inherit; cursor: pointer; opacity: 0.8; text-transform: lowercase; font-size: 12px; }
         .wmBtn.active { opacity: 1; background: rgba(245,244,244,0.12); }
 
-        /* ✅ LOGO watermark overlay */
-        .wmLogo {
+        /* ✅ Tiled logo watermark */
+        .wmTile {
           position: absolute;
           inset: 0;
-          display: grid;
-          place-items: center;
           pointer-events: none;
-          z-index: 4;
           user-select: none;
-        }
-        .wmLogo img {
-          width: 46%;
-          max-width: 260px;
-          opacity: 0.14;
+          z-index: 4;
+
+          background-image: url('/watermark-logo/watermark-logo.png');
+          background-repeat: repeat;
+          background-position: center;
+          background-size: 220px;
+          opacity: 0.08;
           transform: rotate(-12deg);
-          filter: grayscale(100%);
         }
-        .wmLogo-corner { place-items: end; padding: 14px; }
-        .wmLogo-corner img {
-          width: 140px;
-          max-width: 42%;
-          opacity: 0.22;
-          transform: rotate(0deg);
-          filter: grayscale(100%);
-        }
-        .wmLogo-strong img {
-          width: 56%;
-          max-width: 320px;
-          opacity: 0.22;
-          transform: rotate(-12deg);
-          filter: grayscale(100%);
-        }
+        .wmTile-standard { background-size: 220px; opacity: 0.08; }
+        .wmTile-corner { background-size: 260px; opacity: 0.06; }
+        .wmTile-strong { background-size: 180px; opacity: 0.12; }
 
         .buyCard { padding: 16px; position: sticky; top: 18px; }
         .title { margin: 0; font-size: 22px; line-height: 1.2; }
