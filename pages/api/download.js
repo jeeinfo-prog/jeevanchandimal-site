@@ -1,10 +1,17 @@
 import { verifyDownloadToken } from '@/lib/secureDownload'
 import { getObjectStream } from '@/lib/r2'
+import { pipeline } from 'stream'
+import { promisify } from 'util'
+
+const pipe = promisify(pipeline)
 
 function safeFilename(name) {
-  return String(name || '')
-    .replace(/[\r\n"]/g, '')
-    .trim() || 'download'
+  return (
+    String(name || '')
+      .replace(/[\r\n"]/g, '')
+      .replace(/[\\/]/g, '-') // avoid path tricks
+      .trim() || 'download'
+  )
 }
 
 export default async function handler(req, res) {
@@ -18,7 +25,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing token' })
     }
 
-    // ✅ Your helper throws if invalid/expired
+    // ✅ throws if invalid/expired
     const payload = verifyDownloadToken(token)
 
     const objectKey = payload?.objectKey
@@ -28,33 +35,31 @@ export default async function handler(req, res) {
 
     const { body, contentType, contentLength } = await getObjectStream(objectKey)
 
-    const filename = safeFilename(
-      payload?.filename || objectKey.split('/').pop() || 'download'
-    )
+    const filename = safeFilename(payload?.filename || objectKey.split('/').pop() || 'download')
 
     res.setHeader('Content-Type', contentType || 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-    if (contentLength) {
-      res.setHeader('Content-Length', String(contentLength))
-    }
-
-    // 🔐 never cache secure downloads
+    if (contentLength) res.setHeader('Content-Length', String(contentLength))
     res.setHeader('Cache-Control', 'no-store')
 
-    // Stream if possible
-    if (body && typeof body.pipe === 'function') {
-      body.pipe(res)
+    if (!body) {
+      return res.status(404).json({ error: 'File not found' })
+    }
+
+    // Best: stream to client
+    if (typeof body.pipe === 'function') {
+      await pipe(body, res)
       return
     }
 
-    // Fallback for async iterable bodies
+    // Fallback for async-iterable bodies
     const chunks = []
     for await (const chunk of body) chunks.push(chunk)
     return res.status(200).send(Buffer.concat(chunks))
   } catch (err) {
-    console.error('download error:', err)
+    // ✅ THIS is what will tell us the real cause in Vercel logs
+    console.error('download token verify failed:', err?.name, err?.message)
 
-    // jwt.verify throws on invalid/expired → treat as 401
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
 }
