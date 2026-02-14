@@ -31,7 +31,7 @@ function buildDownloadUrl(token, req) {
   return `${base}/api/download?token=${encodeURIComponent(token)}`
 }
 
-// ✅ fallback: where your originals live in R2
+// If delivery_object_key wasn't set at checkout, we can still infer a safe default.
 function fallbackObjectKey(order) {
   if (!order?.photo_id) return null
   if ((order.format || 'jpg') === 'raw') return `photos/original/${order.photo_id}.zip`
@@ -39,7 +39,6 @@ function fallbackObjectKey(order) {
 }
 
 export default async function handler(req, res) {
-  // PayHere should POST
   if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
@@ -107,7 +106,7 @@ export default async function handler(req, res) {
     // ✅ PAYMENT SUCCESS
     // =========================
     if (statusCodeNum === 2) {
-      // Mark as PAID if not already
+      // Mark PAID if not already
       if (order.status !== 'PAID') {
         await supabaseAdmin
           .from('orders')
@@ -121,7 +120,7 @@ export default async function handler(req, res) {
           .eq('id', order_id)
       }
 
-      // Re-fetch latest order (in case email/delivery key updated elsewhere)
+      // Re-fetch latest order (to get the latest delivery_object_key/email fields)
       const { data: fresh, error: freshErr } = await supabaseAdmin
         .from('orders')
         .select('*')
@@ -130,14 +129,13 @@ export default async function handler(req, res) {
 
       const o = freshErr || !fresh ? order : fresh
 
-      // Need objectKey to deliver
       const objectKey = o.delivery_object_key || fallbackObjectKey(o)
       if (!objectKey) {
-        console.error('Missing delivery_object_key (and fallback failed) for order:', order_id)
+        console.error('Missing delivery_object_key for order:', order_id)
         return res.status(200).send('OK')
       }
 
-      // Create token (10 minutes)
+      // ✅ Create expiring JWT download token
       const token = createDownloadToken(
         {
           orderId: o.id,
@@ -153,19 +151,20 @@ export default async function handler(req, res) {
 
       const downloadUrl = buildDownloadUrl(token, req)
 
-      // ✅ Send email ONCE (even if already PAID)
+      // ✅ Send email ONCE
       if (o.email && !o.download_email_sent_at) {
         await sendDownloadEmail({
           to: o.email,
           orderId: o.id,
           photoTitle: o.photo_id,
-          downloadUrl, // ✅ token URL
+          downloadUrl,
         })
 
         await supabaseAdmin
           .from('orders')
           .update({
             download_email_sent_at: new Date().toISOString(),
+            // store key if it was missing and we inferred it
             delivery_object_key: o.delivery_object_key || objectKey,
           })
           .eq('id', order_id)
