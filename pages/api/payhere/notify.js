@@ -1,4 +1,6 @@
 // pages/api/payhere/notify.js
+
+import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
 import { sendDownloadEmail } from '../../../lib/email'
@@ -24,21 +26,34 @@ function parseForm(body) {
   return obj
 }
 
+function getBaseUrl(req) {
+  const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
+  if (host) return `${proto}://${host}`
+  return process.env.NEXT_PUBLIC_SITE_URL || ''
+}
+
 function buildDownloadUrl(token, req) {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`
+  const base = getBaseUrl(req)
   return `${base}/api/download?token=${encodeURIComponent(token)}`
 }
 
-// If delivery_object_key wasn't set at checkout, we can still infer a safe default.
+// If delivery_object_key wasn't set at checkout, infer a safe default
 function fallbackObjectKey(order) {
   if (!order?.photo_id) return null
   if ((order.format || 'jpg') === 'raw') return `photos/original/${order.photo_id}.zip`
   return `photos/original/${order.photo_id}.jpg`
 }
 
+// ✅ Per-license download limits
+function limitForLicense(license) {
+  if (license === 'commercial') return 0 // unlimited
+  if (license === 'editorial') return 5
+  return 3 // personal
+}
+
 export default async function handler(req, res) {
+  // PayHere expects 200 always
   if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
@@ -120,39 +135,70 @@ export default async function handler(req, res) {
           .eq('id', order_id)
       }
 
-      // Re-fetch latest order (to get the latest delivery_object_key/email fields)
+      // Re-fetch latest order
       const { data: fresh, error: freshErr } = await supabaseAdmin
         .from('orders')
         .select('*')
         .eq('id', order_id)
         .single()
 
-      const o = freshErr || !fresh ? order : fresh
+      const o = !freshErr && fresh ? fresh : order
 
+      // Ensure delivery_object_key exists
       const objectKey = o.delivery_object_key || fallbackObjectKey(o)
       if (!objectKey) {
         console.error('Missing delivery_object_key for order:', order_id)
         return res.status(200).send('OK')
       }
 
-      // ✅ Create expiring JWT download token
-      const token = createDownloadToken(
-        {
-          orderId: o.id,
-          photoId: o.photo_id,
-          format: o.format || 'jpg',
-          objectKey,
-          userId: o.user_id || null,
-          guestEmail: o.email || null,
-          filename: `${o.photo_id}.${(o.format || 'jpg') === 'raw' ? 'zip' : 'jpg'}`,
-        },
-        '10m'
-      )
+      // ✅ Ensure per-license download_limit is set (B)
+      const desiredLimit = limitForLicense(o.license)
+      if (o.download_limit == null) {
+        await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
+      }
 
-      const downloadUrl = buildDownloadUrl(token, req)
+      // Always persist inferred key (even if no email)
+      if (!o.delivery_object_key) {
+        await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
+      }
 
-      // ✅ Send email ONCE
+      // ✅ Email ONCE (C) with ONE-TIME token (A)
       if (o.email && !o.download_email_sent_at) {
+        const jti = crypto.randomUUID()
+        const expiresMinutes = 60
+        const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
+
+        // Store one-time token record
+        const ins = await supabaseAdmin.from('download_tokens').insert({
+          jti,
+          order_id: o.id,
+          expires_at: expiresAt.toISOString(),
+        })
+
+        if (ins.error) {
+          console.error('download_tokens insert failed:', ins.error.message)
+          return res.status(200).send('OK')
+        }
+
+        const fmt = (o.format || 'jpg') === 'raw' ? 'raw' : 'jpg'
+        const ext = fmt === 'raw' ? 'zip' : 'jpg'
+
+        const token = createDownloadToken(
+          {
+            jti,
+            orderId: o.id,
+            photoId: o.photo_id,
+            format: fmt,
+            objectKey,
+            userId: o.user_id || null,
+            guestEmail: o.email || null,
+            filename: `${o.photo_id}.${ext}`,
+          },
+          '1h'
+        )
+
+        const downloadUrl = buildDownloadUrl(token, req)
+
         await sendDownloadEmail({
           to: o.email,
           orderId: o.id,
@@ -164,12 +210,10 @@ export default async function handler(req, res) {
           .from('orders')
           .update({
             download_email_sent_at: new Date().toISOString(),
-            // store key if it was missing and we inferred it
-            delivery_object_key: o.delivery_object_key || objectKey,
           })
-          .eq('id', order_id)
+          .eq('id', o.id)
 
-        console.log('Order PAID + email sent:', order_id)
+        console.log('Order PAID + email sent (one-time):', order_id)
       } else {
         console.log('Order PAID (email skipped):', order_id, {
           hasEmail: !!o.email,
