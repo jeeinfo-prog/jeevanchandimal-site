@@ -1,3 +1,5 @@
+// pages/api/download.js
+
 import { verifyDownloadToken } from '@/lib/secureDownload'
 import { getObjectStream } from '@/lib/r2'
 import { pipeline } from 'stream'
@@ -12,6 +14,10 @@ function safeFilename(name) {
       .replace(/[\\/]/g, '-') // avoid path tricks
       .trim() || 'download'
   )
+}
+
+function removeExt(filename) {
+  return String(filename || '').replace(/\.[^.]+$/, '')
 }
 
 export default async function handler(req, res) {
@@ -33,9 +39,57 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid token payload' })
     }
 
-    const { body, contentType, contentLength } = await getObjectStream(objectKey)
+    // ✅ Your bucket stores originals under: photos/original/<photoId>/...
+    // But DB may have: photos/original/<photoId>.jpg
+    // So we try the saved key first, then fallback to the folder layout.
+    let r2obj
+    try {
+      r2obj = await getObjectStream(objectKey)
+    } catch (err) {
+      const code = err?.name || err?.Code
+      const http = err?.$metadata?.httpStatusCode
 
-    const filename = safeFilename(payload?.filename || objectKey.split('/').pop() || 'download')
+      if (code === 'NoSuchKey' || http === 404) {
+        const last = objectKey.split('/').pop() || ''
+        const photoId = removeExt(last)
+
+        // Common folder-layout filenames to try
+        const fallbacks = [
+          `photos/original/${photoId}/original.jpg`,
+          `photos/original/${photoId}/${photoId}.jpg`,
+          `photos/original/${photoId}/original.jpeg`,
+          `photos/original/${photoId}/${photoId}.jpeg`,
+        ]
+
+        let found = null
+        for (const altKey of fallbacks) {
+          try {
+            found = await getObjectStream(altKey)
+            break
+          } catch (e2) {
+            // keep trying
+          }
+        }
+
+        if (!found) {
+          return res.status(404).json({
+            error: 'File not found in storage',
+            tried: [objectKey, ...fallbacks],
+          })
+        }
+
+        r2obj = found
+      } else {
+        // unknown R2 error
+        throw err
+      }
+    }
+
+    const { body, contentType, contentLength } = r2obj
+
+    const filename = safeFilename(
+      payload?.filename || objectKey.split('/').pop() || 'download'
+    )
 
     res.setHeader('Content-Type', contentType || 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
@@ -57,9 +111,7 @@ export default async function handler(req, res) {
     for await (const chunk of body) chunks.push(chunk)
     return res.status(200).send(Buffer.concat(chunks))
   } catch (err) {
-    // ✅ THIS is what will tell us the real cause in Vercel logs
-    console.error('download token verify failed:', err?.name, err?.message)
-
+    console.error('download error:', err?.name, err?.message)
     return res.status(401).json({ error: 'Invalid or expired token' })
   }
 }
