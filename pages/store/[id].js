@@ -125,13 +125,19 @@ export default function StoreDetail() {
       try {
         setRecLoading(true)
 
-        const [s, r] = await Promise.all([
-          fetch(`/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`).then((x) => x.json()),
-          fetch(`/api/store/recommended?excludeId=${encodeURIComponent(photo.id)}&limit=6`).then((x) => x.json()),
-        ])
+        // Similar (tag-based)
+        const s = await fetch(`/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`).then((x) => x.json())
+        const similarList = Array.isArray(s?.photos) ? s.photos : []
+        if (!alive) return
+        setSimilar(similarList)
+
+        // Recommended (latest, excluding similar IDs)
+        const similarIds = similarList.map((p) => p.id).join(',')
+        const r = await fetch(
+          `/api/store/recommended?excludeId=${encodeURIComponent(photo.id)}&similarIds=${encodeURIComponent(similarIds)}&limit=6`
+        ).then((x) => x.json())
 
         if (!alive) return
-        setSimilar(Array.isArray(s?.photos) ? s.photos : [])
         setRecommended(Array.isArray(r?.photos) ? r.photos : [])
       } catch {
         if (!alive) return
@@ -299,69 +305,167 @@ export default function StoreDetail() {
         )}
 
         {!loading && !error && photo && (
-          <div className="layout">
-            <section className="imageCard">
-              <div className="imageFrame wm">
-                <button
-                  type="button"
-                  className="zoomBtn"
-                  onClick={openZoom}
-                  onContextMenu={preventSave}
-                  onDragStart={preventSave}
-                  aria-label="Zoom preview"
-                  title="Click to zoom"
-                >
-                  <img
-                    key={`${photo.id}:${variant}`}
-                    src={previewSrc}
-                    alt={photo.title}
-                    loading="eager"
-                    draggable={false}
+          <>
+            <div className="layout">
+              <section className="imageCard">
+                <div className="imageFrame wm">
+                  <button
+                    type="button"
+                    className="zoomBtn"
+                    onClick={openZoom}
                     onContextMenu={preventSave}
                     onDragStart={preventSave}
-                    onError={(e) => {
-                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
-                        e.currentTarget.src = photo.previewUrl
-                        return
-                      }
-                      if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
-                    }}
+                    aria-label="Zoom preview"
+                    title="Click to zoom"
+                  >
+                    <img
+                      key={`${photo.id}:${variant}`}
+                      src={previewSrc}
+                      alt={photo.title}
+                      loading="eager"
+                      draggable={false}
+                      onContextMenu={preventSave}
+                      onDragStart={preventSave}
+                      onError={(e) => {
+                        if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                          e.currentTarget.src = photo.previewUrl
+                          return
+                        }
+                        if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+                      }}
+                    />
+
+                    {/* ✅ TILED logo watermark overlay (visual only) */}
+                    <div className={`wmTile wmTile-${variant}`} aria-hidden="true" />
+
+                    <span className="zoomPill">Zoom</span>
+                  </button>
+                </div>
+
+                <div className="wmSelector" role="group" aria-label="Watermark selector">
+                  {['standard', 'corner', 'strong'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className={`wmBtn ${variant === v ? 'active' : ''}`}
+                      onClick={() => setVariant(v)}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+
+                <p className="watermarkHint">Preview image shown. Purchased file will be delivered without watermark.</p>
+
+                <div className="tags">
+                  {(photo.tags || []).map((t) => (
+                    <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`}>
+                      <a className="tag">{t}</a>
+                    </Link>
+                  ))}
+                </div>
+
+                {/* ✅ Small description + image detail under tags */}
+                <div className="imgDetails">
+                  <div className="imgDesc">
+                    Premium preview with watermark. Final download is delivered clean after payment.
+                  </div>
+                  <div className="imgMetaRow">
+                    <span className="metaItem">
+                      ID: <span className="mono">{photo.id}</span>
+                    </span>
+                    <span className="metaDot">•</span>
+                    <span className="metaItem">Added: {new Date(photo.createdAt).toLocaleDateString()}</span>
+                    <span className="metaDot">•</span>
+                    <span className="metaItem">{(photo.tags || []).length} tags</span>
+                  </div>
+                </div>
+              </section>
+
+              <aside className="buyCard">
+                <h1 className="title">{photo.title}</h1>
+                <p className="sub">Choose license + format</p>
+
+                {/* ✅ Email + name for receipt + download link */}
+                <div className="block">
+                  <span className="label">Receipt email</span>
+                  <input
+                    className="field"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
 
-                  {/* ✅ TILED logo watermark overlay (visual only) */}
-                  <div className={`wmTile wmTile-${variant}`} aria-hidden="true" />
+                  <div className="row2">
+                    <input
+                      className="field"
+                      type="text"
+                      placeholder="First name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                    <input
+                      className="field"
+                      type="text"
+                      placeholder="Last name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
 
-                  <span className="zoomPill">Zoom</span>
+                  <p className="fine">We’ll send your receipt + secure download link to this email.</p>
+                </div>
+
+                <div className="block">
+                  <span className="label">License</span>
+                  <div className="options options3">
+                    <button type="button" className={`opt ${license === 'personal' ? 'active' : ''}`} onClick={() => setLicense('personal')}>
+                      Personal
+                    </button>
+                    <button type="button" className={`opt ${license === 'commercial' ? 'active' : ''}`} onClick={() => setLicense('commercial')}>
+                      Commercial
+                    </button>
+                    <button type="button" className={`opt ${license === 'editorial' ? 'active' : ''}`} onClick={() => setLicense('editorial')}>
+                      Editorial
+                    </button>
+                  </div>
+                  <p className="fine">
+                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary (no promotion).
+                  </p>
+                </div>
+
+                <div className="block">
+                  <span className="label">Format</span>
+                  <div className="options options2">
+                    <button type="button" className={`opt ${format === 'jpg' ? 'active' : ''}`} onClick={() => setFormat('jpg')}>
+                      JPG
+                    </button>
+                    <button type="button" className={`opt ${format === 'raw' ? 'active' : ''}`} onClick={() => setFormat('raw')}>
+                      RAW
+                    </button>
+                  </div>
+                </div>
+
+                <div className="priceRow">
+                  <span className="price">{formatMoney(currency, price)}</span>
+                  <span className="small">Instant digital download</span>
+                </div>
+
+                <button type="button" className="buyBtn" onClick={startCheckout} disabled={isCheckingOut}>
+                  {isCheckingOut ? 'Working…' : 'Buy license'}
                 </button>
-              </div>
 
-              <div className="wmSelector" role="group" aria-label="Watermark selector">
-                {['standard', 'corner', 'strong'].map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    className={`wmBtn ${variant === v ? 'active' : ''}`}
-                    onClick={() => setVariant(v)}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
+                <p className="fine">After payment, we email your secure download link.</p>
+              </aside>
+            </div>
 
-              <p className="watermarkHint">Preview image shown. Purchased file will be delivered without watermark.</p>
-
-              <div className="tags">
-                {(photo.tags || []).map((t) => (
-                  <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`}>
-                    <a className="tag">{t}</a>
-                  </Link>
-                ))}
-              </div>
-
-              {/* ✅ Similar images */}
-              <div className="relWrap">
-                <div className="relHead">
-                  <h2 className="relTitle">Similar images</h2>
+            {/* ✅ Full-width Similar / Recommended / Popular search */}
+            <section className="fullRel">
+              {/* Similar */}
+              <div className="fullRelBlock">
+                <div className="fullRelHead">
+                  <h2 className="fullRelTitle">Similar images</h2>
                   {firstTag ? (
                     <Link href={`/store?tag=${encodeURIComponent(firstTag)}`}>
                       <a className="seeAll">See all</a>
@@ -376,13 +480,19 @@ export default function StoreDetail() {
                 {recLoading && <div className="relState">Loading…</div>}
 
                 {!recLoading && similar.length > 0 && (
-                  <div className="relGrid">
+                  <div className="fullRelGrid">
                     {similar.map((p) => (
                       <Link key={p.id} href={`/store/${p.id}`}>
-                        <a className="relCard" aria-label={p.title || 'Similar photo'}>
+                        <a className="fullRelCard">
                           <div className="relThumb">
                             <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
                             <div className="relWm" aria-hidden="true" />
+                          </div>
+                          <div className="relMeta">
+                            <div className="relName">{p.title || 'Untitled'}</div>
+                            <div className="relSmall">
+                              {(Array.isArray(p.tags) && p.tags[0]) ? `#${p.tags[0]}` : 'Photo'}
+                            </div>
                           </div>
                         </a>
                       </Link>
@@ -397,23 +507,29 @@ export default function StoreDetail() {
                 )}
               </div>
 
-              {/* ✅ Recommended images */}
-              <div className="relWrap">
-                <div className="relHead">
-                  <h2 className="relTitle">Recommended for you</h2>
+              {/* Recommended */}
+              <div className="fullRelBlock">
+                <div className="fullRelHead">
+                  <h2 className="fullRelTitle">Recommended for you</h2>
                   <Link href="/store">
                     <a className="seeAll">See all</a>
                   </Link>
                 </div>
 
                 {!recLoading && recommended.length > 0 && (
-                  <div className="relGrid">
+                  <div className="fullRelGrid">
                     {recommended.map((p) => (
                       <Link key={p.id} href={`/store/${p.id}`}>
-                        <a className="relCard" aria-label={p.title || 'Recommended photo'}>
+                        <a className="fullRelCard">
                           <div className="relThumb">
                             <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
                             <div className="relWm" aria-hidden="true" />
+                          </div>
+                          <div className="relMeta">
+                            <div className="relName">{p.title || 'Untitled'}</div>
+                            <div className="relSmall">
+                              {(Array.isArray(p.tags) && p.tags[0]) ? `#${p.tags[0]}` : 'Photo'}
+                            </div>
                           </div>
                         </a>
                       </Link>
@@ -422,9 +538,9 @@ export default function StoreDetail() {
                 )}
               </div>
 
-              {/* ✅ Popular related search terms */}
-              <div className="relWrap">
-                <h2 className="relTitle">Didn't find what you're looking for?</h2>
+              {/* Popular terms */}
+              <div className="fullRelBlock">
+                <h2 className="fullRelTitle">Didn't find what you're looking for?</h2>
                 <p className="relSub">Try a popular related search term.</p>
 
                 <div className="chipRow">
@@ -436,104 +552,7 @@ export default function StoreDetail() {
                 </div>
               </div>
             </section>
-
-            <aside className="buyCard">
-              <h1 className="title">{photo.title}</h1>
-              <p className="sub">Choose license + format</p>
-
-              {/* ✅ Email + name for receipt + download link */}
-              <div className="block">
-                <span className="label">Receipt email</span>
-                <input
-                  className="field"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-
-                <div className="row2">
-                  <input
-                    className="field"
-                    type="text"
-                    placeholder="First name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                  />
-                  <input
-                    className="field"
-                    type="text"
-                    placeholder="Last name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                  />
-                </div>
-
-                <p className="fine">We’ll send your receipt + secure download link to this email.</p>
-              </div>
-
-              <div className="block">
-                <span className="label">License</span>
-                <div className="options options3">
-                  <button
-                    type="button"
-                    className={`opt ${license === 'personal' ? 'active' : ''}`}
-                    onClick={() => setLicense('personal')}
-                  >
-                    Personal
-                  </button>
-                  <button
-                    type="button"
-                    className={`opt ${license === 'commercial' ? 'active' : ''}`}
-                    onClick={() => setLicense('commercial')}
-                  >
-                    Commercial
-                  </button>
-                  <button
-                    type="button"
-                    className={`opt ${license === 'editorial' ? 'active' : ''}`}
-                    onClick={() => setLicense('editorial')}
-                  >
-                    Editorial
-                  </button>
-                </div>
-                <p className="fine">
-                  Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary (no promotion).
-                </p>
-              </div>
-
-              <div className="block">
-                <span className="label">Format</span>
-                <div className="options options2">
-                  <button
-                    type="button"
-                    className={`opt ${format === 'jpg' ? 'active' : ''}`}
-                    onClick={() => setFormat('jpg')}
-                  >
-                    JPG
-                  </button>
-                  <button
-                    type="button"
-                    className={`opt ${format === 'raw' ? 'active' : ''}`}
-                    onClick={() => setFormat('raw')}
-                  >
-                    RAW
-                  </button>
-                </div>
-              </div>
-
-              <div className="priceRow">
-                <span className="price">{formatMoney(currency, price)}</span>
-                <span className="small">Instant digital download</span>
-              </div>
-
-              <button type="button" className="buyBtn" onClick={startCheckout} disabled={isCheckingOut}>
-                {isCheckingOut ? 'Working…' : 'Buy license'}
-              </button>
-
-              <p className="fine">After payment, we email your secure download link.</p>
-            </aside>
-          </div>
+          </>
         )}
       </main>
 
@@ -567,6 +586,7 @@ export default function StoreDetail() {
         .tbtn { padding: 10px 14px; background: transparent; color: inherit; border: 0; cursor: pointer; opacity: 0.75; }
         .tbtn.active { opacity: 1; background: rgba(245,244,244,0.12); }
         .state { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(245,244,244,0.12); border-radius: 14px; opacity: 0.95; }
+
         .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono','Courier New', monospace; font-size: 12px; }
 
         .layout { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 18px; align-items: start; }
@@ -588,6 +608,12 @@ export default function StoreDetail() {
         .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
         .tag { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.14); opacity: 0.85; text-decoration: none; color: inherit; }
 
+        /* ✅ Small description + details under tags */
+        .imgDetails { padding: 0 14px 14px; margin-top: -6px; }
+        .imgDesc { font-size: 13px; opacity: 0.8; line-height: 1.6; }
+        .imgMetaRow { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; opacity: 0.75; }
+        .metaDot { opacity: 0.5; }
+
         /* ✅ Tiled logo watermark */
         .wmTile {
           position: absolute;
@@ -606,24 +632,25 @@ export default function StoreDetail() {
         .wmTile-corner { background-size: 260px; opacity: 0.06; }
         .wmTile-strong { background-size: 180px; opacity: 0.12; }
 
-        /* ✅ Similar / Recommended blocks */
-        .relWrap { padding: 14px; border-top: 1px solid rgba(245,244,244,0.12); }
-        .relHead { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
-        .relTitle { margin:0; font-size:16px; }
-        .seeAll { font-size:12px; opacity:0.75; text-decoration:none; }
-        .seeAll:hover { opacity:1; text-decoration:underline; text-underline-offset:3px; }
-        .relSub { margin:8px 0 0; opacity:0.75; font-size:13px; }
-        .relState { opacity:0.7; font-size:13px; padding: 6px 0; }
+        /* ✅ Full-width sections */
+        .fullRel { margin-top: 18px; padding-top: 6px; }
+        .fullRelBlock { margin-top: 14px; padding: 14px 14px 16px; border: 1px solid rgba(245,244,244,0.12); border-radius: 18px; background: rgba(255,255,255,0.02); }
+        .fullRelHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .fullRelTitle { margin: 0; font-size: 16px; }
+        .seeAll { font-size: 12px; opacity: 0.75; text-decoration: none; }
+        .seeAll:hover { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
+        .relSub { margin: 8px 0 0; opacity: 0.75; font-size: 13px; }
+        .relState { opacity: 0.7; font-size: 13px; padding: 6px 0; }
 
-        .relGrid {
-          margin-top: 10px;
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-        }
-        .relCard { display:block; text-decoration:none; color:inherit; }
-        .relThumb { position:relative; border-radius: 14px; overflow:hidden; border: 1px solid rgba(245,244,244,0.10); }
-        .relThumb img { width:100%; height:100%; aspect-ratio: 16/10; object-fit: cover; display:block; }
+        .fullRelGrid { margin-top: 12px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+        .fullRelCard { display: block; text-decoration: none; color: inherit; transition: transform 0.18s ease; }
+        .fullRelCard:hover { transform: translateY(-4px); }
+
+        .relThumb { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid rgba(245,244,244,0.10); transition: border-color 0.18s ease, box-shadow 0.18s ease; }
+        .fullRelCard:hover .relThumb { border-color: rgba(245,244,244,0.35); box-shadow: 0 8px 18px rgba(0,0,0,0.25); }
+
+        .relThumb img { width: 100%; height: 100%; aspect-ratio: 16/10; object-fit: cover; display: block; transition: transform 0.35s ease; }
+        .fullRelCard:hover .relThumb img { transform: scale(1.06); }
 
         .relWm{
           position:absolute; inset:0; pointer-events:none;
@@ -635,17 +662,14 @@ export default function StoreDetail() {
           transform: rotate(-12deg);
         }
 
-        .chipRow { margin-top: 12px; display:flex; flex-wrap:wrap; gap:8px; }
-        .chip {
-          font-size: 12px;
-          padding: 8px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(245,244,244,0.14);
-          text-decoration:none;
-          color: inherit;
-          opacity: 0.85;
-        }
-        .chip:hover { opacity:1; background: rgba(245,244,244,0.06); }
+        .relMeta { margin-top: 8px; }
+        .relName { font-size: 13px; line-height: 1.35; opacity: 0.95; transition: opacity 0.18s ease, text-decoration 0.18s ease; }
+        .fullRelCard:hover .relName { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
+        .relSmall { margin-top: 3px; font-size: 12px; opacity: 0.7; }
+
+        .chipRow { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip { font-size: 12px; padding: 8px 10px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.14); text-decoration: none; color: inherit; opacity: 0.85; }
+        .chip:hover { opacity: 1; background: rgba(245,244,244,0.06); }
 
         .buyCard { padding: 16px; position: sticky; top: 18px; }
         .title { margin: 0; font-size: 22px; line-height: 1.2; }
@@ -657,11 +681,9 @@ export default function StoreDetail() {
         .options2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .opt { padding: 10px 10px; border-radius: 12px; border: 1px solid rgba(245,244,244,0.16); background: transparent; color: inherit; cursor: pointer; opacity: 0.85; }
         .opt.active { opacity: 1; background: rgba(245,244,244,0.12); border-color: rgba(245,244,244,0.3); }
-
         .priceRow { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(245,244,244,0.12); display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
         .price { font-size: 22px; font-weight: 700; }
         .small { opacity: 0.7; font-size: 12px; }
-
         .buyBtn { margin-top: 14px; width: 100%; padding: 12px 14px; border-radius: 999px; border: 0; cursor: pointer; background: #f5f4f4; color: #222222; font-weight: 700; }
         .buyBtn:disabled { cursor: not-allowed; opacity: 0.6; }
         .fine { margin: 12px 0 0; opacity: 0.7; font-size: 12px; line-height: 1.6; }
@@ -682,13 +704,19 @@ export default function StoreDetail() {
           border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.55); color: #f5f4f4; cursor: pointer; font-size: 16px; }
         .zoomHint { margin-top: 10px; text-align: center; font-size: 12px; opacity: 0.75; color: rgba(245,244,244,0.9); }
 
+        @media (max-width: 1200px) {
+          .fullRelGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
         @media (max-width: 991px) {
           .layout { grid-template-columns: 1fr; }
           .buyCard { position: static; }
           .options3 { grid-template-columns: 1fr; }
           .options2 { grid-template-columns: 1fr; }
           .row2 { grid-template-columns: 1fr; }
-          .relGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .fullRelGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (max-width: 520px) {
+          .fullRelGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
       `}</style>
     </>
