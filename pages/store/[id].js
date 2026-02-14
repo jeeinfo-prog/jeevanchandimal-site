@@ -68,14 +68,15 @@ export default function StoreDetail() {
         if (!data?.ok) throw new Error(data?.error || 'Failed')
 
         setPhoto({
-          id: data.photo.id,
-          title: data.photo.title || 'Untitled',
-          description: data.photo.description || '',
-          tags: Array.isArray(data.photo.tags) ? data.photo.tags : [],
-          thumbUrl: data.photo.thumb_url,
-          previewUrl: data.photo.preview_url,
-          createdAt: data.photo.created_at,
-        })
+  id: row.id,
+  title: row.title || 'Untitled',
+  description: row.description || '',
+  tags: Array.isArray(row.tags) ? row.tags : [],
+  thumbUrl: row.thumb_url,
+  previewUrl: row.preview_url,
+  createdAt: row.created_at,
+})
+
       } catch (e) {
         setError('Failed to load photo')
       } finally {
