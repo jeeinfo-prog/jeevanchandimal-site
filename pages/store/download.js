@@ -48,12 +48,29 @@ export default function StoreDownload() {
     });
 
     const data = await t.json();
+
     if (!t.ok) {
       setMsg(data?.error || "Failed to create download link.");
       return;
     }
 
-    setDownloadUrl(data.url);
+    // ✅ Fix: ensure we always use the correct download endpoint
+    // Preferred: API returns { token }
+    // Backward compat: API might return { url } but old url may point to /api/download/file (deleted)
+    const token = data?.token;
+    const url = data?.url;
+
+    if (typeof url === "string" && url.includes("/api/download?token=")) {
+      setDownloadUrl(url);
+      return;
+    }
+
+    if (typeof token === "string" && token.length > 10) {
+      setDownloadUrl(`/api/download?token=${encodeURIComponent(token)}`);
+      return;
+    }
+
+    setMsg("Download token missing. Please try again.");
   }
 
   React.useEffect(() => {
@@ -76,7 +93,11 @@ export default function StoreDownload() {
 
           {!orderId ? (
             <p className="p">
-              Missing order id. Go back to the <Link href="/store"><a className="link">store</a></Link>.
+              Missing order id. Go back to the{" "}
+              <Link href="/store">
+                <a className="link">store</a>
+              </Link>
+              .
             </p>
           ) : (
             <>
