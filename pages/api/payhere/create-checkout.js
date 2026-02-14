@@ -20,18 +20,15 @@ const PRICES = {
   },
 }
 
-/**
- * IMPORTANT:
- * Your previews/thumbs are flat keys like: photos/preview/<id>.jpg
- * For paid delivery we will use flat keys too:
- *  - JPG: photos/original/<id>.jpg
- *  - RAW: photos/original/<id>.zip   (adjust if you store raw somewhere else)
- *
- * If later you add DB columns (original_key/raw_key), we can switch to DB-driven keys.
- */
+// NOTE: Your originals are actually folder-based in R2, but downloads can scan.
+// We still store a stable key here; download API will resolve real key.
 function getDeliveryObjectKey(photoId, format) {
   if (format === 'raw') return `photos/original/${photoId}.zip`
   return `photos/original/${photoId}.jpg`
+}
+
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
 
 export default async function handler(req, res) {
@@ -66,6 +63,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
+    // ✅ email is REQUIRED for receipt + delivery link
+    const cleanEmail = String(email || '').trim().toLowerCase()
+    if (!isValidEmail(cleanEmail)) {
+      return res.status(400).json({ ok: false, error: 'Valid email is required' })
+    }
+
     const amount = PRICES?.[currency]?.[license]?.[format]
     if (!amount) return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
 
@@ -83,7 +86,7 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ Fetch photo (ONLY fields that actually exist)
+    // ✅ Fetch photo
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, title, status')
@@ -96,16 +99,15 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, error: 'Photo not found' })
     }
 
-    // ✅ Delivery key (stored into orders so notify.js can deliver)
-    const delivery_object_key = getDeliveryObjectKey(String(photoId), format)
-
-    // ✅ Create order in Supabase
     const orderId = uid()
+
+    // ✅ Store stable delivery key (download API can resolve real file)
+    const delivery_object_key = getDeliveryObjectKey(String(photoId), format)
 
     const { error: insertError } = await supabaseAdmin.from('orders').insert({
       id: orderId,
       status: 'PENDING',
-      email: email || null,
+      email: cleanEmail,
       currency,
       amount,
       photo_id: String(photoId),
@@ -138,12 +140,11 @@ export default async function handler(req, res) {
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
 
-      // PayHere webhook (set WEBHOOK_BASE_URL to your *.vercel.app domain)
       notify_url: `${webhookBase}/api/payhere/notify`,
 
-      first_name: firstName,
-      last_name: lastName,
-      email: email || 'guest@example.com',
+      first_name: String(firstName || 'Customer').trim(),
+      last_name: String(lastName || 'Guest').trim(),
+      email: cleanEmail,
       phone,
       address,
       city,
