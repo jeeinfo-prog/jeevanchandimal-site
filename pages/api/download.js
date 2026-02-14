@@ -1,7 +1,8 @@
 // pages/api/download.js
 
 import { verifyDownloadToken } from '@/lib/secureDownload'
-import { getObjectStream } from '@/lib/r2'
+import { getObjectStream, r2 } from '@/lib/r2'
+import { ListObjectsV2Command } from '@aws-sdk/client-s3'
 import { pipeline } from 'stream'
 import { promisify } from 'util'
 
@@ -11,7 +12,7 @@ function safeFilename(name) {
   return (
     String(name || '')
       .replace(/[\r\n"]/g, '')
-      .replace(/[\\/]/g, '-') // avoid path tricks
+      .replace(/[\\/]/g, '-')
       .trim() || 'download'
   )
 }
@@ -20,93 +21,115 @@ function removeExt(filename) {
   return String(filename || '').replace(/\.[^.]+$/, '')
 }
 
+function isNoSuchKey(err) {
+  return (
+    err?.name === 'NoSuchKey' ||
+    err?.Code === 'NoSuchKey' ||
+    err?.$metadata?.httpStatusCode === 404
+  )
+}
+
+async function findFirstFileUnderPrefix(prefix) {
+  const Bucket = process.env.R2_BUCKET
+  if (!Bucket) throw new Error('Missing R2_BUCKET')
+
+  const out = await r2.send(
+    new ListObjectsV2Command({
+      Bucket,
+      Prefix: prefix.endsWith('/') ? prefix : `${prefix}/`,
+      MaxKeys: 50,
+    })
+  )
+
+  const items = out?.Contents || []
+  // Pick first real object (ignore "directory" placeholders ending with "/")
+  const file = items.find((x) => x?.Key && !String(x.Key).endsWith('/'))
+  return file?.Key || null
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
     const token = typeof req.query.token === 'string' ? req.query.token : ''
-    if (!token) {
-      return res.status(400).json({ error: 'Missing token' })
-    }
+    if (!token) return res.status(400).json({ error: 'Missing token' })
 
-    // ✅ throws if invalid/expired
     const payload = verifyDownloadToken(token)
 
     const objectKey = payload?.objectKey
-    if (!objectKey) {
-      return res.status(400).json({ error: 'Invalid token payload' })
-    }
+    if (!objectKey) return res.status(400).json({ error: 'Invalid token payload' })
 
-    // ✅ Your bucket stores originals under: photos/original/<photoId>/...
-    // But DB may have: photos/original/<photoId>.jpg
-    // So we try the saved key first, then fallback to the folder layout.
+    let finalKey = objectKey
+    const tried = [objectKey]
+
+    // 1) Try token key
     let r2obj
     try {
-      r2obj = await getObjectStream(objectKey)
+      r2obj = await getObjectStream(finalKey)
     } catch (err) {
-      const code = err?.name || err?.Code
-      const http = err?.$metadata?.httpStatusCode
+      if (!isNoSuchKey(err)) throw err
 
-      if (code === 'NoSuchKey' || http === 404) {
-        const last = objectKey.split('/').pop() || ''
-        const photoId = removeExt(last)
+      // Derive photoId from token key if possible (works for your current orders)
+      const last = objectKey.split('/').pop() || ''
+      const photoId = removeExt(last)
 
-        // Common folder-layout filenames to try
-        const fallbacks = [
-          `photos/original/${photoId}/original.jpg`,
-          `photos/original/${photoId}/${photoId}.jpg`,
-          `photos/original/${photoId}/original.jpeg`,
-          `photos/original/${photoId}/${photoId}.jpeg`,
-        ]
+      // 2) Common guessed fallbacks
+      const fallbacks = [
+        `photos/original/${photoId}/original.jpg`,
+        `photos/original/${photoId}/${photoId}.jpg`,
+        `photos/original/${photoId}/original.jpeg`,
+        `photos/original/${photoId}/${photoId}.jpeg`,
+      ]
 
-        let found = null
-        for (const altKey of fallbacks) {
-          try {
-            found = await getObjectStream(altKey)
-            break
-          } catch (e2) {
-            // keep trying
-          }
+      let found = null
+      for (const altKey of fallbacks) {
+        tried.push(altKey)
+        try {
+          found = await getObjectStream(altKey)
+          finalKey = altKey
+          break
+        } catch (e2) {
+          if (!isNoSuchKey(e2)) throw e2
         }
+      }
 
-        if (!found) {
+      // 3) Dynamic folder scan (THIS fixes your real structure)
+      if (!found) {
+        const prefix = `photos/original/${photoId}/`
+        const scannedKey = await findFirstFileUnderPrefix(prefix)
+        if (!scannedKey) {
           return res.status(404).json({
             error: 'File not found in storage',
-            tried: [objectKey, ...fallbacks],
+            tried,
+            scannedPrefix: prefix,
           })
         }
 
-        r2obj = found
-      } else {
-        // unknown R2 error
-        throw err
+        tried.push(scannedKey)
+        finalKey = scannedKey
+        found = await getObjectStream(scannedKey)
       }
+
+      r2obj = found
     }
 
     const { body, contentType, contentLength } = r2obj
 
-    const filename = safeFilename(
-      payload?.filename || objectKey.split('/').pop() || 'download'
-    )
+    // Prefer filename from token; otherwise use the actual key name we ended up using
+    const filename = safeFilename(payload?.filename || finalKey.split('/').pop() || 'download')
 
     res.setHeader('Content-Type', contentType || 'application/octet-stream')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     if (contentLength) res.setHeader('Content-Length', String(contentLength))
     res.setHeader('Cache-Control', 'no-store')
 
-    if (!body) {
-      return res.status(404).json({ error: 'File not found' })
-    }
+    if (!body) return res.status(404).json({ error: 'File not found' })
 
-    // Best: stream to client
     if (typeof body.pipe === 'function') {
       await pipe(body, res)
       return
     }
 
-    // Fallback for async-iterable bodies
     const chunks = []
     for await (const chunk of body) chunks.push(chunk)
     return res.status(200).send(Buffer.concat(chunks))
