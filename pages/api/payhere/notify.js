@@ -3,7 +3,7 @@
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
-import { sendDownloadEmail } from '../../../lib/email'
+import { sendDownloadEmail, sendReceiptEmail } from '../../../lib/email'
 import { payhereVerifyMd5Sig } from '../../../lib/payhere'
 
 export const config = {
@@ -151,7 +151,7 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
-      // ✅ Ensure per-license download_limit is set (B)
+      // ✅ Ensure per-license download_limit is set
       const desiredLimit = limitForLicense(o.license)
       if (o.download_limit == null) {
         await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
@@ -162,7 +162,7 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
       }
 
-      // ✅ Email ONCE (C) with ONE-TIME token (A)
+      // ✅ Send emails ONCE (receipt + download)
       if (o.email && !o.download_email_sent_at) {
         const jti = crypto.randomUUID()
         const expiresMinutes = 60
@@ -199,7 +199,19 @@ export default async function handler(req, res) {
 
         const downloadUrl = buildDownloadUrl(token, req)
 
-        // ✅ PASS license + format into email template
+        // ✅ Receipt email
+        await sendReceiptEmail({
+          to: o.email,
+          orderId: o.id,
+          amount: o.amount,
+          currency: o.currency,
+          photoTitle: o.photo_id,
+          license: o.license,
+          format: o.format,
+          paymentId: payment_id || null,
+        })
+
+        // ✅ Download email
         await sendDownloadEmail({
           to: o.email,
           orderId: o.id,
@@ -216,7 +228,7 @@ export default async function handler(req, res) {
           })
           .eq('id', o.id)
 
-        console.log('Order PAID + email sent (one-time):', order_id)
+        console.log('Order PAID + receipt+download emails sent (one-time):', order_id)
       } else {
         console.log('Order PAID (email skipped):', order_id, {
           hasEmail: !!o.email,
