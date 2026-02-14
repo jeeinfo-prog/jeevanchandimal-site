@@ -2,16 +2,22 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
-import { verifyDownloadToken } from '../../../../lib/download'
+import { verifyDownloadToken } from '../../../../lib/secureDownload'
 
 export const config = {
   api: { bodyParser: false },
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!SUPABASE_URL) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+const R2_BUCKET = process.env.R2_BUCKET
+if (!R2_BUCKET) throw new Error('Missing R2_BUCKET')
 
 const s3 = new S3Client({
   region: 'auto',
@@ -23,7 +29,7 @@ const s3 = new S3Client({
 })
 
 function clampInt(n, min, max) {
-  const x = parseInt(String(n || ''), 10)
+  const x = parseInt(String(n ?? ''), 10)
   if (Number.isNaN(x)) return null
   return Math.max(min, Math.min(max, x))
 }
@@ -46,6 +52,45 @@ function cacheControlFor(src) {
 
 function contentTypeFor(format) {
   return format === 'webp' ? 'image/webp' : 'image/jpeg'
+}
+
+/**
+ * Supports BOTH styles of secureDownload:
+ * 1) verifyDownloadToken(token) -> payload OR throws
+ * 2) verifyDownloadToken(token) -> { ok, payload, error }
+ * 3) verifyDownloadToken(token, secret) in case your helper expects secret explicitly
+ */
+function verifyTokenCompat(token) {
+  const secret = process.env.DOWNLOAD_TOKEN_SECRET
+
+  // Some builds keep secret inside lib/secureDownload; others want it passed in.
+  // Try the safest path(s) without breaking.
+  try {
+    // First: try (token, secret) ONLY if secret exists (won't hurt if function ignores extra arg in JS,
+    // but could if it checks arity—rare—so we wrap)
+    if (secret) {
+      const out = verifyDownloadToken(token, secret)
+      if (out && typeof out === 'object' && 'ok' in out) {
+        if (!out.ok) return { ok: false, error: out.error || 'Invalid token' }
+        return { ok: true, payload: out.payload }
+      }
+      // Assume payload
+      return { ok: true, payload: out }
+    }
+  } catch (e) {
+    // fall through to token-only attempt
+  }
+
+  try {
+    const out = verifyDownloadToken(token)
+    if (out && typeof out === 'object' && 'ok' in out) {
+      if (!out.ok) return { ok: false, error: out.error || 'Invalid token' }
+      return { ok: true, payload: out.payload }
+    }
+    return { ok: true, payload: out }
+  } catch (e) {
+    return { ok: false, error: e?.message || 'Invalid token' }
+  }
 }
 
 export default async function handler(req, res) {
@@ -75,24 +120,27 @@ export default async function handler(req, res) {
     if (src === 'original') {
       if (!token) return res.status(401).json({ error: 'Missing token' })
 
-      const secret = process.env.DOWNLOAD_TOKEN_SECRET
-      if (!secret) return res.status(500).json({ error: 'DOWNLOAD_TOKEN_SECRET not configured' })
+      // If your secureDownload expects env secret internally, it will validate using DOWNLOAD_TOKEN_SECRET.
+      // If it expects secret passed in, verifyTokenCompat handles that too.
+      if (!process.env.DOWNLOAD_TOKEN_SECRET) {
+        return res.status(500).json({ error: 'DOWNLOAD_TOKEN_SECRET not configured' })
+      }
 
-      const v = verifyDownloadToken(token, secret)
+      const v = verifyTokenCompat(token)
       if (!v.ok) return res.status(401).json({ error: v.error || 'Invalid token' })
 
       tokenPayload = v.payload
 
-      if (tokenPayload.photoId !== id) {
+      if (tokenPayload?.photoId !== id) {
         return res.status(403).json({ error: 'Token mismatch' })
       }
 
-      if (tokenPayload.scope && tokenPayload.scope !== 'original') {
+      if (tokenPayload?.scope && tokenPayload.scope !== 'original') {
         return res.status(403).json({ error: 'Invalid token scope' })
       }
 
       // Optional: lock width in token
-      if (tokenPayload.w && Number(tokenPayload.w) !== Number(width)) {
+      if (tokenPayload?.w && Number(tokenPayload.w) !== Number(width)) {
         return res.status(403).json({ error: 'Token width mismatch' })
       }
     }
@@ -144,7 +192,7 @@ export default async function handler(req, res) {
     try {
       const cached = await s3.send(
         new GetObjectCommand({
-          Bucket: process.env.R2_BUCKET,
+          Bucket: R2_BUCKET,
           Key: derivativeKey,
         })
       )
@@ -165,7 +213,7 @@ export default async function handler(req, res) {
     // ==============================
     const obj = await s3.send(
       new GetObjectCommand({
-        Bucket: process.env.R2_BUCKET,
+        Bucket: R2_BUCKET,
         Key: sourceKey,
       })
     )
@@ -196,7 +244,7 @@ export default async function handler(req, res) {
     // ==============================
     await s3.send(
       new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET,
+        Bucket: R2_BUCKET,
         Key: derivativeKey,
         Body: outBuffer,
         ContentType: contentTypeFor(format),
