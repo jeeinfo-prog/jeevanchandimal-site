@@ -51,6 +51,9 @@ export default function StoreDetail() {
   // ✅ Watermark variant state
   const [variant, setVariant] = React.useState('standard') // standard | corner | strong
 
+  // ✅ Zoom modal state
+  const [zoomOpen, setZoomOpen] = React.useState(false)
+
   React.useEffect(() => {
     if (!router.isReady) return
     if (!id) return
@@ -102,74 +105,104 @@ export default function StoreDetail() {
     }
   }, [router.isReady, id])
 
-  async function startCheckout() {
-  if (!photo) return
-
-  try {
-    setIsCheckingOut(true)
-
-    const r = await fetch('/api/payhere/create-checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        photoId: photo.id,
-        license,
-        format,
-        currency,
-
-        // optional customer details (can keep simple for now)
-        email: null,
-        firstName: 'Customer',
-        lastName: 'Guest',
-        phone: '0000000000',
-        address: 'N/A',
-        city: 'N/A',
-        country: 'Sri Lanka',
-      }),
-    })
-
-    const data = await r.json()
-
-    if (!r.ok || !data?.actionUrl || !data?.fields) {
-      alert(data?.error || 'Checkout init failed')
-      return
+  // ✅ ESC to close zoom + lock scroll
+  React.useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') setZoomOpen(false)
     }
+    if (zoomOpen) {
+      window.addEventListener('keydown', onKey)
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        window.removeEventListener('keydown', onKey)
+        document.body.style.overflow = prev
+      }
+    }
+  }, [zoomOpen])
 
-    // ✅ Auto-submit PayHere form (redirect user to payment)
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = data.actionUrl
+  async function startCheckout() {
+    if (!photo) return
 
-    Object.entries(data.fields).forEach(([k, v]) => {
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = k
-      input.value = String(v ?? '')
-      form.appendChild(input)
-    })
+    try {
+      setIsCheckingOut(true)
 
-    document.body.appendChild(form)
-    form.submit()
-  } catch (e) {
-    console.error(e)
-    alert('Checkout failed')
-  } finally {
-    setIsCheckingOut(false)
+      const r = await fetch('/api/payhere/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photoId: photo.id,
+          license,
+          format,
+          currency,
+
+          // optional customer details (can keep simple for now)
+          email: null,
+          firstName: 'Customer',
+          lastName: 'Guest',
+          phone: '0000000000',
+          address: 'N/A',
+          city: 'N/A',
+          country: 'Sri Lanka',
+        }),
+      })
+
+      const data = await r.json()
+
+      if (!r.ok || !data?.actionUrl || !data?.fields) {
+        alert(data?.error || 'Checkout init failed')
+        return
+      }
+
+      // ✅ Auto-submit PayHere form (redirect user to payment)
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = data.actionUrl
+
+      Object.entries(data.fields).forEach(([k, v]) => {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = k
+        input.value = String(v ?? '')
+        form.appendChild(input)
+      })
+
+      document.body.appendChild(form)
+      form.submit()
+    } catch (e) {
+      console.error(e)
+      alert('Checkout failed')
+    } finally {
+      setIsCheckingOut(false)
+    }
   }
-}
-
 
   const price = PRICES[currency][license][format]
 
   // ✅ Correct preview endpoint (matches: pages/api/photo/[id]/preview.js)
-  // Include variant in URL so it reloads when you click buttons
   const previewSrc = photo?.id ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}` : ''
+
+  // ✅ Click-to-zoom handler
+  function openZoom(e) {
+    // left click only
+    if (e && e.button && e.button !== 0) return
+    setZoomOpen(true)
+  }
+
+  // ✅ shared “disable save” behavior
+  function preventSave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
 
   return (
     <>
       <Head>
         <title>{photo?.title ? `${photo.title} | Store` : 'Photo | Store'}</title>
-        <meta name="description" content="License this photograph for Personal, Commercial, or Editorial use." />
+        <meta
+          name="description"
+          content="License this photograph for Personal, Commercial, or Editorial use."
+        />
       </Head>
 
       <JeevanChandimalNavi />
@@ -213,20 +246,35 @@ export default function StoreDetail() {
           <div className="layout">
             <section className="imageCard">
               <div className="imageFrame wm">
-                <img
-                  key={`${photo.id}:${variant}`} // ✅ forces refresh when variant changes
-                  src={previewSrc}
-                  alt={photo.title}
-                  loading="eager"
-                  onError={(e) => {
-                    // fallback: DB previewUrl then thumb
-                    if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
-                      e.currentTarget.src = photo.previewUrl
-                      return
-                    }
-                    if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
-                  }}
-                />
+                {/* Click-to-zoom wrapper: blocks right-click + drag save */}
+                <button
+                  type="button"
+                  className="zoomBtn"
+                  onClick={openZoom}
+                  onContextMenu={preventSave}
+                  onDragStart={preventSave}
+                  aria-label="Zoom preview"
+                  title="Click to zoom"
+                >
+                  <img
+                    key={`${photo.id}:${variant}`} // ✅ forces refresh when variant changes
+                    src={previewSrc}
+                    alt={photo.title}
+                    loading="eager"
+                    draggable={false}
+                    onContextMenu={preventSave}
+                    onDragStart={preventSave}
+                    onError={(e) => {
+                      // fallback: DB previewUrl then thumb
+                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                        e.currentTarget.src = photo.previewUrl
+                        return
+                      }
+                      if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+                    }}
+                  />
+                  <span className="zoomPill">Zoom</span>
+                </button>
 
                 {/* Optional overlay text watermark (your API images should already be watermarked) */}
                 <span className={`wmText wmText-${variant}`}>JEEVAN CHANDIMAL</span>
@@ -246,7 +294,9 @@ export default function StoreDetail() {
                 ))}
               </div>
 
-              <p className="watermarkHint">Preview image shown. Purchased file will be delivered without watermark.</p>
+              <p className="watermarkHint">
+                Preview image shown. Purchased file will be delivered without watermark.
+              </p>
 
               <div className="tags">
                 {(photo.tags || []).map((t) => (
@@ -323,11 +373,39 @@ export default function StoreDetail() {
                 {isCheckingOut ? 'Working…' : 'Buy license'}
               </button>
 
-              <p className="fine">After payment, you’ll receive a secure download link (expires). (Checkout wiring next.)</p>
+              <p className="fine">
+                After payment, you’ll receive a secure download link (expires). (Checkout wiring next.)
+              </p>
             </aside>
           </div>
         )}
       </main>
+
+      {/* ✅ Zoom modal */}
+      {zoomOpen && photo && (
+        <div
+          className="zoomModal"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setZoomOpen(false)}
+          onContextMenu={preventSave}
+        >
+          <div className="zoomInner" onClick={(e) => e.stopPropagation()}>
+            <button className="zoomClose" type="button" onClick={() => setZoomOpen(false)} aria-label="Close zoom">
+              ✕
+            </button>
+
+            <img
+              src={previewSrc}
+              alt={photo.title}
+              draggable={false}
+              onContextMenu={preventSave}
+              onDragStart={preventSave}
+            />
+            <div className="zoomHint">ESC to close</div>
+          </div>
+        </div>
+      )}
 
       <JeevanChandimalNewFooter />
 
@@ -406,12 +484,45 @@ export default function StoreDetail() {
           width: 100%;
           aspect-ratio: 16/10;
           background: rgba(255, 255, 255, 0.02);
+          position: relative;
         }
+
+        /* ✅ click-to-zoom button wrapper */
+        .zoomBtn {
+          all: unset;
+          cursor: zoom-in;
+          display: block;
+          width: 100%;
+          height: 100%;
+          position: relative;
+          z-index: 2;
+        }
+
         .imageFrame img {
           width: 100%;
           height: 100%;
           object-fit: cover;
           display: block;
+
+          /* ✅ discourage save */
+          -webkit-user-drag: none;
+          user-drag: none;
+          user-select: none;
+          -webkit-touch-callout: none;
+        }
+
+        .zoomPill {
+          position: absolute;
+          right: 12px;
+          top: 12px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 700;
+          background: rgba(0, 0, 0, 0.45);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          color: rgba(245, 244, 244, 0.95);
+          pointer-events: none;
         }
 
         .watermarkHint {
@@ -437,7 +548,7 @@ export default function StoreDetail() {
           color: inherit;
         }
 
-        /* ✅ Watermark selector UI (small, does not break design) */
+        /* ✅ Watermark selector UI */
         .wmSelector {
           display: flex;
           gap: 10px;
@@ -459,13 +570,9 @@ export default function StoreDetail() {
           background: rgba(245, 244, 244, 0.12);
         }
 
-        /* ✅ Overlay watermark text (optional) */
+        /* ✅ Overlay watermark text */
         .wm {
           position: relative;
-        }
-        .wm img {
-          position: relative;
-          z-index: 1;
         }
         .wmText {
           position: absolute;
@@ -586,6 +693,57 @@ export default function StoreDetail() {
           opacity: 0.7;
           font-size: 12px;
           line-height: 1.6;
+        }
+
+        /* ✅ Zoom modal */
+        .zoomModal {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          background: rgba(0, 0, 0, 0.78);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          cursor: zoom-out;
+        }
+        .zoomInner {
+          position: relative;
+          max-width: 1200px;
+          width: 100%;
+          cursor: default;
+        }
+        .zoomInner img {
+          width: 100%;
+          height: auto;
+          display: block;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+
+          -webkit-user-drag: none;
+          user-select: none;
+          -webkit-touch-callout: none;
+        }
+        .zoomClose {
+          position: absolute;
+          top: -10px;
+          right: -10px;
+          width: 36px;
+          height: 36px;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          background: rgba(0, 0, 0, 0.55);
+          color: #f5f4f4;
+          cursor: pointer;
+          font-size: 16px;
+          line-height: 1;
+        }
+        .zoomHint {
+          margin-top: 10px;
+          text-align: center;
+          font-size: 12px;
+          opacity: 0.75;
+          color: rgba(245, 244, 244, 0.9);
         }
 
         @media (max-width: 991px) {
