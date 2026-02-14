@@ -63,6 +63,11 @@ export default function StoreDetail() {
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
 
+  // ✅ Similar + Recommended
+  const [similar, setSimilar] = React.useState([])
+  const [recommended, setRecommended] = React.useState([])
+  const [recLoading, setRecLoading] = React.useState(false)
+
   React.useEffect(() => {
     if (!router.isReady) return
     if (!id) return
@@ -110,6 +115,39 @@ export default function StoreDetail() {
       alive = false
     }
   }, [router.isReady, id])
+
+  // ✅ Fetch similar + recommended when photo is ready
+  React.useEffect(() => {
+    if (!photo?.id) return
+
+    let alive = true
+    async function run() {
+      try {
+        setRecLoading(true)
+
+        const [s, r] = await Promise.all([
+          fetch(`/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`).then((x) => x.json()),
+          fetch(`/api/store/recommended?excludeId=${encodeURIComponent(photo.id)}&limit=6`).then((x) => x.json()),
+        ])
+
+        if (!alive) return
+        setSimilar(Array.isArray(s?.photos) ? s.photos : [])
+        setRecommended(Array.isArray(r?.photos) ? r.photos : [])
+      } catch {
+        if (!alive) return
+        setSimilar([])
+        setRecommended([])
+      } finally {
+        if (!alive) return
+        setRecLoading(false)
+      }
+    }
+
+    run()
+    return () => {
+      alive = false
+    }
+  }, [photo?.id])
 
   // ✅ ESC close zoom + lock scroll
   React.useEffect(() => {
@@ -198,6 +236,23 @@ export default function StoreDetail() {
 
   const price = PRICES[currency][license][format]
   const previewSrc = photo?.id ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}` : ''
+
+  const firstTag = (photo?.tags || []).find(Boolean) || ''
+  const popularTerms = React.useMemo(() => {
+    const base = [
+      ...(photo?.tags || []).slice(0, 6),
+      'Portrait',
+      'Animals',
+      'Closeup',
+      'Nature',
+      'Outdoor',
+      'Macro',
+      'Colorful',
+      'Night',
+      'Travel',
+    ]
+    return Array.from(new Set(base.filter(Boolean))).slice(0, 10)
+  }, [photo?.tags])
 
   return (
     <>
@@ -302,6 +357,84 @@ export default function StoreDetail() {
                   </Link>
                 ))}
               </div>
+
+              {/* ✅ Similar images */}
+              <div className="relWrap">
+                <div className="relHead">
+                  <h2 className="relTitle">Similar images</h2>
+                  {firstTag ? (
+                    <Link href={`/store?tag=${encodeURIComponent(firstTag)}`}>
+                      <a className="seeAll">See all</a>
+                    </Link>
+                  ) : (
+                    <Link href="/store">
+                      <a className="seeAll">See all</a>
+                    </Link>
+                  )}
+                </div>
+
+                {recLoading && <div className="relState">Loading…</div>}
+
+                {!recLoading && similar.length > 0 && (
+                  <div className="relGrid">
+                    {similar.map((p) => (
+                      <Link key={p.id} href={`/store/${p.id}`}>
+                        <a className="relCard" aria-label={p.title || 'Similar photo'}>
+                          <div className="relThumb">
+                            <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
+                            <div className="relWm" aria-hidden="true" />
+                          </div>
+                        </a>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+
+                {!recLoading && similar.length === 0 && (
+                  <div className="relState" style={{ opacity: 0.75 }}>
+                    No similar photos found yet.
+                  </div>
+                )}
+              </div>
+
+              {/* ✅ Recommended images */}
+              <div className="relWrap">
+                <div className="relHead">
+                  <h2 className="relTitle">Recommended for you</h2>
+                  <Link href="/store">
+                    <a className="seeAll">See all</a>
+                  </Link>
+                </div>
+
+                {!recLoading && recommended.length > 0 && (
+                  <div className="relGrid">
+                    {recommended.map((p) => (
+                      <Link key={p.id} href={`/store/${p.id}`}>
+                        <a className="relCard" aria-label={p.title || 'Recommended photo'}>
+                          <div className="relThumb">
+                            <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
+                            <div className="relWm" aria-hidden="true" />
+                          </div>
+                        </a>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ✅ Popular related search terms */}
+              <div className="relWrap">
+                <h2 className="relTitle">Didn't find what you're looking for?</h2>
+                <p className="relSub">Try a popular related search term.</p>
+
+                <div className="chipRow">
+                  {popularTerms.map((t) => (
+                    <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`}>
+                      <a className="chip">🔎 {t}</a>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             </section>
 
             <aside className="buyCard">
@@ -405,26 +538,14 @@ export default function StoreDetail() {
       </main>
 
       {zoomOpen && photo && (
-        <div
-          className="zoomModal"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setZoomOpen(false)}
-          onContextMenu={preventSave}
-        >
+        <div className="zoomModal" role="dialog" aria-modal="true" onClick={() => setZoomOpen(false)} onContextMenu={preventSave}>
           <div className="zoomInner" onClick={(e) => e.stopPropagation()}>
             <button className="zoomClose" type="button" onClick={() => setZoomOpen(false)} aria-label="Close zoom">
               ✕
             </button>
 
             <div className="zoomImgWrap">
-              <img
-                src={previewSrc}
-                alt={photo.title}
-                draggable={false}
-                onContextMenu={preventSave}
-                onDragStart={preventSave}
-              />
+              <img src={previewSrc} alt={photo.title} draggable={false} onContextMenu={preventSave} onDragStart={preventSave} />
 
               {/* ✅ TILED logo watermark overlay inside zoom */}
               <div className={`zoomWm wmTile wmTile-${variant}`} aria-hidden="true" />
@@ -447,6 +568,7 @@ export default function StoreDetail() {
         .tbtn.active { opacity: 1; background: rgba(245,244,244,0.12); }
         .state { margin-top: 18px; padding: 14px 16px; border: 1px solid rgba(245,244,244,0.12); border-radius: 14px; opacity: 0.95; }
         .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono','Courier New', monospace; font-size: 12px; }
+
         .layout { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 18px; align-items: start; }
         .imageCard,.buyCard { border: 1px solid rgba(245,244,244,0.12); border-radius: 18px; background: rgba(255,255,255,0.02); }
         .imageCard { overflow: hidden; }
@@ -457,13 +579,14 @@ export default function StoreDetail() {
         .zoomPill { position: absolute; right: 12px; top: 12px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
           background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); color: rgba(245,244,244,0.95); pointer-events:none; }
 
-        .watermarkHint { margin: 10px 14px 0; opacity: 0.7; font-size: 13px; }
-        .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
-        .tag { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.14); opacity: 0.85; text-decoration: none; color: inherit; }
-
         .wmSelector { display: flex; gap: 10px; padding: 12px 14px 0; }
         .wmBtn { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.18); background: transparent; color: inherit; cursor: pointer; opacity: 0.8; text-transform: lowercase; font-size: 12px; }
         .wmBtn.active { opacity: 1; background: rgba(245,244,244,0.12); }
+
+        .watermarkHint { margin: 10px 14px 0; opacity: 0.7; font-size: 13px; }
+
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
+        .tag { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(245,244,244,0.14); opacity: 0.85; text-decoration: none; color: inherit; }
 
         /* ✅ Tiled logo watermark */
         .wmTile {
@@ -472,7 +595,6 @@ export default function StoreDetail() {
           pointer-events: none;
           user-select: none;
           z-index: 4;
-
           background-image: url('/watermark-logo/watermark-logo.png');
           background-repeat: repeat;
           background-position: center;
@@ -484,6 +606,47 @@ export default function StoreDetail() {
         .wmTile-corner { background-size: 260px; opacity: 0.06; }
         .wmTile-strong { background-size: 180px; opacity: 0.12; }
 
+        /* ✅ Similar / Recommended blocks */
+        .relWrap { padding: 14px; border-top: 1px solid rgba(245,244,244,0.12); }
+        .relHead { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+        .relTitle { margin:0; font-size:16px; }
+        .seeAll { font-size:12px; opacity:0.75; text-decoration:none; }
+        .seeAll:hover { opacity:1; text-decoration:underline; text-underline-offset:3px; }
+        .relSub { margin:8px 0 0; opacity:0.75; font-size:13px; }
+        .relState { opacity:0.7; font-size:13px; padding: 6px 0; }
+
+        .relGrid {
+          margin-top: 10px;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .relCard { display:block; text-decoration:none; color:inherit; }
+        .relThumb { position:relative; border-radius: 14px; overflow:hidden; border: 1px solid rgba(245,244,244,0.10); }
+        .relThumb img { width:100%; height:100%; aspect-ratio: 16/10; object-fit: cover; display:block; }
+
+        .relWm{
+          position:absolute; inset:0; pointer-events:none;
+          background-image:url('/watermark-logo/watermark-logo.png');
+          background-repeat:repeat;
+          background-position:center;
+          background-size: 160px;
+          opacity: 0.08;
+          transform: rotate(-12deg);
+        }
+
+        .chipRow { margin-top: 12px; display:flex; flex-wrap:wrap; gap:8px; }
+        .chip {
+          font-size: 12px;
+          padding: 8px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245,244,244,0.14);
+          text-decoration:none;
+          color: inherit;
+          opacity: 0.85;
+        }
+        .chip:hover { opacity:1; background: rgba(245,244,244,0.06); }
+
         .buyCard { padding: 16px; position: sticky; top: 18px; }
         .title { margin: 0; font-size: 22px; line-height: 1.2; }
         .sub { margin: 8px 0 0; opacity: 0.75; }
@@ -494,9 +657,11 @@ export default function StoreDetail() {
         .options2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .opt { padding: 10px 10px; border-radius: 12px; border: 1px solid rgba(245,244,244,0.16); background: transparent; color: inherit; cursor: pointer; opacity: 0.85; }
         .opt.active { opacity: 1; background: rgba(245,244,244,0.12); border-color: rgba(245,244,244,0.3); }
+
         .priceRow { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(245,244,244,0.12); display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
         .price { font-size: 22px; font-weight: 700; }
         .small { opacity: 0.7; font-size: 12px; }
+
         .buyBtn { margin-top: 14px; width: 100%; padding: 12px 14px; border-radius: 999px; border: 0; cursor: pointer; background: #f5f4f4; color: #222222; font-weight: 700; }
         .buyBtn:disabled { cursor: not-allowed; opacity: 0.6; }
         .fine { margin: 12px 0 0; opacity: 0.7; font-size: 12px; line-height: 1.6; }
@@ -523,6 +688,7 @@ export default function StoreDetail() {
           .options3 { grid-template-columns: 1fr; }
           .options2 { grid-template-columns: 1fr; }
           .row2 { grid-template-columns: 1fr; }
+          .relGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
       `}</style>
     </>
