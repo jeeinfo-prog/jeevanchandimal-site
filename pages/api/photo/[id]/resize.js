@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
-import { verifyDownloadToken } from '../../../../lib/download-token'
+import { verifyDownloadToken } from '../../../../lib/download'
 
 export const config = {
   api: { bodyParser: false },

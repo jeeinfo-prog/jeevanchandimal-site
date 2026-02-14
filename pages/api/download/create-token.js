@@ -1,7 +1,7 @@
 // pages/api/download/create-token.js
 
 import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
-import { signDownloadToken } from "../../../lib/download-token";
+import { signDownloadToken } from "../../../lib/download.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, max-age=0");

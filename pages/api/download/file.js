@@ -1,7 +1,7 @@
 // pages/api/download/file.js
 
 import { supabaseAdmin } from "../../../lib/supabaseAdmin.js";
-import { verifyDownloadToken } from "../../../lib/download-token";
+import { verifyDownloadToken } from "../../../lib/download.js";
 import { getPhotoById } from "../../../lib/photos";
 
 export default async function handler(req, res) {
