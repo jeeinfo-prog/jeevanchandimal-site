@@ -52,6 +52,7 @@ export default function StoreDetail() {
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
 
   const [variant] = React.useState('standard') // keep for future variants
+
   const [email, setEmail] = React.useState('')
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
@@ -60,7 +61,7 @@ export default function StoreDetail() {
   const [recommended, setRecommended] = React.useState([])
   const [relLoading, setRelLoading] = React.useState(false)
 
-  // ✅ Load photo details (THIS WAS MISSING)
+  // ✅ Load photo details
   React.useEffect(() => {
     if (!router.isReady || !id) return
 
@@ -97,7 +98,7 @@ export default function StoreDetail() {
         })
 
         setLoading(false)
-      } catch (e) {
+      } catch {
         if (!alive) return
         setError('Failed to load photo')
         setLoading(false)
@@ -110,7 +111,7 @@ export default function StoreDetail() {
     }
   }, [router.isReady, id])
 
-  // ✅ Load similar + recommended
+  // ✅ Load similar + recommended (exclude similar from recommended)
   React.useEffect(() => {
     if (!photo?.id) return
 
@@ -120,7 +121,10 @@ export default function StoreDetail() {
       try {
         setRelLoading(true)
 
-        const s = await fetch(`/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`).then((r) => r.json())
+        const s = await fetch(
+          `/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`
+        ).then((r) => r.json())
+
         const similarList = Array.isArray(s?.photos) ? s.photos : []
         if (!alive) return
         setSimilar(similarList)
@@ -128,12 +132,14 @@ export default function StoreDetail() {
         const similarIds = similarList.map((p) => p.id).join(',')
 
         const r = await fetch(
-          `/api/store/recommended?excludeId=${encodeURIComponent(photo.id)}&similarIds=${encodeURIComponent(similarIds)}&limit=6`
+          `/api/store/recommended?excludeId=${encodeURIComponent(
+            photo.id
+          )}&similarIds=${encodeURIComponent(similarIds)}&limit=6`
         ).then((r) => r.json())
 
         if (!alive) return
         setRecommended(Array.isArray(r?.photos) ? r.photos : [])
-      } catch (e) {
+      } catch {
         if (!alive) return
         setSimilar([])
         setRecommended([])
@@ -151,43 +157,114 @@ export default function StoreDetail() {
   }, [photo?.id])
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
-  const previewSrc = photo?.id ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}` : ''
+  const previewSrc = photo?.id
+    ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
+    : ''
 
   function preventSave(e) {
     e.preventDefault()
     e.stopPropagation()
   }
 
-  // ✅ Keep your real checkout later: this is ONLY placeholder
   async function startCheckout() {
     if (!photo) return
 
     const em = String(email || '').trim().toLowerCase()
     if (!isValidEmail(em)) {
-      alert('Please enter a valid email')
+      alert('Please enter a valid email for receipt + download link.')
       return
     }
 
-    alert('Checkout is not wired in this simplified file. Please paste your working startCheckout() from earlier.')
+    try {
+      setIsCheckingOut(true)
+
+      const r = await fetch('/api/payhere/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photoId: photo.id,
+          license,
+          format,
+          currency,
+          email: em,
+          firstName: (firstName || 'Customer').trim(),
+          lastName: (lastName || 'Guest').trim(),
+          phone: '0000000000',
+          address: 'N/A',
+          city: 'N/A',
+          country: 'Sri Lanka',
+        }),
+      })
+
+      const data = await r.json()
+
+      if (!r.ok || !data?.actionUrl || !data?.fields) {
+        alert(data?.error || 'Checkout init failed')
+        return
+      }
+
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = data.actionUrl
+
+      Object.entries(data.fields).forEach(([k, v]) => {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = k
+        input.value = String(v ?? '')
+        form.appendChild(input)
+      })
+
+      document.body.appendChild(form)
+      form.submit()
+    } catch (e) {
+      console.error(e)
+      alert('Checkout failed')
+    } finally {
+      setIsCheckingOut(false)
+    }
   }
+
+  const firstTag = (photo?.tags || []).find(Boolean) || ''
 
   return (
     <>
       <Head>
         <title>{photo?.title ? `${photo.title} | Store` : 'Photo | Store'}</title>
+        <meta
+          name="description"
+          content="License this photograph for Personal, Commercial, or Editorial use."
+        />
       </Head>
 
       <JeevanChandimalNavi />
 
       <main className="wrap">
+        <div className="top">
+          <Link href="/store">
+            <a className="back">← Back to store</a>
+          </Link>
+
+          <div className="toggle" role="group" aria-label="Currency toggle">
+            <button
+              type="button"
+              className={`tbtn ${currency === 'LKR' ? 'active' : ''}`}
+              onClick={() => setCurrency('LKR')}
+            >
+              LKR
+            </button>
+            <button
+              type="button"
+              className={`tbtn ${currency === 'USD' ? 'active' : ''}`}
+              onClick={() => setCurrency('USD')}
+            >
+              USD
+            </button>
+          </div>
+        </div>
+
         {loading && <div className="state">Loading…</div>}
         {!loading && error && <div className="state">❌ {error}</div>}
-        {!loading && !error && !photo && (
-          <div className="state">
-            Photo not loaded.<br />
-            Try: <span className="mono">/api/store/photo?id={id}</span>
-          </div>
-        )}
 
         {!loading && !error && photo && (
           <>
@@ -195,12 +272,28 @@ export default function StoreDetail() {
               {/* LEFT IMAGE */}
               <section className="imageCard">
                 <div className="imageFrame" onContextMenu={preventSave}>
-                  <img src={previewSrc} alt={photo.title} onContextMenu={preventSave} />
+                  <img
+                    src={previewSrc}
+                    alt={photo.title}
+                    draggable={false}
+                    onContextMenu={preventSave}
+                    onDragStart={preventSave}
+                    loading="eager"
+                    onError={(e) => {
+                      // fallback to previewUrl then thumbUrl
+                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                        e.currentTarget.src = photo.previewUrl
+                        return
+                      }
+                      if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+                    }}
+                  />
                   <div className="wmTile" />
                 </div>
 
                 <p className="desc">
-                  {photo.description || 'Premium preview with watermark. Final download is delivered clean after payment.'}
+                  {photo.description ||
+                    'Premium preview with watermark. Final download is delivered clean after payment.'}
                 </p>
               </section>
 
@@ -211,39 +304,84 @@ export default function StoreDetail() {
 
                 <div className="block">
                   <span className="label">Receipt email</span>
-                  <input className="field" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <input
+                    className="field"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
 
                   <div className="row2">
-                    <input className="field" type="text" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                    <input className="field" type="text" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                    <input
+                      className="field"
+                      type="text"
+                      placeholder="First name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                    <input
+                      className="field"
+                      type="text"
+                      placeholder="Last name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
                   </div>
 
-                  <p className="fine">We’ll send your receipt + secure download link to this email.</p>
+                  <p className="fine">
+                    We’ll send your receipt + secure download link to this email.
+                  </p>
                 </div>
 
                 <div className="block">
                   <span className="label">License</span>
                   <div className="options options3">
-                    <button type="button" className={`opt ${license === 'personal' ? 'active' : ''}`} onClick={() => setLicense('personal')}>Personal</button>
-                    <button type="button" className={`opt ${license === 'commercial' ? 'active' : ''}`} onClick={() => setLicense('commercial')}>Commercial</button>
-                    <button type="button" className={`opt ${license === 'editorial' ? 'active' : ''}`} onClick={() => setLicense('editorial')}>Editorial</button>
+                    <button
+                      type="button"
+                      className={`opt ${license === 'personal' ? 'active' : ''}`}
+                      onClick={() => setLicense('personal')}
+                    >
+                      Personal
+                    </button>
+                    <button
+                      type="button"
+                      className={`opt ${license === 'commercial' ? 'active' : ''}`}
+                      onClick={() => setLicense('commercial')}
+                    >
+                      Commercial
+                    </button>
+                    <button
+                      type="button"
+                      className={`opt ${license === 'editorial' ? 'active' : ''}`}
+                      onClick={() => setLicense('editorial')}
+                    >
+                      Editorial
+                    </button>
                   </div>
-                  <p className="fine">Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary.</p>
+                  <p className="fine">
+                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial:
+                    news/documentary.
+                  </p>
                 </div>
 
                 <div className="block">
                   <span className="label">Format</span>
                   <div className="options options2">
-                    <button type="button" className={`opt ${format === 'jpg' ? 'active' : ''}`} onClick={() => setFormat('jpg')}>JPG</button>
-                    <button type="button" className={`opt ${format === 'raw' ? 'active' : ''}`} onClick={() => setFormat('raw')}>RAW</button>
-                  </div>
-                </div>
-
-                <div className="block">
-                  <span className="label">Currency</span>
-                  <div className="options options2">
-                    <button type="button" className={`opt ${currency === 'LKR' ? 'active' : ''}`} onClick={() => setCurrency('LKR')}>LKR</button>
-                    <button type="button" className={`opt ${currency === 'USD' ? 'active' : ''}`} onClick={() => setCurrency('USD')}>USD</button>
+                    <button
+                      type="button"
+                      className={`opt ${format === 'jpg' ? 'active' : ''}`}
+                      onClick={() => setFormat('jpg')}
+                    >
+                      JPG
+                    </button>
+                    <button
+                      type="button"
+                      className={`opt ${format === 'raw' ? 'active' : ''}`}
+                      onClick={() => setFormat('raw')}
+                    >
+                      RAW
+                    </button>
                   </div>
                 </div>
 
@@ -252,7 +390,12 @@ export default function StoreDetail() {
                   <span className="small">Instant digital download</span>
                 </div>
 
-                <button type="button" className="buyBtn" onClick={startCheckout} disabled={isCheckingOut}>
+                <button
+                  type="button"
+                  className="buyBtn"
+                  onClick={startCheckout}
+                  disabled={isCheckingOut}
+                >
                   {isCheckingOut ? 'Working…' : 'Buy license'}
                 </button>
 
@@ -264,14 +407,14 @@ export default function StoreDetail() {
             <section className="relBlock">
               <div className="relHead">
                 <h2>Similar images</h2>
-                <Link href={`/store?tag=${encodeURIComponent(photo.tags?.[0] || '')}`}>
+                <Link href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}>
                   <a className="seeAll">See all</a>
                 </Link>
               </div>
 
-              {relLoading && <div className="relState">Loading…</div>}
-
-              {!relLoading && similar.length === 0 ? (
+              {relLoading ? (
+                <div className="relState">Loading…</div>
+              ) : similar.length === 0 ? (
                 <div className="relState">No similar photos found yet.</div>
               ) : (
                 <div className="relGrid">
@@ -279,12 +422,14 @@ export default function StoreDetail() {
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img src={p.thumb_url} alt={p.title || 'Photo'} />
+                          <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
                           <div className="relWm" />
                         </div>
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
-                          <div className="relTag">{Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}</div>
+                          <div className="relTag">
+                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                          </div>
                         </div>
                       </a>
                     </Link>
@@ -294,33 +439,39 @@ export default function StoreDetail() {
             </section>
 
             {/* RECOMMENDED */}
-            {recommended.length > 0 && (
-              <section className="relBlock">
-                <div className="relHead">
-                  <h2>Recommended for you</h2>
-                  <Link href="/store">
-                    <a className="seeAll">See all</a>
-                  </Link>
-                </div>
+            <section className="relBlock">
+              <div className="relHead">
+                <h2>Recommended for you</h2>
+                <Link href="/store">
+                  <a className="seeAll">See all</a>
+                </Link>
+              </div>
 
+              {relLoading ? (
+                <div className="relState">Loading…</div>
+              ) : recommended.length === 0 ? (
+                <div className="relState">No recommendations yet.</div>
+              ) : (
                 <div className="relGrid">
                   {recommended.map((p) => (
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img src={p.thumb_url} alt={p.title || 'Photo'} />
+                          <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
                           <div className="relWm" />
                         </div>
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
-                          <div className="relTag">{Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}</div>
+                          <div className="relTag">
+                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                          </div>
                         </div>
                       </a>
                     </Link>
                   ))}
                 </div>
-              </section>
-            )}
+              )}
+            </section>
           </>
         )}
       </main>
@@ -328,24 +479,77 @@ export default function StoreDetail() {
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
-        .wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 40px 20px 90px; }
+        .wrap {
+          width: 100%;
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 40px 20px 90px;
+        }
 
-        .state{
+        .top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 16px;
+        }
+        .back {
+          text-decoration: none;
+          opacity: 0.8;
+        }
+        .back:hover {
+          opacity: 1;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+        .toggle {
+          display: inline-flex;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          border-radius: 999px;
+          overflow: hidden;
+        }
+        .tbtn {
+          padding: 10px 14px;
+          background: transparent;
+          color: inherit;
+          border: 0;
+          cursor: pointer;
+          opacity: 0.75;
+        }
+        .tbtn.active {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.12);
+        }
+
+        .state {
           margin: 18px 0;
           padding: 14px 16px;
-          border: 1px solid rgba(245,244,244,0.12);
+          border: 1px solid rgba(245, 244, 244, 0.12);
           border-radius: 14px;
           opacity: 0.95;
         }
-        .mono{
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
-          font-size: 12px;
+
+        .layout {
+          display: grid;
+          grid-template-columns: 1.35fr 0.65fr;
+          gap: 20px;
+          align-items: start;
         }
 
-        .layout { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 20px; }
-
-        .imageFrame { position: relative; }
-        .imageFrame img { width: 100%; border-radius: 14px; display: block; }
+        .imageFrame {
+          position: relative;
+          border-radius: 14px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.10);
+        }
+        .imageFrame img {
+          width: 100%;
+          display: block;
+          border-radius: 14px;
+          -webkit-user-drag: none;
+          user-select: none;
+          -webkit-touch-callout: none;
+        }
 
         .wmTile {
           position: absolute;
@@ -355,34 +559,59 @@ export default function StoreDetail() {
           background-size: 220px;
           opacity: 0.08;
           pointer-events: none;
-          border-radius: 14px;
+          transform: rotate(-12deg);
         }
 
-        .desc { margin: 10px 0 0; opacity: 0.8; line-height: 1.6; }
+        .desc {
+          margin: 10px 0 0;
+          opacity: 0.8;
+          line-height: 1.6;
+        }
 
         .buyCard {
-          border: 1px solid rgba(245,244,244,0.12);
+          border: 1px solid rgba(245, 244, 244, 0.12);
           border-radius: 18px;
-          background: rgba(255,255,255,0.02);
+          background: rgba(255, 255, 255, 0.02);
           padding: 16px;
           position: sticky;
           top: 18px;
         }
 
-        .title { margin: 0; font-size: 22px; }
-        .sub { margin: 8px 0 0; opacity: 0.75; }
+        .title {
+          margin: 0;
+          font-size: 22px;
+        }
+        .sub {
+          margin: 8px 0 0;
+          opacity: 0.75;
+        }
 
-        .block { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(245,244,244,0.12); }
-        .label { font-size: 13px; opacity: 0.85; }
+        .block {
+          margin-top: 16px;
+          padding-top: 14px;
+          border-top: 1px solid rgba(245, 244, 244, 0.12);
+        }
+        .label {
+          font-size: 13px;
+          opacity: 0.85;
+        }
 
-        .options { margin-top: 10px; display: grid; gap: 10px; }
-        .options3 { grid-template-columns: repeat(3, 1fr); }
-        .options2 { grid-template-columns: repeat(2, 1fr); }
+        .options {
+          margin-top: 10px;
+          display: grid;
+          gap: 10px;
+        }
+        .options3 {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .options2 {
+          grid-template-columns: repeat(2, 1fr);
+        }
 
         .opt {
           padding: 10px;
           border-radius: 12px;
-          border: 1px solid rgba(245,244,244,0.16);
+          border: 1px solid rgba(245, 244, 244, 0.16);
           background: transparent;
           color: inherit;
           cursor: pointer;
@@ -390,8 +619,8 @@ export default function StoreDetail() {
         }
         .opt.active {
           opacity: 1;
-          background: rgba(245,244,244,0.12);
-          border-color: rgba(245,244,244,0.3);
+          background: rgba(245, 244, 244, 0.12);
+          border-color: rgba(245, 244, 244, 0.3);
         }
 
         .field {
@@ -399,25 +628,37 @@ export default function StoreDetail() {
           margin-top: 10px;
           padding: 12px;
           border-radius: 12px;
-          border: 1px solid rgba(245,244,244,0.16);
-          background: rgba(0,0,0,0.2);
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(0, 0, 0, 0.2);
           color: inherit;
+          outline: none;
         }
 
-        .row2 { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .row2 {
+          margin-top: 10px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
 
         .priceRow {
           margin-top: 16px;
           padding-top: 14px;
-          border-top: 1px solid rgba(245,244,244,0.12);
+          border-top: 1px solid rgba(245, 244, 244, 0.12);
           display: flex;
           justify-content: space-between;
           align-items: baseline;
           gap: 12px;
         }
 
-        .price { font-size: 22px; font-weight: 700; }
-        .small { opacity: 0.7; font-size: 12px; }
+        .price {
+          font-size: 22px;
+          font-weight: 700;
+        }
+        .small {
+          opacity: 0.7;
+          font-size: 12px;
+        }
 
         .buyBtn {
           margin-top: 14px;
@@ -430,30 +671,78 @@ export default function StoreDetail() {
           font-weight: 700;
           cursor: pointer;
         }
-        .buyBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .buyBtn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
 
-        .fine { margin-top: 12px; opacity: 0.7; font-size: 12px; line-height: 1.6; }
+        .fine {
+          margin-top: 12px;
+          opacity: 0.7;
+          font-size: 12px;
+          line-height: 1.6;
+        }
 
         .relBlock {
           margin-top: 16px;
           padding: 14px;
-          border: 1px solid rgba(245,244,244,0.12);
+          border: 1px solid rgba(245, 244, 244, 0.12);
           border-radius: 18px;
-          background: rgba(255,255,255,0.02);
+          background: rgba(255, 255, 255, 0.02);
         }
 
-        .relHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 10px; }
-        .seeAll { font-size: 12px; opacity: 0.75; text-decoration: none; }
-        .seeAll:hover { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
+        .relHead {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+          gap: 10px;
+        }
+        .seeAll {
+          font-size: 12px;
+          opacity: 0.75;
+          text-decoration: none;
+        }
+        .seeAll:hover {
+          opacity: 1;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
 
-        .relState { opacity: 0.75; font-size: 13px; padding: 6px 0; }
+        .relState {
+          opacity: 0.75;
+          font-size: 13px;
+          padding: 6px 0;
+        }
 
-        .relGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+        .relGrid {
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 12px;
+        }
 
-        .relCard { display: block; text-decoration: none; color: inherit; transition: transform 0.18s ease; }
-        .relCard:hover { transform: translateY(-4px); }
+        .relCard {
+          display: block;
+          text-decoration: none;
+          color: inherit;
+          transition: transform 0.18s ease;
+        }
+        .relCard:hover {
+          transform: translateY(-4px);
+        }
 
-        .relThumb { position: relative; border-radius: 12px; overflow: hidden; }
+        .relThumb {
+          position: relative;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.10);
+          transition: border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .relCard:hover .relThumb {
+          border-color: rgba(245, 244, 244, 0.35);
+          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+        }
+
         .relThumb img {
           width: 100%;
           aspect-ratio: 16/10;
@@ -461,7 +750,9 @@ export default function StoreDetail() {
           display: block;
           transition: transform 0.35s ease;
         }
-        .relCard:hover .relThumb img { transform: scale(1.06); }
+        .relCard:hover .relThumb img {
+          transform: scale(1.06);
+        }
 
         .relWm {
           position: absolute;
@@ -471,23 +762,47 @@ export default function StoreDetail() {
           background-size: 140px;
           opacity: 0.08;
           pointer-events: none;
+          transform: rotate(-12deg);
         }
 
-        .relMeta { margin-top: 6px; }
-        .relName { font-size: 13px; line-height: 1.3; opacity: 0.95; }
-        .relTag { font-size: 12px; opacity: 0.7; }
+        .relMeta {
+          margin-top: 6px;
+        }
+        .relName {
+          font-size: 13px;
+          line-height: 1.3;
+          opacity: 0.95;
+        }
+        .relTag {
+          font-size: 12px;
+          opacity: 0.7;
+        }
 
         @media (max-width: 991px) {
-          .layout { grid-template-columns: 1fr; }
-          .buyCard { position: static; }
-          .options3 { grid-template-columns: 1fr; }
-          .options2 { grid-template-columns: 1fr; }
-          .row2 { grid-template-columns: 1fr; }
-          .relGrid { grid-template-columns: repeat(3, 1fr); }
+          .layout {
+            grid-template-columns: 1fr;
+          }
+          .buyCard {
+            position: static;
+          }
+          .options3 {
+            grid-template-columns: 1fr;
+          }
+          .options2 {
+            grid-template-columns: 1fr;
+          }
+          .row2 {
+            grid-template-columns: 1fr;
+          }
+          .relGrid {
+            grid-template-columns: repeat(3, 1fr);
+          }
         }
 
         @media (max-width: 520px) {
-          .relGrid { grid-template-columns: repeat(2, 1fr); }
+          .relGrid {
+            grid-template-columns: repeat(2, 1fr);
+          }
         }
       `}</style>
     </>
