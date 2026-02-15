@@ -1,4 +1,5 @@
 // pages/admin/upload.js
+// ✅ Corrected: commit auth header, folder picker attrs, dark UI, auto description + smart tags
 
 import React from 'react'
 import Head from 'next/head'
@@ -9,6 +10,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 )
 
+// ---------------- helpers ----------------
 function fmtMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(2)
 }
@@ -22,7 +24,6 @@ function fmtEta(sec) {
   const s = Math.floor(sec % 60)
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
-
 function stripExt(name) {
   const n = String(name || '')
   const i = n.lastIndexOf('.')
@@ -30,6 +31,7 @@ function stripExt(name) {
 }
 function toTitleCase(s) {
   return String(s)
+    .replace(/__.+$/, '') // remove __JC000100 etc.
     .replace(/[_\-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -41,12 +43,59 @@ function autoTitleFromFile(file) {
   const base = stripExt(file?.name || '')
   return toTitleCase(base)
 }
-function autoTagsFromFile(file) {
-  const base = stripExt(file?.name || '')
-  const raw = base
+
+// ✅ normalize tags from input (comma-separated in UI)
+// - spaces -> hyphen
+// - fixes sri-anka -> sri-lanka
+function normalizeTags(input) {
+  const arr = Array.isArray(input)
+    ? input
+    : String(input || '')
+        .split(',')
+        .map((t) => t.trim())
+
+  const out = []
+  const seen = new Set()
+
+  for (const raw of arr) {
+    let t = String(raw || '').trim().toLowerCase()
+    t = t.replace(/\s+/g, '-') // spaces -> hyphen
+    if (!t) continue
+    if (t === 'sri-anka') t = 'sri-lanka'
+    if (seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+    if (out.length >= 30) break
+  }
+  return out
+}
+
+/**
+ * ✅ Smart tags: folder + filename → tags + helpers
+ * - folder "history/xxx.jpg" adds "history"
+ * - "landscape-..." adds nature + travel
+ * - "wildlife-..." adds nature
+ * - fixes sri anka / sri-anka → sri-lanka
+ * - creates a few combined tags like beira-lake
+ */
+function smartTagsFromFile(file, relativePath = '') {
+  const base0 = stripExt(file?.name || '')
+    .replace(/__.+$/, '')
+    .toLowerCase()
+
+  const rawWords = base0
     .replace(/[_\-]+/g, ' ')
     .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
-    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+
+  const folder = String(relativePath || '')
+    .replace(/\\/g, '/')
+    .split('/')[0]
+    ?.toLowerCase()
+    ?.trim()
 
   const stop = new Set([
     'the',
@@ -64,60 +113,121 @@ function autoTagsFromFile(file) {
     'by',
     'from',
   ])
-  const words = raw.split(/\s+/g).filter(Boolean)
+
+  const fixToken = (w) => {
+    if (!w) return ''
+    let t = w.trim().toLowerCase()
+    if (t === 'anka') return 'lanka'
+    return t
+  }
+
+  const words = rawWords.map(fixToken).filter(Boolean)
 
   const tags = []
   const seen = new Set()
+  const add = (t) => {
+    const v = String(t || '').trim().toLowerCase()
+    if (!v) return
+    if (seen.has(v)) return
+    seen.add(v)
+    tags.push(v)
+  }
+
+  if (folder && folder.length >= 3 && !stop.has(folder)) add(folder)
+
   for (const w of words) {
     if (w.length < 3) continue
     if (stop.has(w)) continue
     if (/^\d+$/.test(w)) continue
-    if (seen.has(w)) continue
-    seen.add(w)
-    tags.push(w)
-    if (tags.length >= 10) break
+    add(w)
+    if (tags.length >= 20) break
   }
+
+  // join sri+lanka -> sri-lanka
+  if (seen.has('sri') && seen.has('lanka')) {
+    const filtered = tags.filter((t) => t !== 'sri' && t !== 'lanka')
+    filtered.unshift('sri-lanka')
+    return smartEnhanceTags(filtered)
+  }
+
+  return smartEnhanceTags(tags)
+}
+
+function smartEnhanceTags(tagsArr) {
+  const tags = Array.isArray(tagsArr) ? tagsArr.slice() : []
+  const set = new Set(tags)
+  const add = (t) => {
+    const v = String(t || '').trim().toLowerCase()
+    if (!v) return
+    if (set.has(v)) return
+    set.add(v)
+    tags.push(v)
+  }
+
+  if (set.has('landscape')) {
+    add('nature')
+    add('travel')
+  }
+  if (set.has('wildlife')) add('nature')
+
+  const combinePairs = [
+    ['beira', 'lake'],
+    ['lion', 'rock'],
+    ['train', 'bridge'],
+    ['tea', 'plantation'],
+  ]
+  for (const [a, b] of combinePairs) {
+    if (set.has(a) && set.has(b)) add(`${a}-${b}`)
+  }
+
+  // normalize sri-lanka again if user had both
+  if (set.has('sri') && set.has('lanka')) {
+    const cleaned = tags.filter((t) => t !== 'sri' && t !== 'lanka')
+    cleaned.unshift('sri-lanka')
+    return cleaned
+  }
+
   return tags
 }
 
-// ✅ Collections tags (for one-tap tagging)
-const COLLECTION_TAGS = [
-  'nature',
-  'wildlife',
-  'landscape',
-  'travel',
-  'culture',
-  'history',
-  'lifestyle',
-  'fineart',
-]
+// ✅ Auto description from filename + folder
+function autoDescriptionFromFile(file, relativePath = '') {
+  const base = stripExt(file?.name || '')
+    .replace(/__.+$/, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
-// ✅ normalize tags from input
-function normalizeTags(input) {
-  const arr = Array.isArray(input)
-    ? input
-    : String(input || '')
-        .split(',')
-        .map((t) => t.trim())
+  const words = base.split(' ').filter(Boolean)
+  if (!words.length) return ''
 
-  const out = []
-  const seen = new Set()
+  const first = words[0]?.toLowerCase()
+  const folder = (relativePath || '').split('/')[0]?.toLowerCase()
 
-  for (const raw of arr) {
-    const t = String(raw || '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '') // remove spaces (fine art -> fineart)
-    if (!t) continue
-    if (seen.has(t)) continue
-    seen.add(t)
-    out.push(t)
-    if (out.length >= 12) break
-  }
+  const titleCase = (s) =>
+    String(s)
+      .split(' ')
+      .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
+      .join(' ')
 
-  return out
+  const place = words.slice(1).join(' ')
+  const placeTitle = titleCase(place || words.join(' '))
+
+  if (first === 'landscape') return `Landscape photo of ${placeTitle}.`
+  if (first === 'wildlife') return `Wildlife photograph of ${placeTitle}.`
+  if (first === 'nature') return `Nature photograph of ${placeTitle}.`
+  if (first === 'travel') return `Travel photograph of ${placeTitle}.`
+
+  if (folder === 'history' || first === 'history') return `Historical site ${placeTitle}.`
+  if (folder === 'culture' || first === 'culture') return `Cultural scene of ${placeTitle}.`
+
+  return `Photograph of ${placeTitle}.`
 }
 
+// ✅ collections quick tags
+const COLLECTION_TAGS = ['nature', 'wildlife', 'landscape', 'travel', 'culture', 'history', 'lifestyle', 'fineart']
+
+// ---------------- component ----------------
 export default function AdminUploadPage() {
   // Auth
   const [email, setEmail] = React.useState('')
@@ -136,12 +246,12 @@ export default function AdminUploadPage() {
   const [stopAfterCurrent, setStopAfterCurrent] = React.useState(false)
   const [keepFolderStructure, setKeepFolderStructure] = React.useState(true)
 
-  // License preset defaults (Commercial updated to 7500 / 25)
+  // License preset defaults
   const [licensePreset, setLicensePreset] = React.useState('personal')
   const [priceUsd, setPriceUsd] = React.useState(8)
   const [priceLkr, setPriceLkr] = React.useState(2500)
 
-  // Auto FX (USD -> LKR)
+  // FX (USD -> LKR)
   const [fxUsdToLkr, setFxUsdToLkr] = React.useState(320)
   const [autoLkrFromUsd, setAutoLkrFromUsd] = React.useState(true)
 
@@ -150,7 +260,6 @@ export default function AdminUploadPage() {
   const queueRef = React.useRef([])
   const xhrMapRef = React.useRef(new Map())
 
-  // License presets map
   const LICENSE_PRESETS = React.useMemo(
     () => ({
       personal: { lkr: 2500, usd: 8 },
@@ -160,7 +269,6 @@ export default function AdminUploadPage() {
     []
   )
 
-  // Keep ref updated
   React.useEffect(() => {
     queueRef.current = queue
   }, [queue])
@@ -187,15 +295,7 @@ export default function AdminUploadPage() {
     setQueue((q) =>
       q.map((it) =>
         it.status === 'ERROR'
-          ? {
-              ...it,
-              status: 'QUEUED',
-              error: '',
-              errorType: '',
-              progress: 0,
-              speedBps: 0,
-              etaSec: 0,
-            }
+          ? { ...it, status: 'QUEUED', error: '', errorType: '', progress: 0, speedBps: 0, etaSec: 0 }
           : it
       )
     )
@@ -220,7 +320,6 @@ export default function AdminUploadPage() {
     log(`✅ Applied bulk preset to queued items (${licensePreset}, LKR ${priceLkr}, USD ${priceUsd})`)
   }
 
-  // ✅ NEW: bulk add a tag to queued items
   function applyBulkTag(tag) {
     const t = normalizeTags([tag])[0]
     if (!t) return
@@ -244,7 +343,7 @@ export default function AdminUploadPage() {
     }
   }
 
-  // Auto LKR from USD (optional)
+  // Auto LKR from USD
   React.useEffect(() => {
     if (!autoLkrFromUsd) return
     const usd = Number(priceUsd)
@@ -255,7 +354,7 @@ export default function AdminUploadPage() {
     if (Number.isFinite(lkr) && lkr > 0) setPriceLkr(lkr)
   }, [priceUsd, fxUsdToLkr, autoLkrFromUsd])
 
-  // Auth: session
+  // Session
   React.useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data?.session || null))
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
@@ -269,24 +368,16 @@ export default function AdminUploadPage() {
         setIsAdmin(false)
         return
       }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single()
-
+      const { data, error } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
       if (error) {
         log(`❌ Profile check failed: ${error.message}`)
         setIsAdmin(false)
         return
       }
-
       const ok = data?.role === 'admin'
       setIsAdmin(ok)
       log(ok ? '✅ Admin verified' : '❌ Not admin')
     }
-
     checkAdmin()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id])
@@ -321,7 +412,6 @@ export default function AdminUploadPage() {
     }
   }
 
-  // Drag & drop visuals
   const [dragOver, setDragOver] = React.useState(false)
 
   function onDrop(e) {
@@ -332,7 +422,7 @@ export default function AdminUploadPage() {
     if (files && files.length) addFiles(files)
   }
 
-  // XHR PUT with progress
+  // PUT to R2 with progress
   function putToR2WithProgress(itemId, uploadUrl, file, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
@@ -395,7 +485,8 @@ export default function AdminUploadPage() {
       const relPath = keepFolderStructure && rel ? rel : ''
 
       const title = autoTitleFromFile(file)
-      const tags = normalizeTags(autoTagsFromFile(file))
+      const tags = normalizeTags(smartTagsFromFile(file, relPath))
+      const description = autoDescriptionFromFile(file, relPath)
 
       return {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -412,6 +503,7 @@ export default function AdminUploadPage() {
         photoId: null,
         meta: {
           title,
+          description,
           tags,
           licensePreset,
           priceLkr: Number(priceLkr) || 0,
@@ -436,6 +528,7 @@ export default function AdminUploadPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.length, autoStart, paused, busy, stopAfterCurrent, session?.access_token, isAdmin])
 
+  // ✅ commit section included here (search for "commitResp")
   async function uploadSingleItem(item, token) {
     const file = item.file
 
@@ -462,8 +555,8 @@ export default function AdminUploadPage() {
           filename: file.name,
           relativePath: item.relativePath || '',
           title: item?.meta?.title || '',
+          description: item?.meta?.description || '',
           tags: normalizeTags(item?.meta?.tags || []),
-          // NOTE: license/prices are NOT stored in DB yet; we keep them UI-only for now.
           licensePreset: item?.meta?.licensePreset || '',
           priceLkr: item?.meta?.priceLkr ?? null,
           priceUsd: item?.meta?.priceUsd ?? null,
@@ -471,8 +564,7 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(createResp)
-      if (!createResp.ok)
-        throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
+      if (!createResp.ok) throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
 
       photoId = json.photoId
       uploadUrl = json.uploadUrl
@@ -494,7 +586,7 @@ export default function AdminUploadPage() {
       throw Object.assign(new Error(e.message), { _type: e?._type || 'R2' })
     }
 
-    // 3) commit
+    // 3) ✅ COMMIT (AUTH HEADER INCLUDED)
     try {
       setItem(item.id, { status: 'COMMITTING', speedBps: 0, etaSec: 0 })
       log(`Commit: ${file.name}`)
@@ -572,14 +664,7 @@ export default function AdminUploadPage() {
           next.map(async (it) => {
             try {
               await uploadSingleItem(it, token)
-              setItem(it.id, {
-                status: 'DONE',
-                error: '',
-                errorType: '',
-                progress: 100,
-                speedBps: 0,
-                etaSec: 0,
-              })
+              setItem(it.id, { status: 'DONE', error: '', errorType: '', progress: 100, speedBps: 0, etaSec: 0 })
             } catch (e) {
               const msg = e?.message || String(e)
 
@@ -588,13 +673,7 @@ export default function AdminUploadPage() {
                 return
               }
 
-              setItem(it.id, {
-                status: 'ERROR',
-                error: msg,
-                errorType: e?._type || 'UNKNOWN',
-                speedBps: 0,
-                etaSec: 0,
-              })
+              setItem(it.id, { status: 'ERROR', error: msg, errorType: e?._type || 'UNKNOWN', speedBps: 0, etaSec: 0 })
               log(`❌ Failed: ${it.file.name} — ${msg}`)
             }
           })
@@ -628,43 +707,30 @@ export default function AdminUploadPage() {
         <title>Admin Upload</title>
       </Head>
 
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px' }}>
+      <main className="adminUpload" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px' }}>
         <h1 style={{ margin: 0 }}>Admin Upload</h1>
         <p style={{ opacity: 0.8, marginTop: 8 }}>
-          Drag & drop + folder upload + auto title/tags + manual tag editor + bulk preset defaults.
+          Folder upload + auto title + smart tags + auto description + manual editor + secure commit.
         </p>
 
         {!session ? (
-          <div style={{ marginTop: 18, padding: 16, border: '1px solid rgba(245,244,244,0.16)', borderRadius: 14 }}>
+          <div className="card" style={{ marginTop: 18, padding: 16, borderRadius: 14 }}>
             <h3 style={{ marginTop: 0 }}>Login</h3>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              style={{ width: '100%', padding: 10, marginBottom: 10 }}
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              style={{ width: '100%', padding: 10, marginBottom: 10 }}
-            />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" style={{ width: '100%', padding: 10, marginBottom: 10 }} />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" style={{ width: '100%', padding: 10, marginBottom: 10 }} />
             <button onClick={signIn} disabled={busy} style={{ padding: '10px 14px' }}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </div>
         ) : (
-          <div style={{ marginTop: 18, padding: 16, border: '1px solid rgba(245,244,244,0.16)', borderRadius: 14 }}>
+          <div className="card" style={{ marginTop: 18, padding: 16, borderRadius: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700 }}>Signed in</div>
                 <div style={{ opacity: 0.8, fontSize: 13 }}>{session.user.email}</div>
                 <div style={{ marginTop: 6, fontSize: 13 }}>
                   Role:{' '}
-                  <strong style={{ color: isAdmin ? '#7CFF9B' : '#FF7C7C' }}>
-                    {isAdmin ? 'admin' : 'not admin'}
-                  </strong>
+                  <strong style={{ color: isAdmin ? '#7CFF9B' : '#FF7C7C' }}>{isAdmin ? 'admin' : 'not admin'}</strong>
                 </div>
               </div>
               <button onClick={signOut} disabled={busy} style={{ padding: '10px 14px' }}>
@@ -673,14 +739,7 @@ export default function AdminUploadPage() {
             </div>
 
             {/* Bulk preset */}
-            <div
-              style={{
-                marginTop: 18,
-                padding: 14,
-                border: '1px solid rgba(245,244,244,0.16)',
-                borderRadius: 14,
-              }}
-            >
+            <div className="card" style={{ marginTop: 18, padding: 14, borderRadius: 14 }}>
               <h3 style={{ marginTop: 0 }}>Bulk preset</h3>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -708,56 +767,28 @@ export default function AdminUploadPage() {
 
                 <label style={{ fontSize: 13 }}>
                   USD:
-                  <input
-                    type="number"
-                    value={priceUsd}
-                    onChange={(e) => setPriceUsd(e.target.value)}
-                    style={{ width: 90, marginLeft: 8 }}
-                    disabled={busy}
-                  />
+                  <input type="number" value={priceUsd} onChange={(e) => setPriceUsd(e.target.value)} style={{ width: 90, marginLeft: 8 }} disabled={busy} />
                 </label>
 
                 <label style={{ fontSize: 13 }}>
                   LKR:
-                  <input
-                    type="number"
-                    value={priceLkr}
-                    onChange={(e) => setPriceLkr(e.target.value)}
-                    style={{ width: 110, marginLeft: 8 }}
-                    disabled={busy}
-                  />
+                  <input type="number" value={priceLkr} onChange={(e) => setPriceLkr(e.target.value)} style={{ width: 110, marginLeft: 8 }} disabled={busy} />
                 </label>
 
-                <button
-                  type="button"
-                  onClick={applyBulkPresetToQueued}
-                  disabled={busy || queue.length === 0}
-                  style={{ padding: '8px 12px' }}
-                >
+                <button type="button" onClick={applyBulkPresetToQueued} disabled={busy || queue.length === 0} style={{ padding: '8px 12px' }}>
                   Apply to queued
                 </button>
               </div>
 
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
                 <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
-                  <input
-                    type="checkbox"
-                    checked={autoLkrFromUsd}
-                    onChange={(e) => setAutoLkrFromUsd(e.target.checked)}
-                    disabled={busy}
-                  />
+                  <input type="checkbox" checked={autoLkrFromUsd} onChange={(e) => setAutoLkrFromUsd(e.target.checked)} disabled={busy} />
                   Auto LKR from USD
                 </label>
 
                 <label style={{ fontSize: 13, opacity: 0.9 }}>
                   FX (1 USD → LKR):
-                  <input
-                    type="number"
-                    value={fxUsdToLkr}
-                    onChange={(e) => setFxUsdToLkr(e.target.value)}
-                    style={{ width: 110, marginLeft: 8 }}
-                    disabled={busy || !autoLkrFromUsd}
-                  />
+                  <input type="number" value={fxUsdToLkr} onChange={(e) => setFxUsdToLkr(e.target.value)} style={{ width: 110, marginLeft: 8 }} disabled={busy || !autoLkrFromUsd} />
                 </label>
 
                 <div style={{ fontSize: 12, opacity: 0.7 }}>
@@ -765,28 +796,11 @@ export default function AdminUploadPage() {
                 </div>
               </div>
 
-              {/* ✅ Bulk tag helpers */}
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 8 }}>
-                  Quick add a tag to all queued items:
-                </div>
+                <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 8 }}>Quick add a tag to queued:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {COLLECTION_TAGS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => applyBulkTag(t)}
-                      disabled={busy || queue.length === 0}
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: 12,
-                        borderRadius: 999,
-                        border: '1px solid rgba(245,244,244,0.18)',
-                        background: 'transparent',
-                        cursor: busy ? 'not-allowed' : 'pointer',
-                        opacity: busy ? 0.6 : 1,
-                      }}
-                    >
+                    <button key={t} type="button" onClick={() => applyBulkTag(t)} disabled={busy || queue.length === 0} className="pill">
                       {t}
                     </button>
                   ))}
@@ -796,22 +810,12 @@ export default function AdminUploadPage() {
 
             <div style={{ marginTop: 14, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
               <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
-                <input
-                  type="checkbox"
-                  checked={keepFolderStructure}
-                  onChange={(e) => setKeepFolderStructure(e.target.checked)}
-                  disabled={busy}
-                />
-                Keep folder structure (R2 keys use webkitRelativePath)
+                <input type="checkbox" checked={keepFolderStructure} onChange={(e) => setKeepFolderStructure(e.target.checked)} disabled={busy} />
+                Keep folder structure
               </label>
 
               <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
-                <input
-                  type="checkbox"
-                  checked={autoStart}
-                  onChange={(e) => setAutoStart(e.target.checked)}
-                  disabled={busy}
-                />
+                <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} disabled={busy} />
                 Auto-start
               </label>
 
@@ -839,17 +843,15 @@ export default function AdminUploadPage() {
                   setDragOver(false)
                 }}
                 onDrop={onDrop}
+                className="dropZone"
                 style={{
-                  border: `1px dashed ${dragOver ? 'rgba(245,244,244,0.55)' : 'rgba(245,244,244,0.25)'}`,
                   borderRadius: 14,
                   padding: 18,
                   background: dragOver ? 'rgba(245,244,244,0.06)' : 'rgba(255,255,255,0.02)',
                 }}
               >
                 <div style={{ fontWeight: 700 }}>Drag & drop files here</div>
-                <div style={{ opacity: 0.75, marginTop: 6, fontSize: 13 }}>
-                  Tip: use the folder picker below for folder selection.
-                </div>
+                <div style={{ opacity: 0.75, marginTop: 6, fontSize: 13 }}>Tip: use folder picker for folders.</div>
 
                 <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <label style={{ display: 'inline-block' }}>
@@ -867,11 +869,13 @@ export default function AdminUploadPage() {
 
                   <label style={{ display: 'inline-block' }}>
                     <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>Select folder</div>
+                    {/* ✅ corrected folder picker attrs */}
                     <input
                       type="file"
                       multiple
                       accept="image/*,.jpg,.jpeg,.png,.webp,.tif,.tiff"
-                      {...{ webkitdirectory: 'true', directory: 'true' }}
+                      webkitdirectory=""
+                      directory=""
                       onChange={(e) => {
                         addFiles(e.target.files)
                         e.target.value = ''
@@ -888,17 +892,14 @@ export default function AdminUploadPage() {
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
                 <button onClick={runQueue} disabled={!canStart} style={{ padding: '10px 14px' }}>
-                  Start Uploads (4 at a time)
+                  Start Uploads
                 </button>
-
                 <button onClick={pauseQueue} disabled={!canPause} style={{ padding: '10px 14px' }}>
                   Pause
                 </button>
-
                 <button onClick={resumeQueue} disabled={!canResume} style={{ padding: '10px 14px' }}>
                   Resume
                 </button>
-
                 <button
                   type="button"
                   onClick={() => {
@@ -910,11 +911,9 @@ export default function AdminUploadPage() {
                 >
                   Stop after current
                 </button>
-
                 <button onClick={retryFailed} disabled={busy || countErr === 0} style={{ padding: '10px 14px' }}>
                   Retry failed ({countErr})
                 </button>
-
                 <button onClick={() => setQueue([])} disabled={busy} style={{ padding: '10px 14px' }}>
                   Clear queue
                 </button>
@@ -927,15 +926,7 @@ export default function AdminUploadPage() {
 
                   <div style={{ display: 'grid', gap: 10 }}>
                     {queue.map((it) => (
-                      <div
-                        key={it.id}
-                        style={{
-                          padding: 12,
-                          border: '1px solid rgba(245,244,244,0.12)',
-                          borderRadius: 14,
-                          background: 'rgba(255,255,255,0.02)',
-                        }}
-                      >
+                      <div key={it.id} className="card" style={{ padding: 12, borderRadius: 14, background: 'rgba(255,255,255,0.02)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {it.file.name}
@@ -950,31 +941,8 @@ export default function AdminUploadPage() {
                           <div style={{ display: 'flex', gap: 10, alignItems: 'center', whiteSpace: 'nowrap' }}>
                             <span style={{ opacity: 0.9 }}>{it.status === 'ERROR' ? 'ERROR' : it.status}</span>
 
-                            {it.status === 'ERROR' && !busy && (
-                              <button
-                                onClick={() =>
-                                  setItem(it.id, { status: 'QUEUED', error: '', errorType: '', progress: 0 })
-                                }
-                                style={{
-                                  padding: '2px 8px',
-                                  fontSize: 11,
-                                  borderRadius: 8,
-                                  border: '1px solid rgba(245,244,244,0.18)',
-                                  background: 'transparent',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Retry
-                              </button>
-                            )}
-
                             {it.status === 'DONE' && it.photoId && (
-                              <a
-                                href={`/store/${it.photoId}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ fontSize: 11, textDecoration: 'underline', opacity: 0.9 }}
-                              >
+                              <a href={`/store/${it.photoId}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, textDecoration: 'underline', opacity: 0.9 }}>
                                 Open in Store
                               </a>
                             )}
@@ -983,37 +951,35 @@ export default function AdminUploadPage() {
                               type="button"
                               onClick={() => removeItem(it.id)}
                               disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
-                              style={{
-                                padding: '2px 8px',
-                                fontSize: 11,
-                                borderRadius: 8,
-                                border: '1px solid rgba(245,244,244,0.18)',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                opacity: busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING') ? 0.5 : 1,
-                              }}
+                              style={{ padding: '2px 8px', fontSize: 11 }}
                             >
                               Remove
                             </button>
                           </div>
                         </div>
 
-                        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+                        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9 }}>
                           <div>
                             <strong>Title:</strong> {it?.meta?.title || '(auto)'}
                           </div>
 
-                          {/* ✅ Manual tags editor + quick toggles */}
+                          <div style={{ marginTop: 6 }}>
+                            <strong>Description:</strong>
+                            <textarea
+                              value={it?.meta?.description || ''}
+                              onChange={(e) => setItem(it.id, { meta: { ...(it.meta || {}), description: e.target.value } })}
+                              style={{ width: '100%', marginTop: 4, padding: 8, fontSize: 12, minHeight: 70, resize: 'vertical' }}
+                              placeholder="Short description for buyers"
+                              disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
+                            />
+                          </div>
+
                           <div style={{ marginTop: 6 }}>
                             <strong>Tags:</strong>
-
                             <input
                               type="text"
                               value={normalizeTags(it?.meta?.tags || []).join(', ')}
-                              onChange={(e) => {
-                                const tags = normalizeTags(e.target.value)
-                                setItem(it.id, { meta: { ...(it.meta || {}), tags } })
-                              }}
+                              onChange={(e) => setItem(it.id, { meta: { ...(it.meta || {}), tags: normalizeTags(e.target.value) } })}
                               style={{ width: '100%', marginTop: 4, padding: 6, fontSize: 12 }}
                               placeholder="nature, travel, fineart"
                               disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
@@ -1026,25 +992,15 @@ export default function AdminUploadPage() {
                                   <button
                                     key={t}
                                     type="button"
+                                    className="pill"
                                     onClick={() => {
                                       const current = new Set(normalizeTags(it?.meta?.tags || []))
                                       if (current.has(t)) current.delete(t)
                                       else current.add(t)
-                                      setItem(it.id, {
-                                        meta: { ...(it.meta || {}), tags: Array.from(current) },
-                                      })
+                                      setItem(it.id, { meta: { ...(it.meta || {}), tags: Array.from(current) } })
                                     }}
                                     disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
-                                    style={{
-                                      fontSize: 11,
-                                      padding: '3px 8px',
-                                      borderRadius: 999,
-                                      border: '1px solid rgba(245,244,244,0.2)',
-                                      background: active ? 'rgba(245,244,244,0.25)' : 'transparent',
-                                      cursor: 'pointer',
-                                      opacity:
-                                        busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING') ? 0.6 : 1,
-                                    }}
+                                    style={{ background: active ? 'rgba(245,244,244,0.22)' : 'transparent' }}
                                   >
                                     {t}
                                   </button>
@@ -1054,66 +1010,29 @@ export default function AdminUploadPage() {
                           </div>
 
                           <div style={{ marginTop: 8 }}>
-                            <strong>Preset:</strong> {it?.meta?.licensePreset || licensePreset} • LKR{' '}
-                            {it?.meta?.priceLkr ?? priceLkr} • USD {it?.meta?.priceUsd ?? priceUsd}
+                            <strong>Preset:</strong> {it?.meta?.licensePreset || licensePreset} • LKR {it?.meta?.priceLkr ?? priceLkr} • USD{' '}
+                            {it?.meta?.priceUsd ?? priceUsd}
                           </div>
                         </div>
 
-                        <div
-                          style={{
-                            marginTop: 8,
-                            height: 7,
-                            background: 'rgba(245,244,244,0.12)',
-                            borderRadius: 999,
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: `${it.progress || 0}%`,
-                              height: '100%',
-                              background: 'rgba(245,244,244,0.65)',
-                              transition: 'width 120ms linear',
-                            }}
-                          />
+                        <div style={{ marginTop: 8, height: 7, background: 'rgba(245,244,244,0.12)', borderRadius: 999, overflow: 'hidden' }}>
+                          <div style={{ width: `${it.progress || 0}%`, height: '100%', background: 'rgba(245,244,244,0.65)', transition: 'width 120ms linear' }} />
                         </div>
 
-                        <div
-                          style={{
-                            marginTop: 6,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            gap: 10,
-                            fontSize: 12,
-                            opacity: 0.85,
-                          }}
-                        >
+                        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, opacity: 0.85 }}>
                           <div>
-                            {it.status === 'UPLOADING' ? (
-                              <>
-                                {it.progress || 0}% • {fmtMB(it.loaded || 0)}/{fmtMB(it.total || it.file.size)} MB
-                              </>
-                            ) : it.status === 'COMMITTING' ? (
-                              <>100% • Committing…</>
-                            ) : it.status === 'DONE' ? (
-                              <>100% • Done</>
-                            ) : it.status === 'ERROR' ? (
-                              <>
-                                <strong>{it.errorType || 'ERROR'}:</strong> {it.error || 'Unknown error'}
-                              </>
-                            ) : (
-                              <>Waiting…</>
-                            )}
+                            {it.status === 'UPLOADING'
+                              ? `${it.progress || 0}% • ${fmtMB(it.loaded || 0)}/${fmtMB(it.total || it.file.size)} MB`
+                              : it.status === 'COMMITTING'
+                              ? '100% • Committing…'
+                              : it.status === 'DONE'
+                              ? '100% • Done'
+                              : it.status === 'ERROR'
+                              ? `${it.errorType || 'ERROR'}: ${it.error || 'Unknown error'}`
+                              : 'Waiting…'}
                           </div>
-
                           <div style={{ whiteSpace: 'nowrap' }}>
-                            {it.status === 'UPLOADING' ? (
-                              <>
-                                {fmtSpeed(it.speedBps)} • ETA {fmtEta(it.etaSec)}
-                              </>
-                            ) : (
-                              ' '
-                            )}
+                            {it.status === 'UPLOADING' ? `${fmtSpeed(it.speedBps)} • ETA ${fmtEta(it.etaSec)}` : ' '}
                           </div>
                         </div>
                       </div>
@@ -1128,9 +1047,9 @@ export default function AdminUploadPage() {
         <div style={{ marginTop: 18 }}>
           <h3 style={{ marginBottom: 10 }}>Logs</h3>
           <div
+            className="card"
             style={{
               padding: 14,
-              border: '1px solid rgba(245,244,244,0.16)',
               borderRadius: 14,
               minHeight: 80,
               whiteSpace: 'pre-wrap',
@@ -1144,7 +1063,65 @@ export default function AdminUploadPage() {
         </div>
       </main>
 
+      {/* ✅ dark theme + readable inputs/buttons/icons */}
       <style jsx global>{`
+        .adminUpload {
+          color: #e8edf7;
+        }
+
+        .adminUpload a {
+          color: #e8edf7;
+        }
+
+        .adminUpload .card {
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .adminUpload .dropZone {
+          border: 1px dashed rgba(245, 244, 244, 0.25);
+        }
+
+        .adminUpload input,
+        .adminUpload textarea,
+        .adminUpload select {
+          background: rgba(255, 255, 255, 0.06) !important;
+          color: #e8edf7 !important;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          border-radius: 10px;
+          outline: none;
+        }
+
+        .adminUpload input::placeholder,
+        .adminUpload textarea::placeholder {
+          color: rgba(232, 237, 247, 0.55);
+        }
+
+        .adminUpload button {
+          color: #e8edf7 !important;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(255, 255, 255, 0.04);
+          border-radius: 10px;
+          cursor: pointer;
+        }
+
+        .adminUpload button:hover {
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        .adminUpload .pill {
+          padding: 4px 10px;
+          font-size: 12px;
+          border-radius: 999px;
+          background: transparent;
+        }
+
+        .adminUpload svg,
+        .adminUpload svg * {
+          stroke: currentColor;
+          fill: currentColor;
+        }
+
         .spinner {
           display: inline-block;
           width: 10px;

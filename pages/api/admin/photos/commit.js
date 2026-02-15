@@ -1,7 +1,6 @@
 // pages/api/admin/photos/commit.js
 
 import { createClient } from '@supabase/supabase-js'
-
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 
 export const config = {
@@ -21,6 +20,26 @@ async function streamToBuffer(stream) {
     stream.on('end', () => resolve(Buffer.concat(chunks)))
     stream.on('error', reject)
   })
+}
+
+async function requireAdmin(req, supabaseAdmin) {
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return { ok: false, status: 401, error: 'Missing token' }
+
+  const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
+  if (userErr || !userData?.user) return { ok: false, status: 401, error: 'Invalid token' }
+
+  const { data: profile, error: profErr } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single()
+
+  if (profErr || !profile) return { ok: false, status: 403, error: 'No profile' }
+  if (profile.role !== 'admin') return { ok: false, status: 403, error: 'Not admin' }
+
+  return { ok: true, user: userData.user }
 }
 
 function makeWatermarkSvg({ w, h, text, fontSize, opacity, align = 'center' }) {
@@ -48,12 +67,10 @@ function makeWatermarkSvg({ w, h, text, fontSize, opacity, align = 'center' }) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
-    // ---------- ENV CHECK ----------
+    // env check
     const requiredEnv = [
       'NEXT_PUBLIC_SUPABASE_URL',
       'SUPABASE_SERVICE_ROLE_KEY',
@@ -64,11 +81,13 @@ export default async function handler(req, res) {
       'NEXT_PUBLIC_SITE_URL',
     ]
     const missing = requiredEnv.filter((k) => !process.env[k])
-    if (missing.length) {
-      return res.status(500).json({ ok: false, error: 'Missing environment variables', missing })
-    }
+    if (missing.length) return res.status(500).json({ ok: false, error: 'Missing environment variables', missing })
 
-    const supabase = createClient(must('NEXT_PUBLIC_SUPABASE_URL'), must('SUPABASE_SERVICE_ROLE_KEY'))
+    const supabaseAdmin = createClient(must('NEXT_PUBLIC_SUPABASE_URL'), must('SUPABASE_SERVICE_ROLE_KEY'))
+
+    // ✅ admin-only
+    const admin = await requireAdmin(req, supabaseAdmin)
+    if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error })
 
     const s3 = new S3Client({
       region: 'auto',
@@ -79,58 +98,48 @@ export default async function handler(req, res) {
       },
     })
 
-    // 🔥 Dynamic Sharp import (Vercel safe)
     const sharp = (await import('sharp')).default
     sharp.cache(false)
 
     const { photoId } = req.body || {}
     if (!photoId) return res.status(400).json({ ok: false, error: 'photoId required' })
 
-    // ---------- FETCH PHOTO ----------
-    const { data: photo, error: photoErr } = await supabase
+    const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, original_jpg_key, original_raw_key')
       .eq('id', photoId)
       .single()
 
-    if (photoErr || !photo) {
-      return res.status(400).json({ ok: false, error: photoErr?.message || 'Photo not found' })
-    }
+    if (photoErr || !photo) return res.status(400).json({ ok: false, error: photoErr?.message || 'Photo not found' })
 
     const originalKey = photo.original_jpg_key || photo.original_raw_key
-    if (!originalKey) {
-      return res.status(400).json({ ok: false, error: 'No original key found in photos row' })
-    }
+    if (!originalKey) return res.status(400).json({ ok: false, error: 'No original key found in photos row' })
 
-    // ---------- DOWNLOAD ORIGINAL ----------
+    // download original
     const getObj = await s3.send(new GetObjectCommand({ Bucket: must('R2_BUCKET'), Key: originalKey }))
-    if (!getObj?.Body) {
-      return res.status(500).json({ ok: false, error: 'R2 GetObject returned empty Body' })
-    }
+    if (!getObj?.Body) return res.status(500).json({ ok: false, error: 'R2 GetObject returned empty Body' })
     const originalBuffer = await streamToBuffer(getObj.Body)
 
-    // ---------- THUMB (4:3 GRID SAFE) ----------
+    // thumb
     const thumbBuffer = await sharp(originalBuffer, { failOn: 'none' })
       .rotate()
       .resize(600, 450, { fit: 'cover', position: 'attention' })
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer()
 
-    // ---------- PREVIEW BASE BUFFER FIRST (fixes composite size error) ----------
+    // preview base
     const basePreviewBuffer = await sharp(originalBuffer, { failOn: 'none' })
       .rotate()
       .resize({ width: 2000, withoutEnlargement: true })
-      .jpeg({ quality: 92, mozjpeg: true }) // high quality base before watermark
+      .jpeg({ quality: 92, mozjpeg: true })
       .toBuffer()
 
     const meta = await sharp(basePreviewBuffer).metadata()
     const W = meta.width
     const H = meta.height
-    if (!W || !H) {
-      return res.status(400).json({ ok: false, error: 'Invalid preview metadata after resize' })
-    }
+    if (!W || !H) return res.status(400).json({ ok: false, error: 'Invalid preview metadata after resize' })
 
-    // ---------- WATERMARK GENERATION (always matches preview size) ----------
+    // watermark
     const text = 'jeevanchandimal.com'
     const fontStandard = Math.max(28, Math.round(W * 0.04))
     const fontStrong = Math.max(34, Math.round(W * 0.05))
@@ -140,7 +149,6 @@ export default async function handler(req, res) {
     const wmStrong = makeWatermarkSvg({ w: W, h: H, text, fontSize: fontStrong, opacity: 0.5, align: 'center' })
     const wmCorner = makeWatermarkSvg({ w: W, h: H, text, fontSize: fontCorner, opacity: 0.35, align: 'right' })
 
-    // ---------- APPLY WATERMARKS ON RESIZED PREVIEW BUFFER ----------
     const previewStandard = await sharp(basePreviewBuffer)
       .composite([{ input: wmStandard, top: 0, left: 0 }])
       .jpeg({ quality: 84, mozjpeg: true })
@@ -156,13 +164,13 @@ export default async function handler(req, res) {
       .jpeg({ quality: 84, mozjpeg: true })
       .toBuffer()
 
-    // ---------- R2 KEYS ----------
+    // r2 keys
     const thumbKey = `photos/thumb/${photoId}.jpg`
     const previewKey = `photos/preview/${photoId}.jpg`
     const previewStrongKey = `photos/preview_wm-strong/${photoId}.jpg`
     const previewCornerKey = `photos/preview_wm-corner/${photoId}.jpg`
 
-    // ---------- UPLOAD TO R2 ----------
+    // upload
     const uploads = [
       { key: thumbKey, body: thumbBuffer },
       { key: previewKey, body: previewStandard },
@@ -182,12 +190,12 @@ export default async function handler(req, res) {
       )
     }
 
-    // ---------- UPDATE DB ----------
+    // update only urls + status (do NOT overwrite meta)
     const base = must('NEXT_PUBLIC_SITE_URL').replace(/\/$/, '')
     const thumb_url = `${base}/api/photo/${photoId}/thumb`
     const preview_url = `${base}/api/photo/${photoId}/preview`
 
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from('photos')
       .update({ preview_url, thumb_url, status: 'published' })
       .eq('id', photoId)
