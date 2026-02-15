@@ -175,11 +175,7 @@ export default function StoreDetail() {
     }
   }, [router.isReady, id])
 
-  // ✅ Load similar + recommended
-  // Uses "new" API params:
-  // similar:      /api/store/similar?currentId=...&tags=[...]&limit=6
-  // recommended:  /api/store/recommended?currentId=...&tags=[...]&similarIds=[...]&limit=6
-  // (If your API ignores tags, it still works; if tags exist, it becomes smarter.)
+    // ✅ Load similar + recommended (matches existing API params)
   React.useEffect(() => {
     if (!photo?.id) return
 
@@ -189,26 +185,25 @@ export default function StoreDetail() {
       try {
         setRelLoading(true)
 
-        const tagsJson = encodeURIComponent(JSON.stringify(photo.tags || []))
-
+        // Similar expects: ?id=<photoId>
         const sResp = await fetch(
-          `/api/store/similar?currentId=${encodeURIComponent(photo.id)}&tags=${tagsJson}&limit=6`,
+          `/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`,
           { headers: { 'Cache-Control': 'no-store' } }
         )
         const s = await sResp.json().catch(() => ({}))
-
         const similarList = Array.isArray(s?.photos) ? s.photos : []
+
         if (!alive) return
         setSimilar(similarList)
 
-        const similarIdsJson = encodeURIComponent(
-          JSON.stringify(similarList.map((p) => p.id).filter(Boolean))
-        )
+        // Recommended expects:
+        // ?excludeId=<photoId>&similarIds=<comma-separated>&limit=6
+        const similarIds = similarList.map((p) => p.id).filter(Boolean).join(',')
 
         const rResp = await fetch(
-          `/api/store/recommended?currentId=${encodeURIComponent(
+          `/api/store/recommended?excludeId=${encodeURIComponent(
             photo.id
-          )}&tags=${tagsJson}&similarIds=${similarIdsJson}&limit=6`,
+          )}&similarIds=${encodeURIComponent(similarIds)}&limit=6`,
           { headers: { 'Cache-Control': 'no-store' } }
         )
         const r = await rResp.json().catch(() => ({}))
@@ -226,7 +221,6 @@ export default function StoreDetail() {
     }
 
     loadRelated()
-
     return () => {
       alive = false
     }

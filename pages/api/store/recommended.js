@@ -7,35 +7,31 @@ export default async function handler(req, res) {
 
     const similarIds =
       typeof req.query.similarIds === 'string'
-        ? req.query.similarIds.split(',').filter(Boolean)
+        ? req.query.similarIds.split(',').map((s) => s.trim()).filter(Boolean)
         : []
 
-    const limit = Number(req.query.limit) || 6
+    const limit = Math.min(Number(req.query.limit) || 6, 24)
 
-    // Build exclusion list
-    const excludeList = [excludeId, ...similarIds].filter(Boolean)
+    const excludeList = Array.from(new Set([excludeId, ...similarIds].filter(Boolean)))
 
     let query = supabaseAdmin
       .from('photos')
       .select('id, title, tags, thumb_url, created_at')
       .eq('status', 'published')
+      .not('thumb_url', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(limit + excludeList.length) // fetch extra in case we filter
+      .limit(limit)
 
     if (excludeList.length > 0) {
-      query = query.not('id', 'in', `(${excludeList.join(',')})`)
+      // Postgres array literal with quoted UUIDs
+      const arr = `{${excludeList.map((x) => `"${x}"`).join(',')}}`
+      query = query.not('id', 'in', arr)
     }
 
     const { data, error } = await query
+    if (error) return res.status(500).json({ ok: false, error: error.message })
 
-    if (error) {
-      return res.status(500).json({ ok: false, error: error.message })
-    }
-
-    // Ensure final limit after filtering
-    const photos = (data || []).slice(0, limit)
-
-    return res.status(200).json({ ok: true, photos })
+    return res.status(200).json({ ok: true, photos: data || [] })
   } catch (e) {
     return res.status(500).json({ ok: false, error: 'Server error' })
   }

@@ -3,9 +3,9 @@ import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 export default async function handler(req, res) {
   try {
     const id = req.query.id
+    const limit = Math.min(Number(req.query.limit) || 6, 24)
     if (!id) return res.status(400).json({ ok: false, error: 'Missing id' })
 
-    // get current photo tags
     const { data: current } = await supabaseAdmin
       .from('photos')
       .select('tags')
@@ -13,31 +13,30 @@ export default async function handler(req, res) {
       .single()
 
     const tags = Array.isArray(current?.tags) ? current.tags : []
-
     let photos = []
 
-    // 1️⃣ try tag overlap
     if (tags.length) {
       const { data } = await supabaseAdmin
         .from('photos')
         .select('id,title,tags,thumb_url')
         .neq('id', id)
         .eq('status', 'published')
+        .not('thumb_url', 'is', null)
         .overlaps('tags', tags)
-        .limit(6)
+        .limit(limit)
 
       photos = data || []
     }
 
-    // 2️⃣ fallback → latest published photos (excluding current)
     if (!photos.length) {
       const { data } = await supabaseAdmin
         .from('photos')
         .select('id,title,tags,thumb_url')
         .neq('id', id)
         .eq('status', 'published')
+        .not('thumb_url', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(6)
+        .limit(limit)
 
       photos = data || []
     }
