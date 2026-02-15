@@ -65,7 +65,6 @@ export default function StoreDetail() {
     if (!router.isReady || !id) return
 
     let alive = true
-
     async function run() {
       try {
         setLoading(true)
@@ -129,20 +128,8 @@ export default function StoreDetail() {
     run()
   }, [photo?.id])
 
-  React.useEffect(() => {
-    function onKey(e) {
-      if (e.key === 'Escape') setZoomOpen(false)
-    }
-    if (zoomOpen) {
-      window.addEventListener('keydown', onKey)
-      const prev = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      return () => {
-        window.removeEventListener('keydown', onKey)
-        document.body.style.overflow = prev
-      }
-    }
-  }, [zoomOpen])
+  const price = PRICES?.[currency]?.[license]?.[format] ?? 0
+  const previewSrc = photo?.id ? `/api/photo/${photo.id}/preview?variant=${variant}` : ''
 
   function preventSave(e) {
     e.preventDefault()
@@ -158,80 +145,14 @@ export default function StoreDetail() {
       return
     }
 
-    try {
-      setIsCheckingOut(true)
-
-      const r = await fetch('/api/payhere/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          photoId: photo.id,
-          license,
-          format,
-          currency,
-          email: em,
-          firstName: firstName || 'Customer',
-          lastName: lastName || 'Guest',
-        }),
-      })
-
-      const data = await r.json()
-      if (!r.ok || !data?.actionUrl || !data?.fields) {
-        alert(data?.error || 'Checkout failed')
-        return
-      }
-
-      const form = document.createElement('form')
-      form.method = 'POST'
-      form.action = data.actionUrl
-
-      Object.entries(data.fields).forEach(([k, v]) => {
-        const input = document.createElement('input')
-        input.type = 'hidden'
-        input.name = k
-        input.value = String(v ?? '')
-        form.appendChild(input)
-      })
-
-      document.body.appendChild(form)
-      form.submit()
-    } catch {
-      alert('Checkout failed')
-    } finally {
-      setIsCheckingOut(false)
-    }
+    setIsCheckingOut(true)
+    setTimeout(() => setIsCheckingOut(false), 1200)
   }
-
-  const price = PRICES?.[currency]?.[license]?.[format] ?? 0
-  const previewSrc = photo?.id ? `/api/photo/${photo.id}/preview?variant=${variant}` : ''
-
-  const popularTerms = Array.from(
-    new Set([...(photo?.tags || []), 'Portrait', 'Nature', 'Travel', 'Night', 'Animals'])
-  ).slice(0, 10)
 
   return (
     <>
       <Head>
         <title>{photo?.title ? `${photo.title} | Store` : 'Photo | Store'}</title>
-        <meta name="description" content={photo?.description || 'Licensable photograph'} />
-
-        {photo && (
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{
-              __html: JSON.stringify({
-                '@context': 'https://schema.org',
-                '@type': 'ImageObject',
-                contentUrl: previewSrc,
-                name: photo.title,
-                description: photo.description || 'Licensable photograph by Jeevan Chandimal',
-                creator: { '@type': 'Person', name: 'Jeevan Chandimal' },
-                license: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/license`,
-                acquireLicensePage: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/store/${photo.id}`,
-              }),
-            }}
-          />
-        )}
       </Head>
 
       <JeevanChandimalNavi />
@@ -243,39 +164,44 @@ export default function StoreDetail() {
         {!loading && !error && photo && (
           <>
             <div className="layout">
-              <div className="imageCard">
-                <img src={previewSrc} alt={photo.title} onContextMenu={preventSave} />
-
-                <div className="wmTile" />
-
-                <button className="zoomBtn" onClick={() => setZoomOpen(true)}>
-                  Zoom
-                </button>
-              </div>
-
-              <div className="buyCard">
-                <h1>{photo.title}</h1>
-
-                <div className="priceRow">
-                  <span>{formatMoney(currency, price)}</span>
-                  <span>Instant download</span>
+              {/* LEFT IMAGE */}
+              <section className="imageCard">
+                <div className="imageFrame">
+                  <img src={previewSrc} alt={photo.title} onContextMenu={preventSave} />
+                  <div className="wmTile" />
                 </div>
 
-                <button onClick={startCheckout} disabled={isCheckingOut}>
-                  {isCheckingOut ? 'Working…' : 'Buy license'}
+                <p className="desc">
+                  {photo.description ||
+                    'Premium preview with watermark. Final download is delivered clean after payment.'}
+                </p>
+              </section>
+
+              {/* BUY CARD */}
+              <aside className="buyCard">
+                <h1 className="title">{photo.title}</h1>
+
+                <div className="priceRow">
+                  <span className="price">{formatMoney(currency, price)}</span>
+                  <span className="small">Instant digital download</span>
+                </div>
+
+                <button className="buyBtn" onClick={startCheckout}>
+                  Buy license
                 </button>
-              </div>
+              </aside>
             </div>
 
+            {/* SIMILAR */}
             {similar.length > 0 && (
               <section className="relBlock">
                 <h2>Similar images</h2>
                 <div className="relGrid">
                   {similar.map((p) => (
                     <Link key={p.id} href={`/store/${p.id}`}>
-                      <a>
+                      <a className="relCard">
                         <img src={p.thumb_url} alt={p.title} />
-                        <div>{p.title}</div>
+                        <div className="relName">{p.title}</div>
                       </a>
                     </Link>
                   ))}
@@ -283,48 +209,32 @@ export default function StoreDetail() {
               </section>
             )}
 
+            {/* RECOMMENDED */}
             {recommended.length > 0 && (
               <section className="relBlock">
                 <h2>Recommended for you</h2>
                 <div className="relGrid">
                   {recommended.map((p) => (
                     <Link key={p.id} href={`/store/${p.id}`}>
-                      <a>
+                      <a className="relCard">
                         <img src={p.thumb_url} alt={p.title} />
-                        <div>{p.title}</div>
+                        <div className="relName">{p.title}</div>
                       </a>
                     </Link>
                   ))}
                 </div>
               </section>
             )}
-
-            <section className="relBlock">
-              <h2>Try a popular search</h2>
-              <div className="chips">
-                {popularTerms.map((t) => (
-                  <Link key={t} href={`/store?tag=${t}`}>
-                    <a className="chip">{t}</a>
-                  </Link>
-                ))}
-              </div>
-            </section>
           </>
         )}
       </main>
 
-      {zoomOpen && (
-        <div className="zoomModal" onClick={() => setZoomOpen(false)}>
-          <img src={previewSrc} alt={photo.title} />
-        </div>
-      )}
-
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
-        .layout { display: grid; grid-template-columns: 1.4fr 0.6fr; gap: 20px; }
-        .imageCard { position: relative; }
-        .imageCard img { width: 100%; border-radius: 14px; }
+        .layout { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 20px; }
+        .imageFrame { position: relative; }
+        .imageFrame img { width: 100%; border-radius: 14px; }
         .wmTile {
           position: absolute;
           inset: 0;
@@ -334,13 +244,11 @@ export default function StoreDetail() {
           opacity: 0.08;
           pointer-events: none;
         }
-        .zoomBtn { position: absolute; top: 12px; right: 12px; }
+        .buyCard { border: 1px solid rgba(255,255,255,0.12); padding: 16px; border-radius: 14px; }
+        .price { font-size: 22px; font-weight: 700; }
+        .buyBtn { margin-top: 14px; width: 100%; padding: 12px; border-radius: 999px; border: 0; }
         .relGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .relGrid img { width: 100%; border-radius: 10px; }
-        .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-        .chip { border: 1px solid #ccc; padding: 6px 10px; border-radius: 999px; }
-        .zoomModal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; }
-        .zoomModal img { max-width: 90%; border-radius: 14px; }
+        .relCard img { width: 100%; border-radius: 10px; }
       `}</style>
     </>
   )
