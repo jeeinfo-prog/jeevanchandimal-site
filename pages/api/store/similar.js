@@ -1,40 +1,48 @@
-// pages/api/store/similar.js
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).json({ ok: false })
-
   try {
-    const id = typeof req.query.id === 'string' ? req.query.id : ''
-    const limit = Math.min(parseInt(req.query.limit || '6', 10) || 6, 24)
-
+    const id = req.query.id
     if (!id) return res.status(400).json({ ok: false, error: 'Missing id' })
 
+    // get current photo tags
     const { data: current } = await supabaseAdmin
       .from('photos')
-      .select('id,tags')
+      .select('tags')
       .eq('id', id)
       .single()
 
-    const tags = Array.isArray(current?.tags) ? current.tags.filter(Boolean) : []
+    const tags = Array.isArray(current?.tags) ? current.tags : []
 
-    if (!tags.length) {
-      // no tags → no similar
-      return res.status(200).json({ ok: true, photos: [] })
+    let photos = []
+
+    // 1️⃣ try tag overlap
+    if (tags.length) {
+      const { data } = await supabaseAdmin
+        .from('photos')
+        .select('id,title,tags,thumb_url')
+        .neq('id', id)
+        .eq('status', 'published')
+        .overlaps('tags', tags)
+        .limit(6)
+
+      photos = data || []
     }
 
-    const { data } = await supabaseAdmin
-      .from('photos')
-      .select('id,title,tags,thumb_url,preview_url,created_at')
-      .eq('status', 'published')
-      .not('thumb_url', 'is', null)
-      .not('preview_url', 'is', null)
-      .neq('id', id)
-      .overlaps('tags', tags)
-      .order('created_at', { ascending: false })
-      .limit(limit)
+    // 2️⃣ fallback → latest published photos (excluding current)
+    if (!photos.length) {
+      const { data } = await supabaseAdmin
+        .from('photos')
+        .select('id,title,tags,thumb_url')
+        .neq('id', id)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(6)
 
-    return res.status(200).json({ ok: true, photos: data || [] })
+      photos = data || []
+    }
+
+    return res.status(200).json({ ok: true, photos })
   } catch (e) {
     return res.status(500).json({ ok: false, error: 'Server error' })
   }
