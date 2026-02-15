@@ -96,7 +96,8 @@ export default function StoreIndex() {
           <div>
             <h1 className="store-title">Photo Store</h1>
             <p className="store-sub">
-              License images in <strong>Personal</strong>, <strong>Commercial</strong>, or <strong>Editorial</strong>.
+              License images in <strong>Personal</strong>, <strong>Commercial</strong>, or{' '}
+              <strong>Editorial</strong>.
             </p>
           </div>
 
@@ -108,11 +109,18 @@ export default function StoreIndex() {
                 const val = e.target.value
                 setQuery(val)
 
-                router.replace({ pathname: '/store', query: val ? { q: val } : {} }, undefined, { shallow: true })
+                router.replace({ pathname: '/store', query: val ? { q: val } : {} }, undefined, {
+                  shallow: true,
+                })
               }}
               placeholder="Search (e.g. Sigiriya, night, portrait)…"
               aria-label="Search photos"
             />
+
+            {/* ✅ Collections link near the search bar */}
+            <Link href="/store/collections">
+              <a className="collectionsLink">Browse Collections →</a>
+            </Link>
           </div>
         </header>
 
@@ -161,7 +169,11 @@ export default function StoreIndex() {
                             className="tagChip"
                             onClick={(e) => {
                               e.preventDefault()
-                              router.replace({ pathname: '/store', query: { tag: t } }, undefined, { shallow: true })
+                              router.replace(
+                                { pathname: '/store', query: { tag: t } },
+                                undefined,
+                                { shallow: true }
+                              )
                               setQuery(t)
                             }}
                           >
@@ -235,6 +247,26 @@ export default function StoreIndex() {
           opacity: 0.6;
         }
 
+        /* ✅ Collections link */
+        .collectionsLink {
+          text-decoration: none;
+          font-size: 13px;
+          opacity: 0.82;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          padding: 12px 14px;
+          border-radius: 999px;
+          transition: opacity 0.18s ease, border-color 0.18s ease,
+            background 0.18s ease, transform 0.18s ease;
+          background: rgba(255, 255, 255, 0.02);
+          white-space: nowrap;
+        }
+        .collectionsLink:hover {
+          opacity: 1;
+          border-color: rgba(245, 244, 244, 0.35);
+          background: rgba(245, 244, 244, 0.06);
+          transform: translateY(-1px);
+        }
+
         .activeFilter {
           margin-bottom: 14px;
           padding: 10px 14px;
@@ -263,6 +295,8 @@ export default function StoreIndex() {
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 18px;
         }
+
+        /* ✅ Small hover effect */
         .card {
           display: block;
           text-decoration: none;
@@ -271,7 +305,16 @@ export default function StoreIndex() {
           border-radius: 18px;
           overflow: hidden;
           background: rgba(255, 255, 255, 0.02);
+          transition: transform 0.18s ease, border-color 0.18s ease,
+            box-shadow 0.18s ease;
+          will-change: transform;
         }
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(245, 244, 244, 0.3);
+          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+        }
+
         .thumb {
           width: 100%;
           aspect-ratio: 4 / 3;
@@ -282,7 +325,12 @@ export default function StoreIndex() {
           height: 100%;
           object-fit: cover;
           display: block;
+          transition: transform 0.35s ease;
         }
+        .card:hover .thumb img {
+          transform: scale(1.06);
+        }
+
         .meta {
           padding: 14px 14px 16px;
         }
@@ -354,6 +402,10 @@ export default function StoreIndex() {
           .store-search {
             width: 100%;
             min-width: 0;
+          }
+          .collectionsLink {
+            width: 100%;
+            text-align: center;
           }
         }
         @media (max-width: 520px) {
