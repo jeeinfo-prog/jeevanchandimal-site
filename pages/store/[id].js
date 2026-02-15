@@ -178,18 +178,144 @@ export default function StoreDetail() {
               </section>
 
               {/* BUY CARD */}
-              <aside className="buyCard">
-                <h1 className="title">{photo.title}</h1>
+            <aside className="buyCard">
+  <h1 className="title">{photo.title}</h1>
+  <p className="sub">Choose license + format</p>
 
-                <div className="priceRow">
-                  <span className="price">{formatMoney(currency, price)}</span>
-                  <span className="small">Instant digital download</span>
-                </div>
+  {/* EMAIL */}
+  <div className="block">
+    <span className="label">Receipt email</span>
+    <input
+      className="field"
+      type="email"
+      placeholder="you@example.com"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+    />
 
-                <button className="buyBtn" onClick={startCheckout}>
-                  Buy license
-                </button>
-              </aside>
+    <div className="row2">
+      <input
+        className="field"
+        type="text"
+        placeholder="First name"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+      />
+      <input
+        className="field"
+        type="text"
+        placeholder="Last name"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+      />
+    </div>
+
+    <p className="fine">
+      We’ll send your receipt + secure download link to this email.
+    </p>
+  </div>
+
+  {/* LICENSE */}
+  <div className="block">
+    <span className="label">License</span>
+
+    <div className="options options3">
+      <button
+        type="button"
+        className={`opt ${license === 'personal' ? 'active' : ''}`}
+        onClick={() => setLicense('personal')}
+      >
+        Personal
+      </button>
+
+      <button
+        type="button"
+        className={`opt ${license === 'commercial' ? 'active' : ''}`}
+        onClick={() => setLicense('commercial')}
+      >
+        Commercial
+      </button>
+
+      <button
+        type="button"
+        className={`opt ${license === 'editorial' ? 'active' : ''}`}
+        onClick={() => setLicense('editorial')}
+      >
+        Editorial
+      </button>
+    </div>
+
+    <p className="fine">
+      Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary.
+    </p>
+  </div>
+
+  {/* FORMAT */}
+  <div className="block">
+    <span className="label">Format</span>
+
+    <div className="options options2">
+      <button
+        type="button"
+        className={`opt ${format === 'jpg' ? 'active' : ''}`}
+        onClick={() => setFormat('jpg')}
+      >
+        JPG
+      </button>
+
+      <button
+        type="button"
+        className={`opt ${format === 'raw' ? 'active' : ''}`}
+        onClick={() => setFormat('raw')}
+      >
+        RAW
+      </button>
+    </div>
+  </div>
+
+  {/* CURRENCY */}
+  <div className="block">
+    <span className="label">Currency</span>
+
+    <div className="options options2">
+      <button
+        type="button"
+        className={`opt ${currency === 'LKR' ? 'active' : ''}`}
+        onClick={() => setCurrency('LKR')}
+      >
+        LKR
+      </button>
+
+      <button
+        type="button"
+        className={`opt ${currency === 'USD' ? 'active' : ''}`}
+        onClick={() => setCurrency('USD')}
+      >
+        USD
+      </button>
+    </div>
+  </div>
+
+  {/* PRICE */}
+  <div className="priceRow">
+    <span className="price">{formatMoney(currency, price)}</span>
+    <span className="small">Instant digital download</span>
+  </div>
+
+  {/* BUY BUTTON */}
+  <button
+    type="button"
+    className="buyBtn"
+    onClick={startCheckout}
+    disabled={isCheckingOut}
+  >
+    {isCheckingOut ? 'Working…' : 'Buy license'}
+  </button>
+
+  <p className="fine">
+    After payment, we email your secure download link.
+  </p>
+</aside>
             </div>
 
             {/* SIMILAR */}
@@ -231,25 +357,131 @@ export default function StoreDetail() {
 
       <JeevanChandimalNewFooter />
 
-      <style jsx>{`
-        .layout { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 20px; }
-        .imageFrame { position: relative; }
-        .imageFrame img { width: 100%; border-radius: 14px; }
-        .wmTile {
-          position: absolute;
-          inset: 0;
-          background-image: url('/watermark-logo/watermark-logo.png');
-          background-repeat: repeat;
-          background-size: 220px;
-          opacity: 0.08;
-          pointer-events: none;
-        }
-        .buyCard { border: 1px solid rgba(255,255,255,0.12); padding: 16px; border-radius: 14px; }
-        .price { font-size: 22px; font-weight: 700; }
-        .buyBtn { margin-top: 14px; width: 100%; padding: 12px; border-radius: 999px; border: 0; }
-        .relGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .relCard img { width: 100%; border-radius: 10px; }
-      `}</style>
+     <style jsx>{`
+.layout {
+  display: grid;
+  grid-template-columns: 1.35fr 0.65fr;
+  gap: 20px;
+}
+
+.imageFrame {
+  position: relative;
+}
+
+.imageFrame img {
+  width: 100%;
+  border-radius: 14px;
+}
+
+/* WATERMARK */
+.wmTile {
+  position: absolute;
+  inset: 0;
+  background-image: url('/watermark-logo/watermark-logo.png');
+  background-repeat: repeat;
+  background-size: 220px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+/* BUY CARD */
+.buyCard {
+  border: 1px solid rgba(245,244,244,0.12);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.02);
+  padding: 16px;
+  position: sticky;
+  top: 18px;
+}
+
+.title { margin: 0; font-size: 22px; }
+.sub { margin: 8px 0 0; opacity: 0.75; }
+
+.block {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(245,244,244,0.12);
+}
+
+.label { font-size: 13px; opacity: 0.85; }
+
+.options { margin-top: 10px; display: grid; gap: 10px; }
+.options3 { grid-template-columns: repeat(3, 1fr); }
+.options2 { grid-template-columns: repeat(2, 1fr); }
+
+.opt {
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(245,244,244,0.16);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.opt.active {
+  opacity: 1;
+  background: rgba(245,244,244,0.12);
+  border-color: rgba(245,244,244,0.3);
+}
+
+.field {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(245,244,244,0.16);
+  background: rgba(0,0,0,0.2);
+  color: inherit;
+}
+
+.row2 {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.priceRow {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(245,244,244,0.12);
+  display: flex;
+  justify-content: space-between;
+}
+
+.price { font-size: 22px; font-weight: 700; }
+.small { opacity: 0.7; font-size: 12px; }
+
+.buyBtn {
+  margin-top: 14px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 999px;
+  border: 0;
+  background: #f5f4f4;
+  color: #222;
+  font-weight: 700;
+}
+
+.fine {
+  margin-top: 12px;
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+/* RELATED GRID */
+.relGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.relCard img {
+  width: 100%;
+  border-radius: 10px;
+}
+`}</style>
     </>
   )
 }
