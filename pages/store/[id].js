@@ -62,71 +62,46 @@ export default function StoreDetail() {
   const [recommended, setRecommended] = React.useState([])
 
   React.useEffect(() => {
-    if (!router.isReady || !id) return
+  if (!photo?.id) return
 
-    let alive = true
-    async function run() {
-      try {
-        setLoading(true)
-        setError('')
+  let alive = true
 
-        const r = await fetch(`/api/store/photo?id=${encodeURIComponent(id)}`, {
-          headers: { 'Cache-Control': 'no-store' },
-        })
+  async function loadRelated() {
+    try {
+      // 1️⃣ Load similar
+      const s = await fetch(
+        `/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`
+      ).then((r) => r.json())
 
-        const { json, text } = await safeJson(r)
-        if (!alive) return
+      const similarList = Array.isArray(s?.photos) ? s.photos : []
 
-        if (!r.ok || !json?.ok) {
-          setError(json?.error || text || 'Failed to load photo')
-          setLoading(false)
-          return
-        }
+      if (!alive) return
+      setSimilar(similarList)
 
-        const row = json.photo
+      // 2️⃣ Exclude similar + current from recommended
+      const similarIds = similarList.map((p) => p.id).join(',')
 
-        setPhoto({
-          id: row.id,
-          title: row.title || 'Untitled',
-          description: row.description || '',
-          tags: Array.isArray(row.tags) ? row.tags : [],
-          thumbUrl: row.thumb_url,
-          previewUrl: row.preview_url,
-          createdAt: row.created_at,
-        })
+      const r = await fetch(
+        `/api/store/recommended?excludeId=${encodeURIComponent(
+          photo.id
+        )}&similarIds=${encodeURIComponent(similarIds)}&limit=6`
+      ).then((r) => r.json())
 
-        setLoading(false)
-      } catch {
-        if (!alive) return
-        setError('Failed to load photo')
-        setLoading(false)
-      }
+      if (!alive) return
+      setRecommended(Array.isArray(r?.photos) ? r.photos : [])
+    } catch {
+      if (!alive) return
+      setSimilar([])
+      setRecommended([])
     }
+  }
 
-    run()
-    return () => {
-      alive = false
-    }
-  }, [router.isReady, id])
+  loadRelated()
 
-  React.useEffect(() => {
-    if (!photo?.id) return
-
-    async function run() {
-      try {
-        const s = await fetch(`/api/store/similar?id=${photo.id}&limit=6`).then((r) => r.json())
-        setSimilar(Array.isArray(s?.photos) ? s.photos : [])
-
-        const r = await fetch(`/api/store/recommended?excludeId=${photo.id}&limit=6`).then((r) => r.json())
-        setRecommended(Array.isArray(r?.photos) ? r.photos : [])
-      } catch {
-        setSimilar([])
-        setRecommended([])
-      }
-    }
-
-    run()
-  }, [photo?.id])
+  return () => {
+    alive = false
+  }
+}, [photo?.id])
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
   const previewSrc = photo?.id ? `/api/photo/${photo.id}/preview?variant=${variant}` : ''
@@ -158,216 +133,174 @@ export default function StoreDetail() {
       <JeevanChandimalNavi />
 
       <main className="wrap">
-        {loading && <div className="state">Loading…</div>}
-        {!loading && error && <div className="state">❌ {error}</div>}
-
         {!loading && !error && photo && (
-          <>
-            <div className="layout">
-              {/* LEFT IMAGE */}
-              <section className="imageCard">
-                <div className="imageFrame">
-                  <img src={previewSrc} alt={photo.title} onContextMenu={preventSave} />
-                  <div className="wmTile" />
-                </div>
+  <>
+    <div className="layout">
+      {/* LEFT IMAGE */}
+      <section className="imageCard">
+        <div className="imageFrame">
+          <img src={previewSrc} alt={photo.title} onContextMenu={preventSave} />
+          <div className="wmTile" />
+        </div>
 
-                <p className="desc">
-                  {photo.description ||
-                    'Premium preview with watermark. Final download is delivered clean after payment.'}
-                </p>
-              </section>
+        <p className="desc">
+          {photo.description ||
+            'Premium preview with watermark. Final download is delivered clean after payment.'}
+        </p>
+      </section>
 
-              {/* BUY CARD */}
-            <aside className="buyCard">
-  <h1 className="title">{photo.title}</h1>
-  <p className="sub">Choose license + format</p>
+      {/* BUY CARD */}
+      <aside className="buyCard">
+        <h1 className="title">{photo.title}</h1>
+        <p className="sub">Choose license + format</p>
 
-  {/* EMAIL */}
-  <div className="block">
-    <span className="label">Receipt email</span>
-    <input
-      className="field"
-      type="email"
-      placeholder="you@example.com"
-      value={email}
-      onChange={(e) => setEmail(e.target.value)}
-    />
+        {/* EMAIL */}
+        <div className="block">
+          <span className="label">Receipt email</span>
+          <input
+            className="field"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
-    <div className="row2">
-      <input
-        className="field"
-        type="text"
-        placeholder="First name"
-        value={firstName}
-        onChange={(e) => setFirstName(e.target.value)}
-      />
-      <input
-        className="field"
-        type="text"
-        placeholder="Last name"
-        value={lastName}
-        onChange={(e) => setLastName(e.target.value)}
-      />
+          <div className="row2">
+            <input
+              className="field"
+              type="text"
+              placeholder="First name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+            />
+            <input
+              className="field"
+              type="text"
+              placeholder="Last name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+            />
+          </div>
+
+          <p className="fine">
+            We’ll send your receipt + secure download link to this email.
+          </p>
+        </div>
+
+        {/* LICENSE */}
+        <div className="block">
+          <span className="label">License</span>
+          <div className="options options3">
+            <button type="button" className={`opt ${license === 'personal' ? 'active' : ''}`} onClick={() => setLicense('personal')}>Personal</button>
+            <button type="button" className={`opt ${license === 'commercial' ? 'active' : ''}`} onClick={() => setLicense('commercial')}>Commercial</button>
+            <button type="button" className={`opt ${license === 'editorial' ? 'active' : ''}`} onClick={() => setLicense('editorial')}>Editorial</button>
+          </div>
+
+          <p className="fine">
+            Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary.
+          </p>
+        </div>
+
+        {/* FORMAT */}
+        <div className="block">
+          <span className="label">Format</span>
+          <div className="options options2">
+            <button type="button" className={`opt ${format === 'jpg' ? 'active' : ''}`} onClick={() => setFormat('jpg')}>JPG</button>
+            <button type="button" className={`opt ${format === 'raw' ? 'active' : ''}`} onClick={() => setFormat('raw')}>RAW</button>
+          </div>
+        </div>
+
+        {/* CURRENCY */}
+        <div className="block">
+          <span className="label">Currency</span>
+          <div className="options options2">
+            <button type="button" className={`opt ${currency === 'LKR' ? 'active' : ''}`} onClick={() => setCurrency('LKR')}>LKR</button>
+            <button type="button" className={`opt ${currency === 'USD' ? 'active' : ''}`} onClick={() => setCurrency('USD')}>USD</button>
+          </div>
+        </div>
+
+        {/* PRICE */}
+        <div className="priceRow">
+          <span className="price">{formatMoney(currency, price)}</span>
+          <span className="small">Instant digital download</span>
+        </div>
+
+        <button type="button" className="buyBtn" onClick={startCheckout} disabled={isCheckingOut}>
+          {isCheckingOut ? 'Working…' : 'Buy license'}
+        </button>
+
+        <p className="fine">
+          After payment, we email your secure download link.
+        </p>
+      </aside>
     </div>
 
-    <p className="fine">
-      We’ll send your receipt + secure download link to this email.
-    </p>
-  </div>
-
-  {/* LICENSE */}
-  <div className="block">
-    <span className="label">License</span>
-
-    <div className="options options3">
-      <button
-        type="button"
-        className={`opt ${license === 'personal' ? 'active' : ''}`}
-        onClick={() => setLicense('personal')}
-      >
-        Personal
-      </button>
-
-      <button
-        type="button"
-        className={`opt ${license === 'commercial' ? 'active' : ''}`}
-        onClick={() => setLicense('commercial')}
-      >
-        Commercial
-      </button>
-
-      <button
-        type="button"
-        className={`opt ${license === 'editorial' ? 'active' : ''}`}
-        onClick={() => setLicense('editorial')}
-      >
-        Editorial
-      </button>
-    </div>
-
-    <p className="fine">
-      Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary.
-    </p>
-  </div>
-
-  {/* FORMAT */}
-  <div className="block">
-    <span className="label">Format</span>
-
-    <div className="options options2">
-      <button
-        type="button"
-        className={`opt ${format === 'jpg' ? 'active' : ''}`}
-        onClick={() => setFormat('jpg')}
-      >
-        JPG
-      </button>
-
-      <button
-        type="button"
-        className={`opt ${format === 'raw' ? 'active' : ''}`}
-        onClick={() => setFormat('raw')}
-      >
-        RAW
-      </button>
-    </div>
-  </div>
-
-  {/* CURRENCY */}
-  <div className="block">
-    <span className="label">Currency</span>
-
-    <div className="options options2">
-      <button
-        type="button"
-        className={`opt ${currency === 'LKR' ? 'active' : ''}`}
-        onClick={() => setCurrency('LKR')}
-      >
-        LKR
-      </button>
-
-      <button
-        type="button"
-        className={`opt ${currency === 'USD' ? 'active' : ''}`}
-        onClick={() => setCurrency('USD')}
-      >
-        USD
-      </button>
-    </div>
-  </div>
-
-  {/* PRICE */}
-  <div className="priceRow">
-    <span className="price">{formatMoney(currency, price)}</span>
-    <span className="small">Instant digital download</span>
-  </div>
-
-  {/* BUY BUTTON */}
-  <button
-    type="button"
-    className="buyBtn"
-    onClick={startCheckout}
-    disabled={isCheckingOut}
-  >
-    {isCheckingOut ? 'Working…' : 'Buy license'}
-  </button>
-
-  <p className="fine">
-    After payment, we email your secure download link.
-  </p>
-</aside>
-            </div>
-
-            {/* SIMILAR */}
-    {similar.length > 0 && (
-  <section className="relBlock">
-    <div className="relHead">
-      <h2>Similar images</h2>
-      <Link href={`/store?tag=${photo.tags?.[0] || ''}`}>
-        <a className="seeAll">See all</a>
-      </Link>
-    </div>
-
-    <div className="relGrid">
-      {similar.map((p) => (
-        <Link key={p.id} href={`/store/${p.id}`}>
-          <a className="relCard">
-            <div className="relThumb">
-              <img src={p.thumb_url} alt={p.title || 'Photo'} />
-              <div className="relWm" />
-            </div>
-
-            <div className="relMeta">
-              <div className="relName">{p.title || 'Untitled'}</div>
-              <div className="relTag">
-                {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
-              </div>
-            </div>
-          </a>
+    {/* SIMILAR */}
+    <section className="relBlock">
+      <div className="relHead">
+        <h2>Similar images</h2>
+        <Link href={`/store?tag=${photo.tags?.[0] || ''}`}>
+          <a className="seeAll">See all</a>
         </Link>
-      ))}
-    </div>
-  </section>
+      </div>
+
+      {similar.length === 0 ? (
+        <div className="relState">Loading similar photos…</div>
+      ) : (
+        <div className="relGrid">
+          {similar.map((p) => (
+            <Link key={p.id} href={`/store/${p.id}`}>
+              <a className="relCard">
+                <div className="relThumb">
+                  <img src={p.thumb_url} alt={p.title || 'Photo'} />
+                  <div className="relWm" />
+                </div>
+                <div className="relMeta">
+                  <div className="relName">{p.title || 'Untitled'}</div>
+                  <div className="relTag">
+                    {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                  </div>
+                </div>
+              </a>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+
+    {/* RECOMMENDED */}
+    {recommended.length > 0 && (
+      <section className="relBlock">
+        <div className="relHead">
+          <h2>Recommended for you</h2>
+          <Link href="/store">
+            <a className="seeAll">See all</a>
+          </Link>
+        </div>
+
+        <div className="relGrid">
+          {recommended.map((p) => (
+            <Link key={p.id} href={`/store/${p.id}`}>
+              <a className="relCard">
+                <div className="relThumb">
+                  <img src={p.thumb_url} alt={p.title || 'Photo'} />
+                  <div className="relWm" />
+                </div>
+                <div className="relMeta">
+                  <div className="relName">{p.title || 'Untitled'}</div>
+                  <div className="relTag">
+                    {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                  </div>
+                </div>
+              </a>
+            </Link>
+          ))}
+        </div>
+      </section>
+    )}
+  </>
 )}
 
-            {/* RECOMMENDED */}
-            {recommended.length > 0 && (
-              <section className="relBlock">
-                <h2>Recommended for you</h2>
-                <div className="relGrid">
-                  {recommended.map((p) => (
-                    <Link key={p.id} href={`/store/${p.id}`}>
-                      <a className="relCard">
-                        <img src={p.thumb_url} alt={p.title} />
-                        <div className="relName">{p.title}</div>
-                      </a>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
       </main>
 
       <JeevanChandimalNewFooter />
