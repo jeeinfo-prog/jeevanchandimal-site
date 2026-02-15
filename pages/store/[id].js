@@ -38,6 +38,10 @@ async function safeJson(resp) {
   }
 }
 
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n))
+}
+
 export default function StoreDetail() {
   const router = useRouter()
   const id = typeof router.query.id === 'string' ? router.query.id : ''
@@ -60,6 +64,66 @@ export default function StoreDetail() {
   const [similar, setSimilar] = React.useState([])
   const [recommended, setRecommended] = React.useState([])
   const [relLoading, setRelLoading] = React.useState(false)
+
+  // Watermark controls
+  const [wmOn, setWmOn] = React.useState(true)
+  const [wmOpacity, setWmOpacity] = React.useState(0.08)
+
+  // Zoom modal
+  const [zoomOpen, setZoomOpen] = React.useState(false)
+  const [zoom, setZoom] = React.useState(1)
+  const [pan, setPan] = React.useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = React.useState(false)
+  const panStart = React.useRef({ x: 0, y: 0 })
+  const panOrigin = React.useRef({ x: 0, y: 0 })
+
+  function preventSave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  function openZoom() {
+    setZoomOpen(true)
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }
+
+  function closeZoom() {
+    setZoomOpen(false)
+    setIsPanning(false)
+  }
+
+  function onWheelZoom(e) {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? -0.08 : 0.08
+    setZoom((z) => clamp(Number((z + delta).toFixed(2)), 1, 3))
+  }
+
+  function onMouseDownPan(e) {
+    e.preventDefault()
+    setIsPanning(true)
+    panStart.current = { x: e.clientX, y: e.clientY }
+    panOrigin.current = { x: pan.x, y: pan.y }
+  }
+
+  function onMouseMovePan(e) {
+    if (!isPanning) return
+    const dx = e.clientX - panStart.current.x
+    const dy = e.clientY - panStart.current.y
+    setPan({ x: panOrigin.current.x + dx, y: panOrigin.current.y + dy })
+  }
+
+  function onMouseUpPan() {
+    setIsPanning(false)
+  }
+
+  React.useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') closeZoom()
+    }
+    if (zoomOpen) window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomOpen])
 
   // ✅ Load photo details
   React.useEffect(() => {
@@ -111,7 +175,11 @@ export default function StoreDetail() {
     }
   }, [router.isReady, id])
 
-  // ✅ Load similar + recommended (exclude similar from recommended)
+  // ✅ Load similar + recommended
+  // Uses "new" API params:
+  // similar:      /api/store/similar?currentId=...&tags=[...]&limit=6
+  // recommended:  /api/store/recommended?currentId=...&tags=[...]&similarIds=[...]&limit=6
+  // (If your API ignores tags, it still works; if tags exist, it becomes smarter.)
   React.useEffect(() => {
     if (!photo?.id) return
 
@@ -121,21 +189,29 @@ export default function StoreDetail() {
       try {
         setRelLoading(true)
 
-        const s = await fetch(
-          `/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`
-        ).then((r) => r.json())
+        const tagsJson = encodeURIComponent(JSON.stringify(photo.tags || []))
+
+        const sResp = await fetch(
+          `/api/store/similar?currentId=${encodeURIComponent(photo.id)}&tags=${tagsJson}&limit=6`,
+          { headers: { 'Cache-Control': 'no-store' } }
+        )
+        const s = await sResp.json().catch(() => ({}))
 
         const similarList = Array.isArray(s?.photos) ? s.photos : []
         if (!alive) return
         setSimilar(similarList)
 
-        const similarIds = similarList.map((p) => p.id).join(',')
+        const similarIdsJson = encodeURIComponent(
+          JSON.stringify(similarList.map((p) => p.id).filter(Boolean))
+        )
 
-        const r = await fetch(
-          `/api/store/recommended?excludeId=${encodeURIComponent(
+        const rResp = await fetch(
+          `/api/store/recommended?currentId=${encodeURIComponent(
             photo.id
-          )}&similarIds=${encodeURIComponent(similarIds)}&limit=6`
-        ).then((r) => r.json())
+          )}&tags=${tagsJson}&similarIds=${similarIdsJson}&limit=6`,
+          { headers: { 'Cache-Control': 'no-store' } }
+        )
+        const r = await rResp.json().catch(() => ({}))
 
         if (!alive) return
         setRecommended(Array.isArray(r?.photos) ? r.photos : [])
@@ -157,14 +233,13 @@ export default function StoreDetail() {
   }, [photo?.id])
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
+
+  // Uses your existing preview API route pattern
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
     : ''
 
-  function preventSave(e) {
-    e.preventDefault()
-    e.stopPropagation()
-  }
+  const firstTag = (photo?.tags || []).find(Boolean) || ''
 
   async function startCheckout() {
     if (!photo) return
@@ -196,8 +271,9 @@ export default function StoreDetail() {
         }),
       })
 
-      const data = await r.json()
+      const data = await r.json().catch(() => null)
 
+      // Expecting: { actionUrl, fields } where fields is a dict of hidden inputs
       if (!r.ok || !data?.actionUrl || !data?.fields) {
         alert(data?.error || 'Checkout init failed')
         return
@@ -224,8 +300,6 @@ export default function StoreDetail() {
       setIsCheckingOut(false)
     }
   }
-
-  const firstTag = (photo?.tags || []).find(Boolean) || ''
 
   return (
     <>
@@ -272,10 +346,15 @@ export default function StoreDetail() {
               {/* LEFT IMAGE */}
               <section className="imageCard">
                 <div className="imageFrame" onContextMenu={preventSave}>
+                  <button type="button" className="zoomBtn" onClick={openZoom}>
+                    Zoom
+                  </button>
+
                   <img
                     src={previewSrc}
                     alt={photo.title}
                     draggable={false}
+                    onClick={openZoom}
                     onContextMenu={preventSave}
                     onDragStart={preventSave}
                     loading="eager"
@@ -288,13 +367,108 @@ export default function StoreDetail() {
                       if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
                     }}
                   />
-                  <div className="wmTile" />
+
+                  {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
                 </div>
 
                 <p className="desc">
                   {photo.description ||
                     'Premium preview with watermark. Final download is delivered clean after payment.'}
                 </p>
+
+                {/* Watermark controls + details */}
+                <div className="metaCard">
+                  <div className="metaRow">
+                    <div className="metaTitle">Watermark</div>
+                    <div className="metaCell">
+                      <div className="wmControls">
+                        <button
+                          type="button"
+                          className={`miniBtn ${wmOn ? 'active' : ''}`}
+                          onClick={() => setWmOn(true)}
+                        >
+                          On
+                        </button>
+                        <button
+                          type="button"
+                          className={`miniBtn ${!wmOn ? 'active' : ''}`}
+                          onClick={() => setWmOn(false)}
+                        >
+                          Off
+                        </button>
+                      </div>
+                    </div>
+                    <div />
+                  </div>
+
+                  <div className="metaRow">
+                    <div className="metaTitle">Strength</div>
+                    <div className="metaCell">
+                      <input
+                        type="range"
+                        min="0.02"
+                        max="0.18"
+                        step="0.01"
+                        value={wmOpacity}
+                        onChange={(e) => setWmOpacity(Number(e.target.value))}
+                        className="range"
+                        disabled={!wmOn}
+                      />
+                    </div>
+                    <div className="rangeVal">{Math.round(wmOpacity * 100)}%</div>
+                  </div>
+
+                  <div className="metaRow metaRowTall">
+                    <div className="metaTitle">Photo details</div>
+                    <div className="metaText">
+                      <div>
+                        <strong>ID:</strong> {photo.id}
+                      </div>
+                      {photo.createdAt ? (
+                        <div>
+                          <strong>Date:</strong> {new Date(photo.createdAt).toLocaleDateString()}
+                        </div>
+                      ) : null}
+                      <div>
+                        <strong>Preview:</strong> Watermarked
+                      </div>
+                      <div>
+                        <strong>Delivery:</strong> Clean file after payment
+                      </div>
+                    </div>
+                    <div />
+                  </div>
+
+                  <div className="metaRow metaRowTall">
+                    <div className="metaTitle">Tags</div>
+                    <div className="metaText">
+                      {Array.isArray(photo.tags) && photo.tags.length > 0 ? (
+                        <div className="tagRow">
+                          {photo.tags.slice(0, 14).map((t) => (
+                            <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`}>
+                              <a className="tag">#{t}</a>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ opacity: 0.75 }}>No tags</div>
+                      )}
+                    </div>
+                    <div />
+                  </div>
+
+                  <div className="metaRow metaRowTall">
+                    <div className="metaTitle">Description</div>
+                    <div className="metaText">
+                      {photo.description ? (
+                        photo.description
+                      ) : (
+                        <span style={{ opacity: 0.75 }}>No description added yet.</span>
+                      )}
+                    </div>
+                    <div />
+                  </div>
+                </div>
               </section>
 
               {/* BUY CARD */}
@@ -423,7 +597,7 @@ export default function StoreDetail() {
                       <a className="relCard">
                         <div className="relThumb">
                           <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
-                          <div className="relWm" />
+                          {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
@@ -458,7 +632,7 @@ export default function StoreDetail() {
                       <a className="relCard">
                         <div className="relThumb">
                           <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
-                          <div className="relWm" />
+                          {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
@@ -472,6 +646,74 @@ export default function StoreDetail() {
                 </div>
               )}
             </section>
+
+            {/* ZOOM MODAL */}
+            {zoomOpen && (
+              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+                <div className="zoomTop">
+                  <div className="zoomTitle">{photo.title}</div>
+                  <div className="zoomActions">
+                    <button
+                      type="button"
+                      className="miniBtn"
+                      onClick={() => setZoom((z) => clamp(z - 0.2, 1, 3))}
+                    >
+                      -
+                    </button>
+                    <div className="zoomPct">{Math.round(zoom * 100)}%</div>
+                    <button
+                      type="button"
+                      className="miniBtn"
+                      onClick={() => setZoom((z) => clamp(z + 0.2, 1, 3))}
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      className="miniBtn"
+                      onClick={() => {
+                        setZoom(1)
+                        setPan({ x: 0, y: 0 })
+                      }}
+                    >
+                      Reset
+                    </button>
+                    <button type="button" className="closeBtn" onClick={closeZoom}>
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="zoomStage" onWheel={onWheelZoom}>
+                  <div
+                    className="zoomPan"
+                    style={{
+                      transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    }}
+                    onMouseDown={onMouseDownPan}
+                  >
+                    <img
+                      src={previewSrc}
+                      alt={photo.title}
+                      draggable={false}
+                      onContextMenu={preventSave}
+                      onDragStart={preventSave}
+                      className="zoomImg"
+                      onError={(e) => {
+                        if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                          e.currentTarget.src = photo.previewUrl
+                          return
+                        }
+                        if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+                      }}
+                    />
+                    {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
+                  </div>
+                </div>
+
+                <div className="zoomHint">Scroll to zoom • Drag to pan • ESC to close</div>
+              </div>
+            )}
           </>
         )}
       </main>
@@ -540,7 +782,7 @@ export default function StoreDetail() {
           position: relative;
           border-radius: 14px;
           overflow: hidden;
-          border: 1px solid rgba(245, 244, 244, 0.10);
+          border: 1px solid rgba(245, 244, 244, 0.1);
         }
         .imageFrame img {
           width: 100%;
@@ -549,6 +791,23 @@ export default function StoreDetail() {
           -webkit-user-drag: none;
           user-select: none;
           -webkit-touch-callout: none;
+          cursor: zoom-in;
+        }
+
+        .zoomBtn {
+          position: absolute;
+          z-index: 5;
+          top: 12px;
+          left: 12px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(0, 0, 0, 0.35);
+          color: inherit;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 12px;
+          backdrop-filter: blur(6px);
         }
 
         .wmTile {
@@ -557,7 +816,6 @@ export default function StoreDetail() {
           background-image: url('/watermark-logo/watermark-logo.png');
           background-repeat: repeat;
           background-size: 220px;
-          opacity: 0.08;
           pointer-events: none;
           transform: rotate(-12deg);
         }
@@ -566,6 +824,101 @@ export default function StoreDetail() {
           margin: 10px 0 0;
           opacity: 0.8;
           line-height: 1.6;
+        }
+
+        .metaCard {
+          margin-top: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.02);
+          padding: 12px;
+        }
+
+        .metaRow {
+          display: grid;
+          grid-template-columns: 110px 1fr auto;
+          gap: 10px;
+          align-items: center;
+          padding: 10px 0;
+          border-top: 1px solid rgba(245, 244, 244, 0.08);
+        }
+        .metaRow:first-child {
+          border-top: 0;
+          padding-top: 0;
+        }
+        .metaRowTall {
+          align-items: start;
+        }
+
+        .metaTitle {
+          font-size: 12px;
+          opacity: 0.8;
+        }
+
+        .metaCell {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          justify-content: space-between;
+        }
+
+        .metaText {
+          opacity: 0.9;
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        .wmControls {
+          display: inline-flex;
+          gap: 8px;
+        }
+
+        .miniBtn {
+          padding: 8px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: transparent;
+          color: inherit;
+          cursor: pointer;
+          font-size: 12px;
+          opacity: 0.85;
+        }
+        .miniBtn.active {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.12);
+          border-color: rgba(245, 244, 244, 0.3);
+        }
+
+        .range {
+          width: 100%;
+        }
+        .rangeVal {
+          font-size: 12px;
+          opacity: 0.8;
+          min-width: 44px;
+          text-align: right;
+        }
+
+        .tagRow {
+          margin-top: 10px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .tag {
+          display: inline-block;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          text-decoration: none;
+          color: inherit;
+          font-size: 12px;
+          opacity: 0.85;
+        }
+        .tag:hover {
+          opacity: 1;
+          border-color: rgba(245, 244, 244, 0.35);
         }
 
         .buyCard {
@@ -735,7 +1088,7 @@ export default function StoreDetail() {
           position: relative;
           border-radius: 12px;
           overflow: hidden;
-          border: 1px solid rgba(245, 244, 244, 0.10);
+          border: 1px solid rgba(245, 244, 244, 0.1);
           transition: border-color 0.18s ease, box-shadow 0.18s ease;
         }
         .relCard:hover .relThumb {
@@ -760,7 +1113,6 @@ export default function StoreDetail() {
           background-image: url('/watermark-logo/watermark-logo.png');
           background-repeat: repeat;
           background-size: 140px;
-          opacity: 0.08;
           pointer-events: none;
           transform: rotate(-12deg);
         }
@@ -776,6 +1128,100 @@ export default function StoreDetail() {
         .relTag {
           font-size: 12px;
           opacity: 0.7;
+        }
+
+        /* Zoom modal */
+        .zoomOverlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.78);
+          z-index: 9999;
+          display: grid;
+          grid-template-rows: auto 1fr auto;
+        }
+
+        .zoomTop {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 14px 16px;
+          border-bottom: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+        }
+
+        .zoomTitle {
+          font-size: 14px;
+          opacity: 0.95;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          max-width: 55vw;
+        }
+
+        .zoomActions {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .zoomPct {
+          font-size: 12px;
+          opacity: 0.85;
+          min-width: 54px;
+          text-align: center;
+        }
+
+        .closeBtn {
+          padding: 8px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(245, 244, 244, 0.14);
+          color: inherit;
+          cursor: pointer;
+          font-weight: 800;
+        }
+
+        .zoomStage {
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          user-select: none;
+        }
+
+        .zoomPan {
+          position: relative;
+          cursor: grab;
+          transform-origin: center;
+        }
+        .zoomPan:active {
+          cursor: grabbing;
+        }
+
+        .zoomImg {
+          max-width: 92vw;
+          max-height: 78vh;
+          display: block;
+          border-radius: 14px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+        }
+
+        .zoomWm {
+          position: absolute;
+          inset: 0;
+          background-image: url('/watermark-logo/watermark-logo.png');
+          background-repeat: repeat;
+          background-size: 220px;
+          pointer-events: none;
+          transform: rotate(-12deg);
+          border-radius: 14px;
+        }
+
+        .zoomHint {
+          padding: 10px 16px;
+          font-size: 12px;
+          opacity: 0.75;
+          border-top: 1px solid rgba(245, 244, 244, 0.12);
         }
 
         @media (max-width: 991px) {
@@ -802,6 +1248,15 @@ export default function StoreDetail() {
         @media (max-width: 520px) {
           .relGrid {
             grid-template-columns: repeat(2, 1fr);
+          }
+          .metaRow {
+            grid-template-columns: 1fr;
+          }
+          .metaCell {
+            justify-content: flex-start;
+          }
+          .rangeVal {
+            text-align: left;
           }
         }
       `}</style>
