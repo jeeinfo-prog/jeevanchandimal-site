@@ -10,7 +10,7 @@ const COLLECTIONS = [
   { slug: 'culture', title: 'Culture', tag: 'culture', cover: '/collections/culture.jpg' },
   { slug: 'history', title: 'History', tag: 'history', cover: '/collections/history.jpg' },
   { slug: 'lifestyle', title: 'Life Style', tag: 'lifestyle', cover: '/collections/lifestyle.jpg' },
-  { slug: 'fine-art', title: 'Fine Art', tag: 'fine art', cover: '/collections/fine-art.jpg' },
+  { slug: 'fine-art', title: 'Fine Art', tag: 'fineart', cover: '/collections/fine-art.jpg' },
 ]
 
 export default async function handler(req, res) {
