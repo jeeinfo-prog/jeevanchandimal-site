@@ -48,7 +48,22 @@ function autoTagsFromFile(file) {
     .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
     .toLowerCase()
 
-  const stop = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'for', 'with', 'by', 'from'])
+  const stop = new Set([
+    'the',
+    'a',
+    'an',
+    'and',
+    'or',
+    'of',
+    'to',
+    'in',
+    'on',
+    'at',
+    'for',
+    'with',
+    'by',
+    'from',
+  ])
   const words = raw.split(/\s+/g).filter(Boolean)
 
   const tags = []
@@ -63,6 +78,44 @@ function autoTagsFromFile(file) {
     if (tags.length >= 10) break
   }
   return tags
+}
+
+// ✅ Collections tags (for one-tap tagging)
+const COLLECTION_TAGS = [
+  'nature',
+  'wildlife',
+  'landscape',
+  'travel',
+  'culture',
+  'history',
+  'lifestyle',
+  'fineart',
+]
+
+// ✅ normalize tags from input
+function normalizeTags(input) {
+  const arr = Array.isArray(input)
+    ? input
+    : String(input || '')
+        .split(',')
+        .map((t) => t.trim())
+
+  const out = []
+  const seen = new Set()
+
+  for (const raw of arr) {
+    const t = String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '') // remove spaces (fine art -> fineart)
+    if (!t) continue
+    if (seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+    if (out.length >= 12) break
+  }
+
+  return out
 }
 
 export default function AdminUploadPage() {
@@ -134,7 +187,15 @@ export default function AdminUploadPage() {
     setQueue((q) =>
       q.map((it) =>
         it.status === 'ERROR'
-          ? { ...it, status: 'QUEUED', error: '', errorType: '', progress: 0, speedBps: 0, etaSec: 0 }
+          ? {
+              ...it,
+              status: 'QUEUED',
+              error: '',
+              errorType: '',
+              progress: 0,
+              speedBps: 0,
+              etaSec: 0,
+            }
           : it
       )
     )
@@ -157,6 +218,21 @@ export default function AdminUploadPage() {
       )
     )
     log(`✅ Applied bulk preset to queued items (${licensePreset}, LKR ${priceLkr}, USD ${priceUsd})`)
+  }
+
+  // ✅ NEW: bulk add a tag to queued items
+  function applyBulkTag(tag) {
+    const t = normalizeTags([tag])[0]
+    if (!t) return
+    setQueue((q) =>
+      q.map((it) => {
+        if (!(it.status === 'QUEUED' || it.status === 'ERROR')) return it
+        const next = new Set(normalizeTags(it?.meta?.tags || []))
+        next.add(t)
+        return { ...it, meta: { ...(it.meta || {}), tags: Array.from(next) } }
+      })
+    )
+    log(`🏷 Added bulk tag to queued items: ${t}`)
   }
 
   async function safeJson(resp) {
@@ -319,7 +395,7 @@ export default function AdminUploadPage() {
       const relPath = keepFolderStructure && rel ? rel : ''
 
       const title = autoTitleFromFile(file)
-      const tags = autoTagsFromFile(file)
+      const tags = normalizeTags(autoTagsFromFile(file))
 
       return {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -386,7 +462,7 @@ export default function AdminUploadPage() {
           filename: file.name,
           relativePath: item.relativePath || '',
           title: item?.meta?.title || '',
-          tags: item?.meta?.tags || [],
+          tags: normalizeTags(item?.meta?.tags || []),
           // NOTE: license/prices are NOT stored in DB yet; we keep them UI-only for now.
           licensePreset: item?.meta?.licensePreset || '',
           priceLkr: item?.meta?.priceLkr ?? null,
@@ -395,7 +471,8 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(createResp)
-      if (!createResp.ok) throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
+      if (!createResp.ok)
+        throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
 
       photoId = json.photoId
       uploadUrl = json.uploadUrl
@@ -429,7 +506,8 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(commitResp)
-      if (!commitResp.ok) throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
+      if (!commitResp.ok)
+        throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
 
       log('✅ Done: commit complete')
       log(`thumbUrl: ${json?.thumbUrl || json?.thumb_url || '(none)'}`)
@@ -443,7 +521,9 @@ export default function AdminUploadPage() {
     setPaused(true)
     log('⏸ Pausing… aborting active uploads')
     for (const [, xhr] of xhrMapRef.current.entries()) {
-      try { xhr.abort() } catch {}
+      try {
+        xhr.abort()
+      } catch {}
     }
   }
 
@@ -492,7 +572,14 @@ export default function AdminUploadPage() {
           next.map(async (it) => {
             try {
               await uploadSingleItem(it, token)
-              setItem(it.id, { status: 'DONE', error: '', errorType: '', progress: 100, speedBps: 0, etaSec: 0 })
+              setItem(it.id, {
+                status: 'DONE',
+                error: '',
+                errorType: '',
+                progress: 100,
+                speedBps: 0,
+                etaSec: 0,
+              })
             } catch (e) {
               const msg = e?.message || String(e)
 
@@ -501,7 +588,13 @@ export default function AdminUploadPage() {
                 return
               }
 
-              setItem(it.id, { status: 'ERROR', error: msg, errorType: e?._type || 'UNKNOWN', speedBps: 0, etaSec: 0 })
+              setItem(it.id, {
+                status: 'ERROR',
+                error: msg,
+                errorType: e?._type || 'UNKNOWN',
+                speedBps: 0,
+                etaSec: 0,
+              })
               log(`❌ Failed: ${it.file.name} — ${msg}`)
             }
           })
@@ -538,7 +631,7 @@ export default function AdminUploadPage() {
       <main style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px' }}>
         <h1 style={{ margin: 0 }}>Admin Upload</h1>
         <p style={{ opacity: 0.8, marginTop: 8 }}>
-          Drag & drop + folder upload + auto title/tags + bulk preset defaults.
+          Drag & drop + folder upload + auto title/tags + manual tag editor + bulk preset defaults.
         </p>
 
         {!session ? (
@@ -669,6 +762,34 @@ export default function AdminUploadPage() {
 
                 <div style={{ fontSize: 12, opacity: 0.7 }}>
                   Defaults: personal 2500/8 • editorial 4000/13 • commercial 7500/25
+                </div>
+              </div>
+
+              {/* ✅ Bulk tag helpers */}
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 8 }}>
+                  Quick add a tag to all queued items:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {COLLECTION_TAGS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => applyBulkTag(t)}
+                      disabled={busy || queue.length === 0}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        borderRadius: 999,
+                        border: '1px solid rgba(245,244,244,0.18)',
+                        background: 'transparent',
+                        cursor: busy ? 'not-allowed' : 'pointer',
+                        opacity: busy ? 0.6 : 1,
+                      }}
+                    >
+                      {t}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -831,7 +952,9 @@ export default function AdminUploadPage() {
 
                             {it.status === 'ERROR' && !busy && (
                               <button
-                                onClick={() => setItem(it.id, { status: 'QUEUED', error: '', errorType: '', progress: 0 })}
+                                onClick={() =>
+                                  setItem(it.id, { status: 'QUEUED', error: '', errorType: '', progress: 0 })
+                                }
                                 style={{
                                   padding: '2px 8px',
                                   fontSize: 11,
@@ -879,11 +1002,58 @@ export default function AdminUploadPage() {
                           <div>
                             <strong>Title:</strong> {it?.meta?.title || '(auto)'}
                           </div>
-                          <div>
-                            <strong>Tags:</strong>{' '}
-                            {(it?.meta?.tags || []).length ? it.meta.tags.slice(0, 10).join(', ') : '(auto)'}
+
+                          {/* ✅ Manual tags editor + quick toggles */}
+                          <div style={{ marginTop: 6 }}>
+                            <strong>Tags:</strong>
+
+                            <input
+                              type="text"
+                              value={normalizeTags(it?.meta?.tags || []).join(', ')}
+                              onChange={(e) => {
+                                const tags = normalizeTags(e.target.value)
+                                setItem(it.id, { meta: { ...(it.meta || {}), tags } })
+                              }}
+                              style={{ width: '100%', marginTop: 4, padding: 6, fontSize: 12 }}
+                              placeholder="nature, travel, fineart"
+                              disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
+                            />
+
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                              {COLLECTION_TAGS.map((t) => {
+                                const active = normalizeTags(it?.meta?.tags || []).includes(t)
+                                return (
+                                  <button
+                                    key={t}
+                                    type="button"
+                                    onClick={() => {
+                                      const current = new Set(normalizeTags(it?.meta?.tags || []))
+                                      if (current.has(t)) current.delete(t)
+                                      else current.add(t)
+                                      setItem(it.id, {
+                                        meta: { ...(it.meta || {}), tags: Array.from(current) },
+                                      })
+                                    }}
+                                    disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
+                                    style={{
+                                      fontSize: 11,
+                                      padding: '3px 8px',
+                                      borderRadius: 999,
+                                      border: '1px solid rgba(245,244,244,0.2)',
+                                      background: active ? 'rgba(245,244,244,0.25)' : 'transparent',
+                                      cursor: 'pointer',
+                                      opacity:
+                                        busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING') ? 0.6 : 1,
+                                    }}
+                                  >
+                                    {t}
+                                  </button>
+                                )
+                              })}
+                            </div>
                           </div>
-                          <div>
+
+                          <div style={{ marginTop: 8 }}>
                             <strong>Preset:</strong> {it?.meta?.licensePreset || licensePreset} • LKR{' '}
                             {it?.meta?.priceLkr ?? priceLkr} • USD {it?.meta?.priceUsd ?? priceUsd}
                           </div>
