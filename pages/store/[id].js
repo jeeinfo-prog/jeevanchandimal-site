@@ -319,21 +319,36 @@ export default function StoreDetail() {
             </div>
 
             {/* SIMILAR */}
-            {similar.length > 0 && (
-              <section className="relBlock">
-                <h2>Similar images</h2>
-                <div className="relGrid">
-                  {similar.map((p) => (
-                    <Link key={p.id} href={`/store/${p.id}`}>
-                      <a className="relCard">
-                        <img src={p.thumb_url} alt={p.title} />
-                        <div className="relName">{p.title}</div>
-                      </a>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
+    {similar.length > 0 && (
+  <section className="relBlock">
+    <div className="relHead">
+      <h2>Similar images</h2>
+      <Link href={`/store?tag=${photo.tags?.[0] || ''}`}>
+        <a className="seeAll">See all</a>
+      </Link>
+    </div>
+
+    <div className="relGrid">
+      {similar.map((p) => (
+        <Link key={p.id} href={`/store/${p.id}`}>
+          <a className="relCard">
+            <div className="relThumb">
+              <img src={p.thumb_url} alt={p.title || 'Photo'} />
+              <div className="relWm" />
+            </div>
+
+            <div className="relMeta">
+              <div className="relName">{p.title || 'Untitled'}</div>
+              <div className="relTag">
+                {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+              </div>
+            </div>
+          </a>
+        </Link>
+      ))}
+    </div>
+  </section>
+)}
 
             {/* RECOMMENDED */}
             {recommended.length > 0 && (
@@ -481,6 +496,80 @@ export default function StoreDetail() {
   width: 100%;
   border-radius: 10px;
 }
+  .relHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.seeAll {
+  font-size: 12px;
+  opacity: 0.75;
+  text-decoration: none;
+}
+
+.relGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.relCard {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.18s ease;
+}
+
+.relCard:hover {
+  transform: translateY(-4px);
+}
+
+.relThumb {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.relThumb img {
+  width: 100%;
+  aspect-ratio: 16/10;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s ease;
+}
+
+.relCard:hover .relThumb img {
+  transform: scale(1.06);
+}
+
+/* watermark on thumbnails */
+.relWm {
+  position: absolute;
+  inset: 0;
+  background-image: url('/watermark-logo/watermark-logo.png');
+  background-repeat: repeat;
+  background-size: 140px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.relMeta {
+  margin-top: 6px;
+}
+
+.relName {
+  font-size: 13px;
+  line-height: 1.3;
+  opacity: 0.95;
+}
+
+.relTag {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
 `}</style>
     </>
   )
