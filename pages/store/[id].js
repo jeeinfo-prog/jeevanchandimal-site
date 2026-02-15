@@ -3,6 +3,7 @@ import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
@@ -28,99 +29,138 @@ function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
 
+async function safeJson(resp) {
+  const text = await resp.text()
+  try {
+    return { json: JSON.parse(text), text }
+  } catch {
+    return { json: null, text }
+  }
+}
+
 export default function StoreDetail() {
   const router = useRouter()
   const id = typeof router.query.id === 'string' ? router.query.id : ''
 
-  const [photo, setPhoto] = React.useState(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
+  const [photo, setPhoto] = React.useState(null)
 
   const [currency, setCurrency] = React.useState('LKR')
   const [license, setLicense] = React.useState('personal')
   const [format, setFormat] = React.useState('jpg')
-
-  const [email, setEmail] = React.useState('')
-  const [firstName, setFirstName] = React.useState('')
-  const [lastName, setLastName] = React.useState('')
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
 
   const [variant, setVariant] = React.useState('standard')
   const [zoomOpen, setZoomOpen] = React.useState(false)
 
+  const [email, setEmail] = React.useState('')
+  const [firstName, setFirstName] = React.useState('')
+  const [lastName, setLastName] = React.useState('')
+
   const [similar, setSimilar] = React.useState([])
   const [recommended, setRecommended] = React.useState([])
-  const [recLoading, setRecLoading] = React.useState(false)
-
-  const previewSrc = photo?.id
-    ? `/api/photo/${photo.id}/preview?variant=${variant}`
-    : ''
-
-  const firstTag = (photo?.tags || []).find(Boolean) || ''
 
   React.useEffect(() => {
-    if (!id) return
+    if (!router.isReady || !id) return
+
+    let alive = true
+
     async function run() {
       try {
         setLoading(true)
-        const r = await fetch(`/api/store/photo?id=${id}`)
-        const data = await r.json()
-        if (!data?.ok) throw new Error(data?.error || 'Failed')
+        setError('')
+
+        const r = await fetch(`/api/store/photo?id=${encodeURIComponent(id)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        })
+
+        const { json, text } = await safeJson(r)
+        if (!alive) return
+
+        if (!r.ok || !json?.ok) {
+          setError(json?.error || text || 'Failed to load photo')
+          setLoading(false)
+          return
+        }
+
+        const row = json.photo
 
         setPhoto({
-  id: row.id,
-  title: row.title || 'Untitled',
-  description: row.description || '',
-  tags: Array.isArray(row.tags) ? row.tags : [],
-  thumbUrl: row.thumb_url,
-  previewUrl: row.preview_url,
-  createdAt: row.created_at,
-})
+          id: row.id,
+          title: row.title || 'Untitled',
+          description: row.description || '',
+          tags: Array.isArray(row.tags) ? row.tags : [],
+          thumbUrl: row.thumb_url,
+          previewUrl: row.preview_url,
+          createdAt: row.created_at,
+        })
 
-      } catch (e) {
+        setLoading(false)
+      } catch {
+        if (!alive) return
         setError('Failed to load photo')
-      } finally {
         setLoading(false)
       }
     }
+
     run()
-  }, [id])
+    return () => {
+      alive = false
+    }
+  }, [router.isReady, id])
 
   React.useEffect(() => {
     if (!photo?.id) return
+
     async function run() {
-      setRecLoading(true)
       try {
-        const s = await fetch(`/api/store/similar?id=${photo.id}&limit=6`).then((x) => x.json())
-        const similarList = Array.isArray(s?.photos) ? s.photos : []
-        setSimilar(similarList)
+        const s = await fetch(`/api/store/similar?id=${photo.id}&limit=6`).then((r) => r.json())
+        setSimilar(Array.isArray(s?.photos) ? s.photos : [])
 
-        const similarIds = similarList.map((p) => p.id).join(',')
-        const r = await fetch(
-          `/api/store/recommended?excludeId=${photo.id}&similarIds=${similarIds}&limit=6`
-        ).then((x) => x.json())
-
+        const r = await fetch(`/api/store/recommended?excludeId=${photo.id}&limit=6`).then((r) => r.json())
         setRecommended(Array.isArray(r?.photos) ? r.photos : [])
       } catch {
         setSimilar([])
         setRecommended([])
-      } finally {
-        setRecLoading(false)
       }
     }
+
     run()
   }, [photo?.id])
 
+  React.useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Escape') setZoomOpen(false)
+    }
+    if (zoomOpen) {
+      window.addEventListener('keydown', onKey)
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        window.removeEventListener('keydown', onKey)
+        document.body.style.overflow = prev
+      }
+    }
+  }, [zoomOpen])
+
+  function preventSave(e) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   async function startCheckout() {
     if (!photo) return
-    if (!isValidEmail(email)) {
+
+    const em = String(email || '').trim().toLowerCase()
+    if (!isValidEmail(em)) {
       alert('Please enter a valid email')
       return
     }
 
-    setIsCheckingOut(true)
-
     try {
+      setIsCheckingOut(true)
+
       const r = await fetch('/api/payhere/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,14 +169,17 @@ export default function StoreDetail() {
           license,
           format,
           currency,
-          email,
+          email: em,
           firstName: firstName || 'Customer',
           lastName: lastName || 'Guest',
         }),
       })
 
       const data = await r.json()
-      if (!data?.actionUrl) throw new Error('Checkout init failed')
+      if (!r.ok || !data?.actionUrl || !data?.fields) {
+        alert(data?.error || 'Checkout failed')
+        return
+      }
 
       const form = document.createElement('form')
       form.method = 'POST'
@@ -146,7 +189,7 @@ export default function StoreDetail() {
         const input = document.createElement('input')
         input.type = 'hidden'
         input.name = k
-        input.value = v
+        input.value = String(v ?? '')
         form.appendChild(input)
       })
 
@@ -159,178 +202,146 @@ export default function StoreDetail() {
     }
   }
 
-  const price = PRICES[currency][license][format]
+  const price = PRICES?.[currency]?.[license]?.[format] ?? 0
+  const previewSrc = photo?.id ? `/api/photo/${photo.id}/preview?variant=${variant}` : ''
 
-  if (loading) return <div className="wrap">Loading…</div>
-  if (error) return <div className="wrap">{error}</div>
+  const popularTerms = Array.from(
+    new Set([...(photo?.tags || []), 'Portrait', 'Nature', 'Travel', 'Night', 'Animals'])
+  ).slice(0, 10)
 
   return (
     <>
       <Head>
-        <title>{photo.title} | Store</title>
-        <meta name="description" content={photo.description || 'Licensable photograph'} />
+        <title>{photo?.title ? `${photo.title} | Store` : 'Photo | Store'}</title>
+        <meta name="description" content={photo?.description || 'Licensable photograph'} />
 
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'ImageObject',
-              contentUrl: previewSrc,
-              name: photo.title,
-              description: photo.description,
-              creditText: 'Jeevan Chandimal',
-              creator: { '@type': 'Person', name: 'Jeevan Chandimal' },
-              license: `${process.env.NEXT_PUBLIC_SITE_URL}/license`,
-              acquireLicensePage: `${process.env.NEXT_PUBLIC_SITE_URL}/store/${photo.id}`,
-            }),
-          }}
-        />
+        {photo && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'ImageObject',
+                contentUrl: previewSrc,
+                name: photo.title,
+                description: photo.description || 'Licensable photograph by Jeevan Chandimal',
+                creator: { '@type': 'Person', name: 'Jeevan Chandimal' },
+                license: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/license`,
+                acquireLicensePage: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/store/${photo.id}`,
+              }),
+            }}
+          />
+        )}
       </Head>
 
       <JeevanChandimalNavi />
 
       <main className="wrap">
-        <div className="layout">
-          {/* IMAGE */}
-          <section className="imageCard">
-            <div className="imageFrame">
-              <img src={previewSrc} alt={photo.title} />
-              <div className={`wmTile wmTile-${variant}`} />
-            </div>
+        {loading && <div className="state">Loading…</div>}
+        {!loading && error && <div className="state">❌ {error}</div>}
 
-            <div className="tags">
-              {photo.tags.map((t) => (
-                <Link key={t} href={`/store?tag=${t}`}>
-                  <a className="tag">{t}</a>
-                </Link>
-              ))}
-            </div>
+        {!loading && !error && photo && (
+          <>
+            <div className="layout">
+              <div className="imageCard">
+                <img src={previewSrc} alt={photo.title} onContextMenu={preventSave} />
 
-            <div className="imgDetails">
-              <div className="imgDesc">{photo.description}</div>
-              <div className="imgMetaRow">
-                <span>ID: {photo.id}</span>
-                <span>•</span>
-                <span>{new Date(photo.createdAt).toLocaleDateString()}</span>
-                <span>•</span>
-                <span>{photo.tags.length} tags</span>
+                <div className="wmTile" />
+
+                <button className="zoomBtn" onClick={() => setZoomOpen(true)}>
+                  Zoom
+                </button>
+              </div>
+
+              <div className="buyCard">
+                <h1>{photo.title}</h1>
+
+                <div className="priceRow">
+                  <span>{formatMoney(currency, price)}</span>
+                  <span>Instant download</span>
+                </div>
+
+                <button onClick={startCheckout} disabled={isCheckingOut}>
+                  {isCheckingOut ? 'Working…' : 'Buy license'}
+                </button>
               </div>
             </div>
-          </section>
 
-          {/* BUY CARD */}
-          <aside className="buyCard">
-            <h1>{photo.title}</h1>
-            <p className="sub">Choose license + format</p>
-            <p className="photoDesc">{photo.description}</p>
-
-            <input
-              className="field"
-              placeholder="Email for receipt + download"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-
-            <div className="row2">
-              <input
-                className="field"
-                placeholder="First name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-              <input
-                className="field"
-                placeholder="Last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-
-            <div className="priceRow">
-              <span className="price">{formatMoney(currency, price)}</span>
-              <span className="small">Instant digital download</span>
-            </div>
-
-            <button className="buyBtn" onClick={startCheckout} disabled={isCheckingOut}>
-              {isCheckingOut ? 'Working…' : 'Buy license'}
-            </button>
-          </aside>
-        </div>
-
-        {/* FULL WIDTH RELATED SECTIONS */}
-        <section className="fullRel">
-          {similar.length > 0 && (
-            <div className="fullRelBlock">
-              <h2>Similar images</h2>
-              <div className="fullRelGrid">
-                {similar.map((p) => (
-                  <Link key={p.id} href={`/store/${p.id}`}>
-                    <a className="fullRelCard">
-                      <div className="relThumb">
+            {similar.length > 0 && (
+              <section className="relBlock">
+                <h2>Similar images</h2>
+                <div className="relGrid">
+                  {similar.map((p) => (
+                    <Link key={p.id} href={`/store/${p.id}`}>
+                      <a>
                         <img src={p.thumb_url} alt={p.title} />
-                        <div className="relWm" />
-                      </div>
-                      <div className="relName">{p.title}</div>
-                    </a>
+                        <div>{p.title}</div>
+                      </a>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {recommended.length > 0 && (
+              <section className="relBlock">
+                <h2>Recommended for you</h2>
+                <div className="relGrid">
+                  {recommended.map((p) => (
+                    <Link key={p.id} href={`/store/${p.id}`}>
+                      <a>
+                        <img src={p.thumb_url} alt={p.title} />
+                        <div>{p.title}</div>
+                      </a>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="relBlock">
+              <h2>Try a popular search</h2>
+              <div className="chips">
+                {popularTerms.map((t) => (
+                  <Link key={t} href={`/store?tag=${t}`}>
+                    <a className="chip">{t}</a>
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
-
-          {recommended.length > 0 && (
-            <div className="fullRelBlock">
-              <h2>Recommended for you</h2>
-              <div className="fullRelGrid">
-                {recommended.map((p) => (
-                  <Link key={p.id} href={`/store/${p.id}`}>
-                    <a className="fullRelCard">
-                      <div className="relThumb">
-                        <img src={p.thumb_url} alt={p.title} />
-                        <div className="relWm" />
-                      </div>
-                      <div className="relName">{p.title}</div>
-                    </a>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {firstTag && similar.length > 0 && (
-            <div className="fullRelBlock">
-              <h2>More from #{firstTag}</h2>
-              <div className="fullRelGrid">
-                {similar.slice(0, 6).map((p) => (
-                  <Link key={p.id} href={`/store/${p.id}`}>
-                    <a className="fullRelCard">
-                      <div className="relThumb">
-                        <img src={p.thumb_url} alt={p.title} />
-                        <div className="relWm" />
-                      </div>
-                      <div className="relName">{p.title}</div>
-                    </a>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="fullRelBlock">
-            <h2>Curated collections</h2>
-            <div className="chipRow">
-              {['Nature', 'Portrait', 'Wildlife', 'Travel', 'Night', 'Macro'].map((c) => (
-                <Link key={c} href={`/store?tag=${c}`}>
-                  <a className="chip">📁 {c}</a>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
+            </section>
+          </>
+        )}
       </main>
 
+      {zoomOpen && (
+        <div className="zoomModal" onClick={() => setZoomOpen(false)}>
+          <img src={previewSrc} alt={photo.title} />
+        </div>
+      )}
+
       <JeevanChandimalNewFooter />
+
+      <style jsx>{`
+        .layout { display: grid; grid-template-columns: 1.4fr 0.6fr; gap: 20px; }
+        .imageCard { position: relative; }
+        .imageCard img { width: 100%; border-radius: 14px; }
+        .wmTile {
+          position: absolute;
+          inset: 0;
+          background-image: url('/watermark-logo/watermark-logo.png');
+          background-repeat: repeat;
+          background-size: 220px;
+          opacity: 0.08;
+          pointer-events: none;
+        }
+        .zoomBtn { position: absolute; top: 12px; right: 12px; }
+        .relGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .relGrid img { width: 100%; border-radius: 10px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip { border: 1px solid #ccc; padding: 6px 10px; border-radius: 999px; }
+        .zoomModal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; }
+        .zoomModal img { max-width: 90%; border-radius: 14px; }
+      `}</style>
     </>
   )
 }
