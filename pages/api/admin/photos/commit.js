@@ -2,7 +2,6 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
-import exifReader from 'exif-reader'
 
 export const config = {
   api: { bodyParser: { sizeLimit: '2mb' } },
@@ -67,20 +66,75 @@ function makeWatermarkSvg({ w, h, text, fontSize, opacity, align = 'center' }) {
   )
 }
 
-// GPS helper (EXIF usually gives [deg, min, sec] + ref)
-function dmsToDecimal(dms, ref) {
-  if (!Array.isArray(dms) || dms.length < 3) return null
-  const [deg, min, sec] = dms
-  const dec = Number(deg) + Number(min) / 60 + Number(sec) / 3600
-  if (!Number.isFinite(dec)) return null
-  const sign = ref === 'S' || ref === 'W' ? -1 : 1
-  return dec * sign
+function basenameFromKey(key) {
+  const s = String(key || '').replace(/\\/g, '/')
+  const base = s.split('/').pop() || s
+  return base
+}
+
+function stripExt(name) {
+  const n = String(name || '')
+  const i = n.lastIndexOf('.')
+  return i > 0 ? n.slice(0, i) : n
+}
+
+function extractLocationFromFilenameLike(filenameLike) {
+  // filenameLike might be "history-cave-temple-dambulla-sri-lanka__JC000108.jpeg"
+  const base = stripExt(basenameFromKey(filenameLike))
+    .replace(/__.+$/, '') // remove __JC000123 etc
+    .toLowerCase()
+
+  const tokens = base
+    .replace(/[_]+/g, '-') // underscores to hyphen
+    .split(/[-\s]+/g)
+    .filter(Boolean)
+
+  // Sri Lanka normalization
+  const hasSri = tokens.includes('sri')
+  const hasLanka = tokens.includes('lanka') || tokens.includes('srilanka')
+  const country = hasSri && hasLanka ? 'Sri Lanka' : tokens.includes('srilanka') ? 'Sri Lanka' : null
+
+  // Add your common city/area list here (expand anytime)
+  const cities = [
+    'colombo',
+    'kandy',
+    'galle',
+    'dambulla',
+    'sigiriya',
+    'yala',
+    'wilpattu',
+    'ampara',
+    'wellawaya',
+    'hatton',
+    'batticaloa',
+    'koslanda',
+    'kalupahana',
+    'rangiri',
+    'senanayaka',
+    'samudraya',
+    'buduruwagala',
+  ]
+
+  const cityToken = cities.find((c) => tokens.includes(c)) || null
+  const city = cityToken ? cityToken[0].toUpperCase() + cityToken.slice(1) : null
+
+  return {
+    location_country: country,
+    location_city: city,
+    location_name: country && city ? `${city}, ${country}` : country || city || null,
+  }
+}
+
+function isUnknownColumn(err) {
+  const msg = (err?.message || '').toLowerCase()
+  return err?.code === '42703' || msg.includes('does not exist') || msg.includes('schema cache')
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
+    // ---------- ENV CHECK ----------
     const requiredEnv = [
       'NEXT_PUBLIC_SUPABASE_URL',
       'SUPABASE_SERVICE_ROLE_KEY',
@@ -91,11 +145,11 @@ export default async function handler(req, res) {
       'NEXT_PUBLIC_SITE_URL',
     ]
     const missing = requiredEnv.filter((k) => !process.env[k])
-    if (missing.length) return res.status(500).json({ ok: false, error: 'Missing env vars', missing })
+    if (missing.length) return res.status(500).json({ ok: false, error: 'Missing environment variables', missing })
 
     const supabaseAdmin = createClient(must('NEXT_PUBLIC_SUPABASE_URL'), must('SUPABASE_SERVICE_ROLE_KEY'))
 
-    // ✅ Protect commit endpoint
+    // ✅ Admin check
     const admin = await requireAdmin(req, supabaseAdmin)
     if (!admin.ok) return res.status(admin.status).json({ ok: false, error: admin.error })
 
@@ -114,6 +168,7 @@ export default async function handler(req, res) {
     const { photoId } = req.body || {}
     if (!photoId) return res.status(400).json({ ok: false, error: 'photoId required' })
 
+    // ---------- FETCH PHOTO ----------
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, original_jpg_key, original_raw_key')
@@ -123,61 +178,21 @@ export default async function handler(req, res) {
     if (photoErr || !photo) return res.status(400).json({ ok: false, error: photoErr?.message || 'Photo not found' })
 
     const originalKey = photo.original_jpg_key || photo.original_raw_key
-    if (!originalKey) return res.status(400).json({ ok: false, error: 'No original key found' })
+    if (!originalKey) return res.status(400).json({ ok: false, error: 'No original key found in photos row' })
 
-    // Download
+    // ---------- DOWNLOAD ORIGINAL ----------
     const getObj = await s3.send(new GetObjectCommand({ Bucket: must('R2_BUCKET'), Key: originalKey }))
-    if (!getObj?.Body) return res.status(500).json({ ok: false, error: 'R2 GetObject empty body' })
+    if (!getObj?.Body) return res.status(500).json({ ok: false, error: 'R2 GetObject returned empty Body' })
     const originalBuffer = await streamToBuffer(getObj.Body)
 
-    // ✅ Extract EXIF (best-effort)
-    let exif = null
-    let exifPatch = {}
-    try {
-      const meta0 = await sharp(originalBuffer, { failOn: 'none' }).metadata()
-      if (meta0?.exif) {
-        exif = exifReader(meta0.exif)
-        const make = exif?.image?.Make
-        const model = exif?.image?.Model
-        const lens = exif?.exif?.LensModel || exif?.exif?.LensMake
-        const iso = exif?.exif?.ISOSpeedRatings
-        const fnum = exif?.exif?.FNumber
-        const shutter = exif?.exif?.ExposureTime
-        const focal = exif?.exif?.FocalLength
-        const dt = exif?.exif?.DateTimeOriginal
-
-        // GPS
-        const lat = dmsToDecimal(exif?.gps?.GPSLatitude, exif?.gps?.GPSLatitudeRef)
-        const lng = dmsToDecimal(exif?.gps?.GPSLongitude, exif?.gps?.GPSLongitudeRef)
-
-        exifPatch = {
-          exif_json: exif,
-          camera_make: make || null,
-          camera_model: model || null,
-          lens_model: lens || null,
-          iso: typeof iso === 'number' ? iso : Array.isArray(iso) ? iso[0] : null,
-          aperture_f: typeof fnum === 'number' ? fnum : null,
-          shutter: shutter ? String(shutter) : null,
-          focal_length_mm: typeof focal === 'number' ? focal : null,
-          taken_at: dt ? new Date(dt).toISOString() : null,
-          gps_lat: typeof lat === 'number' ? lat : null,
-          gps_lng: typeof lng === 'number' ? lng : null,
-          country: 'Sri Lanka', // ✅ safe default for your catalog
-        }
-      }
-    } catch {
-      // ignore EXIF errors
-      exifPatch = { country: 'Sri Lanka' }
-    }
-
-    // Thumb
+    // ---------- THUMB ----------
     const thumbBuffer = await sharp(originalBuffer, { failOn: 'none' })
       .rotate()
       .resize(600, 450, { fit: 'cover', position: 'attention' })
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer()
 
-    // Preview base
+    // ---------- PREVIEW BASE ----------
     const basePreviewBuffer = await sharp(originalBuffer, { failOn: 'none' })
       .rotate()
       .resize({ width: 2000, withoutEnlargement: true })
@@ -187,9 +202,50 @@ export default async function handler(req, res) {
     const meta = await sharp(basePreviewBuffer).metadata()
     const W = meta.width
     const H = meta.height
-    if (!W || !H) return res.status(400).json({ ok: false, error: 'Invalid preview metadata' })
+    if (!W || !H) return res.status(400).json({ ok: false, error: 'Invalid preview metadata after resize' })
 
-    // Watermarks
+    // ---------- EXIF ----------
+    // 1) store raw exif as base64 (always works if present)
+    const exif_base64 = meta?.exif ? Buffer.from(meta.exif).toString('base64') : null
+
+    // 2) best-effort parsed exif (only if exif-reader is installed)
+    let exif_parsed = null
+    if (meta?.exif) {
+      try {
+        const exifReaderMod = await import('exif-reader')
+        const exifReader = exifReaderMod?.default || exifReaderMod
+        const parsed = exifReader(meta.exif)
+
+        // Keep it small + safe (don’t store huge nested blobs)
+        exif_parsed = {
+          Make: parsed?.image?.Make || null,
+          Model: parsed?.image?.Model || null,
+          LensModel: parsed?.exif?.LensModel || null,
+          DateTimeOriginal: parsed?.exif?.DateTimeOriginal || null,
+          ISO: parsed?.exif?.ISO || null,
+          FNumber: parsed?.exif?.FNumber || null,
+          ExposureTime: parsed?.exif?.ExposureTime || null,
+          FocalLength: parsed?.exif?.FocalLength || null,
+        }
+      } catch {
+        // exif-reader not installed OR parse failed → still ok
+        exif_parsed = null
+      }
+    }
+
+    const exifData = exif_base64 || exif_parsed
+      ? {
+          exif_base64,
+          exif: exif_parsed,
+          image: {
+            width: W,
+            height: H,
+            format: meta.format || null,
+          },
+        }
+      : null
+
+    // ---------- WATERMARKS ----------
     const text = 'jeevanchandimal.com'
     const fontStandard = Math.max(28, Math.round(W * 0.04))
     const fontStrong = Math.max(34, Math.round(W * 0.05))
@@ -214,13 +270,13 @@ export default async function handler(req, res) {
       .jpeg({ quality: 84, mozjpeg: true })
       .toBuffer()
 
-    // Keys
+    // ---------- R2 KEYS ----------
     const thumbKey = `photos/thumb/${photoId}.jpg`
     const previewKey = `photos/preview/${photoId}.jpg`
     const previewStrongKey = `photos/preview_wm-strong/${photoId}.jpg`
     const previewCornerKey = `photos/preview_wm-corner/${photoId}.jpg`
 
-    // Upload
+    // ---------- UPLOAD ----------
     const uploads = [
       { key: thumbKey, body: thumbBuffer },
       { key: previewKey, body: previewStandard },
@@ -240,22 +296,42 @@ export default async function handler(req, res) {
       )
     }
 
-    // Update DB (don’t overwrite title/tags/description)
+    // ---------- URLS ----------
     const base = must('NEXT_PUBLIC_SITE_URL').replace(/\/$/, '')
     const thumb_url = `${base}/api/photo/${photoId}/thumb`
     const preview_url = `${base}/api/photo/${photoId}/preview`
 
-    const { error: updateErr } = await supabaseAdmin
-      .from('photos')
-      .update({
-        preview_url,
-        thumb_url,
-        status: 'published',
-        ...exifPatch, // ✅ store EXIF + gps + country
-      })
-      .eq('id', photoId)
+    // ---------- LOCATION from originalKey filename ----------
+    const loc = extractLocationFromFilenameLike(originalKey)
 
-    if (updateErr) return res.status(400).json({ ok: false, error: updateErr.message })
+    // ---------- UPDATE DB (safe: won't overwrite title/tags/description) ----------
+    const updatePayload = {
+      preview_url,
+      thumb_url,
+      status: 'published',
+    }
+
+    // Only add if columns exist in your DB
+    if (exifData) updatePayload.exif = exifData
+    if (loc?.location_country) updatePayload.location_country = loc.location_country
+    if (loc?.location_city) updatePayload.location_city = loc.location_city
+    if (loc?.location_name) updatePayload.location_name = loc.location_name
+
+    const up = await supabaseAdmin.from('photos').update(updatePayload).eq('id', photoId)
+
+    if (up.error) {
+      // If your table doesn't have exif/location columns yet, fallback to minimal update
+      if (isUnknownColumn(up.error)) {
+        const fallback = await supabaseAdmin
+          .from('photos')
+          .update({ preview_url, thumb_url, status: 'published' })
+          .eq('id', photoId)
+
+        if (fallback.error) return res.status(400).json({ ok: false, error: fallback.error.message })
+      } else {
+        return res.status(400).json({ ok: false, error: up.error.message })
+      }
+    }
 
     return res.status(200).json({
       ok: true,
@@ -267,7 +343,8 @@ export default async function handler(req, res) {
       previewUrl: preview_url,
       keys: { thumbKey, previewKey, previewStrongKey, previewCornerKey },
       meta: { width: W, height: H },
-      exifStored: !!exif,
+      exif: exifData ? { hasExif: !!meta?.exif } : { hasExif: false },
+      location: loc,
     })
   } catch (err) {
     console.error('commit error:', err)

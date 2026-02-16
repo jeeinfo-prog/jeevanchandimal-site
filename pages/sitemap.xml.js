@@ -1,109 +1,120 @@
 // pages/sitemap.xml.js
-import { createClient } from '@supabase/supabase-js'
+
+import { supabaseAdmin } from '../lib/supabaseAdmin'
 
 export async function getServerSideProps({ res }) {
   const siteUrl = 'https://jeevanchandimal.com'
   const wpBase = process.env.NEXT_PUBLIC_WP_BASE_URL
 
-  // ✅ Only allow REAL collection pages here (avoid thin/keyword-spam pages)
-  const COLLECTION_TAGS = [
-    'sri-lanka',
-    'nature',
-    'wildlife',
+  // ✅ Only allow high-value collections in sitemap
+  const ALLOWED_COLLECTIONS = [
     'landscape',
-    'travel',
+    'wildlife',
+    'nature',
     'culture',
     'history',
     'lifestyle',
-    'fineart',
+    'sri-lanka',
+    'colombo',
+    'yala',
+    'wilpattu',
+    'dambulla',
+    'kandy',
+    'galle',
+    'sigiriya',
+    'ampara',
+    'wellawaya',
+    'batticaloa',
+    'hatton',
   ]
 
-  // WordPress posts
+  // --- 1) WordPress posts ---
   let posts = []
   try {
-    const response = await fetch(`${wpBase}/wp-json/wp/v2/posts?per_page=100`)
-    posts = await response.json()
+    const r = await fetch(`${wpBase}/wp-json/wp/v2/posts?per_page=100`)
+    posts = await r.json()
+    if (!Array.isArray(posts)) posts = []
   } catch {
     posts = []
   }
 
-  // ✅ Store photos (published) — include /store/<id> in sitemap
-  let photos = []
-  try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    )
+  const wpUrls = posts.map((post) => {
+    const lastmod = post?.modified ? new Date(post.modified).toISOString() : new Date().toISOString()
+    return `
+      <url>
+        <loc>${siteUrl}/project/${post.slug}</loc>
+        <lastmod>${lastmod}</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
+      </url>
+    `
+  })
 
+  // --- 2) Store photos ---
+  let storePhotos = []
+  try {
     const { data } = await supabaseAdmin
       .from('photos')
-      .select('id, created_at, updated_at')
+      .select('id, updated_at, created_at')
       .eq('status', 'published')
       .not('thumb_url', 'is', null)
       .not('preview_url', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(5000)
+      .limit(2000)
 
-    photos = data || []
+    storePhotos = Array.isArray(data) ? data : []
   } catch {
-    photos = []
+    storePhotos = []
   }
 
-  // Build URL entries
-  const baseUrls = [
-    { loc: `${siteUrl}`, changefreq: 'weekly', priority: '1.0' },
-    { loc: `${siteUrl}/store`, changefreq: 'weekly', priority: '0.9' },
-    { loc: `${siteUrl}/collections`, changefreq: 'weekly', priority: '0.85' },
-  ]
-
-  const collectionUrls = COLLECTION_TAGS.map((tag) => ({
-    loc: `${siteUrl}/collections/${encodeURIComponent(tag)}`,
-    changefreq: 'weekly',
-    priority: '0.75',
-  }))
-
-  const postUrls = (posts || [])
-    .filter((p) => p?.slug)
-    .map((post) => ({
-      loc: `${siteUrl}/project/${post.slug}`,
-      lastmod: post?.modified ? new Date(post.modified).toISOString() : null,
-      changefreq: 'monthly',
-      priority: '0.7',
-    }))
-
-  const photoUrls = (photos || [])
-    .filter((p) => p?.id)
-    .map((p) => ({
-      loc: `${siteUrl}/store/${p.id}`,
-      lastmod: (p.updated_at || p.created_at) ? new Date(p.updated_at || p.created_at).toISOString() : null,
-      changefreq: 'weekly',
-      priority: '0.8',
-    }))
-
-  const all = [
-    ...baseUrls,
-    ...collectionUrls,
-    ...postUrls,
-    ...photoUrls,
-  ]
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${all
-  .map((u) => {
-    const lastmod = u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''
-    return `<url>
-  <loc>${u.loc}</loc>
-  ${lastmod}
-  <changefreq>${u.changefreq}</changefreq>
-  <priority>${u.priority}</priority>
-</url>`
+  const storeUrls = storePhotos.map((p) => {
+    const lastmod = new Date(p.updated_at || p.created_at || Date.now()).toISOString()
+    return `
+      <url>
+        <loc>${siteUrl}/store/${p.id}</loc>
+        <lastmod>${lastmod}</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.85</priority>
+      </url>
+    `
   })
-  .join('\n')}
+
+  // --- 3) Collections (filtered) ---
+  const collectionUrls = ALLOWED_COLLECTIONS.map((tag) => `
+    <url>
+      <loc>${siteUrl}/collections/${tag}</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.75</priority>
+    </url>
+  `)
+
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${siteUrl}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <url>
+    <loc>${siteUrl}/store</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>${siteUrl}/collections</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  ${collectionUrls.join('')}
+  ${storeUrls.join('')}
+  ${wpUrls.join('')}
 </urlset>`
 
   res.setHeader('Content-Type', 'text/xml')
-  res.write(xml)
+  res.write(sitemap)
   res.end()
 
   return { props: {} }
