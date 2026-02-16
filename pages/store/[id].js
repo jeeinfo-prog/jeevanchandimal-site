@@ -18,11 +18,6 @@ const PRICES = {
     commercial: { jpg: 25, raw: 35 },
     editorial: { jpg: 13, raw: 20 },
   },
-  USD: {
-    personal: { jpg: 8, raw: 13 },
-    commercial: { jpg: 25, raw: 35 },
-    editorial: { jpg: 13, raw: 20 },
-  },
 }
 
 function formatMoney(currency, amount) {
@@ -82,6 +77,7 @@ function buildContentLocation(location) {
   }
 }
 
+// Extract width/height safely from any common EXIF keys
 function getImageDims(exif) {
   if (!exif) return { w: undefined, h: undefined }
   const w =
@@ -197,7 +193,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
 
-  // ✅ Client refresh (keeps reliability if data changes), but SSR already gives first paint + SEO.
+  // ✅ Client refresh for navigation or edge cases (SSR already gives first paint + SEO)
   React.useEffect(() => {
     if (!router.isReady || !id) return
 
@@ -298,19 +294,22 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
 
+  // Uses your preview API route
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
     : ''
 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
 
+  // ✅ SEO-safe canonical (never blank)
   const SITE_URL = 'https://jeevanchandimal.com'
   const canonicalId = photo?.id || id
   const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
 
-  // Social image should be PUBLIC + stable for crawlers/bots
+  // ✅ Social images should be PUBLIC and stable for bots
   const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
 
+  // ✅ Width/height for ImageObject / OG (if present)
   const { w: imgW, h: imgH } = getImageDims(photo?.exif)
 
   async function startCheckout() {
@@ -419,12 +418,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         {/* Canonical */}
         <link rel="canonical" href={canonicalUrl} />
 
-        {/* Preload main preview for faster LCP */}
+        {/* Preload main preview image for faster LCP */}
         {photo?.id && previewSrc ? (
           <link rel="preload" as="image" href={previewSrc} fetchPriority="high" />
         ) : null}
 
-        {/* JSON-LD */}
+        {/* JSON-LD Photograph schema */}
         {photo && (
           <script
             type="application/ld+json"
@@ -599,10 +598,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                         </div>
                       ) : null}
 
-                      {photo.exif?.dateTimeOriginal ? (
+                      {/* ✅ Use normalized field from your API */}
+                      {photo.exif?.takenAt ? (
                         <div>
-                          <strong>Taken:</strong>{' '}
-                          {formatExifDate(photo.exif.dateTimeOriginal)}
+                          <strong>Taken:</strong> {formatExifDate(photo.exif.takenAt)}
                         </div>
                       ) : null}
 
@@ -834,11 +833,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
             {/* ZOOM MODAL */}
             {zoomOpen && (
-              <div
-                className="zoomOverlay"
-                onMouseMove={onMouseMovePan}
-                onMouseUp={onMouseUpPan}
-              >
+              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
                 <div className="zoomTop">
                   <div className="zoomTitle">{photo.title}</div>
                   <div className="zoomActions">
@@ -1454,18 +1449,24 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 }
 
 export async function getServerSideProps(ctx) {
-  const id = String(ctx.params?.id || '').trim()
-  if (!id) {
+  const pid = String(ctx.params?.id || '').trim()
+  if (!pid) {
     return { props: { initialPhoto: null, initialError: 'Missing photo id' } }
   }
 
   try {
-    const proto =
-      (ctx.req.headers['x-forwarded-proto'] || 'https').toString().split(',')[0].trim()
-    const host = (ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '').toString()
-    const base = host ? `${proto}://${host}` : 'https://jeevanchandimal.com'
+    const proto = (ctx.req.headers['x-forwarded-proto'] || 'https')
+      .toString()
+      .split(',')[0]
+      .trim()
+    const host = (ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '')
+      .toString()
+      .split(',')[0]
+      .trim()
 
-    const url = `${base}/api/store/photo?id=${encodeURIComponent(id)}`
+    const base = host ? `${proto}://${host}` : 'https://jeevanchandimal.com'
+    const url = `${base}/api/store/photo?id=${encodeURIComponent(pid)}`
+
     const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
     const json = await r.json().catch(() => null)
 
@@ -1489,7 +1490,7 @@ export async function getServerSideProps(ctx) {
         initialError: '',
       },
     }
-  } catch (e) {
+  } catch {
     return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
   }
 }
