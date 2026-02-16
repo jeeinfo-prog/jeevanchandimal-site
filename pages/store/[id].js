@@ -18,6 +18,11 @@ const PRICES = {
     commercial: { jpg: 25, raw: 35 },
     editorial: { jpg: 13, raw: 20 },
   },
+  USD: {
+    personal: { jpg: 8, raw: 13 },
+    commercial: { jpg: 25, raw: 35 },
+    editorial: { jpg: 13, raw: 20 },
+  },
 }
 
 function formatMoney(currency, amount) {
@@ -77,7 +82,6 @@ function buildContentLocation(location) {
   }
 }
 
-// Extract width/height safely from any common EXIF keys
 function getImageDims(exif) {
   if (!exif) return { w: undefined, h: undefined }
   const w =
@@ -89,13 +93,34 @@ function getImageDims(exif) {
   return { w, h }
 }
 
-export default function StoreDetail() {
+// Normalize server/client API shapes into the same "photo" object used by this page.
+function normalizePhotoPayload(payload) {
+  const row = payload?.photo || payload
+  if (!row) return null
+
+  const cleanedThumb = String(row.thumb_url || row.thumbUrl || '').trim()
+  const cleanedPreview = String(row.preview_url || row.previewUrl || '').trim()
+
+  return {
+    id: row.id,
+    title: row.title || 'Untitled',
+    description: row.description || '',
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    thumbUrl: cleanedThumb || '',
+    previewUrl: cleanedPreview || '',
+    createdAt: row.created_at || row.createdAt || null,
+    location: row.location || 'Sri Lanka',
+    exif: row.exif || null,
+  }
+}
+
+export default function StoreDetail({ initialPhoto = null, initialError = '' }) {
   const router = useRouter()
   const id = typeof router.query.id === 'string' ? router.query.id : ''
 
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState('')
-  const [photo, setPhoto] = React.useState(null)
+  const [loading, setLoading] = React.useState(!initialPhoto && !initialError)
+  const [error, setError] = React.useState(initialError || '')
+  const [photo, setPhoto] = React.useState(initialPhoto)
 
   const [currency, setCurrency] = React.useState('LKR')
   const [license, setLicense] = React.useState('personal')
@@ -172,9 +197,12 @@ export default function StoreDetail() {
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
 
-  // ✅ Load photo details
+  // ✅ Client refresh (keeps reliability if data changes), but SSR already gives first paint + SEO.
   React.useEffect(() => {
     if (!router.isReady || !id) return
+
+    // If SSR already provided correct photo for this id, skip refetch.
+    if (photo?.id && photo.id === id) return
 
     let alive = true
 
@@ -191,30 +219,20 @@ export default function StoreDetail() {
         const { json, text } = await safeJson(r)
         if (!alive) return
 
-        if (!r.ok || !json?.ok || !json?.photo) {
+        if (!r.ok || !json?.ok) {
           setError(json?.error || text || 'Failed to load photo')
           setLoading(false)
           return
         }
 
-        const row = json.photo
+        const normalized = normalizePhotoPayload(json)
+        if (!normalized?.id) {
+          setError(json?.error || text || 'Failed to load photo')
+          setLoading(false)
+          return
+        }
 
-        // ✅ IMPORTANT FIX: Trim URLs (DB had newline breaks before)
-        const cleanedThumb = String(row.thumb_url || '').trim()
-        const cleanedPreview = String(row.preview_url || '').trim()
-
-        setPhoto({
-          id: row.id,
-          title: row.title || 'Untitled',
-          description: row.description || '',
-          tags: Array.isArray(row.tags) ? row.tags : [],
-          thumbUrl: cleanedThumb || '',
-          previewUrl: cleanedPreview || '',
-          createdAt: row.created_at,
-          location: row.location || 'Sri Lanka',
-          exif: row.exif || null,
-        })
-
+        setPhoto(normalized)
         setLoading(false)
       } catch {
         if (!alive) return
@@ -227,6 +245,7 @@ export default function StoreDetail() {
     return () => {
       alive = false
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, id])
 
   // ✅ Load similar + recommended
@@ -279,22 +298,19 @@ export default function StoreDetail() {
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
 
-  // Uses your preview API route
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
     : ''
 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
 
-  // ✅ SEO-safe canonical (never blank)
   const SITE_URL = 'https://jeevanchandimal.com'
   const canonicalId = photo?.id || id
   const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
 
-  // ✅ Social images should be PUBLIC and stable for bots
+  // Social image should be PUBLIC + stable for crawlers/bots
   const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
 
-  // ✅ Width/height for ImageObject / OG (if present)
   const { w: imgW, h: imgH } = getImageDims(photo?.exif)
 
   async function startCheckout() {
@@ -385,12 +401,8 @@ export default function StoreDetail() {
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="article" />
         {ogImage ? <meta property="og:image" content={ogImage} /> : null}
-        {ogImage && imgW ? (
-          <meta property="og:image:width" content={String(imgW)} />
-        ) : null}
-        {ogImage && imgH ? (
-          <meta property="og:image:height" content={String(imgH)} />
-        ) : null}
+        {ogImage && imgW ? <meta property="og:image:width" content={String(imgW)} /> : null}
+        {ogImage && imgH ? <meta property="og:image:height" content={String(imgH)} /> : null}
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
@@ -407,12 +419,12 @@ export default function StoreDetail() {
         {/* Canonical */}
         <link rel="canonical" href={canonicalUrl} />
 
-        {/* Preload main preview image for faster LCP */}
+        {/* Preload main preview for faster LCP */}
         {photo?.id && previewSrc ? (
           <link rel="preload" as="image" href={previewSrc} fetchPriority="high" />
         ) : null}
 
-        {/* JSON-LD Photograph schema */}
+        {/* JSON-LD */}
         {photo && (
           <script
             type="application/ld+json"
@@ -1439,4 +1451,45 @@ export default function StoreDetail() {
       `}</style>
     </>
   )
+}
+
+export async function getServerSideProps(ctx) {
+  const id = String(ctx.params?.id || '').trim()
+  if (!id) {
+    return { props: { initialPhoto: null, initialError: 'Missing photo id' } }
+  }
+
+  try {
+    const proto =
+      (ctx.req.headers['x-forwarded-proto'] || 'https').toString().split(',')[0].trim()
+    const host = (ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '').toString()
+    const base = host ? `${proto}://${host}` : 'https://jeevanchandimal.com'
+
+    const url = `${base}/api/store/photo?id=${encodeURIComponent(id)}`
+    const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
+    const json = await r.json().catch(() => null)
+
+    if (!r.ok || !json?.ok) {
+      return {
+        props: {
+          initialPhoto: null,
+          initialError: json?.error || 'Failed to load photo',
+        },
+      }
+    }
+
+    const normalized = normalizePhotoPayload(json)
+    if (!normalized?.id) {
+      return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
+    }
+
+    return {
+      props: {
+        initialPhoto: normalized,
+        initialError: '',
+      },
+    }
+  } catch (e) {
+    return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
+  }
 }
