@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   const shouldSave = String(req.query.save || '') === '1'
 
   try {
-    // 1) Get original_key from DB
+    // 1️⃣ Get original_key from DB
     const { data: row, error } = await supabaseAdmin
       .from('photos')
       .select('id, original_key')
@@ -24,23 +24,49 @@ export default async function handler(req, res) {
       return res.status(404).json({
         ok: false,
         error: 'original_key missing in DB',
-        hint: 'Store original_key during upload commit',
       })
     }
 
     const key = row.original_key
 
-    // 2) Fetch original file from R2
-    const buf = await r2GetObjectBuffer(key)
-    if (!buf) {
-      return res.status(404).json({ ok: false, error: 'Original not found in R2', key })
+    // 2️⃣ Fetch from R2
+    let buf
+    try {
+      buf = await r2GetObjectBuffer(key)
+    } catch (e) {
+      return res.status(500).json({
+        ok: false,
+        error: 'R2 fetch failed',
+        key,
+        message: String(e?.message || e),
+      })
     }
 
-    // 3) Extract EXIF
-    const exif = extractExifFromJpeg(buf) || null
+    if (!buf || !buf.length) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Empty file buffer',
+        key,
+      })
+    }
 
-    // 4) Optional save
-    if (shouldSave) {
+    // 3️⃣ Check file signature (JPEG should start with FF D8)
+    const isJpeg = buf[0] === 0xff && buf[1] === 0xd8
+
+    // 4️⃣ Extract EXIF safely
+    let exif = null
+    let exifError = null
+
+    if (isJpeg) {
+      try {
+        exif = extractExifFromJpeg(buf) || null
+      } catch (e) {
+        exifError = String(e?.message || e)
+      }
+    }
+
+    // 5️⃣ Optional save
+    if (shouldSave && exif) {
       await supabaseAdmin
         .from('photos')
         .update({
@@ -56,13 +82,14 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      id,
       key,
-      saved: shouldSave,
+      size: buf.length,
+      isJpeg,
       exif,
+      exifError,
     })
   } catch (e) {
     console.error(e)
-    return res.status(500).json({ ok: false, error: 'EXIF failed' })
+    return res.status(500).json({ ok: false, error: 'EXIF failed hard' })
   }
 }
