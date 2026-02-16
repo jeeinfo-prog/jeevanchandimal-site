@@ -52,6 +52,43 @@ function formatExifDate(exifDate) {
   return d.toLocaleString()
 }
 
+function buildContentLocation(location) {
+  const loc = String(location || '').trim()
+  if (!loc) {
+    return {
+      '@type': 'Place',
+      name: 'Sri Lanka',
+      address: { '@type': 'PostalAddress', addressCountry: 'Sri Lanka' },
+    }
+  }
+
+  const parts = loc.split(',').map((s) => s.trim()).filter(Boolean)
+  const locality = parts[0] || undefined
+  const country = parts[1] || 'Sri Lanka'
+
+  return {
+    '@type': 'Place',
+    name: loc,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: locality,
+      addressCountry: country,
+    },
+  }
+}
+
+// Extract width/height safely from any common EXIF keys
+function getImageDims(exif) {
+  if (!exif) return { w: undefined, h: undefined }
+  const w =
+    Number(exif.width || exif.ImageWidth || exif.imageWidth || exif.PixelXDimension) ||
+    undefined
+  const h =
+    Number(exif.height || exif.ImageHeight || exif.imageHeight || exif.PixelYDimension) ||
+    undefined
+  return { w, h }
+}
+
 export default function StoreDetail() {
   const router = useRouter()
   const id = typeof router.query.id === 'string' ? router.query.id : ''
@@ -161,13 +198,18 @@ export default function StoreDetail() {
         }
 
         const row = json.photo
+
+        // ✅ IMPORTANT FIX: Trim URLs (DB had newline breaks before)
+        const cleanedThumb = String(row.thumb_url || '').trim()
+        const cleanedPreview = String(row.preview_url || '').trim()
+
         setPhoto({
           id: row.id,
           title: row.title || 'Untitled',
           description: row.description || '',
           tags: Array.isArray(row.tags) ? row.tags : [],
-          thumbUrl: row.thumb_url,
-          previewUrl: row.preview_url,
+          thumbUrl: cleanedThumb || '',
+          previewUrl: cleanedPreview || '',
           createdAt: row.created_at,
           location: row.location || 'Sri Lanka',
           exif: row.exif || null,
@@ -187,7 +229,7 @@ export default function StoreDetail() {
     }
   }, [router.isReady, id])
 
-  // ✅ Load similar + recommended (matches existing API params)
+  // ✅ Load similar + recommended
   React.useEffect(() => {
     if (!photo?.id) return
 
@@ -197,7 +239,6 @@ export default function StoreDetail() {
       try {
         setRelLoading(true)
 
-        // Similar expects: ?id=<photoId>
         const sResp = await fetch(
           `/api/store/similar?id=${encodeURIComponent(photo.id)}&limit=6`,
           { headers: { 'Cache-Control': 'no-store' } }
@@ -208,8 +249,6 @@ export default function StoreDetail() {
         if (!alive) return
         setSimilar(similarList)
 
-        // Recommended expects:
-        // ?excludeId=<photoId>&similarIds=<comma-separated>&limit=6
         const similarIds = similarList.map((p) => p.id).filter(Boolean).join(',')
 
         const rResp = await fetch(
@@ -240,12 +279,23 @@ export default function StoreDetail() {
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
 
-  // Uses your existing preview API route pattern
+  // Uses your preview API route
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
     : ''
 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
+
+  // ✅ SEO-safe canonical (never blank)
+  const SITE_URL = 'https://jeevanchandimal.com'
+  const canonicalId = photo?.id || id
+  const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
+
+  // ✅ Social images should be PUBLIC and stable for bots
+  const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
+
+  // ✅ Width/height for ImageObject / OG (if present)
+  const { w: imgW, h: imgH } = getImageDims(photo?.exif)
 
   async function startCheckout() {
     if (!photo) return
@@ -279,7 +329,6 @@ export default function StoreDetail() {
 
       const data = await r.json().catch(() => null)
 
-      // Expecting: { actionUrl, fields } where fields is a dict of hidden inputs
       if (!r.ok || !data?.actionUrl || !data?.fields) {
         alert(data?.error || 'Checkout init failed')
         return
@@ -324,7 +373,7 @@ export default function StoreDetail() {
           }
         />
 
-        {/* Open Graph for social + Google Images */}
+        {/* Open Graph */}
         <meta property="og:title" content={photo?.title || 'Photograph'} />
         <meta
           property="og:description"
@@ -333,59 +382,66 @@ export default function StoreDetail() {
             `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
           }
         />
-        <meta property="og:image" content={photo?.previewUrl} />
-        <meta property="og:type" content="image" />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:type" content="article" />
+        {ogImage ? <meta property="og:image" content={ogImage} /> : null}
+        {ogImage && imgW ? (
+          <meta property="og:image:width" content={String(imgW)} />
+        ) : null}
+        {ogImage && imgH ? (
+          <meta property="og:image:height" content={String(imgH)} />
+        ) : null}
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content={photo?.previewUrl} />
+        <meta name="twitter:title" content={photo?.title || 'Photograph'} />
+        <meta
+          name="twitter:description"
+          content={
+            photo?.description ||
+            `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
+          }
+        />
+        {ogImage ? <meta name="twitter:image" content={ogImage} /> : null}
 
         {/* Canonical */}
-        <link
-          rel="canonical"
-          href={`https://jeevanchandimal.com/store/${photo?.id || ''}`}
-        />
+        <link rel="canonical" href={canonicalUrl} />
 
-        {/* JSON-LD Photograph schema (single canonical block) */}
+        {/* Preload main preview image for faster LCP */}
+        {photo?.id && previewSrc ? (
+          <link rel="preload" as="image" href={previewSrc} fetchPriority="high" />
+        ) : null}
+
+        {/* JSON-LD Photograph schema */}
         {photo && (
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
               __html: JSON.stringify({
                 '@context': 'https://schema.org',
-                '@type': 'Photograph',
-                '@id': `https://jeevanchandimal.com/store/${photo.id}#photo`,
-                url: `https://jeevanchandimal.com/store/${photo.id}`,
+                '@type': 'ImageObject',
+                '@id': `${canonicalUrl}#photo`,
+                url: canonicalUrl,
                 name: photo.title,
                 description:
                   photo.description ||
                   `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
-                keywords: Array.isArray(photo.tags)
-                  ? photo.tags.join(', ')
-                  : undefined,
+                keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : undefined,
                 creator: {
                   '@type': 'Person',
                   name: 'Jeevan Chandimal',
-                  url: 'https://jeevanchandimal.com',
+                  url: SITE_URL,
                 },
                 copyrightHolder: {
                   '@type': 'Person',
                   name: 'Jeevan Chandimal',
                 },
                 isAccessibleForFree: false,
-                image: {
-                  '@type': 'ImageObject',
-                  url: photo.previewUrl || undefined,
-                  thumbnailUrl: photo.thumbUrl || undefined,
-                },
-                contentLocation: {
-                  '@type': 'Place',
-                  name: photo.location || 'Sri Lanka',
-                  address: {
-                    '@type': 'PostalAddress',
-                    addressCountry: 'Sri Lanka',
-                  },
-                },
+                contentUrl: ogImage || undefined,
+                thumbnailUrl: photo.thumbUrl || undefined,
+                width: imgW,
+                height: imgH,
+                contentLocation: buildContentLocation(photo.location),
               }),
             }}
           />
@@ -432,7 +488,7 @@ export default function StoreDetail() {
                   </button>
 
                   <img
-                    src={previewSrc}
+                    src={previewSrc || photo.previewUrl || photo.thumbUrl}
                     alt={photo.title}
                     draggable={false}
                     onClick={openZoom}
@@ -440,11 +496,7 @@ export default function StoreDetail() {
                     onDragStart={preventSave}
                     loading="eager"
                     onError={(e) => {
-                      // fallback to previewUrl then thumbUrl
-                      if (
-                        photo.previewUrl &&
-                        e.currentTarget.src !== photo.previewUrl
-                      ) {
+                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
                         e.currentTarget.src = photo.previewUrl
                         return
                       }
@@ -452,9 +504,7 @@ export default function StoreDetail() {
                     }}
                   />
 
-                  {wmOn && (
-                    <div className="wmTile" style={{ opacity: wmOpacity }} />
-                  )}
+                  {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
                 </div>
 
                 <p className="desc">
@@ -496,16 +546,12 @@ export default function StoreDetail() {
                         max="0.18"
                         step="0.01"
                         value={wmOpacity}
-                        onChange={(e) =>
-                          setWmOpacity(Number(e.target.value))
-                        }
+                        onChange={(e) => setWmOpacity(Number(e.target.value))}
                         className="range"
                         disabled={!wmOn}
                       />
                     </div>
-                    <div className="rangeVal">
-                      {Math.round(wmOpacity * 100)}%
-                    </div>
+                    <div className="rangeVal">{Math.round(wmOpacity * 100)}%</div>
                   </div>
 
                   <div className="metaRow metaRowTall">
@@ -525,9 +571,7 @@ export default function StoreDetail() {
                       {photo.exif?.make || photo.exif?.model ? (
                         <div>
                           <strong>Camera:</strong>{' '}
-                          {[photo.exif?.make, photo.exif?.model]
-                            .filter(Boolean)
-                            .join(' ')}
+                          {[photo.exif?.make, photo.exif?.model].filter(Boolean).join(' ')}
                         </div>
                       ) : null}
 
@@ -566,10 +610,7 @@ export default function StoreDetail() {
                       {Array.isArray(photo.tags) && photo.tags.length > 0 ? (
                         <div className="tagRow">
                           {photo.tags.slice(0, 14).map((t) => (
-                            <Link
-                              key={t}
-                              href={`/store?tag=${encodeURIComponent(t)}`}
-                            >
+                            <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`}>
                               <a className="tag">#{t}</a>
                             </Link>
                           ))}
@@ -587,9 +628,7 @@ export default function StoreDetail() {
                       {photo.description ? (
                         photo.description
                       ) : (
-                        <span style={{ opacity: 0.75 }}>
-                          No description added yet.
-                        </span>
+                        <span style={{ opacity: 0.75 }}>No description added yet.</span>
                       )}
                     </div>
                     <div />
@@ -707,9 +746,7 @@ export default function StoreDetail() {
             <section className="relBlock">
               <div className="relHead">
                 <h2>Similar images</h2>
-                <Link
-                  href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}
-                >
+                <Link href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}>
                   <a className="seeAll">See all</a>
                 </Link>
               </div>
@@ -724,7 +761,11 @@ export default function StoreDetail() {
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
+                          <img
+                            src={String(p.thumb_url || '').trim()}
+                            alt={p.title || 'Photo'}
+                            loading="lazy"
+                          />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
@@ -759,7 +800,11 @@ export default function StoreDetail() {
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img src={p.thumb_url} alt={p.title || 'Photo'} loading="lazy" />
+                          <img
+                            src={String(p.thumb_url || '').trim()}
+                            alt={p.title || 'Photo'}
+                            loading="lazy"
+                          />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
@@ -777,7 +822,11 @@ export default function StoreDetail() {
 
             {/* ZOOM MODAL */}
             {zoomOpen && (
-              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+              <div
+                className="zoomOverlay"
+                onMouseMove={onMouseMovePan}
+                onMouseUp={onMouseUpPan}
+              >
                 <div className="zoomTop">
                   <div className="zoomTitle">{photo.title}</div>
                   <div className="zoomActions">
@@ -821,7 +870,7 @@ export default function StoreDetail() {
                     onMouseDown={onMouseDownPan}
                   >
                     <img
-                      src={previewSrc}
+                      src={previewSrc || photo.previewUrl || photo.thumbUrl}
                       alt={photo.title}
                       draggable={false}
                       onContextMenu={preventSave}
