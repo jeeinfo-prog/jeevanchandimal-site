@@ -331,36 +331,79 @@ export default function StoreDetail() {
   {/* Canonical */}
   <link rel="canonical" href={`https://jeevanchandimal.com/store/${photo?.id}`} />
 
-  {/* JSON-LD Photograph schema */}
-  {photo?.previewUrl && (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{
-        __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'Photograph',
-          name: photo.title,
-          image: photo.previewUrl,
-          description:
-            photo.description ||
-            `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
-          creator: {
-            '@type': 'Person',
-            name: 'Jeevan Chandimal',
-          },
-          copyrightHolder: {
-            '@type': 'Person',
-            name: 'Jeevan Chandimal',
-          },
-          contentLocation: {
-            '@type': 'Place',
-            name: 'Sri Lanka',
-          },
-        }),
-      }}
-    />
-  )}
-</Head>
+  {/* JSON-LD Photograph schema (single canonical block) */}
+{photo?.id && (
+  <script
+    type="application/ld+json"
+    dangerouslySetInnerHTML={{
+      __html: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Photograph',
+        '@id': `https://jeevanchandimal.com/store/${photo.id}#photo`,
+        url: `https://jeevanchandimal.com/store/${photo.id}`,
+        name: photo.title || 'Photograph',
+        description:
+          photo.description || `${photo.title || 'Photograph'} – Sri Lanka photography by Jeevan Chandimal`,
+        keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : undefined,
+
+        creator: {
+          '@type': 'Person',
+          name: 'Jeevan Chandimal',
+          url: 'https://jeevanchandimal.com',
+        },
+        copyrightHolder: {
+          '@type': 'Person',
+          name: 'Jeevan Chandimal',
+          url: 'https://jeevanchandimal.com',
+        },
+
+        isAccessibleForFree: false,
+
+        image: {
+          '@type': 'ImageObject',
+          url: photo.previewUrl || undefined,
+          thumbnailUrl: photo.thumbUrl || undefined,
+        },
+
+        // ✅ EXIF (only if API returns photo.exif)
+        exifData: photo?.exif
+          ? Object.entries(photo.exif).map(([k, v]) => ({
+              '@type': 'PropertyValue',
+              name: k,
+              value: String(v),
+            }))
+          : undefined,
+
+        // ✅ Location (prefer actual location; fallback to Sri Lanka)
+        contentLocation: photo?.location
+          ? {
+              '@type': 'Place',
+              name: photo.location.name || photo.location.country || 'Sri Lanka',
+              address: {
+                '@type': 'PostalAddress',
+                addressLocality: photo.location.city || undefined,
+                addressRegion: photo.location.region || undefined,
+                addressCountry: photo.location.country || 'Sri Lanka',
+              },
+              geo:
+                typeof photo.location.lat === 'number' && typeof photo.location.lng === 'number'
+                  ? {
+                      '@type': 'GeoCoordinates',
+                      latitude: photo.location.lat,
+                      longitude: photo.location.lng,
+                    }
+                  : undefined,
+            }
+          : {
+              '@type': 'Place',
+              name: 'Sri Lanka',
+              address: { '@type': 'PostalAddress', addressCountry: 'Sri Lanka' },
+            },
+      }),
+    }}
+  />
+)}
+
 
       <JeevanChandimalNavi />
 
