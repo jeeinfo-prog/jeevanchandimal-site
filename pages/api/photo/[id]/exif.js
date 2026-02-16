@@ -1,3 +1,4 @@
+// pages/api/photo/[id]/exif.js
 import { r2GetObjectBuffer } from '../../../../lib/r2'
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { extractExifFromJpeg } from '../../../../lib/exif-lite'
@@ -10,26 +11,32 @@ export default async function handler(req, res) {
   const id = String(req.query.id || '').trim()
   if (!id) return res.status(400).json({ ok: false, error: 'Missing id' })
 
+  const forcedKey = req.query.key ? String(req.query.key).trim() : ''
   const shouldSave = String(req.query.save || '') === '1'
 
   try {
-    // 1️⃣ Get original_key from DB
-    const { data: row, error } = await supabaseAdmin
-      .from('photos')
-      .select('id, original_key')
-      .eq('id', id)
-      .single()
+    // ✅ Priority 1: use ?key=... if provided
+    let key = forcedKey
 
-    if (error || !row?.original_key) {
-      return res.status(404).json({
-        ok: false,
-        error: 'original_key missing in DB',
-      })
+    // ✅ Priority 2: fallback to DB
+    if (!key) {
+      const { data: row, error } = await supabaseAdmin
+        .from('photos')
+        .select('id, original_key')
+        .eq('id', id)
+        .single()
+
+      if (error || !row?.original_key) {
+        return res.status(404).json({
+          ok: false,
+          error: 'original_key missing in DB',
+          hint: 'Store original_key during upload commit',
+        })
+      }
+      key = row.original_key
     }
 
-    const key = row.original_key
-
-    // 2️⃣ Fetch from R2
+    // 2) Fetch from R2
     let buf
     try {
       buf = await r2GetObjectBuffer(key)
@@ -43,17 +50,13 @@ export default async function handler(req, res) {
     }
 
     if (!buf || !buf.length) {
-      return res.status(500).json({
-        ok: false,
-        error: 'Empty file buffer',
-        key,
-      })
+      return res.status(500).json({ ok: false, error: 'Empty file buffer', key })
     }
 
-    // 3️⃣ Check file signature (JPEG should start with FF D8)
+    // 3) Signature check (JPEG = FF D8)
     const isJpeg = buf[0] === 0xff && buf[1] === 0xd8
 
-    // 4️⃣ Extract EXIF safely
+    // 4) Extract EXIF
     let exif = null
     let exifError = null
 
@@ -65,11 +68,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // 5️⃣ Optional save
-    if (shouldSave && exif) {
+    // 5) Optional save
+    if (shouldSave) {
       await supabaseAdmin
         .from('photos')
         .update({
+          original_key: key, // ✅ store it if it was forced
           exif_json: exif,
           exif_make: exif?.make || null,
           exif_model: exif?.model || null,
@@ -82,14 +86,16 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
+      id,
       key,
       size: buf.length,
       isJpeg,
       exif,
       exifError,
+      saved: shouldSave,
     })
   } catch (e) {
     console.error(e)
-    return res.status(500).json({ ok: false, error: 'EXIF failed hard' })
+    return res.status(500).json({ ok: false, error: 'EXIF failed' })
   }
 }
