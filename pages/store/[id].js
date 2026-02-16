@@ -298,12 +298,69 @@ export default function StoreDetail() {
   return (
     <>
       <Head>
-        <title>{photo?.title ? `${photo.title} | Store` : 'Photo | Store'}</title>
-        <meta
-          name="description"
-          content="License this photograph for Personal, Commercial, or Editorial use."
-        />
-      </Head>
+  <title>
+    {photo?.title
+      ? `${photo.title} | Photograph by Jeevan Chandimal`
+      : 'Photo | Jeevan Chandimal'}
+  </title>
+
+  <meta
+    name="description"
+    content={
+      photo?.description ||
+      `${photo?.title || 'Photograph'} – premium Sri Lanka photography by Jeevan Chandimal. Available for licensing.`
+    }
+  />
+
+  {/* Open Graph for social + Google Images */}
+  <meta property="og:title" content={photo?.title || 'Photograph'} />
+  <meta
+    property="og:description"
+    content={
+      photo?.description ||
+      `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
+    }
+  />
+  <meta property="og:image" content={photo?.previewUrl} />
+  <meta property="og:type" content="image" />
+
+  {/* Twitter */}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content={photo?.previewUrl} />
+
+  {/* Canonical */}
+  <link rel="canonical" href={`https://jeevanchandimal.com/store/${photo?.id}`} />
+
+  {/* JSON-LD Photograph schema */}
+  {photo?.previewUrl && (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Photograph',
+          name: photo.title,
+          image: photo.previewUrl,
+          description:
+            photo.description ||
+            `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
+          creator: {
+            '@type': 'Person',
+            name: 'Jeevan Chandimal',
+          },
+          copyrightHolder: {
+            '@type': 'Person',
+            name: 'Jeevan Chandimal',
+          },
+          contentLocation: {
+            '@type': 'Place',
+            name: 'Sri Lanka',
+          },
+        }),
+      }}
+    />
+  )}
+</Head>
 
       <JeevanChandimalNavi />
 
