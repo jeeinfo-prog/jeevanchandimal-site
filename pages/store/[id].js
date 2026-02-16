@@ -42,6 +42,10 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n))
 }
 
+function safeJsonLd(obj) {
+  return JSON.stringify(obj, (k, v) => (v === undefined ? undefined : v))
+}
+
 export default function StoreDetail() {
   const router = useRouter()
   const id = typeof router.query.id === 'string' ? router.query.id : ''
@@ -175,7 +179,7 @@ export default function StoreDetail() {
     }
   }, [router.isReady, id])
 
-    // ✅ Load similar + recommended (matches existing API params)
+  // ✅ Load similar + recommended (matches existing API params)
   React.useEffect(() => {
     if (!photo?.id) return
 
@@ -298,112 +302,89 @@ export default function StoreDetail() {
   return (
     <>
       <Head>
-  <title>
-    {photo?.title
-      ? `${photo.title} | Photograph by Jeevan Chandimal`
-      : 'Photo | Jeevan Chandimal'}
-  </title>
+        <title>
+          {photo?.title
+            ? `${photo.title} | Photograph by Jeevan Chandimal`
+            : 'Photo | Jeevan Chandimal'}
+        </title>
 
-  <meta
-    name="description"
-    content={
-      photo?.description ||
-      `${photo?.title || 'Photograph'} – premium Sri Lanka photography by Jeevan Chandimal. Available for licensing.`
-    }
-  />
+        <meta
+          name="description"
+          content={
+            photo?.description ||
+            `${photo?.title || 'Photograph'} – premium Sri Lanka photography by Jeevan Chandimal. Available for licensing.`
+          }
+        />
 
-  {/* Open Graph for social + Google Images */}
-  <meta property="og:title" content={photo?.title || 'Photograph'} />
-  <meta
-    property="og:description"
-    content={
-      photo?.description ||
-      `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
-    }
-  />
-  <meta property="og:image" content={photo?.previewUrl} />
-  <meta property="og:type" content="image" />
+        {/* Open Graph for social + Google Images */}
+        <meta property="og:title" content={photo?.title || 'Photograph'} />
+        <meta
+          property="og:description"
+          content={
+            photo?.description ||
+            `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
+          }
+        />
+        <meta property="og:image" content={photo?.previewUrl || ''} />
+        <meta property="og:type" content="image" />
 
-  {/* Twitter */}
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content={photo?.previewUrl} />
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content={photo?.previewUrl || ''} />
 
-  {/* Canonical */}
-  <link rel="canonical" href={`https://jeevanchandimal.com/store/${photo?.id}`} />
+        {/* Canonical */}
+        {photo?.id ? (
+          <link
+            rel="canonical"
+            href={`https://jeevanchandimal.com/store/${photo.id}`}
+          />
+        ) : null}
 
-  {/* JSON-LD Photograph schema (single canonical block) */}
-{photo?.id && (
-  <script
-    type="application/ld+json"
-    dangerouslySetInnerHTML={{
-      __html: JSON.stringify({
-        '@context': 'https://schema.org',
-        '@type': 'Photograph',
-        '@id': `https://jeevanchandimal.com/store/${photo.id}#photo`,
-        url: `https://jeevanchandimal.com/store/${photo.id}`,
-        name: photo.title || 'Photograph',
-        description:
-          photo.description || `${photo.title || 'Photograph'} – Sri Lanka photography by Jeevan Chandimal`,
-        keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : undefined,
-
-        creator: {
-          '@type': 'Person',
-          name: 'Jeevan Chandimal',
-          url: 'https://jeevanchandimal.com',
-        },
-        copyrightHolder: {
-          '@type': 'Person',
-          name: 'Jeevan Chandimal',
-          url: 'https://jeevanchandimal.com',
-        },
-
-        isAccessibleForFree: false,
-
-        image: {
-          '@type': 'ImageObject',
-          url: photo.previewUrl || undefined,
-          thumbnailUrl: photo.thumbUrl || undefined,
-        },
-
-        // ✅ EXIF (only if API returns photo.exif)
-        exifData: photo?.exif
-          ? Object.entries(photo.exif).map(([k, v]) => ({
-              '@type': 'PropertyValue',
-              name: k,
-              value: String(v),
-            }))
-          : undefined,
-
-        // ✅ Location (prefer actual location; fallback to Sri Lanka)
-        contentLocation: photo?.location
-          ? {
-              '@type': 'Place',
-              name: photo.location.name || photo.location.country || 'Sri Lanka',
-              address: {
-                '@type': 'PostalAddress',
-                addressLocality: photo.location.city || undefined,
-                addressRegion: photo.location.region || undefined,
-                addressCountry: photo.location.country || 'Sri Lanka',
-              },
-              geo:
-                typeof photo.location.lat === 'number' && typeof photo.location.lng === 'number'
-                  ? {
-                      '@type': 'GeoCoordinates',
-                      latitude: photo.location.lat,
-                      longitude: photo.location.lng,
-                    }
+        {/* JSON-LD Photograph schema (single canonical block) */}
+        {photo ? (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: safeJsonLd({
+                '@context': 'https://schema.org',
+                '@type': 'Photograph',
+                '@id': `https://jeevanchandimal.com/store/${photo.id}#photo`,
+                url: `https://jeevanchandimal.com/store/${photo.id}`,
+                name: photo.title,
+                description:
+                  photo.description ||
+                  `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
+                keywords: Array.isArray(photo.tags)
+                  ? photo.tags.join(', ')
                   : undefined,
-            }
-          : {
-              '@type': 'Place',
-              name: 'Sri Lanka',
-              address: { '@type': 'PostalAddress', addressCountry: 'Sri Lanka' },
-            },
-      }),
-    }}
-  />
-)}
-
+                creator: {
+                  '@type': 'Person',
+                  name: 'Jeevan Chandimal',
+                  url: 'https://jeevanchandimal.com',
+                },
+                copyrightHolder: {
+                  '@type': 'Person',
+                  name: 'Jeevan Chandimal',
+                },
+                isAccessibleForFree: false,
+                image: {
+                  '@type': 'ImageObject',
+                  url: photo.previewUrl || undefined,
+                  thumbnailUrl: photo.thumbUrl || undefined,
+                },
+                contentLocation: {
+                  '@type': 'Place',
+                  name: 'Sri Lanka',
+                  address: {
+                    '@type': 'PostalAddress',
+                    addressCountry: 'Sri Lanka',
+                  },
+                },
+              }),
+            }}
+          />
+        ) : null}
+      </Head>
 
       <JeevanChandimalNavi />
 
@@ -454,7 +435,10 @@ export default function StoreDetail() {
                     loading="eager"
                     onError={(e) => {
                       // fallback to previewUrl then thumbUrl
-                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                      if (
+                        photo.previewUrl &&
+                        e.currentTarget.src !== photo.previewUrl
+                      ) {
                         e.currentTarget.src = photo.previewUrl
                         return
                       }
@@ -462,7 +446,9 @@ export default function StoreDetail() {
                     }}
                   />
 
-                  {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
+                  {wmOn && (
+                    <div className="wmTile" style={{ opacity: wmOpacity }} />
+                  )}
                 </div>
 
                 <p className="desc">
@@ -509,7 +495,9 @@ export default function StoreDetail() {
                         disabled={!wmOn}
                       />
                     </div>
-                    <div className="rangeVal">{Math.round(wmOpacity * 100)}%</div>
+                    <div className="rangeVal">
+                      {Math.round(wmOpacity * 100)}%
+                    </div>
                   </div>
 
                   <div className="metaRow metaRowTall">
@@ -520,7 +508,8 @@ export default function StoreDetail() {
                       </div>
                       {photo.createdAt ? (
                         <div>
-                          <strong>Date:</strong> {new Date(photo.createdAt).toLocaleDateString()}
+                          <strong>Date:</strong>{' '}
+                          {new Date(photo.createdAt).toLocaleDateString()}
                         </div>
                       ) : null}
                       <div>
@@ -557,7 +546,9 @@ export default function StoreDetail() {
                       {photo.description ? (
                         photo.description
                       ) : (
-                        <span style={{ opacity: 0.75 }}>No description added yet.</span>
+                        <span style={{ opacity: 0.75 }}>
+                          No description added yet.
+                        </span>
                       )}
                     </div>
                     <div />
@@ -628,8 +619,8 @@ export default function StoreDetail() {
                     </button>
                   </div>
                   <p className="fine">
-                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial:
-                    news/documentary.
+                    Personal: non-paid use. Commercial: ads/brand/client work.
+                    Editorial: news/documentary.
                   </p>
                 </div>
 
@@ -675,7 +666,9 @@ export default function StoreDetail() {
             <section className="relBlock">
               <div className="relHead">
                 <h2>Similar images</h2>
-                <Link href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}>
+                <Link
+                  href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}
+                >
                   <a className="seeAll">See all</a>
                 </Link>
               </div>
@@ -696,7 +689,9 @@ export default function StoreDetail() {
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
                           <div className="relTag">
-                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                            {Array.isArray(p.tags) && p.tags[0]
+                              ? `#${p.tags[0]}`
+                              : 'Photo'}
                           </div>
                         </div>
                       </a>
@@ -731,7 +726,9 @@ export default function StoreDetail() {
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
                           <div className="relTag">
-                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                            {Array.isArray(p.tags) && p.tags[0]
+                              ? `#${p.tags[0]}`
+                              : 'Photo'}
                           </div>
                         </div>
                       </a>
