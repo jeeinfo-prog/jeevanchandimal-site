@@ -42,8 +42,14 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n))
 }
 
-function safeJsonLd(obj) {
-  return JSON.stringify(obj, (k, v) => (v === undefined ? undefined : v))
+function formatExifDate(exifDate) {
+  const s = String(exifDate || '').trim()
+  if (!s) return ''
+  // EXIF: "YYYY:MM:DD HH:MM:SS" -> "YYYY-MM-DD HH:MM:SS"
+  const isoish = s.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
+  const d = new Date(isoish)
+  if (String(d) === 'Invalid Date') return s
+  return d.toLocaleString()
 }
 
 export default function StoreDetail() {
@@ -163,6 +169,8 @@ export default function StoreDetail() {
           thumbUrl: row.thumb_url,
           previewUrl: row.preview_url,
           createdAt: row.created_at,
+          location: row.location || 'Sri Lanka',
+          exif: row.exif || null,
         })
 
         setLoading(false)
@@ -325,27 +333,25 @@ export default function StoreDetail() {
             `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
           }
         />
-        <meta property="og:image" content={photo?.previewUrl || ''} />
+        <meta property="og:image" content={photo?.previewUrl} />
         <meta property="og:type" content="image" />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content={photo?.previewUrl || ''} />
+        <meta name="twitter:image" content={photo?.previewUrl} />
 
         {/* Canonical */}
-        {photo?.id ? (
-          <link
-            rel="canonical"
-            href={`https://jeevanchandimal.com/store/${photo.id}`}
-          />
-        ) : null}
+        <link
+          rel="canonical"
+          href={`https://jeevanchandimal.com/store/${photo?.id || ''}`}
+        />
 
         {/* JSON-LD Photograph schema (single canonical block) */}
-        {photo ? (
+        {photo && (
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
-              __html: safeJsonLd({
+              __html: JSON.stringify({
                 '@context': 'https://schema.org',
                 '@type': 'Photograph',
                 '@id': `https://jeevanchandimal.com/store/${photo.id}#photo`,
@@ -374,7 +380,7 @@ export default function StoreDetail() {
                 },
                 contentLocation: {
                   '@type': 'Place',
-                  name: 'Sri Lanka',
+                  name: photo.location || 'Sri Lanka',
                   address: {
                     '@type': 'PostalAddress',
                     addressCountry: 'Sri Lanka',
@@ -383,7 +389,7 @@ export default function StoreDetail() {
               }),
             }}
           />
-        ) : null}
+        )}
       </Head>
 
       <JeevanChandimalNavi />
@@ -490,7 +496,9 @@ export default function StoreDetail() {
                         max="0.18"
                         step="0.01"
                         value={wmOpacity}
-                        onChange={(e) => setWmOpacity(Number(e.target.value))}
+                        onChange={(e) =>
+                          setWmOpacity(Number(e.target.value))
+                        }
                         className="range"
                         disabled={!wmOn}
                       />
@@ -506,12 +514,42 @@ export default function StoreDetail() {
                       <div>
                         <strong>ID:</strong> {photo.id}
                       </div>
+
                       {photo.createdAt ? (
                         <div>
                           <strong>Date:</strong>{' '}
                           {new Date(photo.createdAt).toLocaleDateString()}
                         </div>
                       ) : null}
+
+                      {photo.exif?.make || photo.exif?.model ? (
+                        <div>
+                          <strong>Camera:</strong>{' '}
+                          {[photo.exif?.make, photo.exif?.model]
+                            .filter(Boolean)
+                            .join(' ')}
+                        </div>
+                      ) : null}
+
+                      {photo.exif?.lensModel ? (
+                        <div>
+                          <strong>Lens:</strong> {photo.exif.lensModel}
+                        </div>
+                      ) : null}
+
+                      {photo.exif?.settingsLine ? (
+                        <div>
+                          <strong>Settings:</strong> {photo.exif.settingsLine}
+                        </div>
+                      ) : null}
+
+                      {photo.exif?.dateTimeOriginal ? (
+                        <div>
+                          <strong>Taken:</strong>{' '}
+                          {formatExifDate(photo.exif.dateTimeOriginal)}
+                        </div>
+                      ) : null}
+
                       <div>
                         <strong>Preview:</strong> Watermarked
                       </div>
@@ -528,7 +566,10 @@ export default function StoreDetail() {
                       {Array.isArray(photo.tags) && photo.tags.length > 0 ? (
                         <div className="tagRow">
                           {photo.tags.slice(0, 14).map((t) => (
-                            <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`}>
+                            <Link
+                              key={t}
+                              href={`/store?tag=${encodeURIComponent(t)}`}
+                            >
                               <a className="tag">#{t}</a>
                             </Link>
                           ))}
@@ -619,8 +660,8 @@ export default function StoreDetail() {
                     </button>
                   </div>
                   <p className="fine">
-                    Personal: non-paid use. Commercial: ads/brand/client work.
-                    Editorial: news/documentary.
+                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial:
+                    news/documentary.
                   </p>
                 </div>
 
@@ -689,9 +730,7 @@ export default function StoreDetail() {
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
                           <div className="relTag">
-                            {Array.isArray(p.tags) && p.tags[0]
-                              ? `#${p.tags[0]}`
-                              : 'Photo'}
+                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
                           </div>
                         </div>
                       </a>
@@ -726,9 +765,7 @@ export default function StoreDetail() {
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
                           <div className="relTag">
-                            {Array.isArray(p.tags) && p.tags[0]
-                              ? `#${p.tags[0]}`
-                              : 'Photo'}
+                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
                           </div>
                         </div>
                       </a>
