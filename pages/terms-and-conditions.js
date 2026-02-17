@@ -1,62 +1,67 @@
-import React from 'react'
+import Head from 'next/head'
+import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
-export default function TermsAndConditionsPage() {
+export default function Terms() {
   return (
-    <main className="legal-page">
-      <div className="legal-wrap">
-        <h1>Terms &amp; Conditions</h1>
-        <p className="legal-updated">Last updated: February 2026</p>
+    <>
+      <Head>
+        <title>Terms & Conditions | Jeevan Chandimal</title>
+        <meta name="robots" content="index, follow" />
+      </Head>
 
-        <h2>1. Use of this Website</h2>
+      <JeevanChandimalNavi />
+
+      <main className="wrap">
+        <h1>Terms & Conditions</h1>
+        <p>Last updated: {new Date().toLocaleDateString()}</p>
+
+        <h2>1. Introduction</h2>
         <p>
-          By using this website, you agree not to misuse the site, attempt unauthorized access, or disrupt services.
+          This website, https://jeevanchandimal.com, is operated by Jeevan Chandimal.
+          By purchasing any content from this website, you agree to these Terms.
         </p>
 
-        <h2>2. Orders &amp; Payments</h2>
-        <p>
-          Product/service availability and pricing may change without notice. Payments are handled by third-party
-          gateways (e.g., PayHere). We do not store card details.
-        </p>
+        <h2>2. Nature of Products</h2>
+        <p>All products are digital photographs delivered electronically. No physical items will be shipped.</p>
 
-        <h2>3. Refunds</h2>
-        <p>
-          If refunds apply to a specific product/service, refund rules will be shown on the relevant product page,
-          invoice, or checkout page.
-        </p>
+        <h2>3. Licensing</h2>
+        <ul>
+          <li><strong>Personal</strong> – Non-commercial use only</li>
+          <li><strong>Editorial</strong> – Blogs, news, documentaries (no advertising)</li>
+          <li><strong>Commercial</strong> – Advertising, branding, and business use</li>
+        </ul>
+        <p>Copyright remains with Jeevan Chandimal. Files may not be resold or redistributed.</p>
 
-        <h2>4. Intellectual Property</h2>
-        <p>
-          All content on this website (text, images, video, branding) is owned by or licensed to us unless stated
-          otherwise.
-        </p>
+        <h2>4. Delivery</h2>
+        <p>A secure download link will be emailed after successful payment.</p>
 
-        <h2>5. Limitation of Liability</h2>
-        <p>
-          To the fullest extent allowed by law, we are not liable for indirect or incidental losses arising from the use
-          of this website.
-        </p>
+        <h2>5. Pricing</h2>
+        <p>Prices are displayed in LKR and/or USD and may change without notice.</p>
 
-        <h2>6. Changes</h2>
-        <p>
-          We may update these Terms &amp; Conditions from time to time. Any changes will be posted on this page with an
-          updated date.
-        </p>
+        <h2>6. Prohibited Use</h2>
+        <ul>
+          <li>No resale as stock</li>
+          <li>No claiming authorship</li>
+          <li>No illegal or defamatory use</li>
+        </ul>
 
-        <h2>7. Contact</h2>
-        <p>
-          Jeevan Chandimal<br />
-          Website: https://jeevanchandimal.com<br />
-          Email: contact@jeevanchandimal.com
-        </p>
-      </div>
+        <h2>7. Governing Law</h2>
+        <p>These terms are governed by the laws of Sri Lanka.</p>
+      </main>
+
+      <JeevanChandimalNewFooter />
 
       <style jsx>{`
-        .legal-page { padding: 80px 20px; }
-        .legal-wrap { max-width: 900px; margin: 0 auto; }
-        .legal-updated { opacity: 0.8; margin: 8px 0 24px; }
+        .wrap {
+          max-width: 900px;
+          margin: 0 auto;
+          padding: 40px 20px;
+          line-height: 1.7;
+        }
+        h1 { margin-bottom: 10px; }
         h2 { margin-top: 28px; }
-        p { line-height: 1.8; }
       `}</style>
-    </main>
+    </>
   )
 }
