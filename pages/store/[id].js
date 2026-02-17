@@ -97,6 +97,18 @@ function normalizePhotoPayload(payload) {
   const cleanedThumb = String(row.thumb_url || row.thumbUrl || '').trim()
   const cleanedPreview = String(row.preview_url || row.previewUrl || '').trim()
 
+  // ✅ RAW availability: support many backend shapes (any one of these makes RAW available)
+  const rawAvailable =
+    Boolean(row.raw_available) ||
+    Boolean(row.has_raw) ||
+    Boolean(row.hasRaw) ||
+    Boolean(row.rawUrl) ||
+    Boolean(row.raw_url) ||
+    Boolean(row.raw_key) ||
+    Boolean(row.rawKey) ||
+    (Array.isArray(row.formats) && row.formats.includes('raw')) ||
+    (Array.isArray(row.available_formats) && row.available_formats.includes('raw'))
+
   return {
     id: row.id,
     title: row.title || 'Untitled',
@@ -107,8 +119,12 @@ function normalizePhotoPayload(payload) {
     createdAt: row.created_at || row.createdAt || null,
     location: row.location || 'Sri Lanka',
     exif: row.exif || null,
+
+    // ✅ new
+    rawAvailable,
   }
 }
+
 
 export default function StoreDetail({ initialPhoto = null, initialError = '' }) {
   const router = useRouter()
@@ -193,6 +209,13 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     if (zoomOpen) window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
+
+  React.useEffect(() => {
+  // If RAW isn't available but user is on RAW, force JPG
+  if (photo && rawAvailable === false && format === 'raw') {
+    setFormat('jpg')
+  }
+}, [photo, rawAvailable, format])
 
   // ✅ Client refresh for navigation or edge cases (SSR already gives first paint + SEO)
   React.useEffect(() => {
@@ -338,6 +361,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     : ''
 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
+  const rawAvailable = photo?.rawAvailable !== false // default true unless explicitly false
 
   // ✅ SEO-safe canonical (never blank)
   const SITE_URL = 'https://jeevanchandimal.com'
@@ -352,6 +376,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   async function startCheckout() {
     if (!photo) return
+    if (format === 'raw' && rawAvailable === false) {
+  alert('RAW is not available for this image. Please choose JPG.')
+  return
+}
 
     const em = String(email || '').trim().toLowerCase()
     if (!isValidEmail(em)) {
@@ -772,12 +800,24 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                       JPG
                     </button>
                     <button
-                      type="button"
-                      className={`opt ${format === 'raw' ? 'active' : ''}`}
-                      onClick={() => setFormat('raw')}
-                    >
-                      RAW
-                    </button>
+  type="button"
+  className={`opt ${format === 'raw' ? 'active' : ''} ${rawAvailable ? '' : 'disabled'}`}
+  onClick={() => {
+    if (!rawAvailable) return
+    setFormat('raw')
+  }}
+  disabled={!rawAvailable}
+  title={!rawAvailable ? 'RAW not available for this image' : 'RAW'}
+>
+  RAW
+</button>
+
+{!rawAvailable ? (
+  <p className="fine" style={{ marginTop: 8 }}>
+    RAW is not available for this image.
+  </p>
+) : null}
+
                   </div>
                 </div>
 
@@ -1275,6 +1315,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           background: rgba(245, 244, 244, 0.12);
           border-color: rgba(245, 244, 244, 0.3);
         }
+
+        .opt.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 
         .field {
           width: 100%;
