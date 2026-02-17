@@ -139,7 +139,6 @@ function normalizePhotoPayload(payload) {
   }
 }
 
-
 export default function StoreDetail({ initialPhoto = null, initialError = '' }) {
   const router = useRouter()
   const id = typeof router.query.id === 'string' ? router.query.id : ''
@@ -165,7 +164,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [relLoading, setRelLoading] = React.useState(false)
 
   const [naturalDims, setNaturalDims] = React.useState({ w: null, h: null })
-
 
   // Watermark controls
   const [wmOn, setWmOn] = React.useState(true)
@@ -226,13 +224,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     if (zoomOpen) window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
-
-  React.useEffect(() => {
-  // If RAW isn't available but user is on RAW, force JPG
-  if (photo && rawAvailable === false && format === 'raw') {
-    setFormat('jpg')
-  }
-}, [photo, rawAvailable, format])
 
   // ✅ Client refresh for navigation or edge cases (SSR already gives first paint + SEO)
   React.useEffect(() => {
@@ -380,6 +371,13 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
   const rawAvailable = photo?.rawAvailable !== false // default true unless explicitly false
 
+  // ✅ If RAW isn't available but user is on RAW, force JPG
+  React.useEffect(() => {
+    if (photo && rawAvailable === false && format === 'raw') {
+      setFormat('jpg')
+    }
+  }, [photo, rawAvailable, format])
+
   // ✅ SEO-safe canonical (never blank)
   const SITE_URL = 'https://jeevanchandimal.com'
   const canonicalId = photo?.id || id
@@ -390,26 +388,22 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   // ✅ Width/height for ImageObject / OG (if present)
   const { w: imgW, h: imgH } = getImageDims(photo?.exif)
-  console.log('EXIF dims:', imgW, imgH, photo?.exif)
+
   const finalW = imgW || naturalDims.w
-const finalH = imgH || naturalDims.h
+  const finalH = imgH || naturalDims.h
 
-const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
+  const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
 
-const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
-const rawSizeMB = estimateRawSizeMB(finalW, finalH)
-
-
-const jpgSizeMB = estimateJpgSizeMB(imgW, imgH)
-const rawSizeMB = estimateRawSizeMB(imgW, imgH)
-
+  const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
+  const rawSizeMB = estimateRawSizeMB(finalW, finalH)
 
   async function startCheckout() {
     if (!photo) return
+
     if (format === 'raw' && rawAvailable === false) {
-  alert('RAW is not available for this image. Please choose JPG.')
-  return
-}
+      alert('RAW is not available for this image. Please choose JPG.')
+      return
+    }
 
     const em = String(email || '').trim().toLowerCase()
     if (!isValidEmail(em)) {
@@ -601,27 +595,26 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
                   </button>
 
                   <img
-  src={previewSrc || photo.previewUrl || photo.thumbUrl}
-  alt={photo.title}
-  draggable={false}
-  onClick={openZoom}
-  onContextMenu={preventSave}
-  onDragStart={preventSave}
-  loading="eager"
-  onLoad={(e) => {
-    const w = e.currentTarget.naturalWidth
-    const h = e.currentTarget.naturalHeight
-    if (w && h) setNaturalDims({ w, h })
-  }}
-  onError={(e) => {
-    if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
-      e.currentTarget.src = photo.previewUrl
-      return
-    }
-    if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
-  }}
-/>
-
+                    src={previewSrc || photo.previewUrl || photo.thumbUrl}
+                    alt={photo.title}
+                    draggable={false}
+                    onClick={openZoom}
+                    onContextMenu={preventSave}
+                    onDragStart={preventSave}
+                    loading="eager"
+                    onLoad={(e) => {
+                      const w = e.currentTarget.naturalWidth
+                      const h = e.currentTarget.naturalHeight
+                      if (w && h) setNaturalDims({ w, h })
+                    }}
+                    onError={(e) => {
+                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                        e.currentTarget.src = photo.previewUrl
+                        return
+                      }
+                      if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+                    }}
+                  />
 
                   {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
                 </div>
@@ -835,25 +828,27 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
                     >
                       JPG
                     </button>
+
                     <button
-  type="button"
-  className={`opt ${format === 'raw' ? 'active' : ''} ${rawAvailable ? '' : 'disabled'}`}
-  onClick={() => {
-    if (!rawAvailable) return
-    setFormat('raw')
-  }}
-  disabled={!rawAvailable}
-  title={!rawAvailable ? 'RAW not available for this image' : 'RAW'}
->
-  RAW
-</button>
+                      type="button"
+                      className={`opt ${format === 'raw' ? 'active' : ''} ${
+                        rawAvailable ? '' : 'disabled'
+                      }`}
+                      onClick={() => {
+                        if (!rawAvailable) return
+                        setFormat('raw')
+                      }}
+                      disabled={!rawAvailable}
+                      title={!rawAvailable ? 'RAW not available for this image' : 'RAW'}
+                    >
+                      RAW
+                    </button>
 
-{!rawAvailable ? (
-  <p className="fine" style={{ marginTop: 8 }}>
-    RAW is not available for this image.
-  </p>
-) : null}
-
+                    {!rawAvailable ? (
+                      <p className="fine" style={{ marginTop: 8 }}>
+                        RAW is not available for this image.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -884,31 +879,30 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
                 </div>
 
                 <div className="priceRow">
-  <span className="price">{formatMoney(currency, price)}</span>
-  <span className="small">Instant digital download</span>
-</div>
+                  <span className="price">{formatMoney(currency, price)}</span>
+                  <span className="small">Instant digital download</span>
+                </div>
 
-{/* FILE INFO */}
-<div className="fileInfo">
-  {resolution && (
-    <div>
-      <strong>Resolution:</strong> {resolution}
-    </div>
-  )}
+                {/* FILE INFO */}
+                <div className="fileInfo">
+                  {resolution && (
+                    <div>
+                      <strong>Resolution:</strong> {resolution}
+                    </div>
+                  )}
 
-  {format === 'jpg' && jpgSizeMB && (
-    <div>
-      <strong>JPG size:</strong> ~{jpgSizeMB} MB
-    </div>
-  )}
+                  {format === 'jpg' && jpgSizeMB && (
+                    <div>
+                      <strong>JPG size:</strong> ~{jpgSizeMB} MB
+                    </div>
+                  )}
 
-  {format === 'raw' && rawSizeMB && rawAvailable && (
-    <div>
-      <strong>RAW size:</strong> ~{rawSizeMB} MB
-    </div>
-  )}
-</div>
-
+                  {format === 'raw' && rawSizeMB && rawAvailable && (
+                    <div>
+                      <strong>RAW size:</strong> ~{rawSizeMB} MB
+                    </div>
+                  )}
+                </div>
 
                 {/* DIGITAL PRODUCT NOTICE – REQUIRED */}
                 <p className="digitalNotice">
@@ -956,14 +950,11 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
 
                 {/* CONTACT LINE – TRUST SIGNAL */}
                 <p className="fine">
-  Need help? 📧{' '}
-  <a href="mailto:info@jeevanchandimal.com">Email us</a>{' '}
-  or{' '}
-  <Link href="/contact">
-    <a>Contact form</a>
-  </Link>
-</p>
-
+                  Need help? 📧 <a href="mailto:info@jeevanchandimal.com">Email us</a> or{' '}
+                  <Link href="/contact">
+                    <a>Contact form</a>
+                  </Link>
+                </p>
               </aside>
             </div>
 
@@ -971,7 +962,9 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
             <section className="relBlock">
               <div className="relHead">
                 <h2>Similar images</h2>
-                <Link href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}>
+                <Link
+                  href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}
+                >
                   <a className="seeAll">See all</a>
                 </Link>
               </div>
@@ -1047,7 +1040,11 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
 
             {/* ZOOM MODAL */}
             {zoomOpen && (
-              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+              <div
+                className="zoomOverlay"
+                onMouseMove={onMouseMovePan}
+                onMouseUp={onMouseUpPan}
+              >
                 <div className="zoomTop">
                   <div className="zoomTitle">{photo.title}</div>
                   <div className="zoomActions">
@@ -1375,10 +1372,9 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
         }
 
         .opt.disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
 
         .field {
           width: 100%;
@@ -1391,12 +1387,12 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
           outline: none;
         }
 
-          .fileInfo {
-  margin-top: 8px;
-  font-size: 12px;
-  opacity: 0.8;
-  line-height: 1.6;
-}
+        .fileInfo {
+          margin-top: 8px;
+          font-size: 12px;
+          opacity: 0.8;
+          line-height: 1.6;
+        }
 
         .row2 {
           margin-top: 10px;
