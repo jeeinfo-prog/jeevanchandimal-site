@@ -990,8 +990,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 <div className="zoomHint">Scroll to zoom • Drag to pan • ESC to close</div>
               </div>
             )}
-          </>
-        )}
+          </div> {/* ⬅️ CLOSE layout div */}
+        </>
+      )}
       </main>
 
       <JeevanChandimalNewFooter />
@@ -1499,6 +1500,39 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           opacity: 0.75;
           border-top: 1px solid rgba(245, 244, 244, 0.12);
         }
+
+        .digitalNotice {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin: 10px 0;
+}
+
+.termsRow {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+  margin: 10px 0;
+  align-items: flex-start;
+}
+
+.termsRow a {
+  text-decoration: underline;
+}
+
+.licenseTable table {
+  width: 100%;
+  font-size: 0.75rem;
+  margin: 10px 0;
+  border-collapse: collapse;
+}
+
+.licenseTable th,
+.licenseTable td {
+  border-bottom: 1px solid #333;
+  padding: 4px;
+  text-align: left;
+}
+
 
         @media (max-width: 991px) {
           .layout {
