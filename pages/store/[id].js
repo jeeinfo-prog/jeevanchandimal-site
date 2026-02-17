@@ -686,110 +686,164 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               </section>
 
               {/* BUY CARD */}
-              <aside className="buyCard">
-                <h1 className="title">{photo.title}</h1>
-                <p className="sub">Choose license + format</p>
+<aside className="buyCard">
+  <h1 className="title">{photo.title}</h1>
+  <p className="sub">Choose license + format</p>
 
-                <div className="block">
-                  <span className="label">Receipt email</span>
-                  <input
-                    className="field"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+  <div className="block">
+    <span className="label">Receipt email</span>
+    <input
+      className="field"
+      type="email"
+      placeholder="you@example.com"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+    />
 
-                  <div className="row2">
-                    <input
-                      className="field"
-                      type="text"
-                      placeholder="First name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                    <input
-                      className="field"
-                      type="text"
-                      placeholder="Last name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                  </div>
+    <div className="row2">
+      <input
+        className="field"
+        type="text"
+        placeholder="First name"
+        value={firstName}
+        onChange={(e) => setFirstName(e.target.value)}
+      />
+      <input
+        className="field"
+        type="text"
+        placeholder="Last name"
+        value={lastName}
+        onChange={(e) => setLastName(e.target.value)}
+      />
+    </div>
 
-                  <p className="fine">
-                    We’ll send your receipt + secure download link to this email.
-                  </p>
-                </div>
+    <p className="fine">
+      We’ll send your receipt and secure download link to this email.
+    </p>
+  </div>
 
-                <div className="block">
-                  <span className="label">License</span>
-                  <div className="options options3">
-                    <button
-                      type="button"
-                      className={`opt ${license === 'personal' ? 'active' : ''}`}
-                      onClick={() => setLicense('personal')}
-                    >
-                      Personal
-                    </button>
-                    <button
-                      type="button"
-                      className={`opt ${license === 'commercial' ? 'active' : ''}`}
-                      onClick={() => setLicense('commercial')}
-                    >
-                      Commercial
-                    </button>
-                    <button
-                      type="button"
-                      className={`opt ${license === 'editorial' ? 'active' : ''}`}
-                      onClick={() => setLicense('editorial')}
-                    >
-                      Editorial
-                    </button>
-                  </div>
-                  <p className="fine">
-                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial:
-                    news/documentary.
-                  </p>
-                </div>
+  <div className="block">
+    <span className="label">License</span>
+    <div className="options options3">
+      <button
+        type="button"
+        className={`opt ${license === 'personal' ? 'active' : ''}`}
+        onClick={() => setLicense('personal')}
+      >
+        Personal
+      </button>
+      <button
+        type="button"
+        className={`opt ${license === 'commercial' ? 'active' : ''}`}
+        onClick={() => setLicense('commercial')}
+      >
+        Commercial
+      </button>
+      <button
+        type="button"
+        className={`opt ${license === 'editorial' ? 'active' : ''}`}
+        onClick={() => setLicense('editorial')}
+      >
+        Editorial
+      </button>
+    </div>
 
-                <div className="block">
-                  <span className="label">Format</span>
-                  <div className="options options2">
-                    <button
-                      type="button"
-                      className={`opt ${format === 'jpg' ? 'active' : ''}`}
-                      onClick={() => setFormat('jpg')}
-                    >
-                      JPG
-                    </button>
-                    <button
-                      type="button"
-                      className={`opt ${format === 'raw' ? 'active' : ''}`}
-                      onClick={() => setFormat('raw')}
-                    >
-                      RAW
-                    </button>
-                  </div>
-                </div>
+    <p className="fine">
+      Personal: non-commercial use. Commercial: ads, branding, client work.
+      Editorial: news, blogs, documentary.
+    </p>
+  </div>
 
-                <div className="priceRow">
-                  <span className="price">{formatMoney(currency, price)}</span>
-                  <span className="small">Instant digital download</span>
-                </div>
+  <div className="block">
+    <span className="label">Format</span>
+    <div className="options options2">
+      <button
+        type="button"
+        className={`opt ${format === 'jpg' ? 'active' : ''}`}
+        onClick={() => setFormat('jpg')}
+      >
+        JPG
+      </button>
+      <button
+        type="button"
+        className={`opt ${format === 'raw' ? 'active' : ''}`}
+        onClick={() => setFormat('raw')}
+      >
+        RAW
+      </button>
+    </div>
+  </div>
 
-                <button
-                  type="button"
-                  className="buyBtn"
-                  onClick={startCheckout}
-                  disabled={isCheckingOut}
-                >
-                  {isCheckingOut ? 'Working…' : 'Buy license'}
-                </button>
+  {/* LICENSE TABLE – PayHere clarity */}
+  <div className="licenseTable">
+    <table>
+      <thead>
+        <tr>
+          <th>License</th>
+          <th>Allowed Usage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Personal</td>
+          <td>Social media, personal projects (non-commercial)</td>
+        </tr>
+        <tr>
+          <td>Commercial</td>
+          <td>Advertising, websites, marketing, client work</td>
+        </tr>
+        <tr>
+          <td>Editorial</td>
+          <td>News articles, blogs, documentaries</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 
-                <p className="fine">After payment, we email your secure download link.</p>
-              </aside>
-            </div>
+  <div className="priceRow">
+    <span className="price">{formatMoney(currency, price)}</span>
+    <span className="small">Instant digital download</span>
+  </div>
+
+  {/* DIGITAL PRODUCT NOTICE – REQUIRED */}
+  <p className="digitalNotice">
+    This is a digital product. No physical item will be shipped.
+    Files are delivered instantly after successful payment.
+  </p>
+
+  {/* TERMS CHECKBOX – BANK SAFE */}
+  <div className="termsRow">
+    <input
+      type="checkbox"
+      id="agree"
+      checked={agreed}
+      onChange={(e) => setAgreed(e.target.checked)}
+    />
+    <label htmlFor="agree">
+      I agree to the{' '}
+      <a href="/terms-and-conditions" target="_blank">Terms</a>,{' '}
+      <a href="/refund-policy" target="_blank">Refund Policy</a>, and{' '}
+      <a href="/privacy-policy" target="_blank">Privacy Policy</a>.
+    </label>
+  </div>
+
+  <button
+    type="button"
+    className="buyBtn"
+    onClick={startCheckout}
+    disabled={isCheckingOut || !agreed}
+  >
+    {isCheckingOut ? 'Working…' : 'Buy license'}
+  </button>
+
+  <p className="fine">
+    After payment, you will receive an email with your secure download link.
+  </p>
+
+  {/* CONTACT LINE – TRUST SIGNAL */}
+  <p className="fine">Need help? 📧 info@jeevanchandimal.com</p>
+</aside>
+
 
             {/* SIMILAR */}
             <section className="relBlock">
@@ -1445,6 +1499,38 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           opacity: 0.75;
           border-top: 1px solid rgba(245, 244, 244, 0.12);
         }
+          .digitalNotice {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin: 10px 0;
+}
+
+.termsRow {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+  margin: 10px 0;
+  align-items: flex-start;
+}
+
+.termsRow a {
+  text-decoration: underline;
+}
+
+.licenseTable table {
+  width: 100%;
+  font-size: 0.75rem;
+  margin: 10px 0;
+  border-collapse: collapse;
+}
+
+.licenseTable th,
+.licenseTable td {
+  border-bottom: 1px solid #333;
+  padding: 4px;
+  text-align: left;
+}
+
 
         @media (max-width: 991px) {
           .layout {
