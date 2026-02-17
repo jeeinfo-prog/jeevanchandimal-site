@@ -857,7 +857,15 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 </p>
 
                 {/* CONTACT LINE – TRUST SIGNAL */}
-                <p className="fine">Need help? 📧 info@jeevanchandimal.com</p>
+                <p className="fine">
+  Need help? 📧{' '}
+  <a href="mailto:info@jeevanchandimal.com">Email us</a>{' '}
+  or{' '}
+  <Link href="/contact">
+    <a>Contact form</a>
+  </Link>
+</p>
+
               </aside>
             </div>
 
