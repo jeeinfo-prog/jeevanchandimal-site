@@ -21,7 +21,18 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, title, description, tags, preview_url, thumb_url, created_at') // ✅ no exif, no location
+      .select(`
+        id,
+        title,
+        description,
+        tags,
+        preview_url,
+        thumb_url,
+        created_at,
+        location,
+        exif,
+        raw_available
+      `)
       .eq('id', id)
       .eq('status', 'published')
       .maybeSingle()
@@ -41,6 +52,9 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, error: 'Preview not ready' })
     }
 
+    // Ensure EXIF is an object (never null) for UI safety
+    const exif = data.exif && typeof data.exif === 'object' ? data.exif : {}
+
     const photo = {
       id: data.id,
       title: data.title || 'Untitled',
@@ -49,7 +63,9 @@ export default async function handler(req, res) {
       preview_url: preview,
       thumb_url: thumb,
       created_at: data.created_at,
-      exif: null, // ✅ keep shape for UI compatibility
+      location: data.location || 'Sri Lanka',
+      exif, // ✅ now contains width/height if stored
+      raw_available: Boolean(data.raw_available),
     }
 
     return res.status(200).json({
