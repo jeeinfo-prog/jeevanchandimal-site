@@ -18,11 +18,6 @@ const PRICES = {
     commercial: { jpg: 25, raw: 35 },
     editorial: { jpg: 13, raw: 20 },
   },
-  USD: {
-    personal: { jpg: 8, raw: 13 },
-    commercial: { jpg: 25, raw: 35 },
-    editorial: { jpg: 13, raw: 20 },
-  },
 }
 
 function formatMoney(currency, amount) {
@@ -82,6 +77,7 @@ function buildContentLocation(location) {
   }
 }
 
+// Extract width/height safely from any common EXIF keys
 function getImageDims(exif) {
   if (!exif) return { w: undefined, h: undefined }
   const w =
@@ -197,7 +193,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
 
-  // ✅ Client refresh (keeps reliability if data changes), but SSR already gives first paint + SEO.
+  // ✅ Client refresh for navigation or edge cases (SSR already gives first paint + SEO)
   React.useEffect(() => {
     if (!router.isReady || !id) return
 
@@ -247,6 +243,43 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, id])
+
+  // ✅ Load EXIF from your existing endpoint (reads original_key in DB + extracts EXIF)
+  React.useEffect(() => {
+    if (!photo?.id) return
+    if (photo?.exif) return
+
+    let alive = true
+
+    async function loadExif() {
+      try {
+        const r = await fetch(`/api/photo/${encodeURIComponent(photo.id)}/exif`, {
+          headers: { 'Cache-Control': 'no-store' },
+        })
+        const j = await r.json().catch(() => null)
+        if (!alive) return
+        if (!j?.ok || !j?.exif) return
+
+        // Map into the keys your UI reads
+        const mapped = {
+          make: j.exif?.make || j.exif?.Make || null,
+          model: j.exif?.model || j.exif?.Model || null,
+          lensModel: j.exif?.lensModel || j.exif?.LensModel || null,
+          settingsLine: j.exif?.settingsLine || null,
+          dateTimeOriginal: j.exif?.dateTimeOriginal || j.exif?.DateTimeOriginal || null,
+          width: j.exif?.width || j.exif?.ImageWidth || j.exif?.PixelXDimension || null,
+          height: j.exif?.height || j.exif?.ImageHeight || j.exif?.PixelYDimension || null,
+        }
+
+        setPhoto((p) => ({ ...p, exif: mapped }))
+      } catch {}
+    }
+
+    loadExif()
+    return () => {
+      alive = false
+    }
+  }, [photo?.id])
 
   // ✅ Load similar + recommended
   React.useEffect(() => {
@@ -298,19 +331,22 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
 
+  // Uses your preview API route
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
     : ''
 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
 
+  // ✅ SEO-safe canonical (never blank)
   const SITE_URL = 'https://jeevanchandimal.com'
   const canonicalId = photo?.id || id
   const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
 
-  // Social image should be PUBLIC + stable for crawlers/bots
+  // ✅ Social images should be PUBLIC and stable for bots
   const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
 
+  // ✅ Width/height for ImageObject / OG (if present)
   const { w: imgW, h: imgH } = getImageDims(photo?.exif)
 
   async function startCheckout() {
@@ -419,12 +455,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         {/* Canonical */}
         <link rel="canonical" href={canonicalUrl} />
 
-        {/* Preload main preview for faster LCP */}
+        {/* Preload main preview image for faster LCP */}
         {photo?.id && previewSrc ? (
           <link rel="preload" as="image" href={previewSrc} fetchPriority="high" />
         ) : null}
 
-        {/* JSON-LD */}
+        {/* JSON-LD Photograph schema */}
         {photo && (
           <script
             type="application/ld+json"
@@ -599,6 +635,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                         </div>
                       ) : null}
 
+                      {/* ✅ Uses dateTimeOriginal (matches your existing UI) */}
                       {photo.exif?.dateTimeOriginal ? (
                         <div>
                           <strong>Taken:</strong>{' '}
@@ -834,11 +871,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
             {/* ZOOM MODAL */}
             {zoomOpen && (
-              <div
-                className="zoomOverlay"
-                onMouseMove={onMouseMovePan}
-                onMouseUp={onMouseUpPan}
-              >
+              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
                 <div className="zoomTop">
                   <div className="zoomTitle">{photo.title}</div>
                   <div className="zoomActions">
@@ -1499,4 +1532,3 @@ export async function getServerSideProps(ctx) {
     return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
   }
 }
-
