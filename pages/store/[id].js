@@ -52,6 +52,20 @@ function formatExifDate(exifDate) {
   return d.toLocaleString()
 }
 
+function estimateJpgSizeMB(width, height) {
+  if (!width || !height) return null
+  // rough compression estimate: 0.35 bytes per pixel
+  const bytes = width * height * 0.35
+  return (bytes / (1024 * 1024)).toFixed(1)
+}
+
+function estimateRawSizeMB(width, height) {
+  if (!width || !height) return null
+  // RAW ~ 2 bytes per pixel (varies by camera, good estimate)
+  const bytes = width * height * 2
+  return (bytes / (1024 * 1024)).toFixed(1)
+}
+
 function buildContentLocation(location) {
   const loc = String(location || '').trim()
   if (!loc) {
@@ -373,6 +387,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   // ✅ Width/height for ImageObject / OG (if present)
   const { w: imgW, h: imgH } = getImageDims(photo?.exif)
+  const resolution = imgW && imgH ? `${imgW}×${imgH}` : null
+
+const jpgSizeMB = estimateJpgSizeMB(imgW, imgH)
+const rawSizeMB = estimateRawSizeMB(imgW, imgH)
+
 
   async function startCheckout() {
     if (!photo) return
@@ -848,9 +867,31 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 </div>
 
                 <div className="priceRow">
-                  <span className="price">{formatMoney(currency, price)}</span>
-                  <span className="small">Instant digital download</span>
-                </div>
+  <span className="price">{formatMoney(currency, price)}</span>
+  <span className="small">Instant digital download</span>
+</div>
+
+{/* FILE INFO */}
+<div className="fileInfo">
+  {resolution && (
+    <div>
+      <strong>Resolution:</strong> {resolution}
+    </div>
+  )}
+
+  {format === 'jpg' && jpgSizeMB && (
+    <div>
+      <strong>JPG size:</strong> ~{jpgSizeMB} MB
+    </div>
+  )}
+
+  {format === 'raw' && rawSizeMB && rawAvailable && (
+    <div>
+      <strong>RAW size:</strong> ~{rawSizeMB} MB
+    </div>
+  )}
+</div>
+
 
                 {/* DIGITAL PRODUCT NOTICE – REQUIRED */}
                 <p className="digitalNotice">
@@ -1332,6 +1373,13 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           color: inherit;
           outline: none;
         }
+
+          .fileInfo {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1.6;
+}
 
         .row2 {
           margin-top: 10px;
