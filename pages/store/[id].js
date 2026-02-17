@@ -164,6 +164,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [recommended, setRecommended] = React.useState([])
   const [relLoading, setRelLoading] = React.useState(false)
 
+  const [naturalDims, setNaturalDims] = React.useState({ w: null, h: null })
+
+
   // Watermark controls
   const [wmOn, setWmOn] = React.useState(true)
   const [wmOpacity, setWmOpacity] = React.useState(0.08)
@@ -387,7 +390,15 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   // ✅ Width/height for ImageObject / OG (if present)
   const { w: imgW, h: imgH } = getImageDims(photo?.exif)
-  const resolution = imgW && imgH ? `${imgW}×${imgH}` : null
+  console.log('EXIF dims:', imgW, imgH, photo?.exif)
+  const finalW = imgW || naturalDims.w
+const finalH = imgH || naturalDims.h
+
+const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
+
+const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
+const rawSizeMB = estimateRawSizeMB(finalW, finalH)
+
 
 const jpgSizeMB = estimateJpgSizeMB(imgW, imgH)
 const rawSizeMB = estimateRawSizeMB(imgW, imgH)
@@ -590,21 +601,27 @@ const rawSizeMB = estimateRawSizeMB(imgW, imgH)
                   </button>
 
                   <img
-                    src={previewSrc || photo.previewUrl || photo.thumbUrl}
-                    alt={photo.title}
-                    draggable={false}
-                    onClick={openZoom}
-                    onContextMenu={preventSave}
-                    onDragStart={preventSave}
-                    loading="eager"
-                    onError={(e) => {
-                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
-                        e.currentTarget.src = photo.previewUrl
-                        return
-                      }
-                      if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
-                    }}
-                  />
+  src={previewSrc || photo.previewUrl || photo.thumbUrl}
+  alt={photo.title}
+  draggable={false}
+  onClick={openZoom}
+  onContextMenu={preventSave}
+  onDragStart={preventSave}
+  loading="eager"
+  onLoad={(e) => {
+    const w = e.currentTarget.naturalWidth
+    const h = e.currentTarget.naturalHeight
+    if (w && h) setNaturalDims({ w, h })
+  }}
+  onError={(e) => {
+    if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+      e.currentTarget.src = photo.previewUrl
+      return
+    }
+    if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+  }}
+/>
+
 
                   {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
                 </div>
