@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, title, description, tags, preview_url, thumb_url, created_at, exif')
+      .select('id, title, description, tags, preview_url, thumb_url, created_at') // ✅ no exif, no location
       .eq('id', id)
       .eq('status', 'published')
       .maybeSingle()
@@ -37,7 +37,6 @@ export default async function handler(req, res) {
     const preview = cleanUrl(data.preview_url)
     const thumb = cleanUrl(data.thumb_url)
 
-    // Ensure derivatives exist (matches your list page logic)
     if (!preview || !thumb) {
       return res.status(404).json({ ok: false, error: 'Preview not ready' })
     }
@@ -50,7 +49,7 @@ export default async function handler(req, res) {
       preview_url: preview,
       thumb_url: thumb,
       created_at: data.created_at,
-      exif: data.exif || null,
+      exif: null, // ✅ keep shape for UI compatibility
     }
 
     return res.status(200).json({
