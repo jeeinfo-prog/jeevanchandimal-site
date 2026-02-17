@@ -990,8 +990,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 <div className="zoomHint">Scroll to zoom • Drag to pan • ESC to close</div>
               </div>
             )}
-          </>
-        )}
+          </div> {/* ⬅️ CLOSE layout div */}
+        </>
+      )}
       </main>
 
       <JeevanChandimalNewFooter />
@@ -1499,7 +1500,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           opacity: 0.75;
           border-top: 1px solid rgba(245, 244, 244, 0.12);
         }
-          .digitalNotice {
+
+        .digitalNotice {
   font-size: 0.85rem;
   opacity: 0.8;
   margin: 10px 0;
