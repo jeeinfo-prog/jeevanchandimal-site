@@ -14,7 +14,9 @@ export async function getServerSideProps({ res }) {
   const wpBase = process.env.NEXT_PUBLIC_WP_BASE_URL
   const nowIso = new Date().toISOString()
 
-  /* ---------------- FETCH STORE PHOTOS (via API) ---------------- */
+  const MIN_TAG_PHOTOS = 3
+
+  // --- Fetch store photos (via your API)
   let storePhotos = []
   try {
     const r = await fetch(`${siteUrl}/api/store/photos`, {
@@ -26,55 +28,69 @@ export async function getServerSideProps({ res }) {
     storePhotos = []
   }
 
-  /* ---------------- STORE PHOTO URLS + IMAGE TAGS ---------------- */
-  const storeUrls = storePhotos.map((p) => {
-    const pageUrl = `${siteUrl}/store/${p.id}`
-    const imageUrl = p.preview_url || ''
+  // --- Store URLs + Image Sitemap tags
+  const storeUrls = storePhotos
+    .map((p) => {
+      const id = String(p?.id || '').trim()
+      if (!id) return ''
 
-    return `
+      const pageUrl = `${siteUrl}/store/${id}`
+      const imageUrl = `${siteUrl}/api/photo/${encodeURIComponent(id)}/preview`
+
+      const title = p?.title || 'Photograph by Jeevan Chandimal'
+      const caption =
+        (p?.description && String(p.description).trim()) ||
+        title ||
+        'Sri Lanka photography by Jeevan Chandimal'
+
+      return `
   <url>
     <loc>${esc(pageUrl)}</loc>
     <lastmod>${esc(nowIso)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
-    ${
-      imageUrl
-        ? `
+
     <image:image>
       <image:loc>${esc(imageUrl)}</image:loc>
-      <image:title>${esc(p.title || 'Photo')}</image:title>
-    </image:image>`
-        : ''
-    }
+      <image:title>${esc(title)}</image:title>
+      <image:caption>${esc(caption)}</image:caption>
+    </image:image>
   </url>`
-  }).join('')
+    })
+    .filter(Boolean)
+    .join('')
 
-  /* ---------------- COLLECTIONS ---------------- */
-  const MIN_TAG_PHOTOS = 3
+  // --- Collections (from tags)
+  let collectionUrls = ''
+  try {
+    const counts = new Map()
 
-  const tagCounts = new Map()
-
-  for (const row of storePhotos) {
-    const tags = Array.isArray(row?.tags) ? row.tags : []
-    for (const t of tags) {
-      const tag = String(t || '').trim().toLowerCase()
-      if (!tag) continue
-      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)
+    for (const row of storePhotos) {
+      const tags = Array.isArray(row?.tags) ? row.tags : []
+      for (const t of tags) {
+        const tag = String(t || '').trim().toLowerCase()
+        if (!tag) continue
+        counts.set(tag, (counts.get(tag) || 0) + 1)
+      }
     }
-  }
 
-  const collectionUrls = Array.from(tagCounts.entries())
-    .filter(([, c]) => c >= MIN_TAG_PHOTOS)
-    .map(([tag]) => `
+    collectionUrls = Array.from(counts.entries())
+      .filter(([, c]) => c >= MIN_TAG_PHOTOS)
+      .map(
+        ([tag]) => `
   <url>
     <loc>${esc(`${siteUrl}/collections/${encodeURIComponent(tag)}`)}</loc>
     <lastmod>${esc(nowIso)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
-  </url>`)
-    .join('')
+  </url>`
+      )
+      .join('')
+  } catch {
+    collectionUrls = ''
+  }
 
-  /* ---------------- WORDPRESS PROJECTS ---------------- */
+  // --- WordPress projects
   let wpUrls = ''
   try {
     if (wpBase) {
@@ -82,26 +98,27 @@ export async function getServerSideProps({ res }) {
       const posts = await r.json().catch(() => [])
 
       if (Array.isArray(posts)) {
-        wpUrls = posts.map((post) => {
-          const lastmod = post?.modified
-            ? new Date(post.modified).toISOString()
-            : nowIso
+        wpUrls = posts
+          .map((post) => {
+            const lastmod = post?.modified
+              ? new Date(post.modified).toISOString()
+              : nowIso
 
-          return `
+            return `
   <url>
     <loc>${esc(`${siteUrl}/project/${post.slug}`)}</loc>
     <lastmod>${esc(lastmod)}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>`
-        }).join('')
+          })
+          .join('')
       }
     }
   } catch {
     wpUrls = ''
   }
 
-  /* ---------------- ROOT PAGES ---------------- */
   const rootUrls = `
   <url>
     <loc>${esc(siteUrl)}</loc>
@@ -125,7 +142,6 @@ export async function getServerSideProps({ res }) {
   </url>
   `
 
-  /* ---------------- FINAL XML ---------------- */
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
@@ -139,7 +155,10 @@ export async function getServerSideProps({ res }) {
 </urlset>`
 
   res.setHeader('Content-Type', 'text/xml')
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.setHeader(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate'
+  )
   res.setHeader('Pragma', 'no-cache')
   res.setHeader('Expires', '0')
 
