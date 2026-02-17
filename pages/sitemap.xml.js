@@ -13,10 +13,9 @@ export async function getServerSideProps({ res }) {
   const siteUrl = 'https://www.jeevanchandimal.com'
   const wpBase = process.env.NEXT_PUBLIC_WP_BASE_URL
   const nowIso = new Date().toISOString()
-
   const MIN_TAG_PHOTOS = 3
 
-  // --- Fetch store photos (via your API)
+  /* ---------------- FETCH STORE PHOTOS ---------------- */
   let storePhotos = []
   try {
     const r = await fetch(`${siteUrl}/api/store/photos`, {
@@ -28,7 +27,7 @@ export async function getServerSideProps({ res }) {
     storePhotos = []
   }
 
-  // --- Store URLs + Image Sitemap tags
+  /* ---------------- STORE URLS + IMAGE TAGS ---------------- */
   const storeUrls = storePhotos
     .map((p) => {
       const id = String(p?.id || '').trim()
@@ -54,13 +53,14 @@ export async function getServerSideProps({ res }) {
       <image:loc>${esc(imageUrl)}</image:loc>
       <image:title>${esc(title)}</image:title>
       <image:caption>${esc(caption)}</image:caption>
+      <image:license>${esc(pageUrl)}</image:license>
     </image:image>
   </url>`
     })
     .filter(Boolean)
     .join('')
 
-  // --- Collections (from tags)
+  /* ---------------- COLLECTIONS (FROM TAGS) ---------------- */
   let collectionUrls = ''
   try {
     const counts = new Map()
@@ -90,7 +90,7 @@ export async function getServerSideProps({ res }) {
     collectionUrls = ''
   }
 
-  // --- WordPress projects
+  /* ---------------- WORDPRESS PROJECTS ---------------- */
   let wpUrls = ''
   try {
     if (wpBase) {
@@ -119,6 +119,7 @@ export async function getServerSideProps({ res }) {
     wpUrls = ''
   }
 
+  /* ---------------- ROOT URLS ---------------- */
   const rootUrls = `
   <url>
     <loc>${esc(siteUrl)}</loc>
@@ -142,6 +143,7 @@ export async function getServerSideProps({ res }) {
   </url>
   `
 
+  /* ---------------- FINAL XML ---------------- */
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset
   xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
