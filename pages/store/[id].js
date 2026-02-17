@@ -20,6 +20,8 @@ const PRICES = {
   },
 }
 
+const SITE_URL = 'https://www.jeevanchandimal.com'
+
 function formatMoney(currency, amount) {
   if (currency === 'LKR') return `LKR ${Number(amount).toLocaleString('en-LK')}`
   return `$${Number(amount)}`
@@ -94,8 +96,9 @@ function normalizePhotoPayload(payload) {
   const row = payload?.photo || payload
   if (!row) return null
 
-  const cleanedThumb = String(row.thumb_url || row.thumbUrl || '').trim()
-  const cleanedPreview = String(row.preview_url || row.previewUrl || '').trim()
+  // Clean any accidental whitespace/newlines coming from DB
+  const cleanedThumb = String(row.thumb_url || row.thumbUrl || '').replace(/\s+/g, '')
+  const cleanedPreview = String(row.preview_url || row.previewUrl || '').replace(/\s+/g, '')
 
   return {
     id: row.id,
@@ -301,10 +304,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
 
-  // ✅ SEO-safe canonical (never blank)
-  const SITE_URL = 'https://jeevanchandimal.com'
+  // ✅ SEO-safe canonical (always resolves to a real id when possible)
   const canonicalId = photo?.id || id
-  const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
+  const canonicalUrl = canonicalId ? `${SITE_URL}/store/${canonicalId}` : `${SITE_URL}/store`
 
   // ✅ Social images should be PUBLIC and stable for bots
   const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
@@ -574,8 +576,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
                       {photo.createdAt ? (
                         <div>
-                          <strong>Date:</strong>{' '}
-                          {new Date(photo.createdAt).toLocaleDateString()}
+                          <strong>Date:</strong> {new Date(photo.createdAt).toLocaleDateString()}
                         </div>
                       ) : null}
 
@@ -679,9 +680,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     />
                   </div>
 
-                  <p className="fine">
-                    We’ll send your receipt + secure download link to this email.
-                  </p>
+                  <p className="fine">We’ll send your receipt + secure download link to this email.</p>
                 </div>
 
                 <div className="block">
@@ -710,8 +709,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     </button>
                   </div>
                   <p className="fine">
-                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial:
-                    news/documentary.
+                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary.
                   </p>
                 </div>
 
@@ -772,11 +770,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img
-                            src={String(p.thumb_url || '').trim()}
-                            alt={p.title || 'Photo'}
-                            loading="lazy"
-                          />
+                          <img src={String(p.thumb_url || '').replace(/\s+/g, '')} alt={p.title || 'Photo'} loading="lazy" />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
@@ -811,11 +805,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img
-                            src={String(p.thumb_url || '').trim()}
-                            alt={p.title || 'Photo'}
-                            loading="lazy"
-                          />
+                          <img src={String(p.thumb_url || '').replace(/\s+/g, '')} alt={p.title || 'Photo'} loading="lazy" />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
@@ -1455,17 +1445,8 @@ export async function getServerSideProps(ctx) {
   }
 
   try {
-    const proto = (ctx.req.headers['x-forwarded-proto'] || 'https')
-      .toString()
-      .split(',')[0]
-      .trim()
-    const host = (ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '')
-      .toString()
-      .split(',')[0]
-      .trim()
-
-    const base = host ? `${proto}://${host}` : 'https://jeevanchandimal.com'
-    const url = `${base}/api/store/photo?id=${encodeURIComponent(pid)}`
+    // ✅ Always use your canonical public origin for SSR fetches (prevents redirect issues)
+    const url = `${SITE_URL}/api/store/photo?id=${encodeURIComponent(pid)}`
 
     const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
     const json = await r.json().catch(() => null)
