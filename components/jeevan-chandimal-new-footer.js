@@ -379,6 +379,13 @@ const JeevanChandimalNewFooter = (props) => {
                   </a>
                 </Link>
 
+                <Link href="/refund-policy">
+                  <a className="thq-body-small legal-link">
+                        <span className="jeevan-chandimal-new-footer-text19">Refund Policy</span>
+                      </a>
+                </Link>
+
+
                 <Link href="/cookies-policy">
                   <a className="thq-body-small legal-link">
                     {props.cookiesLink ?? (
