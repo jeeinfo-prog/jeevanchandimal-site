@@ -1,3 +1,5 @@
+// pages/refund-policy.js
+import React from 'react'
 import Head from 'next/head'
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
@@ -7,50 +9,95 @@ export default function RefundPolicy() {
     <>
       <Head>
         <title>Refund Policy | Jeevan Chandimal</title>
+        <meta
+          name="description"
+          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com"
+        />
       </Head>
 
       <JeevanChandimalNavi />
 
       <main className="wrap">
         <h1>Refund Policy</h1>
-        <p>Last updated: {new Date().toLocaleDateString()}</p>
 
         <p>
-          All products sold on this website are digital downloads and licensing rights
-          for photographs. No physical items are shipped.
+          Thank you for purchasing from <strong>JeevanChandimal.com</strong>. We provide
+          high-quality digital photography and licensing services. Because our products are
+          digital downloads, our refund policy is different from physical goods.
         </p>
 
-        <h2>No Returns on Digital Downloads</h2>
+        <h2>Digital Product Refunds</h2>
         <p>
-          Due to the nature of digital products, all sales are final once the download
-          link or license access has been delivered.
+          All purchases made on our website are for digital files and licensing rights. Once a
+          file has been successfully delivered or downloaded, the sale is considered final and
+          non-refundable.
         </p>
 
-        <h2>Duplicate or Failed Payments</h2>
+        <p>We do not offer refunds for:</p>
+        <ul>
+          <li>Change of mind after purchase</li>
+          <li>Accidental purchases</li>
+          <li>Incorrect license selection</li>
+          <li>Incompatibility with software or devices</li>
+          <li>Failure to read product details before purchase</li>
+        </ul>
+
+        <h2>Exceptions (Eligible for Refund or Replacement)</h2>
+        <p>A refund or replacement may be provided only if:</p>
+        <ul>
+          <li>The purchased file is corrupted or cannot be opened</li>
+          <li>You received the wrong file</li>
+          <li>The file fails to download due to a verified system error</li>
+        </ul>
+
         <p>
-          If you are charged multiple times for the same order, please contact us
-          within 7 days. Verified duplicate payments will be fully refunded.
+          In such cases, you must contact us within <strong>3 days</strong> of purchase with:
+        </p>
+        <ul>
+          <li>Your order ID</li>
+          <li>A description of the issue</li>
+          <li>Screenshots (if applicable)</li>
+        </ul>
+
+        <p>
+          We will first attempt to re-deliver a correct working file. If the issue cannot be
+          resolved, a refund will be issued to the original payment method.
         </p>
 
-        <h2>Technical Issues</h2>
+        <h2>Duplicate Payments</h2>
         <p>
-          If you receive a corrupted file or cannot download your purchase, we will
-          provide a replacement or a full refund if the issue cannot be resolved.
-        </p>
-
-        <h2>Unauthorized Transactions</h2>
-        <p>
-          If you believe a payment was made fraudulently, contact us immediately.
+          If you were charged more than once for the same order due to a payment error, the
+          duplicate amount will be refunded.
         </p>
 
         <h2>Processing Time</h2>
         <p>
-          Approved refunds will be processed within 5–10 business days via the original
-          payment method.
+          Approved refunds will be processed within <strong>5–10 business days</strong>. The time
+          taken for the refund to appear in your account depends on your payment provider.
         </p>
 
-        <h2>Contact</h2>
-        <p>Email: support@jeevanchandimal.com</p>
+        <h2>License Usage</h2>
+        <p>Refunds will not be granted if the downloaded image has already been:</p>
+        <ul>
+          <li>Used in any published work</li>
+          <li>Shared publicly</li>
+          <li>Distributed to third parties</li>
+        </ul>
+
+        <p>
+          As licensing rights are granted immediately upon delivery.
+        </p>
+
+        <h2>Contact Us</h2>
+        <p>
+          If you experience any issues with your purchase, please contact:
+        </p>
+        <p>
+          📧 <strong>info@jeevanchandimal.com</strong>
+        </p>
+        <p>
+          We will respond as quickly as possible to resolve your issue.
+        </p>
       </main>
 
       <JeevanChandimalNewFooter />
@@ -59,8 +106,26 @@ export default function RefundPolicy() {
         .wrap {
           max-width: 900px;
           margin: 0 auto;
-          padding: 40px 20px;
+          padding: 60px 20px 100px;
           line-height: 1.7;
+        }
+
+        h1 {
+          margin-bottom: 20px;
+        }
+
+        h2 {
+          margin-top: 30px;
+          margin-bottom: 10px;
+        }
+
+        ul {
+          margin-left: 20px;
+          margin-top: 10px;
+        }
+
+        li {
+          margin-bottom: 6px;
         }
       `}</style>
     </>
