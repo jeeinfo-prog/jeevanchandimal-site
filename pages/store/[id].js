@@ -18,9 +18,12 @@ const PRICES = {
     commercial: { jpg: 25, raw: 35 },
     editorial: { jpg: 13, raw: 20 },
   },
+  USD: {
+    personal: { jpg: 8, raw: 13 },
+    commercial: { jpg: 25, raw: 35 },
+    editorial: { jpg: 13, raw: 20 },
+  },
 }
-
-const SITE_URL = 'https://www.jeevanchandimal.com'
 
 function formatMoney(currency, amount) {
   if (currency === 'LKR') return `LKR ${Number(amount).toLocaleString('en-LK')}`
@@ -79,7 +82,6 @@ function buildContentLocation(location) {
   }
 }
 
-// Extract width/height safely from any common EXIF keys
 function getImageDims(exif) {
   if (!exif) return { w: undefined, h: undefined }
   const w =
@@ -96,9 +98,8 @@ function normalizePhotoPayload(payload) {
   const row = payload?.photo || payload
   if (!row) return null
 
-  // Clean any accidental whitespace/newlines coming from DB
-  const cleanedThumb = String(row.thumb_url || row.thumbUrl || '').replace(/\s+/g, '')
-  const cleanedPreview = String(row.preview_url || row.previewUrl || '').replace(/\s+/g, '')
+  const cleanedThumb = String(row.thumb_url || row.thumbUrl || '').trim()
+  const cleanedPreview = String(row.preview_url || row.previewUrl || '').trim()
 
   return {
     id: row.id,
@@ -196,7 +197,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
 
-  // ✅ Client refresh for navigation or edge cases (SSR already gives first paint + SEO)
+  // ✅ Client refresh (keeps reliability if data changes), but SSR already gives first paint + SEO.
   React.useEffect(() => {
     if (!router.isReady || !id) return
 
@@ -297,21 +298,19 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
 
-  // Uses your preview API route
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
     : ''
 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
 
-  // ✅ SEO-safe canonical (always resolves to a real id when possible)
+  const SITE_URL = 'https://jeevanchandimal.com'
   const canonicalId = photo?.id || id
-  const canonicalUrl = canonicalId ? `${SITE_URL}/store/${canonicalId}` : `${SITE_URL}/store`
+  const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
 
-  // ✅ Social images should be PUBLIC and stable for bots
+  // Social image should be PUBLIC + stable for crawlers/bots
   const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
 
-  // ✅ Width/height for ImageObject / OG (if present)
   const { w: imgW, h: imgH } = getImageDims(photo?.exif)
 
   async function startCheckout() {
@@ -420,12 +419,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         {/* Canonical */}
         <link rel="canonical" href={canonicalUrl} />
 
-        {/* Preload main preview image for faster LCP */}
+        {/* Preload main preview for faster LCP */}
         {photo?.id && previewSrc ? (
           <link rel="preload" as="image" href={previewSrc} fetchPriority="high" />
         ) : null}
 
-        {/* JSON-LD Photograph schema */}
+        {/* JSON-LD */}
         {photo && (
           <script
             type="application/ld+json"
@@ -576,7 +575,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
                       {photo.createdAt ? (
                         <div>
-                          <strong>Date:</strong> {new Date(photo.createdAt).toLocaleDateString()}
+                          <strong>Date:</strong>{' '}
+                          {new Date(photo.createdAt).toLocaleDateString()}
                         </div>
                       ) : null}
 
@@ -599,10 +599,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                         </div>
                       ) : null}
 
-                      {/* ✅ Use normalized field from your API */}
-                      {photo.exif?.takenAt ? (
+                      {photo.exif?.dateTimeOriginal ? (
                         <div>
-                          <strong>Taken:</strong> {formatExifDate(photo.exif.takenAt)}
+                          <strong>Taken:</strong>{' '}
+                          {formatExifDate(photo.exif.dateTimeOriginal)}
                         </div>
                       ) : null}
 
@@ -680,7 +680,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     />
                   </div>
 
-                  <p className="fine">We’ll send your receipt + secure download link to this email.</p>
+                  <p className="fine">
+                    We’ll send your receipt + secure download link to this email.
+                  </p>
                 </div>
 
                 <div className="block">
@@ -709,7 +711,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     </button>
                   </div>
                   <p className="fine">
-                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial: news/documentary.
+                    Personal: non-paid use. Commercial: ads/brand/client work. Editorial:
+                    news/documentary.
                   </p>
                 </div>
 
@@ -770,7 +773,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img src={String(p.thumb_url || '').replace(/\s+/g, '')} alt={p.title || 'Photo'} loading="lazy" />
+                          <img
+                            src={String(p.thumb_url || '').trim()}
+                            alt={p.title || 'Photo'}
+                            loading="lazy"
+                          />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
@@ -805,7 +812,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`}>
                       <a className="relCard">
                         <div className="relThumb">
-                          <img src={String(p.thumb_url || '').replace(/\s+/g, '')} alt={p.title || 'Photo'} loading="lazy" />
+                          <img
+                            src={String(p.thumb_url || '').trim()}
+                            alt={p.title || 'Photo'}
+                            loading="lazy"
+                          />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
@@ -823,7 +834,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
             {/* ZOOM MODAL */}
             {zoomOpen && (
-              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+              <div
+                className="zoomOverlay"
+                onMouseMove={onMouseMovePan}
+                onMouseUp={onMouseUpPan}
+              >
                 <div className="zoomTop">
                   <div className="zoomTitle">{photo.title}</div>
                   <div className="zoomActions">
@@ -1445,8 +1460,17 @@ export async function getServerSideProps(ctx) {
   }
 
   try {
-    // ✅ Always use your canonical public origin for SSR fetches (prevents redirect issues)
-    const url = `${SITE_URL}/api/store/photo?id=${encodeURIComponent(pid)}`
+    const proto = (ctx.req.headers['x-forwarded-proto'] || 'https')
+      .toString()
+      .split(',')[0]
+      .trim()
+    const host = (ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '')
+      .toString()
+      .split(',')[0]
+      .trim()
+
+    const base = host ? `${proto}://${host}` : 'https://jeevanchandimal.com'
+    const url = `${base}/api/store/photo?id=${encodeURIComponent(pid)}`
 
     const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
     const json = await r.json().catch(() => null)
@@ -1475,3 +1499,4 @@ export async function getServerSideProps(ctx) {
     return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
   }
 }
+
