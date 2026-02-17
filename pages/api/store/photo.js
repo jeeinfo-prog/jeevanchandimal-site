@@ -1,11 +1,5 @@
-// pages/api/store/photos.js
+// pages/api/store/photo.js
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
-
-function cleanUrl(u) {
-  const s = String(u || '')
-  const v = s.replace(/\s+/g, '')
-  return v || null
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -13,34 +7,37 @@ export default async function handler(req, res) {
   }
 
   try {
+    const id = String(req.query?.id || '').trim()
+
+    // ✅ Require id
+    if (!id) {
+      return res.status(400).json({ ok: false, error: 'Missing photo id' })
+    }
+
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, title, tags, preview_url, thumb_url, created_at')
+      .select(
+        'id, title, description, tags, preview_url, thumb_url, created_at, location, exif'
+      )
+      .eq('id', id)
       .eq('status', 'published')
-      .not('thumb_url', 'is', null)
-      .not('preview_url', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(2000)
+      .maybeSingle()
 
     if (error) {
       return res.status(500).json({ ok: false, error: error.message })
     }
 
-    const photos = (data || []).map((row) => ({
-      id: row.id,
-      title: row.title || 'Untitled',
-      tags: Array.isArray(row.tags) ? row.tags : [],
-      preview_url: cleanUrl(row.preview_url),
-      thumb_url: cleanUrl(row.thumb_url),
-      created_at: row.created_at,
-    }))
+    if (!data) {
+      return res.status(404).json({ ok: false, error: 'Photo not found' })
+    }
 
-    return res.status(200).json({
-      ok: true,
-      photos,
-    })
+    // ✅ Ensure derivatives exist (optional but matches your list behavior)
+    if (!data.thumb_url || !data.preview_url) {
+      return res.status(404).json({ ok: false, error: 'Preview not ready' })
+    }
+
+    return res.status(200).json({ ok: true, photo: data })
   } catch (e) {
-    console.error(e)
     return res.status(500).json({ ok: false, error: 'Server error' })
   }
 }
