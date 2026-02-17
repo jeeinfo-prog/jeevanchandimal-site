@@ -19,10 +19,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing photo id' })
     }
 
-    // ✅ IMPORTANT: do NOT select columns that may not exist (like location)
+    // ✅ IMPORTANT: select ONLY columns that exist in your DB
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, title, description, tags, preview_url, thumb_url, created_at, exif')
+      .select('id, title, description, tags, preview_url, thumb_url, created_at')
       .eq('id', id)
       .eq('status', 'published')
       .maybeSingle()
@@ -42,8 +42,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, error: 'Preview not ready' })
     }
 
-    const exif = data.exif && typeof data.exif === 'object' ? data.exif : {}
-
     const photo = {
       id: data.id,
       title: data.title || 'Untitled',
@@ -53,15 +51,16 @@ export default async function handler(req, res) {
       thumb_url: thumb,
       created_at: data.created_at,
 
-      // ✅ Keep shape for UI compatibility
-      exif,
-
-      // ✅ Defaults (since DB column doesn't exist)
+      // ✅ keep keys for UI compatibility (but DB doesn't have them)
       location: 'Sri Lanka',
+      exif: null,
       raw_available: true,
     }
 
-    return res.status(200).json({ ok: true, photo })
+    return res.status(200).json({
+      ok: true,
+      photo,
+    })
   } catch (e) {
     console.error(e)
     return res.status(500).json({ ok: false, error: 'Server error' })
