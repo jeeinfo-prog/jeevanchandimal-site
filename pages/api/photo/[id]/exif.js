@@ -3,6 +3,48 @@ import { r2GetObjectBuffer } from '../../../../lib/r2'
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { extractExifFromJpeg } from '../../../../lib/exif-lite'
 
+// ✅ Read width/height from JPEG header (SOF marker) when EXIF doesn't include dims
+function getJpegDimensions(buf) {
+  if (!buf || buf.length < 4) return { width: null, height: null }
+  // JPEG starts with FF D8
+  if (!(buf[0] === 0xff && buf[1] === 0xd8)) return { width: null, height: null }
+
+  let i = 2
+  while (i < buf.length) {
+    if (buf[i] !== 0xff) {
+      i += 1
+      continue
+    }
+
+    const marker = buf[i + 1]
+    // Standalone markers
+    if (marker === 0xd8 || marker === 0xd9) {
+      i += 2
+      continue
+    }
+
+    if (i + 3 >= buf.length) break
+    const length = buf.readUInt16BE(i + 2)
+    if (!length || i + 2 + length > buf.length) break
+
+    // SOF markers that contain dimensions
+    // SOF0 (C0), SOF1 (C1), SOF2 (C2), SOF3 (C3)
+    if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2 || marker === 0xc3) {
+      // Layout: FF Cx [len hi] [len lo] [precision] [H hi] [H lo] [W hi] [W lo] ...
+      if (i + 7 < buf.length) {
+        const height = buf.readUInt16BE(i + 5)
+        const width = buf.readUInt16BE(i + 7)
+        return { width: width || null, height: height || null }
+      }
+      break
+    }
+
+    i += 2 + length
+  }
+
+  return { width: null, height: null }
+}
+
 function normalizeDims(exif) {
   if (!exif || typeof exif !== 'object') return exif
 
@@ -46,7 +88,7 @@ export default async function handler(req, res) {
     // ✅ Priority 1: use ?key=... if provided
     let key = forcedKey
 
-    // ✅ Priority 2: fallback to DB (now supports original_jpg_key + exif_json)
+    // ✅ Priority 2: fallback to DB (supports original_jpg_key + exif_json)
     if (!key) {
       const { data: row, error } = await supabaseAdmin
         .from('photos')
@@ -120,7 +162,20 @@ export default async function handler(req, res) {
       }
     }
 
+    // Normalize width/height from EXIF keys
     exif = normalizeDims(exif)
+
+    // ✅ Fallback: read dims from JPEG header if EXIF doesn't provide them
+    if (isJpeg && (!exif?.width || !exif?.height)) {
+      const dims = getJpegDimensions(buf)
+      if (dims.width && dims.height) {
+        exif = {
+          ...(exif || {}),
+          width: exif?.width || dims.width,
+          height: exif?.height || dims.height,
+        }
+      }
+    }
 
     // 5) Optional save (stores correct EXIF back to DB)
     if (shouldSave) {
