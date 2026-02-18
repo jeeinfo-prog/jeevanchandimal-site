@@ -6,7 +6,6 @@ import { extractExifFromJpeg } from '../../../../lib/exif-lite'
 function normalizeDims(exif) {
   if (!exif || typeof exif !== 'object') return exif
 
-  // Try many common width/height keys
   const width =
     Number(
       exif.width ||
@@ -47,13 +46,11 @@ export default async function handler(req, res) {
     // ✅ Priority 1: use ?key=... if provided
     let key = forcedKey
 
-    // ✅ Priority 2: fallback to DB
-    // Now also fetch exif_json for fallback
-    let row = null
+    // ✅ Priority 2: fallback to DB (now supports original_jpg_key + exif_json)
     if (!key) {
-      const { data, error } = await supabaseAdmin
+      const { data: row, error } = await supabaseAdmin
         .from('photos')
-        .select('id, original_key, exif_json')
+        .select('id, original_key, original_jpg_key, exif_json')
         .eq('id', id)
         .single()
 
@@ -61,23 +58,23 @@ export default async function handler(req, res) {
         return res.status(500).json({ ok: false, error: error.message })
       }
 
-      row = data || null
+      // ✅ If original_key missing, use original_jpg_key
+      key = row?.original_key || row?.original_jpg_key || ''
 
-      // ✅ Fallback: if original_key missing but exif_json exists, return it
-      if (!row?.original_key) {
+      // ✅ If still no key, but exif_json exists, return cached exif_json
+      if (!key) {
         const cachedExif =
           row?.exif_json && typeof row.exif_json === 'object' ? row.exif_json : null
 
         if (cachedExif) {
-          const exifOut = normalizeDims(cachedExif)
           return res.status(200).json({
             ok: true,
             id,
             key: null,
             source: 'db_exif_json',
-            isJpeg: null,
             size: null,
-            exif: exifOut,
+            isJpeg: null,
+            exif: normalizeDims(cachedExif),
             exifError: null,
             saved: false,
           })
@@ -85,12 +82,10 @@ export default async function handler(req, res) {
 
         return res.status(404).json({
           ok: false,
-          error: 'original_key missing in DB',
-          hint: 'Store original_key during upload commit OR save exif_json',
+          error: 'No original key found',
+          hint: 'Need original_key or original_jpg_key in DB (or exif_json saved)',
         })
       }
-
-      key = row.original_key
     }
 
     // 2) Fetch from R2
@@ -125,15 +120,15 @@ export default async function handler(req, res) {
       }
     }
 
-    // Normalize width/height keys for UI
     exif = normalizeDims(exif)
 
-    // 5) Optional save
+    // 5) Optional save (stores correct EXIF back to DB)
     if (shouldSave) {
       await supabaseAdmin
         .from('photos')
         .update({
-          original_key: key, // ✅ store it if it was forced
+          // ✅ store usable key if original_key was missing before
+          original_key: forcedKey ? key : undefined,
           exif_json: exif,
           exif_make: exif?.make || exif?.Make || null,
           exif_model: exif?.model || exif?.Model || null,
