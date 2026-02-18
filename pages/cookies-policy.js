@@ -1,27 +1,27 @@
-import Head from 'next/head'
+import React from 'react'
+import LegalSeo from '../components/LegalSeo'
 
-export default function Cookies() {
+export default function CookiesPolicy() {
   return (
     <>
-      <Head>
-        <title>Cookies Policy | Jeevan Chandimal</title>
-        <meta
-          name="description"
-          content="Cookies Policy explaining how JeevanChandimal.com uses cookies for functionality, analytics, and security."
-        />
-        <link rel="canonical" href="https://jeevanchandimal.com/cookies-policy" />
-      </Head>
+      <LegalSeo
+        title="Cookies Policy | Jeevan Chandimal"
+        description="Cookies Policy explaining how JeevanChandimal.com uses cookies for functionality, analytics, and security."
+        path="/cookies-policy"
+      />
 
       <main className="wrap">
         <h1>Cookies Policy</h1>
-        <p>Last updated: {new Date().toLocaleDateString()}</p>
 
         <p>
-          This website uses cookies to improve user experience and analyze website traffic.
+          This website uses cookies to improve user experience and analyze website
+          traffic.
         </p>
 
         <h2>What Are Cookies?</h2>
-        <p>Cookies are small text files stored on your device when you visit a website.</p>
+        <p>
+          Cookies are small text files stored on your device when you visit a website.
+        </p>
 
         <h2>How We Use Cookies</h2>
         <ul>
@@ -36,7 +36,9 @@ export default function Cookies() {
         </p>
 
         <h2>Managing Cookies</h2>
-        <p>You can disable cookies in your browser settings if you prefer.</p>
+        <p>
+          You can disable cookies in your browser settings if you prefer.
+        </p>
       </main>
 
       <style jsx>{`
@@ -45,6 +47,24 @@ export default function Cookies() {
           margin: 0 auto;
           padding: 60px 20px 100px;
           line-height: 1.7;
+        }
+
+        h1 {
+          margin-bottom: 20px;
+        }
+
+        h2 {
+          margin-top: 30px;
+          margin-bottom: 10px;
+        }
+
+        ul {
+          margin-left: 20px;
+          margin-top: 10px;
+        }
+
+        li {
+          margin-bottom: 6px;
         }
       `}</style>
     </>
