@@ -1,21 +1,37 @@
 // pages/refund-policy.js
 import React from 'react'
 import Head from 'next/head'
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 export default function RefundPolicy() {
+  const CANONICAL = 'https://jeevanchandimal.com/refund-policy'
+
   return (
     <>
       <Head>
         <title>Refund Policy | Jeevan Chandimal</title>
         <meta
           name="description"
-          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com"
+          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com."
+        />
+        <link rel="canonical" href={CANONICAL} />
+
+        {/* Open Graph */}
+        <meta property="og:title" content="Refund Policy | Jeevan Chandimal" />
+        <meta
+          property="og:description"
+          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com."
+        />
+        <meta property="og:url" content={CANONICAL} />
+        <meta property="og:type" content="website" />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Refund Policy | Jeevan Chandimal" />
+        <meta
+          name="twitter:description"
+          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com."
         />
       </Head>
-
-      <JeevanChandimalNavi />
 
       <main className="wrap">
         <h1>Refund Policy</h1>
@@ -84,23 +100,15 @@ export default function RefundPolicy() {
           <li>Distributed to third parties</li>
         </ul>
 
-        <p>
-          As licensing rights are granted immediately upon delivery.
-        </p>
+        <p>As licensing rights are granted immediately upon delivery.</p>
 
         <h2>Contact Us</h2>
-        <p>
-          If you experience any issues with your purchase, please contact:
-        </p>
+        <p>If you experience any issues with your purchase, please contact:</p>
         <p>
           📧 <strong>info@jeevanchandimal.com</strong>
         </p>
-        <p>
-          We will respond as quickly as possible to resolve your issue.
-        </p>
+        <p>We will respond as quickly as possible to resolve your issue.</p>
       </main>
-
-      <JeevanChandimalNewFooter />
 
       <style jsx>{`
         .wrap {
