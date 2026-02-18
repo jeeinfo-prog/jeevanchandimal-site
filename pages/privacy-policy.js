@@ -1,8 +1,6 @@
 // pages/privacy-policy.js
 import React from 'react'
 import Head from 'next/head'
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 export default function PrivacyPolicy() {
   return (
@@ -14,8 +12,6 @@ export default function PrivacyPolicy() {
           content="Privacy Policy explaining how JeevanChandimal.com collects, uses, and protects customer data."
         />
       </Head>
-
-      <JeevanChandimalNavi />
 
       <main className="wrap">
         <h1>Privacy Policy</h1>
@@ -39,9 +35,7 @@ export default function PrivacyPolicy() {
             third-party payment processors such as <strong>PayHere</strong>. We do not store
             your full card details.
           </li>
-          <li>
-            Order and licensing information related to the digital products you purchase.
-          </li>
+          <li>Order and licensing information related to the digital products you purchase.</li>
           <li>
             Technical data such as your IP address, browser type, device information, and
             usage data collected through cookies and analytics tools.
@@ -82,9 +76,7 @@ export default function PrivacyPolicy() {
           they provide.
         </p>
 
-        <p>
-          We may also disclose information if required by law or to protect our legal rights.
-        </p>
+        <p>We may also disclose information if required by law or to protect our legal rights.</p>
 
         <h2>Data Security</h2>
         <p>
@@ -128,8 +120,6 @@ export default function PrivacyPolicy() {
           📧 <strong>info@jeevanchandimal.com</strong>
         </p>
       </main>
-
-      <JeevanChandimalNewFooter />
 
       <style jsx>{`
         .wrap {
