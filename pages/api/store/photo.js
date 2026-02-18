@@ -14,15 +14,15 @@ export default async function handler(req, res) {
 
   try {
     const id = String(req.query?.id || '').trim()
-
     if (!id) {
       return res.status(400).json({ ok: false, error: 'Missing photo id' })
     }
 
-    // ✅ IMPORTANT: select ONLY columns that exist in your DB
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, title, description, tags, preview_url, thumb_url, created_at')
+      .select(
+        'id, title, description, tags, preview_url, thumb_url, created_at, location_name, city, country, exif_json, original_raw_key'
+      )
       .eq('id', id)
       .eq('status', 'published')
       .maybeSingle()
@@ -42,6 +42,13 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, error: 'Preview not ready' })
     }
 
+    const exif = data.exif_json && typeof data.exif_json === 'object' ? data.exif_json : null
+
+    const location =
+      String(data.location_name || '').trim() ||
+      [data.city, data.country].filter(Boolean).join(', ') ||
+      'Sri Lanka'
+
     const photo = {
       id: data.id,
       title: data.title || 'Untitled',
@@ -51,16 +58,17 @@ export default async function handler(req, res) {
       thumb_url: thumb,
       created_at: data.created_at,
 
-      // ✅ keep keys for UI compatibility (but DB doesn't have them)
-      location: 'Sri Lanka',
-      exif: null,
-      raw_available: true,
+      // ✅ now available for original resolution in UI
+      exif,
+
+      // ✅ use your real location fields
+      location,
+
+      // ✅ RAW available if original_raw_key exists
+      raw_available: Boolean(data.original_raw_key),
     }
 
-    return res.status(200).json({
-      ok: true,
-      photo,
-    })
+    return res.status(200).json({ ok: true, photo })
   } catch (e) {
     console.error(e)
     return res.status(500).json({ ok: false, error: 'Server error' })

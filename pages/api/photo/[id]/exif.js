@@ -3,6 +3,35 @@ import { r2GetObjectBuffer } from '../../../../lib/r2'
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { extractExifFromJpeg } from '../../../../lib/exif-lite'
 
+function normalizeDims(exif) {
+  if (!exif || typeof exif !== 'object') return exif
+
+  // Try many common width/height keys
+  const width =
+    Number(
+      exif.width ||
+        exif.ImageWidth ||
+        exif.imageWidth ||
+        exif.PixelXDimension ||
+        exif.ExifImageWidth
+    ) || null
+
+  const height =
+    Number(
+      exif.height ||
+        exif.ImageHeight ||
+        exif.imageHeight ||
+        exif.PixelYDimension ||
+        exif.ExifImageHeight
+    ) || null
+
+  return {
+    ...exif,
+    width: exif.width ?? width,
+    height: exif.height ?? height,
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
@@ -19,20 +48,48 @@ export default async function handler(req, res) {
     let key = forcedKey
 
     // ✅ Priority 2: fallback to DB
+    // Now also fetch exif_json for fallback
+    let row = null
     if (!key) {
-      const { data: row, error } = await supabaseAdmin
+      const { data, error } = await supabaseAdmin
         .from('photos')
-        .select('id, original_key')
+        .select('id, original_key, exif_json')
         .eq('id', id)
         .single()
 
-      if (error || !row?.original_key) {
+      if (error) {
+        return res.status(500).json({ ok: false, error: error.message })
+      }
+
+      row = data || null
+
+      // ✅ Fallback: if original_key missing but exif_json exists, return it
+      if (!row?.original_key) {
+        const cachedExif =
+          row?.exif_json && typeof row.exif_json === 'object' ? row.exif_json : null
+
+        if (cachedExif) {
+          const exifOut = normalizeDims(cachedExif)
+          return res.status(200).json({
+            ok: true,
+            id,
+            key: null,
+            source: 'db_exif_json',
+            isJpeg: null,
+            size: null,
+            exif: exifOut,
+            exifError: null,
+            saved: false,
+          })
+        }
+
         return res.status(404).json({
           ok: false,
           error: 'original_key missing in DB',
-          hint: 'Store original_key during upload commit',
+          hint: 'Store original_key during upload commit OR save exif_json',
         })
       }
+
       key = row.original_key
     }
 
@@ -68,6 +125,9 @@ export default async function handler(req, res) {
       }
     }
 
+    // Normalize width/height keys for UI
+    exif = normalizeDims(exif)
+
     // 5) Optional save
     if (shouldSave) {
       await supabaseAdmin
@@ -75,9 +135,9 @@ export default async function handler(req, res) {
         .update({
           original_key: key, // ✅ store it if it was forced
           exif_json: exif,
-          exif_make: exif?.make || null,
-          exif_model: exif?.model || null,
-          exif_taken_at: exif?.dateTimeOriginal || null,
+          exif_make: exif?.make || exif?.Make || null,
+          exif_model: exif?.model || exif?.Model || null,
+          exif_taken_at: exif?.dateTimeOriginal || exif?.DateTimeOriginal || null,
           exif_lat: typeof exif?.lat === 'number' ? exif.lat : null,
           exif_lng: typeof exif?.lng === 'number' ? exif.lng : null,
         })
@@ -88,6 +148,7 @@ export default async function handler(req, res) {
       ok: true,
       id,
       key,
+      source: 'r2_original',
       size: buf.length,
       isJpeg,
       exif,
