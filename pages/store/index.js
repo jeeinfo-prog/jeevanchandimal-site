@@ -147,49 +147,59 @@ export default function StoreIndex() {
         {!loading && !error && (
           <>
             <section className="grid">
-              {filtered.map((p) => (
-                <Link key={p.id} href={`/store/${p.id}`}>
-                  <a className="card">
-                    <div className="thumb">
-                      <img src={p.thumbUrl} alt={p.title} loading="lazy" />
-                    </div>
+              {filtered.map((p) => {
+                const firstTag = Array.isArray(p.tags) ? p.tags.find(Boolean) : ''
+                return (
+                  <Link key={p.id} href={`/store/${p.id}`}>
+                    <a className="card">
+                      <div className="thumb">
+                        <img src={p.thumbUrl} alt={p.title} loading="lazy" />
 
-                    <div className="meta">
-                      <div className="meta-top">
-                        <h3 className="name">{p.title}</h3>
-                        <span className="pill">{p.orientation}</span>
+                        {/* ✅ Getty-style hover overlay */}
+                        <div className="overlay" aria-hidden="true">
+                          <div className="overlayInner">
+                            <div className="ovTitle">{p.title}</div>
+                            <div className="ovMeta">
+                              {firstTag ? `#${firstTag}` : 'View details'}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* ✅ clickable tag chips */}
-                      <div className="tagRow">
-                        {(p.tags || []).slice(0, 3).map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            className="tagChip"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              router.replace(
-                                { pathname: '/store', query: { tag: t } },
-                                undefined,
-                                { shallow: true }
-                              )
-                              setQuery(t)
-                            }}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
+                      <div className="meta">
+                        <div className="meta-top">
+                          <h3 className="name">{p.title}</h3>
+                          <span className="pill">{p.orientation}</span>
+                        </div>
 
-                      {/* ✅ Price hidden → show text only */}
-                      <p className="priceHint">
-                        <strong>Price at checkout</strong>
-                      </p>
-                    </div>
-                  </a>
-                </Link>
-              ))}
+                        {/* ✅ clickable tag chips */}
+                        <div className="tagRow">
+                          {(p.tags || []).slice(0, 3).map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              className="tagChip"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                router.replace(
+                                  { pathname: '/store', query: { tag: t } },
+                                  undefined,
+                                  { shallow: true }
+                                )
+                                setQuery(t)
+                              }}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* ✅ remove price hint completely (clean grid) */}
+                      </div>
+                    </a>
+                  </Link>
+                )
+              })}
             </section>
 
             {filtered.length === 0 && (
@@ -247,7 +257,6 @@ export default function StoreIndex() {
           opacity: 0.6;
         }
 
-        /* ✅ Collections link */
         .collectionsLink {
           text-decoration: none;
           font-size: 13px;
@@ -296,7 +305,6 @@ export default function StoreIndex() {
           gap: 18px;
         }
 
-        /* ✅ Small hover effect */
         .card {
           display: block;
           text-decoration: none;
@@ -319,6 +327,7 @@ export default function StoreIndex() {
           width: 100%;
           aspect-ratio: 4 / 3;
           overflow: hidden;
+          position: relative;
         }
         .thumb img {
           width: 100%;
@@ -329,6 +338,41 @@ export default function StoreIndex() {
         }
         .card:hover .thumb img {
           transform: scale(1.06);
+        }
+
+        /* ✅ Overlay */
+        .overlay {
+          position: absolute;
+          inset: 0;
+          opacity: 0;
+          transform: translateY(6px);
+          transition: opacity 0.18s ease, transform 0.18s ease;
+          background: linear-gradient(
+            to top,
+            rgba(0, 0, 0, 0.65),
+            rgba(0, 0, 0, 0.08),
+            rgba(0, 0, 0, 0)
+          );
+          display: grid;
+          align-items: end;
+          pointer-events: none;
+        }
+        .card:hover .overlay {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        .overlayInner {
+          padding: 14px;
+        }
+        .ovTitle {
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 1.25;
+        }
+        .ovMeta {
+          margin-top: 6px;
+          font-size: 12px;
+          opacity: 0.85;
         }
 
         .meta {
@@ -372,12 +416,6 @@ export default function StoreIndex() {
         .tagChip:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
-        }
-
-        .priceHint {
-          margin: 10px 0 0;
-          font-size: 13px;
-          opacity: 0.9;
         }
 
         .empty {

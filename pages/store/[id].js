@@ -291,8 +291,16 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     if (!photo?.id) return
 
     // If we already have useful original dims + bytes, skip
-    const hasW = Number(photo?.exif?.width || photo?.exif?.ExifImageWidth || photo?.exif?.PixelXDimension)
-    const hasH = Number(photo?.exif?.height || photo?.exif?.ExifImageHeight || photo?.exif?.PixelYDimension)
+    const hasW = Number(
+      photo?.exif?.width ||
+        photo?.exif?.ExifImageWidth ||
+        photo?.exif?.PixelXDimension
+    )
+    const hasH = Number(
+      photo?.exif?.height ||
+        photo?.exif?.ExifImageHeight ||
+        photo?.exif?.PixelYDimension
+    )
     const hasBytes = typeof photo?.exif?.bytes === 'number' || typeof photo?.exif?.size === 'number'
     if (photo?.exif && hasW && hasH && hasBytes) return
 
@@ -413,8 +421,17 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const canonicalId = photo?.id || id
   const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
 
-  // ✅ Social images should be PUBLIC and stable for bots
-  const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
+  // ✅ Licensable image URLs (Google Images)
+  const licenseUrl = `${SITE_URL}/terms-and-conditions`
+  const acquireLicensePage = canonicalUrl
+
+  // ✅ Social/Schema image should be PUBLIC + stable + absolute for bots
+  const absolutePreviewForBots = canonicalId
+    ? `${SITE_URL}/api/photo/${encodeURIComponent(canonicalId)}/preview?variant=${variant}`
+    : ''
+
+  const ogImageFromDb = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
+  const ogImage = ogImageFromDb || absolutePreviewForBots
 
   // ✅ ORIGINAL width/height (prefer EXIF; fallback to preview natural dims)
   const exifW =
@@ -572,35 +589,58 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           <link rel="preload" as="image" href={previewSrc} fetchPriority="high" />
         ) : null}
 
-        {/* JSON-LD Photograph schema */}
-        {photo && (
+        {/* ✅ Licensable ImageObject JSON-LD (Google Images) */}
+        {photo && ogImage && (
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
               __html: JSON.stringify({
                 '@context': 'https://schema.org',
                 '@type': 'ImageObject',
-                '@id': `${canonicalUrl}#photo`,
-                url: canonicalUrl,
+
+                // Unique ID for the image entity
+                '@id': `${canonicalUrl}#image`,
+
+                // Page where the image is licensed/purchased
+                mainEntityOfPage: canonicalUrl,
+
+                // The actual image file URL (must be crawlable)
+                contentUrl: ogImage,
+                url: ogImage,
+
+                // Thumbnail (optional but recommended)
+                thumbnailUrl: photo.thumbUrl || ogImage,
+
                 name: photo.title,
                 description:
                   photo.description ||
                   `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
+
                 keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : undefined,
+
                 creator: {
                   '@type': 'Person',
                   name: 'Jeevan Chandimal',
                   url: SITE_URL,
                 },
+
                 copyrightHolder: {
                   '@type': 'Person',
                   name: 'Jeevan Chandimal',
                 },
+
+                creditText: 'Jeevan Chandimal',
+                copyrightNotice: '© Jeevan Chandimal',
+
+                // ✅ Licensable fields
+                license: licenseUrl,
+                acquireLicensePage: acquireLicensePage,
+
                 isAccessibleForFree: false,
-                contentUrl: ogImage || undefined,
-                thumbnailUrl: photo.thumbUrl || undefined,
+
                 width: imgW || undefined,
                 height: imgH || undefined,
+
                 contentLocation: buildContentLocation(photo.location),
               }),
             }}
