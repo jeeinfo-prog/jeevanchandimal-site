@@ -1,15 +1,11 @@
 import Head from 'next/head'
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
-export default function Cookies() {
+export default function CookiesPolicy() {
   return (
     <>
       <Head>
         <title>Cookies Policy | Jeevan Chandimal</title>
       </Head>
-
-      <JeevanChandimalNavi />
 
       <main className="wrap">
         <h1>Cookies Policy</h1>
@@ -20,9 +16,7 @@ export default function Cookies() {
         </p>
 
         <h2>What Are Cookies?</h2>
-        <p>
-          Cookies are small text files stored on your device when you visit a website.
-        </p>
+        <p>Cookies are small text files stored on your device when you visit a website.</p>
 
         <h2>How We Use Cookies</h2>
         <ul>
@@ -32,17 +26,11 @@ export default function Cookies() {
         </ul>
 
         <h2>Third-Party Services</h2>
-        <p>
-          Payment processing is handled securely by PayHere. We do not store card details.
-        </p>
+        <p>Payment processing is handled securely by PayHere. We do not store card details.</p>
 
         <h2>Managing Cookies</h2>
-        <p>
-          You can disable cookies in your browser settings if you prefer.
-        </p>
+        <p>You can disable cookies in your browser settings if you prefer.</p>
       </main>
-
-      <JeevanChandimalNewFooter />
 
       <style jsx>{`
         .wrap {
