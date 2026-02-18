@@ -95,11 +95,21 @@ function buildContentLocation(location) {
 function getImageDims(exif) {
   if (!exif) return { w: undefined, h: undefined }
   const w =
-    Number(exif.width || exif.ImageWidth || exif.imageWidth || exif.PixelXDimension) ||
-    undefined
+    Number(
+      exif.width ||
+        exif.ImageWidth ||
+        exif.imageWidth ||
+        exif.PixelXDimension ||
+        exif.ExifImageWidth
+    ) || undefined
   const h =
-    Number(exif.height || exif.ImageHeight || exif.imageHeight || exif.PixelYDimension) ||
-    undefined
+    Number(
+      exif.height ||
+        exif.ImageHeight ||
+        exif.imageHeight ||
+        exif.PixelYDimension ||
+        exif.ExifImageHeight
+    ) || undefined
   return { w, h }
 }
 
@@ -276,10 +286,15 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, id])
 
-  // ✅ Load EXIF from your existing endpoint (reads original_key in DB + extracts EXIF)
+  // ✅ Load EXIF from endpoint (gets ORIGINAL file bytes + ORIGINAL dimensions)
   React.useEffect(() => {
     if (!photo?.id) return
-    if (photo?.exif) return
+
+    // If we already have useful original dims + bytes, skip
+    const hasW = Number(photo?.exif?.width || photo?.exif?.ExifImageWidth || photo?.exif?.PixelXDimension)
+    const hasH = Number(photo?.exif?.height || photo?.exif?.ExifImageHeight || photo?.exif?.PixelYDimension)
+    const hasBytes = typeof photo?.exif?.bytes === 'number' || typeof photo?.exif?.size === 'number'
+    if (photo?.exif && hasW && hasH && hasBytes) return
 
     let alive = true
 
@@ -299,11 +314,26 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           lensModel: j.exif?.lensModel || j.exif?.LensModel || null,
           settingsLine: j.exif?.settingsLine || null,
           dateTimeOriginal: j.exif?.dateTimeOriginal || j.exif?.DateTimeOriginal || null,
-          width: j.exif?.width || j.exif?.ImageWidth || j.exif?.PixelXDimension || null,
-          height: j.exif?.height || j.exif?.ImageHeight || j.exif?.PixelYDimension || null,
+
+          // ✅ ORIGINAL dimensions (supports multiple keys)
+          width:
+            j.exif?.width ||
+            j.exif?.ImageWidth ||
+            j.exif?.PixelXDimension ||
+            j.exif?.ExifImageWidth ||
+            null,
+          height:
+            j.exif?.height ||
+            j.exif?.ImageHeight ||
+            j.exif?.PixelYDimension ||
+            j.exif?.ExifImageHeight ||
+            null,
+
+          // ✅ exact ORIGINAL JPG bytes (returned as "size" by API)
+          bytes: typeof j.size === 'number' ? j.size : null,
         }
 
-        setPhoto((p) => ({ ...p, exif: mapped }))
+        setPhoto((p) => ({ ...p, exif: { ...(p?.exif || {}), ...mapped } }))
       } catch {}
     }
 
@@ -386,13 +416,37 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   // ✅ Social images should be PUBLIC and stable for bots
   const ogImage = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
 
-  // ✅ Width/height for ImageObject / OG (if present)
-  const { w: imgW, h: imgH } = getImageDims(photo?.exif)
+  // ✅ ORIGINAL width/height (prefer EXIF; fallback to preview natural dims)
+  const exifW =
+    Number(
+      photo?.exif?.width ||
+        photo?.exif?.ImageWidth ||
+        photo?.exif?.PixelXDimension ||
+        photo?.exif?.ExifImageWidth
+    ) || null
 
-  const finalW = imgW || naturalDims.w
-  const finalH = imgH || naturalDims.h
+  const exifH =
+    Number(
+      photo?.exif?.height ||
+        photo?.exif?.ImageHeight ||
+        photo?.exif?.PixelYDimension ||
+        photo?.exif?.ExifImageHeight
+    ) || null
+
+  const finalW = exifW || naturalDims.w || null
+  const finalH = exifH || naturalDims.h || null
+
+  // ✅ Use these for OG + JSON-LD too (fixes undefined imgW/imgH bugs)
+  const imgW = finalW
+  const imgH = finalH
 
   const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
+
+  // exact JPG size if available, otherwise estimate
+  const exactJpgMB =
+    typeof photo?.exif?.bytes === 'number'
+      ? (photo.exif.bytes / (1024 * 1024)).toFixed(1)
+      : null
 
   const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
   const rawSizeMB = estimateRawSizeMB(finalW, finalH)
@@ -545,8 +599,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 isAccessibleForFree: false,
                 contentUrl: ogImage || undefined,
                 thumbnailUrl: photo.thumbUrl || undefined,
-                width: imgW,
-                height: imgH,
+                width: imgW || undefined,
+                height: imgH || undefined,
                 contentLocation: buildContentLocation(photo.location),
               }),
             }}
@@ -891,9 +945,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     </div>
                   )}
 
-                  {format === 'jpg' && jpgSizeMB && (
+                  {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
                     <div>
-                      <strong>JPG size:</strong> ~{jpgSizeMB} MB
+                      <strong>JPG size:</strong>{' '}
+                      {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
                     </div>
                   )}
 
