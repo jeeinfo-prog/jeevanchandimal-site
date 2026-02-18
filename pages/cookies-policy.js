@@ -1,35 +1,18 @@
-import Head from 'next/head'
+import React from 'react'
+import LegalSeo from '../components/LegalSeo'
 
 export default function CookiesPolicy() {
   return (
     <>
-      <Head>
-        <title>Cookies Policy | Jeevan Chandimal</title>
-      </Head>
+      <LegalSeo
+        title="Cookies Policy | Jeevan Chandimal"
+        description="Cookies Policy explaining how JeevanChandimal.com uses cookies and similar technologies."
+        path="/cookies-policy"
+      />
 
       <main className="wrap">
         <h1>Cookies Policy</h1>
-        <p>Last updated: {new Date().toLocaleDateString()}</p>
-
-        <p>
-          This website uses cookies to improve user experience and analyze website traffic.
-        </p>
-
-        <h2>What Are Cookies?</h2>
-        <p>Cookies are small text files stored on your device when you visit a website.</p>
-
-        <h2>How We Use Cookies</h2>
-        <ul>
-          <li>Website functionality</li>
-          <li>Analytics</li>
-          <li>Security</li>
-        </ul>
-
-        <h2>Third-Party Services</h2>
-        <p>Payment processing is handled securely by PayHere. We do not store card details.</p>
-
-        <h2>Managing Cookies</h2>
-        <p>You can disable cookies in your browser settings if you prefer.</p>
+        {/* ...your existing content... */}
       </main>
 
       <style jsx>{`
