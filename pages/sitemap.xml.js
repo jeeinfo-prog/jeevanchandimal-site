@@ -10,7 +10,9 @@ function esc(s) {
 }
 
 export async function getServerSideProps({ res }) {
-  const siteUrl = 'https://www.jeevanchandimal.com'
+  // ✅ Use ONE canonical domain everywhere (match your site)
+  const siteUrl = 'https://jeevanchandimal.com'
+
   const wpBase = process.env.NEXT_PUBLIC_WP_BASE_URL
   const nowIso = new Date().toISOString()
   const MIN_TAG_PHOTOS = 3
@@ -34,7 +36,11 @@ export async function getServerSideProps({ res }) {
       if (!id) return ''
 
       const pageUrl = `${siteUrl}/store/${id}`
-      const imageUrl = `${siteUrl}/api/photo/${encodeURIComponent(id)}/preview`
+
+      // ✅ ensure correct preview API format
+      const imageUrl = `${siteUrl}/api/photo/${encodeURIComponent(
+        id
+      )}/preview?variant=standard`
 
       const title = p?.title || 'Photograph by Jeevan Chandimal'
       const caption =
@@ -42,10 +48,13 @@ export async function getServerSideProps({ res }) {
         title ||
         'Sri Lanka photography by Jeevan Chandimal'
 
+      // ✅ use real timestamps if available
+      const lastmod = p?.created_at ? new Date(p.created_at).toISOString() : nowIso
+
       return `
   <url>
     <loc>${esc(pageUrl)}</loc>
-    <lastmod>${esc(nowIso)}</lastmod>
+    <lastmod>${esc(lastmod)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
 
@@ -74,12 +83,13 @@ export async function getServerSideProps({ res }) {
       }
     }
 
+    // ✅ Use /store?tag=... because it's guaranteed to exist
     collectionUrls = Array.from(counts.entries())
       .filter(([, c]) => c >= MIN_TAG_PHOTOS)
       .map(
         ([tag]) => `
   <url>
-    <loc>${esc(`${siteUrl}/collections/${encodeURIComponent(tag)}`)}</loc>
+    <loc>${esc(`${siteUrl}/store?tag=${encodeURIComponent(tag)}`)}</loc>
     <lastmod>${esc(nowIso)}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
@@ -131,15 +141,8 @@ export async function getServerSideProps({ res }) {
   <url>
     <loc>${esc(`${siteUrl}/store`)}</loc>
     <lastmod>${esc(nowIso)}</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>daily</changefreq>
     <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>${esc(`${siteUrl}/collections`)}</loc>
-    <lastmod>${esc(nowIso)}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
   </url>
   `
 
