@@ -1,8 +1,6 @@
 // pages/terms-and-conditions.js
 import React from 'react'
 import Head from 'next/head'
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 export default function TermsAndConditions() {
   return (
@@ -14,8 +12,6 @@ export default function TermsAndConditions() {
           content="Terms and Conditions for purchasing digital photography and licensing from JeevanChandimal.com"
         />
       </Head>
-
-      <JeevanChandimalNavi />
 
       <main className="wrap">
         <h1>Terms & Conditions</h1>
@@ -67,9 +63,7 @@ export default function TermsAndConditions() {
             We strive to ensure that all product descriptions, previews, and pricing are
             accurate.
           </li>
-          <li>
-            Prices are subject to change without prior notice.
-          </li>
+          <li>Prices are subject to change without prior notice.</li>
           <li>
             Any promotional offers are time-limited and may be withdrawn at any time.
           </li>
@@ -155,8 +149,6 @@ export default function TermsAndConditions() {
           📧 <strong>info@jeevanchandimal.com</strong>
         </p>
       </main>
-
-      <JeevanChandimalNewFooter />
 
       <style jsx>{`
         .wrap {
