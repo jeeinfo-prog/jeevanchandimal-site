@@ -7,6 +7,11 @@ function cleanUrl(u) {
   return v || null
 }
 
+function cleanText(v) {
+  const s = String(v || '').trim()
+  return s || ''
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
@@ -44,28 +49,37 @@ export default async function handler(req, res) {
 
     const exif = data.exif_json && typeof data.exif_json === 'object' ? data.exif_json : null
 
-    const location =
-      String(data.location_name || '').trim() ||
-      [data.city, data.country].filter(Boolean).join(', ') ||
-      'Sri Lanka'
+    const locName = cleanText(data.location_name)
+    const city = cleanText(data.city)
+    const country = cleanText(data.country)
+
+    const fallbackLoc = [city, country].filter(Boolean).join(', ')
+    const location = locName || fallbackLoc || 'Sri Lanka'
+
+    const rawAvailable = Boolean(cleanText(data.original_raw_key))
 
     const photo = {
       id: data.id,
       title: data.title || 'Untitled',
       description: data.description || '',
       tags: Array.isArray(data.tags) ? data.tags : [],
-      preview_url: preview,
-      thumb_url: thumb,
       created_at: data.created_at,
 
-      // ✅ now available for original resolution in UI
+      // ✅ provide both shapes (safer for different UI code paths)
+      preview_url: preview,
+      thumb_url: thumb,
+      previewUrl: preview,
+      thumbUrl: thumb,
+
+      // ✅ original EXIF (already saved by /api/photo/[id]/exif?save=1)
       exif,
 
-      // ✅ use your real location fields
+      // ✅ location string
       location,
 
-      // ✅ RAW available if original_raw_key exists
-      raw_available: Boolean(data.original_raw_key),
+      // ✅ RAW availability
+      raw_available: rawAvailable,
+      original_raw_key: rawAvailable ? data.original_raw_key : null,
     }
 
     return res.status(200).json({ ok: true, photo })
