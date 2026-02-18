@@ -1,4 +1,3 @@
-// pages/_app.js
 import '../styles/style.css'
 
 import { GlobalProvider } from '../global-context'
@@ -11,27 +10,21 @@ import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 export default function MyApp({ Component, pageProps }) {
   const router = useRouter()
 
-  const LEGAL_ROUTES = [
+  const LEGAL_ROUTES = new Set([
     '/privacy-policy',
     '/terms-and-conditions',
     '/cookies-policy',
     '/refund-policy',
-  ]
+  ])
 
-  const isLegalPage = LEGAL_ROUTES.includes(router.pathname)
+  const isLegalPage = LEGAL_ROUTES.has(router.pathname)
 
   return (
     <NextIntlProvider messages={pageProps?.messages}>
       <GlobalProvider>
-        {isLegalPage ? (
-          <>
-            <JeevanChandimalNavi />
-            <Component {...pageProps} />
-            <JeevanChandimalNewFooter />
-          </>
-        ) : (
-          <Component {...pageProps} />
-        )}
+        {isLegalPage && <JeevanChandimalNavi />}
+        <Component {...pageProps} />
+        {isLegalPage && <JeevanChandimalNewFooter />}
       </GlobalProvider>
     </NextIntlProvider>
   )
