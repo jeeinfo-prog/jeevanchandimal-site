@@ -1,349 +1,200 @@
-import React, { useState, Fragment } from 'react'
-
+import React, { useState } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const Process01 = (props) => {
   const [activeTab, setActiveTab] = useState(0)
+
   return (
     <>
-      <div className={`thq-section-padding ${props.rootClassName} `}>
+      <div className={`thq-section-padding ${props.rootClassName}`}>
         <div className="process-01-container2 thq-section-max-width">
+
+          {/* TABS */}
           <div className="process-01-thq-tabs-menu-elm">
-            <div
-              onClick={() => setActiveTab(0)}
-              className="process-01-thq-tab-horizontal-elm1"
-            >
+
+            {/* TAB 1 */}
+            <div onClick={() => setActiveTab(0)} className="process-01-thq-tab-horizontal-elm1">
               <div className="process-01-thq-divider-container-elm1">
-                {activeTab === 0 && (
-                  <div className="process-01-container3"></div>
-                )}
+                {activeTab === 0 && <div className="process-01-container3" />}
               </div>
+
               <div className="process-01-thq-content-elm1">
                 <h2 className="thq-heading-2">
-                  {props.feature1Title2 ?? (
-                    <Fragment>
-                      <span className="process-01-text3">Process</span>
-                    </Fragment>
-                  )}
+                  {props.feature1Title2 ?? <span>Process</span>}
                 </h2>
-                <h2 className="thq-heading-3">
-                  {props.feature1Title11 ?? (
-                    <Fragment>
-                      <span className="process-01-text6">Concept First</span>
-                    </Fragment>
-                  )}
-                </h2>
+
+                <h3 className="thq-heading-3">
+                  {props.feature1Title11 ?? <span>Concept First</span>}
+                </h3>
+
                 <span className="thq-body-small">
                   {props.feature1Description2 ?? (
-                    <Fragment>
-                      <span className="process-01-text1">
-                        Every collaboration begins with intention. We define the
-                        atmosphere, the emotional direction, and the story
-                        before production begins.
-                      </span>
-                    </Fragment>
+                    <span>
+                      Every collaboration begins with intention. Atmosphere,
+                      emotional direction, and story are defined before
+                      production begins.
+                    </span>
                   )}
                 </span>
               </div>
             </div>
-            <div
-              onClick={() => setActiveTab(2)}
-              className="process-01-thq-tab-horizontal-elm2"
-            >
+
+            {/* TAB 2 */}
+            <div onClick={() => setActiveTab(1)} className="process-01-thq-tab-horizontal-elm2">
               <div className="process-01-thq-divider-container-elm2">
-                {activeTab === 2 && (
-                  <div className="process-01-container4"></div>
-                )}
+                {activeTab === 1 && <div className="process-01-container4" />}
               </div>
+
               <div className="process-01-thq-content-elm2">
-                <h2 className="thq-heading-3">
-                  {props.feature3Title ?? (
-                    <Fragment>
-                      <span className="process-01-text4">
-                        Observation Over Noise
-                      </span>
-                    </Fragment>
-                  )}
-                </h2>
+                <h3 className="thq-heading-3">
+                  {props.feature3Title ?? <span>Observation Over Noise</span>}
+                </h3>
+
                 <span className="thq-body-small">
                   {props.feature3Description ?? (
-                    <Fragment>
-                      <span className="process-01-text7">
-                        I prefer quiet moments to forced gestures. Real presence
-                        over performance. Stillness often reveals more than
-                        motion.
-                      </span>
-                    </Fragment>
+                    <span>
+                      I prefer quiet moments to forced gestures. Real presence
+                      over performance. Stillness often reveals more than motion.
+                    </span>
                   )}
                 </span>
               </div>
             </div>
-            <div
-              onClick={() => setActiveTab(2)}
-              className="process-01-thq-tab-horizontal-elm3"
-            >
+
+            {/* TAB 3 */}
+            <div onClick={() => setActiveTab(2)} className="process-01-thq-tab-horizontal-elm3">
               <div className="process-01-thq-divider-container-elm3">
-                {activeTab === 2 && (
-                  <div className="process-01-container5"></div>
-                )}
+                {activeTab === 2 && <div className="process-01-container5" />}
               </div>
+
               <div className="process-01-thq-content-elm3">
-                <h2 className="thq-heading-3">
-                  {props.feature3Title1 ?? (
-                    <Fragment>
-                      <span className="process-01-text5">
-                        Craft &amp; Detail
-                      </span>
-                    </Fragment>
-                  )}
-                </h2>
+                <h3 className="thq-heading-3">
+                  {props.feature3Title1 ?? <span>Craft & Detail</span>}
+                </h3>
+
                 <span className="thq-body-small">
                   {props.feature3Description1 ?? (
-                    <Fragment>
-                      <span className="process-01-text2">
-                        From lighting and composition to sound texture and
-                        pacing, every element is refined with care. Small
-                        decisions shape the final experience.
-                      </span>
-                    </Fragment>
+                    <span>
+                      From lighting and composition to sound texture and pacing,
+                      every element is refined with care. Small decisions shape
+                      the final experience.
+                    </span>
                   )}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* IMAGE PANEL */}
           <div className="process-01-thq-image-container-elm">
             {activeTab === 0 && (
               <img
-                alt={props.feature1ImgAlt}
-                src={props.feature1ImgSrc}
-                className="process-01-image1 thq-img-ratio-16-9"
+                src={props.feature1ImgSrc || '/about/process-concept.jpg'}
+                alt={props.feature1ImgAlt || 'Concept planning'}
+                className="process-img thq-img-ratio-16-9"
+                loading="lazy"
               />
             )}
+
             {activeTab === 1 && (
               <img
-                alt={props.feature2ImgAlt}
-                src={props.feature2ImgSrc}
-                className="process-01-image2 thq-img-ratio-16-9"
+                src={props.feature2ImgSrc || '/about/process-observation.jpg'}
+                alt={props.feature2ImgAlt || 'Observation and framing'}
+                className="process-img thq-img-ratio-16-9"
+                loading="lazy"
               />
             )}
+
             {activeTab === 2 && (
               <img
-                alt={props.feature3ImgAlt}
-                src={props.feature3ImgSrc}
-                className="process-01-image3 thq-img-ratio-16-9"
+                src={props.feature3ImgSrc || '/about/process-detail.jpg'}
+                alt={props.feature3ImgAlt || 'Craft and detail'}
+                className="process-img thq-img-ratio-16-9"
+                loading="lazy"
               />
             )}
           </div>
         </div>
       </div>
-      <style jsx>
-        {`
+
+      <style jsx>{`
+        .process-01-container2 {
+          width: 100%;
+          display: grid;
+          gap: var(--dl-layout-space-fiveunits);
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .process-01-thq-tabs-menu-elm {
+          display: flex;
+          flex-direction: column;
+          gap: var(--dl-layout-space-twounits);
+          justify-content: center;
+        }
+
+        /* Center image vertically */
+        .process-01-thq-image-container-elm {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100%;
+        }
+
+        .process-img {
+          width: 100%;
+          max-height: 520px;
+          object-fit: cover;
+          border-radius: 14px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          animation: fadeIn 300ms ease;
+        }
+
+        @media (max-width: 991px) {
           .process-01-container2 {
-            width: 100%;
-            display: grid;
-            grid-gap: var(--dl-layout-space-fiveunits);
-            position: relative;
-            grid-template-columns: 1fr 1fr;
-          }
-          .process-01-thq-tabs-menu-elm {
+            grid-template-columns: 1fr;
             gap: var(--dl-layout-space-twounits);
-            width: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .process-01-thq-tab-horizontal-elm1 {
-            gap: var(--dl-layout-space-twounits);
-            cursor: pointer;
-            display: flex;
-            overflow: hidden;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .process-01-thq-divider-container-elm1 {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .process-01-container3 {
-            width: 2px;
-            align-self: stretch;
-            background-color: var(--dl-color-theme-neutral-dark);
-          }
-          .process-01-thq-content-elm1 {
-            gap: 16px;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .process-01-thq-tab-horizontal-elm2 {
-            gap: var(--dl-layout-space-twounits);
-            cursor: pointer;
-            display: flex;
-            overflow: hidden;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .process-01-thq-divider-container-elm2 {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .process-01-container4 {
-            width: 2px;
-            align-self: stretch;
-            background-color: var(--dl-color-theme-neutral-dark);
-          }
-          .process-01-thq-content-elm2 {
-            gap: 16px;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .process-01-thq-tab-horizontal-elm3 {
-            gap: var(--dl-layout-space-twounits);
-            cursor: pointer;
-            display: flex;
-            overflow: hidden;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .process-01-thq-divider-container-elm3 {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .process-01-container5 {
-            width: 2px;
-            align-self: stretch;
-            background-color: var(--dl-color-theme-neutral-dark);
-          }
-          .process-01-thq-content-elm3 {
-            gap: 16px;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .process-01-thq-image-container-elm {
-            height: 100%;
-            display: flex;
-            position: relative;
-          }
-          .process-01-image1 {
-            animation-name: fadeIn;
-            animation-delay: 0s;
-            animation-duration: 300ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .process-01-image2 {
-            animation-name: fadeIn;
-            animation-delay: 0s;
-            animation-duration: 300ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .process-01-image3 {
-            animation-name: fadeIn;
-            animation-delay: 0s;
-            animation-duration: 300ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .process-01-text1 {
-            display: inline-block;
-          }
-          .process-01-text2 {
-            display: inline-block;
-          }
-          .process-01-text3 {
-            display: inline-block;
-          }
-          .process-01-text4 {
-            display: inline-block;
-          }
-          .process-01-text5 {
-            display: inline-block;
-          }
-          .process-01-text6 {
-            display: inline-block;
-          }
-          .process-01-text7 {
-            display: inline-block;
           }
 
-          @media (max-width: 991px) {
-            .process-01-container2 {
-              grid-gap: var(--dl-layout-space-twounits);
-              grid-template-columns: 1fr;
-            }
-            .process-01-thq-tabs-menu-elm {
-              order: 2;
-            }
+          .process-01-thq-tabs-menu-elm {
+            order: 2;
           }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 Process01.defaultProps = {
-  feature1Description2: undefined,
-  feature2ImgAlt: 'Photography Image',
-  feature1ImgAlt: 'Film Image',
-  feature3Description1: undefined,
-  feature1Title2: undefined,
-  feature1ImgSrc:
-    'https://images.unsplash.com/photo-1769399287730-6e42c3990377?ixid=M3w5MTMyMXwwfDF8YWxsfDU0fHx8fHx8fHwxNzcwMDYzMTM1fA&ixlib=rb-4.1.0&w=1400',
-  feature3Title: undefined,
-  feature3Title1: undefined,
   rootClassName: '',
-  feature3ImgSrc:
-    'https://images.unsplash.com/photo-1496492813606-88559707e685?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc3MDA2MjkwOHw&ixlib=rb-4.1.0&q=80&w=1080',
-  feature1Title11: undefined,
-  feature2ImgSrc:
-    'https://images.unsplash.com/photo-1759417501248-0aa9489dab3f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc3MDA2MjkwOXw&ixlib=rb-4.1.0&q=80&w=1080',
-  feature3Description: undefined,
-  feature3ImgAlt: 'Sound Image',
+
+  feature1ImgSrc: '/about/process-concept.jpg',
+  feature2ImgSrc: '/about/process-observation.jpg',
+  feature3ImgSrc: '/about/process-detail.jpg',
+
+  feature1ImgAlt: 'Concept planning',
+  feature2ImgAlt: 'Observation and framing',
+  feature3ImgAlt: 'Craft and detail',
 }
 
 Process01.propTypes = {
-  feature1Description2: PropTypes.element,
-  feature2ImgAlt: PropTypes.string,
-  feature1ImgAlt: PropTypes.string,
-  feature3Description1: PropTypes.element,
-  feature1Title2: PropTypes.element,
-  feature1ImgSrc: PropTypes.string,
-  feature3Title: PropTypes.element,
-  feature3Title1: PropTypes.element,
   rootClassName: PropTypes.string,
-  feature3ImgSrc: PropTypes.string,
+
+  feature1Title2: PropTypes.element,
   feature1Title11: PropTypes.element,
-  feature2ImgSrc: PropTypes.string,
+  feature1Description2: PropTypes.element,
+
+  feature3Title: PropTypes.element,
   feature3Description: PropTypes.element,
+
+  feature3Title1: PropTypes.element,
+  feature3Description1: PropTypes.element,
+
+  feature1ImgSrc: PropTypes.string,
+  feature2ImgSrc: PropTypes.string,
+  feature3ImgSrc: PropTypes.string,
+
+  feature1ImgAlt: PropTypes.string,
+  feature2ImgAlt: PropTypes.string,
   feature3ImgAlt: PropTypes.string,
 }
 
