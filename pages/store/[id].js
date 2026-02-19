@@ -1778,6 +1778,18 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           user-select: none;
         }
 
+        .imageFrame:hover .wmTile {
+  opacity: 0;
+}
+
+.relThumb:hover .relWm {
+  opacity: 0;
+}
+
+.zoomBody:hover .zoomWm {
+  opacity: 0;
+}
+
         .zoomWm {
           position: absolute;
           inset: 0;

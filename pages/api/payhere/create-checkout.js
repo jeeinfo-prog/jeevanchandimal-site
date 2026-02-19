@@ -1,7 +1,7 @@
 // pages/api/payhere/create-checkout.js
 
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { payhereInitHash } from '@/lib/payhere'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'
+import { payhereInitHash } from '../../../lib/payhere'
 
 function uid() {
   return `ORD_${Date.now()}_${Math.random().toString(16).slice(2)}`
@@ -33,14 +33,8 @@ function toBool(v) {
   return String(v || '').trim().toLowerCase() === 'true'
 }
 
-function cleanBaseUrl(v) {
-  return String(v || '').trim().replace(/\/+$/, '')
-}
-
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' })
-  }
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
     const {
@@ -57,9 +51,7 @@ export default async function handler(req, res) {
       country = 'Sri Lanka',
     } = req.body || {}
 
-    // ✅ Validate request
-    const cleanPhotoId = String(photoId || '').trim()
-    if (!cleanPhotoId || !license || !format || !currency) {
+    if (!photoId || !license || !format || !currency) {
       return res.status(400).json({ ok: false, error: 'Missing required fields' })
     }
     if (!['personal', 'commercial', 'editorial'].includes(license)) {
@@ -78,19 +70,12 @@ export default async function handler(req, res) {
     }
 
     const amount = PRICES?.[currency]?.[license]?.[format]
-    if (!amount) {
-      return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
-    }
+    if (!amount) return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
 
-    // ✅ Env vars (server)
-    const merchantId = cleanBaseUrl(process.env.PAYHERE_MERCHANT_ID) // no harm if not url; we just trim
+    const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
     const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
-
-    // Use stable public site URL for return/cancel links
-    const siteUrl = cleanBaseUrl(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL)
-
-    // Webhook base must be publicly reachable URL (prefer WEBHOOK_BASE_URL)
-    const webhookBase = cleanBaseUrl(process.env.WEBHOOK_BASE_URL || siteUrl)
+    const siteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || '').trim()
+    const webhookBase = String(process.env.WEBHOOK_BASE_URL || siteUrl).trim()
 
     const sandbox =
       toBool(process.env.PAYHERE_SANDBOX) || toBool(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX)
@@ -98,8 +83,7 @@ export default async function handler(req, res) {
     if (!merchantId || !merchantSecret || !siteUrl) {
       return res.status(500).json({
         ok: false,
-        error:
-          'Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, SITE_URL or NEXT_PUBLIC_SITE_URL)',
+        error: 'Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, NEXT_PUBLIC_SITE_URL)',
       })
     }
 
@@ -107,55 +91,43 @@ export default async function handler(req, res) {
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, title, status')
-      .eq('id', cleanPhotoId)
+      .eq('id', String(photoId))
       .eq('status', 'published')
       .single()
 
     if (photoErr || !photo) {
-      console.error('Photo lookup failed:', { photoId: cleanPhotoId, photoErr })
+      console.error('Photo lookup failed:', { photoId, photoErr })
       return res.status(404).json({ ok: false, error: 'Photo not found' })
     }
 
     const orderId = uid()
-    const delivery_object_key = getDeliveryObjectKey(cleanPhotoId, format)
+    const delivery_object_key = getDeliveryObjectKey(String(photoId), format)
 
-    // ✅ Store everything you need for emails/receipt in DB
-    const { error: insertError } = await supabaseAdmin.from('orders').insert({
+    // ✅ IMPORTANT: only insert columns that exist in your `orders` table
+    const insertPayload = {
       id: orderId,
       status: 'PENDING',
-
-      // type
-      order_kind: 'photo',
-
-      // customer
       email: cleanEmail,
-      first_name: String(firstName || 'Customer').trim(),
-      last_name: String(lastName || 'Guest').trim(),
-      phone: String(phone || '').trim(),
-      address: String(address || '').trim(),
-      city: String(city || '').trim(),
-      country: String(country || '').trim(),
-
-      // item
       currency,
       amount,
-      photo_id: cleanPhotoId,
+      photo_id: String(photoId),
       license,
       format,
       delivery_object_key,
-    })
+      order_kind: 'photo',
+    }
+
+    const { error: insertError } = await supabaseAdmin.from('orders').insert(insertPayload)
 
     if (insertError) {
       console.error('Supabase insert error:', insertError)
       return res.status(500).json({ ok: false, error: 'Failed to create order' })
     }
 
-    // ✅ PayHere checkout URL
     const actionUrl = sandbox
       ? 'https://sandbox.payhere.lk/pay/checkout'
       : 'https://www.payhere.lk/pay/checkout'
 
-    // ✅ Hash for PayHere init
     const hash = payhereInitHash({
       merchantId,
       merchantSecret,
@@ -164,23 +136,20 @@ export default async function handler(req, res) {
       currency,
     })
 
-    // ✅ PayHere form fields
     const fields = {
       merchant_id: merchantId,
 
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
-
-      // ✅ Critical: PayHere will call this URL on payment status change
       notify_url: `${webhookBase}/api/payhere/notify`,
 
       first_name: String(firstName || 'Customer').trim(),
       last_name: String(lastName || 'Guest').trim(),
       email: cleanEmail,
-      phone: String(phone || '0000000000').trim(),
-      address: String(address || 'N/A').trim(),
-      city: String(city || 'N/A').trim(),
-      country: String(country || 'Sri Lanka').trim(),
+      phone,
+      address,
+      city,
+      country,
 
       order_id: orderId,
       items: `${photo.title || 'Photo'} - ${license.toUpperCase()} - ${format.toUpperCase()}`,
@@ -188,34 +157,13 @@ export default async function handler(req, res) {
       amount: Number(amount).toFixed(2),
       hash,
 
-      // ✅ Custom fields used by notify.js (keep consistent)
-      custom_1: 'photo',          // order kind
-      custom_2: cleanPhotoId,     // photo id
+      custom_1: 'photo',
+      custom_2: `${license}:${format}`,
     }
 
-    // ✅ Return
-    return res.status(200).json({
-      ok: true,
-      actionUrl,
-      fields,
-      orderId,
-      // Optional debug only in development
-      ...(process.env.NODE_ENV !== 'production'
-        ? {
-            debug: {
-              sandbox,
-              siteUrl,
-              webhookBase,
-            },
-          }
-        : {}),
-    })
+    return res.status(200).json({ ok: true, actionUrl, fields, orderId })
   } catch (e) {
     console.error('create-checkout error:', e)
-    return res.status(500).json({
-      ok: false,
-      error: 'Server error',
-      detail: e?.message || String(e),
-    })
+    return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
 }
