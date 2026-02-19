@@ -418,930 +418,745 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const price = PRICES?.[currency]?.[license]?.[format] ?? 0
 
   // Uses your preview API route
-  const previewSrc = photo?.id
-    ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
+const previewSrc = photo?.id
+  ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
+  : ''
+
+// ✅ tags safe
+const tagsArr = Array.isArray(photo?.tags)
+  ? photo.tags
+  : typeof photo?.tags === 'string'
+  ? photo.tags.split(',').map((s) => s.trim()).filter(Boolean)
+  : []
+
+const firstTag = tagsArr[0] || ''
+
+const rawAvailable = photo?.rawAvailable !== false // default true unless explicitly false
+
+// ✅ If RAW isn't available but user is on RAW, force JPG
+React.useEffect(() => {
+  if (photo && rawAvailable === false && format === 'raw') {
+    setFormat('jpg')
+  }
+}, [photo, rawAvailable, format])
+
+// ✅ SEO-safe canonical (never blank)
+const SITE_URL = 'https://jeevanchandimal.com'
+const canonicalId = photo?.id || id
+const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
+
+// ✅ Licensable image URLs (Google Images)
+const licenseUrl = `${SITE_URL}/terms-and-conditions`
+const acquireLicensePage = canonicalUrl
+
+// ✅ Social/Schema image should be PUBLIC + stable + absolute for bots
+const absolutePreviewForBots = canonicalId
+  ? `${SITE_URL}/api/photo/${encodeURIComponent(canonicalId)}/preview?variant=${variant}`
+  : ''
+
+// ✅ support snake_case + camelCase
+const ogImageFromDb = String(
+  photo?.preview_url || photo?.thumb_url || photo?.previewUrl || photo?.thumbUrl || ''
+).trim()
+
+const ogImage = ogImageFromDb || absolutePreviewForBots
+
+// ✅ ORIGINAL width/height (prefer EXIF; fallback to preview natural dims)
+const exifW =
+  Number(
+    photo?.exif?.width ||
+      photo?.exif?.ImageWidth ||
+      photo?.exif?.PixelXDimension ||
+      photo?.exif?.ExifImageWidth
+  ) || null
+
+const exifH =
+  Number(
+    photo?.exif?.height ||
+      photo?.exif?.ImageHeight ||
+      photo?.exif?.PixelYDimension ||
+      photo?.exif?.ExifImageHeight
+  ) || null
+
+const finalW = exifW || naturalDims.w || null
+const finalH = exifH || naturalDims.h || null
+
+const imgW = finalW
+const imgH = finalH
+
+const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
+
+const exactJpgMB =
+  typeof photo?.exif?.bytes === 'number' ? (photo.exif.bytes / (1024 * 1024)).toFixed(1) : null
+
+const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
+const rawSizeMB = estimateRawSizeMB(finalW, finalH)
+
+// ✅ Always make OG/LD image absolute for bots
+const ogRaw = ogImage || ''
+const ogAbs =
+  ogRaw && /^https?:\/\//i.test(ogRaw)
+    ? ogRaw
+    : ogRaw
+    ? `${SITE_URL}${ogRaw.startsWith('/') ? '' : '/'}${ogRaw}`
     : ''
 
-  const firstTag = (photo?.tags || []).find(Boolean) || ''
-  const rawAvailable = photo?.rawAvailable !== false // default true unless explicitly false
+const thumbRaw = String(photo?.thumb_url || photo?.thumbUrl || '').trim()
+const thumbAbs =
+  thumbRaw && /^https?:\/\//i.test(thumbRaw)
+    ? thumbRaw
+    : thumbRaw
+    ? `${SITE_URL}${thumbRaw.startsWith('/') ? '' : '/'}${thumbRaw}`
+    : ogAbs
 
-  // ✅ If RAW isn't available but user is on RAW, force JPG
-  React.useEffect(() => {
-    if (photo && rawAvailable === false && format === 'raw') {
-      setFormat('jpg')
-    }
-  }, [photo, rawAvailable, format])
-
-  // ✅ SEO-safe canonical (never blank)
-  const SITE_URL = 'https://jeevanchandimal.com'
-  const canonicalId = photo?.id || id
-  const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
-
-  // ✅ Licensable image URLs (Google Images)
-  const licenseUrl = `${SITE_URL}/terms-and-conditions`
-  const acquireLicensePage = canonicalUrl
-
-  // ✅ Social/Schema image should be PUBLIC + stable + absolute for bots
-  const absolutePreviewForBots = canonicalId
-    ? `${SITE_URL}/api/photo/${encodeURIComponent(canonicalId)}/preview?variant=${variant}`
-    : ''
-
-  const ogImageFromDb = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
-  const ogImage = ogImageFromDb || absolutePreviewForBots
-
-  // ✅ ORIGINAL width/height (prefer EXIF; fallback to preview natural dims)
-  const exifW =
-    Number(
-      photo?.exif?.width ||
-        photo?.exif?.ImageWidth ||
-        photo?.exif?.PixelXDimension ||
-        photo?.exif?.ExifImageWidth
-    ) || null
-
-  const exifH =
-    Number(
-      photo?.exif?.height ||
-        photo?.exif?.ImageHeight ||
-        photo?.exif?.PixelYDimension ||
-        photo?.exif?.ExifImageHeight
-    ) || null
-
-  const finalW = exifW || naturalDims.w || null
-  const finalH = exifH || naturalDims.h || null
-
-  // ✅ Use these for OG + JSON-LD too (fixes undefined imgW/imgH bugs)
-  const imgW = finalW
-  const imgH = finalH
-
-  const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
-
-  // exact JPG size if available, otherwise estimate
-  const exactJpgMB =
-    typeof photo?.exif?.bytes === 'number' ? (photo.exif.bytes / (1024 * 1024)).toFixed(1) : null
-
-  const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
-  const rawSizeMB = estimateRawSizeMB(finalW, finalH)
-
-  // ✅ Check membership when email changes (debounced)
-  React.useEffect(() => {
-    const em = String(email || '').trim().toLowerCase()
-
-    // reset if email not valid
-    if (!validEmailQuick(em)) {
-      setIsMember(false)
-      setMemberPlan(null)
-      setMemberLoading(false)
-      if (memberTimer.current) clearTimeout(memberTimer.current)
-      return
-    }
-
-    if (memberTimer.current) clearTimeout(memberTimer.current)
-
-    memberTimer.current = setTimeout(async () => {
-      try {
-        setMemberLoading(true)
-
-        const r = await fetch(`/api/membership/check?email=${encodeURIComponent(em)}`, {
-          headers: { 'Cache-Control': 'no-store' },
-        })
-        const j = await r.json().catch(() => null)
-
-        if (j?.ok && j?.member) {
-          setIsMember(true)
-          setMemberPlan(j?.plan || null)
-        } else {
-          setIsMember(false)
-          setMemberPlan(null)
-        }
-      } catch {
-        setIsMember(false)
-        setMemberPlan(null)
-      } finally {
-        setMemberLoading(false)
+const imageObjectJsonLd =
+  photo && ogAbs
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'ImageObject',
+        '@id': `${canonicalUrl}#image`,
+        mainEntityOfPage: canonicalUrl,
+        contentUrl: ogAbs,
+        url: ogAbs,
+        thumbnailUrl: thumbAbs || ogAbs,
+        name: photo.title,
+        description:
+          photo.description || `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
+        keywords: tagsArr.length ? tagsArr.join(', ') : undefined,
+        creator: { '@type': 'Person', name: 'Jeevan Chandimal', url: SITE_URL },
+        copyrightHolder: { '@type': 'Person', name: 'Jeevan Chandimal' },
+        creditText: 'Jeevan Chandimal',
+        copyrightNotice: '© Jeevan Chandimal',
+        license: licenseUrl,
+        acquireLicensePage,
+        isAccessibleForFree: false,
+        width: imgW || undefined,
+        height: imgH || undefined,
+        contentLocation: buildContentLocation(photo?.location || null),
       }
-    }, 450)
-
-    return () => {
-      if (memberTimer.current) clearTimeout(memberTimer.current)
-    }
-  }, [email])
-
-  async function downloadAsMember() {
-    if (!photo?.id) return
-
-    const em = String(email || '').trim().toLowerCase()
-    if (!validEmailQuick(em)) {
-      alert('Enter your membership email first.')
-      return
-    }
-
-    try {
-      setIsCheckingOut(true)
-
-      const r = await fetch('/api/member/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId: photo.id, email: em }),
-      })
-
-      const j = await r.json().catch(() => null)
-      if (!r.ok || !j?.ok || !j?.url) {
-        alert(j?.error || 'Member download failed')
-        return
-      }
-
-      window.location.href = j.url
-    } catch (e) {
-      console.error(e)
-      alert('Member download failed')
-    } finally {
-      setIsCheckingOut(false)
-    }
-  }
-
-  async function startCheckout() {
-    if (!photo) return
-
-    if (format === 'raw' && rawAvailable === false) {
-      alert('RAW is not available for this image. Please choose JPG.')
-      return
-    }
-
-    const em = String(email || '').trim().toLowerCase()
-    if (!isValidEmail(em)) {
-      alert('Please enter a valid email for receipt + download link.')
-      return
-    }
-
-    if (!agreed) {
-      alert('Please agree to the Terms / Refund / Privacy Policy to continue.')
-      return
-    }
-
-    try {
-      setIsCheckingOut(true)
-
-      const r = await fetch('/api/payhere/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          photoId: photo.id,
-          license,
-          format,
-          currency,
-          email: em,
-          firstName: (firstName || 'Customer').trim(),
-          lastName: (lastName || 'Guest').trim(),
-          phone: '0000000000',
-          address: 'N/A',
-          city: 'N/A',
-          country: 'Sri Lanka',
-        }),
-      })
-
-      const data = await r.json().catch(() => null)
-
-      if (!r.ok || !data?.actionUrl || !data?.fields) {
-        alert(data?.error || 'Checkout init failed')
-        return
-      }
-
-      // ✅ IMPORTANT: Save order id for /store/return fallback (PayHere may drop query params)
-      const oid = String(data?.orderId || data?.order_id || data?.fields?.order_id || '').trim()
-      if (oid) {
-        try {
-          localStorage.setItem('last_order_id', oid)
-        } catch {}
-      }
-
-      const form = document.createElement('form')
-      form.method = 'POST'
-      form.action = String(data.actionUrl)
-
-      Object.entries(data.fields).forEach(([k, v]) => {
-        const input = document.createElement('input')
-        input.type = 'hidden'
-        input.name = k
-        input.value = String(v ?? '')
-        form.appendChild(input)
-      })
-
-      document.body.appendChild(form)
-      form.submit()
-    } catch (e) {
-      console.error(e)
-      alert('Checkout failed')
-    } finally {
-      setIsCheckingOut(false)
-    }
-  }
-
-  // ✅ Always make OG/LD image absolute for bots
-  const ogRaw = ogImage || ''
-  const ogAbs =
-    ogRaw && /^https?:\/\//i.test(ogRaw)
-      ? ogRaw
-      : ogRaw
-      ? `${SITE_URL}${ogRaw.startsWith('/') ? '' : '/'}${ogRaw}`
-      : ''
-
-  const thumbRaw = (photo?.thumbUrl || '').trim()
-  const thumbAbs =
-    thumbRaw && /^https?:\/\//i.test(thumbRaw)
-      ? thumbRaw
-      : thumbRaw
-      ? `${SITE_URL}${thumbRaw.startsWith('/') ? '' : '/'}${thumbRaw}`
-      : ogAbs
-
-  const imageObjectJsonLd =
-    photo && ogAbs
-      ? {
-          '@context': 'https://schema.org',
-          '@type': 'ImageObject',
-
-          // Unique ID for the image entity
-          '@id': `${canonicalUrl}#image`,
-
-          // Page where the image is licensed/purchased
-          mainEntityOfPage: canonicalUrl,
-
-          // The actual image file URL (must be crawlable)
-          contentUrl: ogAbs,
-          url: ogAbs,
-
-          // Thumbnail (optional but recommended)
-          thumbnailUrl: thumbAbs || ogAbs,
-
-          name: photo.title,
-          description:
-            photo.description || `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
-
-          keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : undefined,
-
-          creator: {
-            '@type': 'Person',
-            name: 'Jeevan Chandimal',
-            url: SITE_URL,
-          },
-
-          copyrightHolder: {
-            '@type': 'Person',
-            name: 'Jeevan Chandimal',
-          },
-
-          creditText: 'Jeevan Chandimal',
-          copyrightNotice: '© Jeevan Chandimal',
-
-          // ✅ Licensable fields
-          license: licenseUrl,
-          acquireLicensePage: acquireLicensePage,
-
-          isAccessibleForFree: false,
-
-          width: imgW || undefined,
-          height: imgH || undefined,
-
-          contentLocation: buildContentLocation(photo.location),
-        }
-      : null
+    : null
 
   return (
     <>
       <Head>
-        <title>
-          {photo?.title
-            ? `${photo.title} | Photograph by Jeevan Chandimal`
-            : 'Photo | Jeevan Chandimal'}
-        </title>
+  <title>
+    {photo?.title
+      ? `${photo.title} | Photograph by Jeevan Chandimal`
+      : 'Photo | Jeevan Chandimal'}
+  </title>
 
-        <meta
-          name="description"
-          content={
-            photo?.description ||
-            `${photo?.title || 'Photograph'} – premium Sri Lanka photography by Jeevan Chandimal. Available for licensing.`
-          }
-        />
+  <meta
+    name="description"
+    content={
+      photo?.description ||
+      `${photo?.title || 'Photograph'} – premium Sri Lanka photography by Jeevan Chandimal. Available for licensing.`
+    }
+  />
 
-        {/* Open Graph */}
-        <meta property="og:title" content={photo?.title || 'Photograph'} />
-        <meta
-          property="og:description"
-          content={
-            photo?.description ||
-            `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
-          }
-        />
-        <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:type" content="article" />
-        {ogAbs ? <meta property="og:image" content={ogAbs} /> : null}
-        {ogAbs && imgW ? <meta property="og:image:width" content={String(imgW)} /> : null}
-        {ogAbs && imgH ? <meta property="og:image:height" content={String(imgH)} /> : null}
+  {/* Open Graph */}
+  <meta property="og:title" content={photo?.title || 'Photograph'} />
+  <meta
+    property="og:description"
+    content={
+      photo?.description ||
+      'Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.'
+    }
+  />
+  <meta property="og:url" content={String(canonicalUrl || '')} />
+  <meta property="og:type" content="article" />
 
-        {/* Twitter */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={photo?.title || 'Photograph'} />
-        <meta
-          name="twitter:description"
-          content={
-            photo?.description ||
-            `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
-          }
-        />
-        {ogAbs ? <meta name="twitter:image" content={ogAbs} /> : null}
+  {ogAbs && <meta property="og:image" content={String(ogAbs)} />}
+  {ogAbs && imgW ? <meta property="og:image:width" content={String(imgW)} /> : null}
+  {ogAbs && imgH ? <meta property="og:image:height" content={String(imgH)} /> : null}
 
-        {/* Canonical */}
-        <link rel="canonical" href={canonicalUrl} />
+  {/* Twitter */}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={photo?.title || 'Photograph'} />
+  <meta
+    name="twitter:description"
+    content={
+      photo?.description ||
+      'Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.'
+    }
+  />
+  {ogAbs && <meta name="twitter:image" content={String(ogAbs)} />}
 
-        {/* Preload main preview image for faster LCP */}
-        {photo?.id && previewSrc ? (
-          <link rel="preload" as="image" href={previewSrc} fetchPriority="high" />
-        ) : null}
+  {/* Canonical */}
+  <link rel="canonical" href={String(canonicalUrl || '')} />
 
-        {/* ✅ Licensable ImageObject JSON-LD (Google Images) */}
-        {imageObjectJsonLd ? (
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{
-              __html: JSON.stringify(imageObjectJsonLd),
-            }}
-          />
-        ) : null}
-      </Head>
+  {/* Preload main preview image for faster LCP */}
+  {photo?.id && previewSrc ? (
+    <link rel="preload" as="image" href={String(previewSrc)} />
+  ) : null}
 
-      <JeevanChandimalNavi />
+  {/* ✅ Licensable ImageObject JSON-LD (Google Images) */}
+  {imageObjectJsonLd && (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(imageObjectJsonLd) }}
+    />
+  )}
+</Head>
 
-      <main className="wrap">
-        <div className="top">
-          <Link href="/store" className="back">
-            ← Back to store
-          </Link>
+     <JeevanChandimalNavi />
 
-          <div className="toggle" role="group" aria-label="Currency toggle">
-            <button
-              type="button"
-              className={`tbtn ${currency === 'LKR' ? 'active' : ''}`}
-              onClick={() => setCurrency('LKR')}
-            >
-              LKR
+<main className="wrap">
+  <div className="top">
+    {/* Back link (compatible with both old/new Next Link) */}
+    <Link href="/store" legacyBehavior>
+      <a className="back">← Back to store</a>
+    </Link>
+
+    <div className="toggle" role="group" aria-label="Currency toggle">
+      <button
+        type="button"
+        className={`tbtn ${currency === 'LKR' ? 'active' : ''}`}
+        onClick={() => setCurrency('LKR')}
+      >
+        LKR
+      </button>
+      <button
+        type="button"
+        className={`tbtn ${currency === 'USD' ? 'active' : ''}`}
+        onClick={() => setCurrency('USD')}
+      >
+        USD
+      </button>
+    </div>
+  </div>
+
+  {loading && <div className="state">Loading…</div>}
+  {!loading && error && <div className="state">❌ {error}</div>}
+
+  {!loading && !error && photo && (
+    <>
+      {/* ✅ KEEP layout grid ONLY for left+right columns */}
+      <div className="layout">
+        {/* LEFT IMAGE */}
+        <section className="imageCard">
+          <div className="imageFrame" onContextMenu={preventSave}>
+            <button type="button" className="zoomBtn" onClick={openZoom}>
+              Zoom
             </button>
-            <button
-              type="button"
-              className={`tbtn ${currency === 'USD' ? 'active' : ''}`}
-              onClick={() => setCurrency('USD')}
-            >
-              USD
-            </button>
+
+            <img
+              src={previewSrc || photo.previewUrl || photo.thumbUrl}
+              alt={photo.title}
+              draggable={false}
+              onClick={openZoom}
+              onContextMenu={preventSave}
+              onDragStart={preventSave}
+              loading="eager"
+              onLoad={(e) => {
+                const w = e.currentTarget.naturalWidth
+                const h = e.currentTarget.naturalHeight
+                if (w && h) setNaturalDims({ w, h })
+              }}
+              onError={(e) => {
+                if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+                  e.currentTarget.src = photo.previewUrl
+                  return
+                }
+                if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+              }}
+            />
+
+            {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
           </div>
-        </div>
 
-        {loading && <div className="state">Loading…</div>}
-        {!loading && error && <div className="state">❌ {error}</div>}
+          <p className="desc">
+            {photo.description ||
+              'Premium preview with watermark. Final download is delivered clean after payment.'}
+          </p>
 
-        {!loading && !error && photo && (
-          <>
-            {/* ✅ KEEP layout grid ONLY for left+right columns */}
-            <div className="layout">
-              {/* LEFT IMAGE */}
-              <section className="imageCard">
-                <div className="imageFrame" onContextMenu={preventSave}>
-                  <button type="button" className="zoomBtn" onClick={openZoom}>
-                    Zoom
+          {/* Watermark controls + details */}
+          <div className="metaCard">
+            <div className="metaRow">
+              <div className="metaTitle">Watermark</div>
+              <div className="metaCell">
+                <div className="wmControls">
+                  <button
+                    type="button"
+                    className={`miniBtn ${wmOn ? 'active' : ''}`}
+                    onClick={() => setWmOn(true)}
+                  >
+                    On
+                  </button>
+                  <button
+                    type="button"
+                    className={`miniBtn ${!wmOn ? 'active' : ''}`}
+                    onClick={() => setWmOn(false)}
+                  >
+                    Off
+                  </button>
+                </div>
+              </div>
+              <div />
+            </div>
+
+            <div className="metaRow">
+              <div className="metaTitle">Strength</div>
+              <div className="metaCell">
+                <input
+                  type="range"
+                  min="0.02"
+                  max="0.18"
+                  step="0.01"
+                  value={wmOpacity}
+                  onChange={(e) => setWmOpacity(Number(e.target.value))}
+                  className="range"
+                  disabled={!wmOn}
+                />
+              </div>
+              <div className="rangeVal">{Math.round(wmOpacity * 100)}%</div>
+            </div>
+
+            <div className="metaRow metaRowTall">
+              <div className="metaTitle">Photo details</div>
+              <div className="metaText">
+                <div>
+                  <strong>ID:</strong> {String(photo.id || '')}
+                </div>
+
+                {photo.createdAt ? (
+                  <div>
+                    <strong>Date:</strong> {new Date(photo.createdAt).toLocaleDateString()}
+                  </div>
+                ) : null}
+
+                {photo.exif?.make || photo.exif?.model ? (
+                  <div>
+                    <strong>Camera:</strong>{' '}
+                    {[photo.exif?.make, photo.exif?.model]
+                      .map((x) => String(x ?? '').trim())
+                      .filter(Boolean)
+                      .join(' ')}
+                  </div>
+                ) : null}
+
+                {photo.exif?.lensModel ? (
+                  <div>
+                    <strong>Lens:</strong> {String(photo.exif.lensModel)}
+                  </div>
+                ) : null}
+
+                {photo.exif?.settingsLine ? (
+                  <div>
+                    <strong>Settings:</strong> {String(photo.exif.settingsLine)}
+                  </div>
+                ) : null}
+
+                {photo.exif?.dateTimeOriginal ? (
+                  <div>
+                    <strong>Taken:</strong> {formatExifDate(photo.exif.dateTimeOriginal)}
+                  </div>
+                ) : null}
+
+                <div>
+                  <strong>Preview:</strong> Watermarked
+                </div>
+                <div>
+                  <strong>Delivery:</strong> Clean file after payment
+                </div>
+              </div>
+              <div />
+            </div>
+
+            {/* ✅ TAGS (safe even if tags contain objects) */}
+            <div className="metaRow metaRowTall">
+              <div className="metaTitle">Tags</div>
+              <div className="metaText">
+                {Array.isArray(photo.tags) && photo.tags.length > 0 ? (
+                  <div className="tagRow">
+                    {photo.tags
+                      .map((t) => String(t ?? '').trim())
+                      .filter(Boolean)
+                      .slice(0, 14)
+                      .map((t) => (
+                        <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`} legacyBehavior>
+                          <a className="tag">#{t}</a>
+                        </Link>
+                      ))}
+                  </div>
+                ) : (
+                  <div style={{ opacity: 0.75 }}>No tags</div>
+                )}
+              </div>
+              <div />
+            </div>
+
+            <div className="metaRow metaRowTall">
+              <div className="metaTitle">Description</div>
+              <div className="metaText">
+                {photo.description ? (
+                  photo.description
+                ) : (
+                  <span style={{ opacity: 0.75 }}>No description added yet.</span>
+                )}
+              </div>
+              <div />
+            </div>
+          </div>
+        </section>
+
+        {/* BUY CARD */}
+        <aside className="buyCard">
+          <h1 className="title">{photo.title}</h1>
+
+          {isMember ? (
+            <div className="memberBadge">{String(memberPlan || 'member').toUpperCase()}</div>
+          ) : null}
+
+          <p className="sub">
+            {isMember ? 'Download included with your membership' : 'Choose license + format'}
+          </p>
+
+          <div className="block">
+            <span className="label">Receipt email</span>
+            <input
+              className="field"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => {
+                const v = e.target.value
+                setEmail(v)
+                try {
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('user_email', String(v || '').trim().toLowerCase())
+                  }
+                } catch {}
+              }}
+            />
+
+            <div className="row2">
+              <input
+                className="field"
+                type="text"
+                placeholder="First name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+              <input
+                className="field"
+                type="text"
+                placeholder="Last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
+
+            <p className="fine">We’ll send your receipt and secure download link to this email.</p>
+          </div>
+
+          {!isMember && (
+            <>
+              <div className="block">
+                <span className="label">License</span>
+                <div className="options options3">
+                  <button
+                    type="button"
+                    className={`opt ${license === 'personal' ? 'active' : ''}`}
+                    onClick={() => setLicense('personal')}
+                  >
+                    Personal
+                  </button>
+                  <button
+                    type="button"
+                    className={`opt ${license === 'commercial' ? 'active' : ''}`}
+                    onClick={() => setLicense('commercial')}
+                  >
+                    Commercial
+                  </button>
+                  <button
+                    type="button"
+                    className={`opt ${license === 'editorial' ? 'active' : ''}`}
+                    onClick={() => setLicense('editorial')}
+                  >
+                    Editorial
+                  </button>
+                </div>
+
+                <p className="fine">
+                  Personal: non-commercial use. Commercial: ads, branding, client work. Editorial:
+                  news, blogs, documentary.
+                </p>
+              </div>
+
+              <div className="block">
+                <span className="label">Format</span>
+                <div className="options options2">
+                  <button
+                    type="button"
+                    className={`opt ${format === 'jpg' ? 'active' : ''}`}
+                    onClick={() => setFormat('jpg')}
+                  >
+                    JPG
                   </button>
 
-                  <img
-                    src={previewSrc || photo.previewUrl || photo.thumbUrl}
-                    alt={photo.title}
-                    draggable={false}
-                    onClick={openZoom}
-                    onContextMenu={preventSave}
-                    onDragStart={preventSave}
-                    loading="eager"
-                    onLoad={(e) => {
-                      const w = e.currentTarget.naturalWidth
-                      const h = e.currentTarget.naturalHeight
-                      if (w && h) setNaturalDims({ w, h })
+                  <button
+                    type="button"
+                    className={`opt ${format === 'raw' ? 'active' : ''} ${
+                      rawAvailable ? '' : 'disabled'
+                    }`}
+                    onClick={() => {
+                      if (!rawAvailable) return
+                      setFormat('raw')
                     }}
-                    onError={(e) => {
-                      if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
-                        e.currentTarget.src = photo.previewUrl
-                        return
-                      }
-                      if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
-                    }}
-                  />
+                    disabled={!rawAvailable}
+                    title={!rawAvailable ? 'RAW not available for this image' : 'RAW'}
+                  >
+                    RAW
+                  </button>
 
-                  {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
-                </div>
-
-                <p className="desc">
-                  {photo.description ||
-                    'Premium preview with watermark. Final download is delivered clean after payment.'}
-                </p>
-
-                {/* Watermark controls + details */}
-                <div className="metaCard">
-                  <div className="metaRow">
-                    <div className="metaTitle">Watermark</div>
-                    <div className="metaCell">
-                      <div className="wmControls">
-                        <button
-                          type="button"
-                          className={`miniBtn ${wmOn ? 'active' : ''}`}
-                          onClick={() => setWmOn(true)}
-                        >
-                          On
-                        </button>
-                        <button
-                          type="button"
-                          className={`miniBtn ${!wmOn ? 'active' : ''}`}
-                          onClick={() => setWmOn(false)}
-                        >
-                          Off
-                        </button>
-                      </div>
-                    </div>
-                    <div />
-                  </div>
-
-                  <div className="metaRow">
-                    <div className="metaTitle">Strength</div>
-                    <div className="metaCell">
-                      <input
-                        type="range"
-                        min="0.02"
-                        max="0.18"
-                        step="0.01"
-                        value={wmOpacity}
-                        onChange={(e) => setWmOpacity(Number(e.target.value))}
-                        className="range"
-                        disabled={!wmOn}
-                      />
-                    </div>
-                    <div className="rangeVal">{Math.round(wmOpacity * 100)}%</div>
-                  </div>
-
-                  <div className="metaRow metaRowTall">
-                    <div className="metaTitle">Photo details</div>
-                    <div className="metaText">
-                      <div>
-                        <strong>ID:</strong> {photo.id}
-                      </div>
-
-                      {photo.createdAt ? (
-                        <div>
-                          <strong>Date:</strong> {new Date(photo.createdAt).toLocaleDateString()}
-                        </div>
-                      ) : null}
-
-                      {photo.exif?.make || photo.exif?.model ? (
-                        <div>
-                          <strong>Camera:</strong>{' '}
-                          {[photo.exif?.make, photo.exif?.model].filter(Boolean).join(' ')}
-                        </div>
-                      ) : null}
-
-                      {photo.exif?.lensModel ? (
-                        <div>
-                          <strong>Lens:</strong> {photo.exif.lensModel}
-                        </div>
-                      ) : null}
-
-                      {photo.exif?.settingsLine ? (
-                        <div>
-                          <strong>Settings:</strong> {photo.exif.settingsLine}
-                        </div>
-                      ) : null}
-
-                      {/* ✅ Uses dateTimeOriginal (matches your existing UI) */}
-                      {photo.exif?.dateTimeOriginal ? (
-                        <div>
-                          <strong>Taken:</strong> {formatExifDate(photo.exif.dateTimeOriginal)}
-                        </div>
-                      ) : null}
-
-                      <div>
-                        <strong>Preview:</strong> Watermarked
-                      </div>
-                      <div>
-                        <strong>Delivery:</strong> Clean file after payment
-                      </div>
-                    </div>
-                    <div />
-                  </div>
-
-                  <div className="metaRow metaRowTall">
-                    <div className="metaTitle">Tags</div>
-                    <div className="metaText">
-                      {Array.isArray(photo.tags) && photo.tags.length > 0 ? (
-                        <div className="tagRow">
-                          {photo.tags.slice(0, 14).map((t) => (
-                            <Link
-                              key={t}
-                              href={`/store?tag=${encodeURIComponent(t)}`}
-                              className="tag"
-                            >
-                              #{t}
-                            </Link>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ opacity: 0.75 }}>No tags</div>
-                      )}
-                    </div>
-                    <div />
-                  </div>
-
-                  <div className="metaRow metaRowTall">
-                    <div className="metaTitle">Description</div>
-                    <div className="metaText">
-                      {photo.description ? (
-                        photo.description
-                      ) : (
-                        <span style={{ opacity: 0.75 }}>No description added yet.</span>
-                      )}
-                    </div>
-                    <div />
-                  </div>
-                </div>
-              </section>
-
-              {/* BUY CARD */}
-              <aside className="buyCard">
-                <h1 className="title">{photo.title}</h1>
-                {isMember ? (
-                  <div className="memberBadge">{(memberPlan || 'member').toUpperCase()}</div>
-                ) : null}
-                <p className="sub">
-                  {isMember ? 'Download included with your membership' : 'Choose license + format'}
-                </p>
-
-                <div className="block">
-                  <span className="label">Receipt email</span>
-                  <input
-                    className="field"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setEmail(v)
-                      try {
-                        if (typeof window !== 'undefined') {
-                          window.localStorage.setItem(
-                            'user_email',
-                            String(v || '').trim().toLowerCase()
-                          )
-                        }
-                      } catch {}
-                    }}
-                  />
-
-                  <div className="row2">
-                    <input
-                      className="field"
-                      type="text"
-                      placeholder="First name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                    <input
-                      className="field"
-                      type="text"
-                      placeholder="Last name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                  </div>
-
-                  <p className="fine">We’ll send your receipt and secure download link to this email.</p>
-                </div>
-
-                {!isMember && (
-                  <>
-                    <div className="block">
-                      <span className="label">License</span>
-                      <div className="options options3">
-                        <button
-                          type="button"
-                          className={`opt ${license === 'personal' ? 'active' : ''}`}
-                          onClick={() => setLicense('personal')}
-                        >
-                          Personal
-                        </button>
-                        <button
-                          type="button"
-                          className={`opt ${license === 'commercial' ? 'active' : ''}`}
-                          onClick={() => setLicense('commercial')}
-                        >
-                          Commercial
-                        </button>
-                        <button
-                          type="button"
-                          className={`opt ${license === 'editorial' ? 'active' : ''}`}
-                          onClick={() => setLicense('editorial')}
-                        >
-                          Editorial
-                        </button>
-                      </div>
-
-                      <p className="fine">
-                        Personal: non-commercial use. Commercial: ads, branding, client work. Editorial:
-                        news, blogs, documentary.
-                      </p>
-                    </div>
-
-                    <div className="block">
-                      <span className="label">Format</span>
-                      <div className="options options2">
-                        <button
-                          type="button"
-                          className={`opt ${format === 'jpg' ? 'active' : ''}`}
-                          onClick={() => setFormat('jpg')}
-                        >
-                          JPG
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`opt ${format === 'raw' ? 'active' : ''} ${
-                            rawAvailable ? '' : 'disabled'
-                          }`}
-                          onClick={() => {
-                            if (!rawAvailable) return
-                            setFormat('raw')
-                          }}
-                          disabled={!rawAvailable}
-                          title={!rawAvailable ? 'RAW not available for this image' : 'RAW'}
-                        >
-                          RAW
-                        </button>
-
-                        {!rawAvailable ? (
-                          <p className="fine" style={{ marginTop: 8 }}>
-                            RAW is not available for this image.
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* ✅ MEMBERSHIP DOWNLOAD */}
-                {memberLoading ? (
-                  <p className="fine">Checking membership…</p>
-                ) : isMember ? (
-                  <div className="memberBox">
-                    <div className="memberLine">
-                      ✅ Membership active{memberPlan ? ` (${memberPlan})` : ''}
-                    </div>
-
-                    <button
-                      type="button"
-                      className="memberBtn"
-                      onClick={downloadAsMember}
-                      disabled={isCheckingOut}
-                    >
-                      {isCheckingOut ? 'Working…' : 'Download with membership'}
-                    </button>
-
+                  {!rawAvailable ? (
                     <p className="fine" style={{ marginTop: 8 }}>
-                      Basic/Pro downloads JPG • Elite downloads RAW ZIP
+                      RAW is not available for this image.
                     </p>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ✅ MEMBERSHIP DOWNLOAD */}
+          {memberLoading ? (
+            <p className="fine">Checking membership…</p>
+          ) : isMember ? (
+            <div className="memberBox">
+              <div className="memberLine">✅ Membership active{memberPlan ? ` (${memberPlan})` : ''}</div>
+
+              <button
+                type="button"
+                className="memberBtn"
+                onClick={downloadAsMember}
+                disabled={isCheckingOut}
+              >
+                {isCheckingOut ? 'Working…' : 'Download with membership'}
+              </button>
+
+              <p className="fine" style={{ marginTop: 8 }}>
+                Basic/Pro downloads JPG • Elite downloads RAW ZIP
+              </p>
+            </div>
+          ) : null}
+
+          {!isMember && (
+            <>
+              <div className="licenseTable">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>License</th>
+                      <th>Allowed Usage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Personal</td>
+                      <td>Social media, personal projects (non-commercial)</td>
+                    </tr>
+                    <tr>
+                      <td>Commercial</td>
+                      <td>Advertising, websites, marketing, client work</td>
+                    </tr>
+                    <tr>
+                      <td>Editorial</td>
+                      <td>News articles, blogs, documentaries</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="priceRow">
+                <span className="price">{formatMoney(currency, price)}</span>
+                <span className="small">Instant digital download</span>
+              </div>
+
+              <div className="fileInfo">
+                {resolution && (
+                  <div>
+                    <strong>Resolution:</strong> {resolution}
                   </div>
-                ) : null}
-
-                {!isMember && (
-                  <>
-                    {/* LICENSE TABLE – PayHere clarity */}
-                    <div className="licenseTable">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>License</th>
-                            <th>Allowed Usage</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>Personal</td>
-                            <td>Social media, personal projects (non-commercial)</td>
-                          </tr>
-                          <tr>
-                            <td>Commercial</td>
-                            <td>Advertising, websites, marketing, client work</td>
-                          </tr>
-                          <tr>
-                            <td>Editorial</td>
-                            <td>News articles, blogs, documentaries</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="priceRow">
-                      <span className="price">{formatMoney(currency, price)}</span>
-                      <span className="small">Instant digital download</span>
-                    </div>
-
-                    {/* FILE INFO */}
-                    <div className="fileInfo">
-                      {resolution && (
-                        <div>
-                          <strong>Resolution:</strong> {resolution}
-                        </div>
-                      )}
-
-                      {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
-                        <div>
-                          <strong>JPG size:</strong>{' '}
-                          {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
-                        </div>
-                      )}
-
-                      {format === 'raw' && rawSizeMB && rawAvailable && (
-                        <div>
-                          <strong>RAW size:</strong> ~{rawSizeMB} MB
-                        </div>
-                      )}
-                    </div>
-
-                    {/* DIGITAL PRODUCT NOTICE – REQUIRED */}
-                    <p className="digitalNotice">
-                      This is a digital product. No physical item will be shipped. Files are delivered
-                      instantly after successful payment.
-                    </p>
-
-                    {/* TERMS CHECKBOX – BANK SAFE */}
-                    <div className="termsRow">
-                      <input
-                        type="checkbox"
-                        id="agree"
-                        checked={agreed}
-                        onChange={(e) => setAgreed(e.target.checked)}
-                      />
-                      <label htmlFor="agree">
-                        I agree to the{' '}
-                        <a href="/terms-and-conditions" target="_blank" rel="noreferrer">
-                          Terms
-                        </a>
-                        ,{' '}
-                        <a href="/refund-policy" target="_blank" rel="noreferrer">
-                          Refund Policy
-                        </a>
-                        , and{' '}
-                        <a href="/privacy-policy" target="_blank" rel="noreferrer">
-                          Privacy Policy
-                        </a>
-                        .
-                      </label>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="buyBtn"
-                      onClick={startCheckout}
-                      disabled={isCheckingOut || !agreed}
-                    >
-                      {isCheckingOut ? 'Working…' : 'Buy license'}
-                    </button>
-
-                    <p className="fine">
-                      After payment, you will receive an email with your secure download link.
-                    </p>
-                  </>
                 )}
 
-                {/* CONTACT LINE – TRUST SIGNAL */}
-                <p className="fine">
-                  Need help? 📧 <a href="mailto:info@jeevanchandimal.com">Email us</a> or{' '}
-                  <Link href="/contact">Contact form</Link>
-                </p>
-              </aside>
-            </div>
+                {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
+                  <div>
+                    <strong>JPG size:</strong>{' '}
+                    {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
+                  </div>
+                )}
 
-            {/* SIMILAR */}
-            <section className="relBlock">
-              <div className="relHead">
-                <h2>Similar images</h2>
-                <Link
-                  href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}
-                  className="seeAll"
-                >
-                  See all
+                {format === 'raw' && rawSizeMB && rawAvailable && (
+                  <div>
+                    <strong>RAW size:</strong> ~{rawSizeMB} MB
+                  </div>
+                )}
+              </div>
+
+              <p className="digitalNotice">
+                This is a digital product. No physical item will be shipped. Files are delivered
+                instantly after successful payment.
+              </p>
+
+              <div className="termsRow">
+                <input
+                  type="checkbox"
+                  id="agree"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
+                <label htmlFor="agree">
+                  I agree to the{' '}
+                  <a href="/terms-and-conditions" target="_blank" rel="noreferrer">
+                    Terms
+                  </a>
+                  ,{' '}
+                  <a href="/refund-policy" target="_blank" rel="noreferrer">
+                    Refund Policy
+                  </a>
+                  , and{' '}
+                  <a href="/privacy-policy" target="_blank" rel="noreferrer">
+                    Privacy Policy
+                  </a>
+                  .
+                </label>
+              </div>
+
+              <button
+                type="button"
+                className="buyBtn"
+                onClick={startCheckout}
+                disabled={isCheckingOut || !agreed}
+              >
+                {isCheckingOut ? 'Working…' : 'Buy license'}
+              </button>
+
+              <p className="fine">After payment, you will receive an email with your secure download link.</p>
+            </>
+          )}
+
+          <p className="fine">
+            Need help? 📧 <a href="mailto:info@jeevanchandimal.com">Email us</a> or{' '}
+            <Link href="/contact" legacyBehavior>
+              <a>Contact form</a>
+            </Link>
+          </p>
+        </aside>
+      </div>
+
+      {/* SIMILAR */}
+      <section className="relBlock">
+        <div className="relHead">
+          <h2>Similar images</h2>
+
+          <Link href={firstTag ? `/store?tag=${encodeURIComponent(String(firstTag))}` : '/store'} legacyBehavior>
+            <a className="seeAll">See all</a>
+          </Link>
+        </div>
+
+        {relLoading ? (
+          <div className="relState">Loading…</div>
+        ) : similar.length === 0 ? (
+          <div className="relState">No similar photos found yet.</div>
+        ) : (
+          <div className="relGrid">
+            {similar.map((p) => {
+              const tag0 = String((Array.isArray(p.tags) ? p.tags[0] : p.tags) ?? '').trim()
+              return (
+                <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
+                  <a className="relCard">
+                    <div className="relThumb">
+                      <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} loading="lazy" />
+                      {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
+                    </div>
+                    <div className="relMeta">
+                      <div className="relName">{p.title || 'Untitled'}</div>
+                      <div className="relTag">{tag0 ? `#${tag0}` : 'Photo'}</div>
+                    </div>
+                  </a>
                 </Link>
-              </div>
-
-              {relLoading ? (
-                <div className="relState">Loading…</div>
-              ) : similar.length === 0 ? (
-                <div className="relState">No similar photos found yet.</div>
-              ) : (
-                <div className="relGrid">
-                  {similar.map((p) => (
-                    <Link key={p.id} href={`/store/${p.id}`} className="relCard">
-                      <div className="relThumb">
-                        <img
-                          src={String(p.thumb_url || '').trim()}
-                          alt={p.title || 'Photo'}
-                          loading="lazy"
-                        />
-                        {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
-                      </div>
-                      <div className="relMeta">
-                        <div className="relName">{p.title || 'Untitled'}</div>
-                        <div className="relTag">
-                          {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* RECOMMENDED */}
-            <section className="relBlock">
-              <div className="relHead">
-                <h2>Recommended for you</h2>
-                <Link href="/store" className="seeAll">
-                  See all
-                </Link>
-              </div>
-
-              {relLoading ? (
-                <div className="relState">Loading…</div>
-              ) : recommended.length === 0 ? (
-                <div className="relState">No recommendations yet.</div>
-              ) : (
-                <div className="relGrid">
-                  {recommended.map((p) => (
-                    <Link key={p.id} href={`/store/${p.id}`} className="relCard">
-                      <div className="relThumb">
-                        <img
-                          src={String(p.thumb_url || '').trim()}
-                          alt={p.title || 'Photo'}
-                          loading="lazy"
-                        />
-                        {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
-                      </div>
-                      <div className="relMeta">
-                        <div className="relName">{p.title || 'Untitled'}</div>
-                        <div className="relTag">
-                          {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
-        )}
-
-        {/* ZOOM OVERLAY */}
-        {zoomOpen && (
-          <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
-            <div className="zoomTop">
-              <div className="zoomTitle">{photo?.title || 'Preview'}</div>
-              <div className="zoomActions">
-                <span className="zoomPct">{Math.round(zoom * 100)}%</span>
-                <button
-                  type="button"
-                  className="miniBtn"
-                  onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  className="miniBtn"
-                  onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}
-                >
-                  +
-                </button>
-                <button type="button" className="miniBtn" onClick={closeZoom}>
-                  Close
-                </button>
-              </div>
-            </div>
-
-            <div className="zoomBody" onWheel={onWheelZoom} onMouseDown={onMouseDownPan}>
-              <img
-                src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
-                alt={photo?.title || 'Preview'}
-                draggable={false}
-                style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                  cursor: isPanning ? 'grabbing' : 'grab',
-                }}
-              />
-              {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
-            </div>
+              )
+            })}
           </div>
         )}
-      </main>
+      </section>
 
-      <JeevanChandimalNewFooter />
+      {/* RECOMMENDED */}
+      <section className="relBlock">
+        <div className="relHead">
+          <h2>Recommended for you</h2>
+          <Link href="/store" legacyBehavior>
+            <a className="seeAll">See all</a>
+          </Link>
+        </div>
+
+        {relLoading ? (
+          <div className="relState">Loading…</div>
+        ) : recommended.length === 0 ? (
+          <div className="relState">No recommendations yet.</div>
+        ) : (
+          <div className="relGrid">
+            {recommended.map((p) => {
+              const tag0 = String((Array.isArray(p.tags) ? p.tags[0] : p.tags) ?? '').trim()
+              return (
+                <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
+                  <a className="relCard">
+                    <div className="relThumb">
+                      <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} loading="lazy" />
+                      {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
+                    </div>
+                    <div className="relMeta">
+                      <div className="relName">{p.title || 'Untitled'}</div>
+                      <div className="relTag">{tag0 ? `#${tag0}` : 'Photo'}</div>
+                    </div>
+                  </a>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    </>
+  )}
+
+  {/* ZOOM OVERLAY */}
+  {zoomOpen && (
+    <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+      <div className="zoomTop">
+        <div className="zoomTitle">{photo?.title || 'Preview'}</div>
+        <div className="zoomActions">
+          <span className="zoomPct">{Math.round(zoom * 100)}%</span>
+          <button type="button" className="miniBtn" onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}>
+            −
+          </button>
+          <button type="button" className="miniBtn" onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}>
+            +
+          </button>
+          <button type="button" className="miniBtn" onClick={closeZoom}>
+            Close
+          </button>
+        </div>
+      </div>
+
+      <div className="zoomBody" onWheel={onWheelZoom} onMouseDown={onMouseDownPan}>
+        <img
+          src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
+          alt={photo?.title || 'Preview'}
+          draggable={false}
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            cursor: isPanning ? 'grabbing' : 'grab',
+          }}
+        />
+        {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
+      </div>
+    </div>
+  )}
+</main>
+
+<JeevanChandimalNewFooter />
+
 
       <style jsx>{`
         .wrap {
