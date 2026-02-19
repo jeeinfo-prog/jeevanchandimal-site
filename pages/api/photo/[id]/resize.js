@@ -66,8 +66,7 @@ function verifyTokenCompat(token) {
   // Some builds keep secret inside lib/secureDownload; others want it passed in.
   // Try the safest path(s) without breaking.
   try {
-    // First: try (token, secret) ONLY if secret exists (won't hurt if function ignores extra arg in JS,
-    // but could if it checks arity—rare—so we wrap)
+    // First: try (token, secret) ONLY if secret exists
     if (secret) {
       const out = verifyDownloadToken(token, secret)
       if (out && typeof out === 'object' && 'ok' in out) {
@@ -120,8 +119,6 @@ export default async function handler(req, res) {
     if (src === 'original') {
       if (!token) return res.status(401).json({ error: 'Missing token' })
 
-      // If your secureDownload expects env secret internally, it will validate using DOWNLOAD_TOKEN_SECRET.
-      // If it expects secret passed in, verifyTokenCompat handles that too.
       if (!process.env.DOWNLOAD_TOKEN_SECRET) {
         return res.status(500).json({ error: 'DOWNLOAD_TOKEN_SECRET not configured' })
       }
@@ -168,13 +165,21 @@ export default async function handler(req, res) {
       else if (variant === 'corner') sourceKey = `photos/preview_wm-corner/${id}.jpg`
       else sourceKey = `photos/preview/${id}.jpg`
     } else if (src === 'original') {
-      sourceKey = photo.original_jpg_key || photo.original_raw_key
+      // ✅ IMPORTANT FIX:
+      // This resize endpoint uses sharp() and therefore must ONLY process real image files.
+      // RAW is usually a .zip, so NEVER fall back to original_raw_key here.
+      sourceKey = photo.original_jpg_key
     } else {
       return res.status(400).json({ error: 'Invalid src (thumb|preview|original)' })
     }
 
     if (!sourceKey) {
-      return res.status(400).json({ error: 'Missing source key' })
+      return res.status(400).json({
+        error:
+          src === 'original'
+            ? 'Missing original_jpg_key (RAW zip cannot be resized here)'
+            : 'Missing source key',
+      })
     }
 
     // ==============================

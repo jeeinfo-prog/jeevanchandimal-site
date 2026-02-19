@@ -52,6 +52,20 @@ function limitForLicense(license) {
   return 3 // personal
 }
 
+// ✅ Invoice number generator
+function genInvoiceNo(orderId) {
+  const d = new Date()
+  const yyyy = d.getUTCFullYear()
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(d.getUTCDate()).padStart(2, '0')
+  const tail =
+    String(orderId || '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(-6)
+      .toUpperCase() || crypto.randomUUID().slice(0, 6).toUpperCase()
+  return `INV-${yyyy}${mm}${dd}-${tail}`
+}
+
 export default async function handler(req, res) {
   // PayHere expects 200 always
   if (req.method !== 'POST') return res.status(200).send('OK')
@@ -143,6 +157,49 @@ export default async function handler(req, res) {
         .single()
 
       const o = !freshErr && fresh ? fresh : order
+      const email = (o.email || '').trim().toLowerCase()
+
+      // =========================
+      // 🔓 MEMBERSHIP UNLOCK
+      // =========================
+      if (o.order_kind === 'membership') {
+        const plan = (o.membership_plan || '').trim().toLowerCase()
+
+        if (!email) {
+          console.error('Membership order has no email:', o.id)
+          return res.status(200).send('OK')
+        }
+
+        let endDate = null
+        if (plan === 'monthly') {
+          endDate = new Date()
+          endDate.setMonth(endDate.getMonth() + 1)
+        } else if (plan === 'yearly') {
+          endDate = new Date()
+          endDate.setFullYear(endDate.getFullYear() + 1)
+        } else if (plan === 'lifetime') {
+          endDate = null
+        } else {
+          console.error('Invalid membership_plan:', plan, 'order:', o.id)
+          return res.status(200).send('OK')
+        }
+
+        const { error: memErr } = await supabaseAdmin.from('memberships').insert({
+          email,
+          plan,
+          status: 'active',
+          end_date: endDate ? endDate.toISOString() : null,
+        })
+
+        if (memErr) {
+          console.error('Membership insert failed:', memErr.message)
+        } else {
+          console.log('✅ Membership unlocked:', email, plan, 'order:', o.id)
+        }
+
+        // Membership orders do not send photo download links
+        return res.status(200).send('OK')
+      }
 
       // Ensure delivery_object_key exists
       const objectKey = o.delivery_object_key || fallbackObjectKey(o)
@@ -151,9 +208,9 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
-      // ✅ Ensure per-license download_limit is set
+      // ✅ Ensure per-license download_limit is set (or corrected)
       const desiredLimit = limitForLicense(o.license)
-      if (o.download_limit == null) {
+      if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
         await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
       }
 
@@ -162,8 +219,45 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
       }
 
-      // ✅ Send emails ONCE (receipt + download)
-      if (o.email && !o.download_email_sent_at) {
+      // ✅ INVOICE: generate + store invoice_no (once)
+      let invoiceNo = o.invoice_no
+      if (!invoiceNo) {
+        invoiceNo = genInvoiceNo(o.id)
+        await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', o.id)
+      }
+
+      // =========================
+      // ✅ INVOICE EMAIL (ONCE)
+      // =========================
+      if (email && !o.invoice_email_sent_at) {
+        try {
+          await sendReceiptEmail({
+            to: email,
+            orderId: o.id,
+            invoiceNo,
+            amount: o.amount,
+            currency: o.currency,
+            photoTitle: o.photo_id,
+            license: o.license,
+            format: o.format,
+            paymentId: payment_id || null,
+          })
+
+          await supabaseAdmin
+            .from('orders')
+            .update({ invoice_email_sent_at: new Date().toISOString() })
+            .eq('id', o.id)
+
+          console.log('✅ Invoice email sent (one-time):', order_id, invoiceNo)
+        } catch (e) {
+          console.error('Invoice email failed:', order_id, e)
+        }
+      }
+
+      // =========================
+      // ✅ DOWNLOAD EMAIL (ONCE)
+      // =========================
+      if (email && !o.download_email_sent_at) {
         const jti = crypto.randomUUID()
         const expiresMinutes = 60
         const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
@@ -191,7 +285,7 @@ export default async function handler(req, res) {
             format: fmt,
             objectKey,
             userId: o.user_id || null,
-            guestEmail: o.email || null,
+            guestEmail: email,
             filename: `${o.photo_id}.${ext}`,
           },
           '1h'
@@ -199,21 +293,8 @@ export default async function handler(req, res) {
 
         const downloadUrl = buildDownloadUrl(token, req)
 
-        // ✅ Receipt email
-        await sendReceiptEmail({
-          to: o.email,
-          orderId: o.id,
-          amount: o.amount,
-          currency: o.currency,
-          photoTitle: o.photo_id,
-          license: o.license,
-          format: o.format,
-          paymentId: payment_id || null,
-        })
-
-        // ✅ Download email
         await sendDownloadEmail({
-          to: o.email,
+          to: email,
           orderId: o.id,
           photoTitle: o.photo_id,
           downloadUrl,
@@ -228,10 +309,10 @@ export default async function handler(req, res) {
           })
           .eq('id', o.id)
 
-        console.log('Order PAID + receipt+download emails sent (one-time):', order_id)
+        console.log('✅ Download email sent (one-time):', order_id)
       } else {
-        console.log('Order PAID (email skipped):', order_id, {
-          hasEmail: !!o.email,
+        console.log('Order PAID (download email skipped):', order_id, {
+          hasEmail: !!email,
           alreadySent: !!o.download_email_sent_at,
         })
       }

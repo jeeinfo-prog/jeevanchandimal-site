@@ -187,6 +187,16 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const panStart = React.useRef({ x: 0, y: 0 })
   const panOrigin = React.useRef({ x: 0, y: 0 })
 
+  // ✅ Membership state
+  const [memberLoading, setMemberLoading] = React.useState(false)
+  const [isMember, setIsMember] = React.useState(false)
+  const [memberPlan, setMemberPlan] = React.useState(null)
+  const memberTimer = React.useRef(null)
+
+  function validEmailQuick(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+  }
+
   function preventSave(e) {
     e.preventDefault()
     e.stopPropagation()
@@ -301,7 +311,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         photo?.exif?.ExifImageHeight ||
         photo?.exif?.PixelYDimension
     )
-    const hasBytes = typeof photo?.exif?.bytes === 'number' || typeof photo?.exif?.size === 'number'
+    const hasBytes =
+      typeof photo?.exif?.bytes === 'number' || typeof photo?.exif?.size === 'number'
     if (photo?.exif && hasW && hasH && hasBytes) return
 
     let alive = true
@@ -468,6 +479,83 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
   const rawSizeMB = estimateRawSizeMB(finalW, finalH)
 
+  // ✅ Check membership when email changes (debounced)
+  React.useEffect(() => {
+    const em = String(email || '').trim().toLowerCase()
+
+    // reset if email not valid
+    if (!validEmailQuick(em)) {
+      setIsMember(false)
+      setMemberPlan(null)
+      setMemberLoading(false)
+      if (memberTimer.current) clearTimeout(memberTimer.current)
+      return
+    }
+
+    if (memberTimer.current) clearTimeout(memberTimer.current)
+
+    memberTimer.current = setTimeout(async () => {
+      try {
+        setMemberLoading(true)
+
+        const r = await fetch(`/api/membership/check?email=${encodeURIComponent(em)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        })
+        const j = await r.json().catch(() => null)
+
+        if (j?.ok && j?.member) {
+          setIsMember(true)
+          setMemberPlan(j?.plan || null)
+        } else {
+          setIsMember(false)
+          setMemberPlan(null)
+        }
+      } catch {
+        setIsMember(false)
+        setMemberPlan(null)
+      } finally {
+        setMemberLoading(false)
+      }
+    }, 450)
+
+    return () => {
+      if (memberTimer.current) clearTimeout(memberTimer.current)
+    }
+  }, [email])
+
+  async function downloadAsMember() {
+    if (!photo?.id) return
+
+    const em = String(email || '').trim().toLowerCase()
+    if (!validEmailQuick(em)) {
+      alert('Enter your membership email first.')
+      return
+    }
+
+    try {
+      setIsCheckingOut(true)
+
+      const r = await fetch('/api/member/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId: photo.id, email: em }),
+      })
+
+      const j = await r.json().catch(() => null)
+      if (!r.ok || !j?.ok || !j?.url) {
+        alert(j?.error || 'Member download failed')
+        return
+      }
+
+      window.location.href = j.url
+    } catch (e) {
+      console.error(e)
+      alert('Member download failed')
+    } finally {
+      setIsCheckingOut(false)
+    }
+  }
+
   async function startCheckout() {
     if (!photo) return
 
@@ -566,8 +654,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="article" />
         {ogImage ? <meta property="og:image" content={ogImage} /> : null}
-        {ogImage && imgW ? <meta property="og:image:width" content={String(imgW)} /> : null}
-        {ogImage && imgH ? <meta property="og:image:height" content={String(imgH)} /> : null}
+        {ogImage && imgW ? (
+          <meta property="og:image:width" content={String(imgW)} />
+        ) : null}
+        {ogImage && imgH ? (
+          <meta property="og:image:height" content={String(imgH)} />
+        ) : null}
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
@@ -769,8 +861,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
                       {photo.createdAt ? (
                         <div>
-                          <strong>Date:</strong>{' '}
-                          {new Date(photo.createdAt).toLocaleDateString()}
+                          <strong>Date:</strong> {new Date(photo.createdAt).toLocaleDateString()}
                         </div>
                       ) : null}
 
@@ -796,8 +887,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                       {/* ✅ Uses dateTimeOriginal (matches your existing UI) */}
                       {photo.exif?.dateTimeOriginal ? (
                         <div>
-                          <strong>Taken:</strong>{' '}
-                          {formatExifDate(photo.exif.dateTimeOriginal)}
+                          <strong>Taken:</strong> {formatExifDate(photo.exif.dateTimeOriginal)}
                         </div>
                       ) : null}
 
@@ -875,9 +965,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     />
                   </div>
 
-                  <p className="fine">
-                    We’ll send your receipt and secure download link to this email.
-                  </p>
+                  <p className="fine">We’ll send your receipt and secure download link to this email.</p>
                 </div>
 
                 <div className="block">
@@ -907,8 +995,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                   </div>
 
                   <p className="fine">
-                    Personal: non-commercial use. Commercial: ads, branding, client work.
-                    Editorial: news, blogs, documentary.
+                    Personal: non-commercial use. Commercial: ads, branding, client work. Editorial: news,
+                    blogs, documentary.
                   </p>
                 </div>
 
@@ -945,6 +1033,30 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     ) : null}
                   </div>
                 </div>
+
+                {/* ✅ MEMBERSHIP DOWNLOAD */}
+                {memberLoading ? (
+                  <p className="fine">Checking membership…</p>
+                ) : isMember ? (
+                  <div className="memberBox">
+                    <div className="memberLine">
+                      ✅ Membership active{memberPlan ? ` (${memberPlan})` : ''}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="memberBtn"
+                      onClick={downloadAsMember}
+                      disabled={isCheckingOut}
+                    >
+                      {isCheckingOut ? 'Working…' : 'Download with membership'}
+                    </button>
+
+                    <p className="fine" style={{ marginTop: 8 }}>
+                      Basic/Pro downloads JPG • Elite downloads RAW ZIP
+                    </p>
+                  </div>
+                ) : null}
 
                 {/* LICENSE TABLE – PayHere clarity */}
                 <div className="licenseTable">
@@ -987,8 +1099,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
                   {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
                     <div>
-                      <strong>JPG size:</strong>{' '}
-                      {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
+                      <strong>JPG size:</strong> {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
                     </div>
                   )}
 
@@ -1001,8 +1112,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
                 {/* DIGITAL PRODUCT NOTICE – REQUIRED */}
                 <p className="digitalNotice">
-                  This is a digital product. No physical item will be shipped. Files are
-                  delivered instantly after successful payment.
+                  This is a digital product. No physical item will be shipped. Files are delivered instantly
+                  after successful payment.
                 </p>
 
                 {/* TERMS CHECKBOX – BANK SAFE */}
@@ -1057,9 +1168,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
             <section className="relBlock">
               <div className="relHead">
                 <h2>Similar images</h2>
-                <Link
-                  href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}
-                >
+                <Link href={firstTag ? `/store?tag=${encodeURIComponent(firstTag)}` : '/store'}>
                   <a className="seeAll">See all</a>
                 </Link>
               </div>
@@ -1135,11 +1244,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
             {/* ZOOM MODAL */}
             {zoomOpen && (
-              <div
-                className="zoomOverlay"
-                onMouseMove={onMouseMovePan}
-                onMouseUp={onMouseUpPan}
-              >
+              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
                 <div className="zoomTop">
                   <div className="zoomTitle">{photo.title}</div>
                   <div className="zoomActions">
@@ -1494,6 +1599,36 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 10px;
+        }
+
+        .memberBox {
+          margin-top: 14px;
+          padding: 12px;
+          border-radius: 14px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .memberLine {
+          font-size: 12px;
+          opacity: 0.9;
+        }
+
+        .memberBtn {
+          margin-top: 10px;
+          width: 100%;
+          padding: 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.22);
+          background: transparent;
+          color: inherit;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .memberBtn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .priceRow {
