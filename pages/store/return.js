@@ -1,74 +1,82 @@
 // pages/store/return.js
 
-import React from "react";
-import Head from "next/head";
-import { useRouter } from "next/router";
+import React from 'react'
+import Head from 'next/head'
+import { useRouter } from 'next/router'
 
-import JeevanChandimalNavi from "../../components/jeevan-chandimal-navi";
-import JeevanChandimalNewFooter from "../../components/jeevan-chandimal-new-footer";
+import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
+import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
+
+const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED'])
+const FAIL_STATUSES = new Set(['FAILED', 'CANCELED', 'CANCELLED', 'EXPIRED'])
 
 export default function StoreReturn() {
-  const router = useRouter();
-  const orderId = typeof router.query.order_id === "string" ? router.query.order_id : "";
+  const router = useRouter()
+  const orderId =
+    typeof router.query.order_id === 'string' ? router.query.order_id.trim() : ''
 
-  const [status, setStatus] = React.useState("PENDING");
-  const [msg, setMsg] = React.useState("");
+  const [status, setStatus] = React.useState('PENDING')
+  const [msg, setMsg] = React.useState('')
 
   React.useEffect(() => {
-    if (!orderId) return;
+    if (!router.isReady || !orderId) return
 
-    let cancelled = false;
-    let tries = 0;
-    const maxTries = 30; // 60s
+    let cancelled = false
+    let tries = 0
+    const maxTries = 30 // 60s (30 * 2s)
 
     async function poll() {
-      tries += 1;
+      tries += 1
 
       try {
-        // Cache-bust query param so nothing can serve stale data
-        const url = `/api/orders/${encodeURIComponent(orderId)}?t=${Date.now()}`;
+        // ✅ Poll a stable status endpoint
+        const url = `/api/orders/status?order_id=${encodeURIComponent(
+          orderId
+        )}&t=${Date.now()}`
 
         const r = await fetch(url, {
-          method: "GET",
-          headers: { "Cache-Control": "no-store" },
-        });
+          method: 'GET',
+          headers: { 'Cache-Control': 'no-store' },
+        })
 
-        if (!r.ok) {
-          setMsg(`Order check failed (${r.status}).`);
-          return;
+        const data = await r.json().catch(() => ({}))
+
+        if (cancelled) return
+
+        if (!r.ok || !data?.ok) {
+          setMsg(data?.error ? String(data.error) : `Order check failed (${r.status}).`)
+        } else {
+          const s = String(data?.order?.status || data?.status || 'PENDING').toUpperCase()
+          setStatus(s)
+
+          // ✅ Auto redirect when paid
+          if (PAID_STATUSES.has(s)) {
+            router.replace(`/store/download?order_id=${encodeURIComponent(orderId)}`)
+            return
+          }
+
+          // Stop polling on failure states
+          if (FAIL_STATUSES.has(s)) {
+            setMsg('Payment not completed. If you were charged, please contact support with your Order ID.')
+            return
+          }
         }
-
-        const data = await r.json();
-        if (cancelled) return;
-
-        const s = data?.status || "PENDING";
-        setStatus(s);
-
-        // ✅ AUTO REDIRECT WHEN PAID
-        if (s === "PAID") {
-          router.replace(`/store/download?order_id=${encodeURIComponent(orderId)}`);
-          return;
-        }
-
-        // Stop polling on final failure states
-        if (s === "FAILED" || s === "CANCELED") return;
       } catch (e) {
-        if (!cancelled) setMsg(e?.message || "Error checking payment.");
-        return;
+        if (!cancelled) setMsg(e?.message || 'Error checking payment.')
       }
 
       if (!cancelled && tries < maxTries) {
-        setTimeout(poll, 2000);
+        setTimeout(poll, 2000)
       } else if (!cancelled) {
-        setMsg("Still waiting for confirmation. You can refresh.");
+        setMsg('Still waiting for confirmation. You can refresh this page.')
       }
     }
 
-    poll();
+    poll()
     return () => {
-      cancelled = true;
-    };
-  }, [orderId, router]);
+      cancelled = true
+    }
+  }, [router.isReady, orderId, router])
 
   return (
     <>
@@ -84,25 +92,63 @@ export default function StoreReturn() {
           <h1 className="title">Confirming payment…</h1>
 
           <p className="p">
-            Order ID: <span className="mono">{orderId || "-"}</span>
+            Order ID: <span className="mono">{orderId || '-'}</span>
           </p>
 
           <div className="badge">Status: {status}</div>
+
           {msg ? <p className="p2">{msg}</p> : <p className="p2">Please wait…</p>}
+
+          {!orderId ? (
+            <p className="p2">
+              Missing order_id. Please return from PayHere again or contact support.
+            </p>
+          ) : null}
         </div>
       </main>
 
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
-        .wrap { max-width: 900px; margin: 0 auto; padding: 50px 20px 90px; }
-        .card { border: 1px solid rgba(245,244,244,0.12); border-radius: 18px; background: rgba(255,255,255,0.02); padding: 18px; }
-        .title { margin: 0 0 10px; font-size: 22px; }
-        .p { margin: 0; opacity: 0.85; line-height: 1.6; }
-        .p2 { margin: 10px 0 0; opacity: 0.85; line-height: 1.6; }
-        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; }
-        .badge { display: inline-block; margin-top: 12px; padding: 6px 12px; border-radius: 999px; font-size: 12px; border: 1px solid rgba(245,244,244,0.18); }
+        .wrap {
+          max-width: 900px;
+          margin: 0 auto;
+          padding: 50px 20px 90px;
+        }
+        .card {
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.02);
+          padding: 18px;
+        }
+        .title {
+          margin: 0 0 10px;
+          font-size: 22px;
+        }
+        .p {
+          margin: 0;
+          opacity: 0.85;
+          line-height: 1.6;
+        }
+        .p2 {
+          margin: 10px 0 0;
+          opacity: 0.85;
+          line-height: 1.6;
+        }
+        .mono {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+            'Liberation Mono', 'Courier New', monospace;
+          font-size: 13px;
+        }
+        .badge {
+          display: inline-block;
+          margin-top: 12px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+        }
       `}</style>
     </>
-  );
+  )
 }
