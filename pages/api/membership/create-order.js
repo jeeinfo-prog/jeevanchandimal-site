@@ -44,9 +44,6 @@ export default async function handler(req, res) {
 
     const orderId = crypto.randomUUID()
 
-    // IMPORTANT:
-    // Membership orders do NOT have photo_id/license/format/object_key etc.
-    // We set them explicitly to null so the insert works if your DB allows nulls.
     const payload = {
       id: orderId,
       email: cleanEmail,
@@ -56,12 +53,11 @@ export default async function handler(req, res) {
       amount,
       status: 'PENDING',
 
-      // membership -> null
+      // membership → no photo fields
       photo_id: null,
       license: null,
       format: null,
       delivery_object_key: null,
-      user_id: null,
     }
 
     const { error } = await supabaseAdmin.from('orders').insert(payload)
