@@ -44,20 +44,24 @@ export default async function handler(req, res) {
 
     const orderId = crypto.randomUUID()
 
+    // ✅ IMPORTANT: your orders table has NOT NULL columns (license/format/etc).
+    // For membership orders we store harmless placeholder strings.
     const payload = {
       id: orderId,
       email: cleanEmail,
+
       order_kind: 'membership',
       membership_plan: cleanPlan,
+
       currency: cleanCurrency,
       amount,
       status: 'PENDING',
 
-      // membership → no photo fields
-      photo_id: null,
-      license: null,
-      format: null,
-      delivery_object_key: null,
+      // placeholders for NOT NULL photo-order fields
+      photo_id: 'membership',
+      license: 'membership',
+      format: 'membership',
+      delivery_object_key: 'membership',
     }
 
     const { error } = await supabaseAdmin.from('orders').insert(payload)
