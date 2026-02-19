@@ -868,6 +868,18 @@ const JeevanChandimalNavi = (props) => {
             display: flex;
           }
 
+          /* Make Work dropdown toggle match Services toggle */
+.jeevan-chandimal-navi-thq-dropdown-toggle-elm10 {
+  padding-right: 4px;
+}
+
+/* Make arrows consistent */
+.jeevan-chandimal-navi-thq-dropdown-arrow-elm1,
+.jeevan-chandimal-navi-thq-dropdown-arrow-elm2 {
+  display: inline-flex;
+  align-items: center;
+}
+
           @media (max-width: 767px) {
             .jeevan-chandimal-navi-thq-navbar-interactive-elm {
               padding-left: var(--dl-layout-space-twounits);
