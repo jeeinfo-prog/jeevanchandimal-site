@@ -20,8 +20,6 @@ const PRICES = {
   },
 }
 
-// NOTE: Your originals are actually folder-based in R2, but downloads can scan.
-// We still store a stable key here; download API will resolve real key.
 function getDeliveryObjectKey(photoId, format) {
   if (format === 'raw') return `photos/original/${photoId}.zip`
   return `photos/original/${photoId}.jpg`
@@ -31,8 +29,14 @@ function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
 
+function toBool(v) {
+  return String(v || '').trim().toLowerCase() === 'true'
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  }
 
   try {
     const {
@@ -63,26 +67,34 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
-    // ✅ email is REQUIRED for receipt + delivery link
     const cleanEmail = String(email || '').trim().toLowerCase()
     if (!isValidEmail(cleanEmail)) {
       return res.status(400).json({ ok: false, error: 'Valid email is required' })
     }
 
     const amount = PRICES?.[currency]?.[license]?.[format]
-    if (!amount) return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+    if (!amount) {
+      return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+    }
 
-    // ✅ Env vars
-    const merchantId = process.env.PAYHERE_MERCHANT_ID
-    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-    const webhookBase = process.env.WEBHOOK_BASE_URL || siteUrl
-    const sandbox = String(process.env.PAYHERE_SANDBOX || 'false') === 'true'
+    // ✅ Env vars (server)
+    const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
+    const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
+
+    // Prefer server-only SITE_URL; fallback to NEXT_PUBLIC_SITE_URL
+    const siteUrl = String(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim()
+
+    // Webhook base must be public reachable URL (on Vercel use your vercel domain)
+    const webhookBase = String(process.env.WEBHOOK_BASE_URL || siteUrl).trim()
+
+    // ✅ Sandbox flag: accept either server or NEXT_PUBLIC to avoid accidental LIVE
+    const sandbox = toBool(process.env.PAYHERE_SANDBOX) || toBool(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX)
 
     if (!merchantId || !merchantSecret || !siteUrl) {
       return res.status(500).json({
         ok: false,
-        error: 'Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, NEXT_PUBLIC_SITE_URL)',
+        error:
+          'Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, SITE_URL or NEXT_PUBLIC_SITE_URL)',
       })
     }
 
@@ -100,8 +112,6 @@ export default async function handler(req, res) {
     }
 
     const orderId = uid()
-
-    // ✅ Store stable delivery key (download API can resolve real file)
     const delivery_object_key = getDeliveryObjectKey(String(photoId), format)
 
     const { error: insertError } = await supabaseAdmin.from('orders').insert({
@@ -122,7 +132,9 @@ export default async function handler(req, res) {
     }
 
     // ✅ PayHere checkout URL
-    const actionUrl = sandbox ? 'https://sandbox.payhere.lk/pay/checkout' : 'https://www.payhere.lk/pay/checkout'
+    const actionUrl = sandbox
+      ? 'https://sandbox.payhere.lk/pay/checkout'
+      : 'https://www.payhere.lk/pay/checkout'
 
     // ✅ Hash for PayHere init
     const hash = payhereInitHash({
@@ -160,7 +172,19 @@ export default async function handler(req, res) {
       custom_2: `${license}:${format}`,
     }
 
-    return res.status(200).json({ ok: true, actionUrl, fields, orderId })
+    // ✅ Return + safe debug
+    return res.status(200).json({
+      ok: true,
+      actionUrl,
+      fields,
+      orderId,
+      debug: {
+        sandbox,
+        merchantIdUsed: merchantId,
+        siteUrl,
+        webhookBase,
+      },
+    })
   } catch (e) {
     console.error('create-checkout error:', e)
     return res.status(500).json({ ok: false, error: 'Server error', detail: e?.message || String(e) })
