@@ -193,6 +193,16 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [memberPlan, setMemberPlan] = React.useState(null)
   const memberTimer = React.useRef(null)
 
+  // ✅ Prefill email from membership / last checkout
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const saved = window.localStorage.getItem('user_email')
+      if (saved && !email) setEmail(String(saved).trim().toLowerCase())
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function validEmailQuick(v) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
   }
@@ -598,23 +608,22 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
       const data = await r.json().catch(() => null)
 
-if (!r.ok || !data?.actionUrl || !data?.fields) {
-  alert(data?.error || 'Checkout init failed')
-  return
-}
+      if (!r.ok || !data?.actionUrl || !data?.fields) {
+        alert(data?.error || 'Checkout init failed')
+        return
+      }
 
-// ✅ IMPORTANT: Save order id for /store/return fallback (PayHere may drop query params)
-const oid = String(data?.orderId || data?.order_id || data?.fields?.order_id || '').trim()
-if (oid) {
-  try {
-    localStorage.setItem('last_order_id', oid)
-  } catch {}
-}
+      // ✅ IMPORTANT: Save order id for /store/return fallback (PayHere may drop query params)
+      const oid = String(data?.orderId || data?.order_id || data?.fields?.order_id || '').trim()
+      if (oid) {
+        try {
+          localStorage.setItem('last_order_id', oid)
+        } catch {}
+      }
 
-const form = document.createElement('form')
-form.method = 'POST'
-form.action = String(data.actionUrl)
-
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = String(data.actionUrl)
 
       Object.entries(data.fields).forEach(([k, v]) => {
         const input = document.createElement('input')
@@ -945,7 +954,12 @@ form.action = String(data.actionUrl)
               {/* BUY CARD */}
               <aside className="buyCard">
                 <h1 className="title">{photo.title}</h1>
-                <p className="sub">Choose license + format</p>
+                {isMember ? (
+                  <div className="memberBadge">{(memberPlan || 'member').toUpperCase()}</div>
+                ) : null}
+                <p className="sub">
+                  {isMember ? 'Download included with your membership' : 'Choose license + format'}
+                </p>
 
                 <div className="block">
                   <span className="label">Receipt email</span>
@@ -954,7 +968,18 @@ form.action = String(data.actionUrl)
                     type="email"
                     placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setEmail(v)
+                      try {
+                        if (typeof window !== 'undefined') {
+                          window.localStorage.setItem(
+                            'user_email',
+                            String(v || '').trim().toLowerCase()
+                          )
+                        }
+                      } catch {}
+                    }}
                   />
 
                   <div className="row2">
@@ -977,71 +1002,75 @@ form.action = String(data.actionUrl)
                   <p className="fine">We’ll send your receipt and secure download link to this email.</p>
                 </div>
 
-                <div className="block">
-                  <span className="label">License</span>
-                  <div className="options options3">
-                    <button
-                      type="button"
-                      className={`opt ${license === 'personal' ? 'active' : ''}`}
-                      onClick={() => setLicense('personal')}
-                    >
-                      Personal
-                    </button>
-                    <button
-                      type="button"
-                      className={`opt ${license === 'commercial' ? 'active' : ''}`}
-                      onClick={() => setLicense('commercial')}
-                    >
-                      Commercial
-                    </button>
-                    <button
-                      type="button"
-                      className={`opt ${license === 'editorial' ? 'active' : ''}`}
-                      onClick={() => setLicense('editorial')}
-                    >
-                      Editorial
-                    </button>
-                  </div>
+                {!isMember && (
+                  <>
+                    <div className="block">
+                      <span className="label">License</span>
+                      <div className="options options3">
+                        <button
+                          type="button"
+                          className={`opt ${license === 'personal' ? 'active' : ''}`}
+                          onClick={() => setLicense('personal')}
+                        >
+                          Personal
+                        </button>
+                        <button
+                          type="button"
+                          className={`opt ${license === 'commercial' ? 'active' : ''}`}
+                          onClick={() => setLicense('commercial')}
+                        >
+                          Commercial
+                        </button>
+                        <button
+                          type="button"
+                          className={`opt ${license === 'editorial' ? 'active' : ''}`}
+                          onClick={() => setLicense('editorial')}
+                        >
+                          Editorial
+                        </button>
+                      </div>
 
-                  <p className="fine">
-                    Personal: non-commercial use. Commercial: ads, branding, client work. Editorial: news,
-                    blogs, documentary.
-                  </p>
-                </div>
-
-                <div className="block">
-                  <span className="label">Format</span>
-                  <div className="options options2">
-                    <button
-                      type="button"
-                      className={`opt ${format === 'jpg' ? 'active' : ''}`}
-                      onClick={() => setFormat('jpg')}
-                    >
-                      JPG
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`opt ${format === 'raw' ? 'active' : ''} ${
-                        rawAvailable ? '' : 'disabled'
-                      }`}
-                      onClick={() => {
-                        if (!rawAvailable) return
-                        setFormat('raw')
-                      }}
-                      disabled={!rawAvailable}
-                      title={!rawAvailable ? 'RAW not available for this image' : 'RAW'}
-                    >
-                      RAW
-                    </button>
-
-                    {!rawAvailable ? (
-                      <p className="fine" style={{ marginTop: 8 }}>
-                        RAW is not available for this image.
+                      <p className="fine">
+                        Personal: non-commercial use. Commercial: ads, branding, client work. Editorial:
+                        news, blogs, documentary.
                       </p>
-                    ) : null}
-                  </div>
-                </div>
+                    </div>
+
+                    <div className="block">
+                      <span className="label">Format</span>
+                      <div className="options options2">
+                        <button
+                          type="button"
+                          className={`opt ${format === 'jpg' ? 'active' : ''}`}
+                          onClick={() => setFormat('jpg')}
+                        >
+                          JPG
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`opt ${format === 'raw' ? 'active' : ''} ${
+                            rawAvailable ? '' : 'disabled'
+                          }`}
+                          onClick={() => {
+                            if (!rawAvailable) return
+                            setFormat('raw')
+                          }}
+                          disabled={!rawAvailable}
+                          title={!rawAvailable ? 'RAW not available for this image' : 'RAW'}
+                        >
+                          RAW
+                        </button>
+
+                        {!rawAvailable ? (
+                          <p className="fine" style={{ marginTop: 8 }}>
+                            RAW is not available for this image.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* ✅ MEMBERSHIP DOWNLOAD */}
                 {memberLoading ? (
@@ -1067,101 +1096,106 @@ form.action = String(data.actionUrl)
                   </div>
                 ) : null}
 
-                {/* LICENSE TABLE – PayHere clarity */}
-                <div className="licenseTable">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>License</th>
-                        <th>Allowed Usage</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>Personal</td>
-                        <td>Social media, personal projects (non-commercial)</td>
-                      </tr>
-                      <tr>
-                        <td>Commercial</td>
-                        <td>Advertising, websites, marketing, client work</td>
-                      </tr>
-                      <tr>
-                        <td>Editorial</td>
-                        <td>News articles, blogs, documentaries</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="priceRow">
-                  <span className="price">{formatMoney(currency, price)}</span>
-                  <span className="small">Instant digital download</span>
-                </div>
-
-                {/* FILE INFO */}
-                <div className="fileInfo">
-                  {resolution && (
-                    <div>
-                      <strong>Resolution:</strong> {resolution}
+                {!isMember && (
+                  <>
+                    {/* LICENSE TABLE – PayHere clarity */}
+                    <div className="licenseTable">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>License</th>
+                            <th>Allowed Usage</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>Personal</td>
+                            <td>Social media, personal projects (non-commercial)</td>
+                          </tr>
+                          <tr>
+                            <td>Commercial</td>
+                            <td>Advertising, websites, marketing, client work</td>
+                          </tr>
+                          <tr>
+                            <td>Editorial</td>
+                            <td>News articles, blogs, documentaries</td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
-                  )}
 
-                  {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
-                    <div>
-                      <strong>JPG size:</strong> {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
+                    <div className="priceRow">
+                      <span className="price">{formatMoney(currency, price)}</span>
+                      <span className="small">Instant digital download</span>
                     </div>
-                  )}
 
-                  {format === 'raw' && rawSizeMB && rawAvailable && (
-                    <div>
-                      <strong>RAW size:</strong> ~{rawSizeMB} MB
+                    {/* FILE INFO */}
+                    <div className="fileInfo">
+                      {resolution && (
+                        <div>
+                          <strong>Resolution:</strong> {resolution}
+                        </div>
+                      )}
+
+                      {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
+                        <div>
+                          <strong>JPG size:</strong>{' '}
+                          {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
+                        </div>
+                      )}
+
+                      {format === 'raw' && rawSizeMB && rawAvailable && (
+                        <div>
+                          <strong>RAW size:</strong> ~{rawSizeMB} MB
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* DIGITAL PRODUCT NOTICE – REQUIRED */}
-                <p className="digitalNotice">
-                  This is a digital product. No physical item will be shipped. Files are delivered instantly
-                  after successful payment.
-                </p>
+                    {/* DIGITAL PRODUCT NOTICE – REQUIRED */}
+                    <p className="digitalNotice">
+                      This is a digital product. No physical item will be shipped. Files are delivered
+                      instantly after successful payment.
+                    </p>
 
-                {/* TERMS CHECKBOX – BANK SAFE */}
-                <div className="termsRow">
-                  <input
-                    type="checkbox"
-                    id="agree"
-                    checked={agreed}
-                    onChange={(e) => setAgreed(e.target.checked)}
-                  />
-                  <label htmlFor="agree">
-                    I agree to the{' '}
-                    <a href="/terms-and-conditions" target="_blank" rel="noreferrer">
-                      Terms
-                    </a>
-                    ,{' '}
-                    <a href="/refund-policy" target="_blank" rel="noreferrer">
-                      Refund Policy
-                    </a>
-                    , and{' '}
-                    <a href="/privacy-policy" target="_blank" rel="noreferrer">
-                      Privacy Policy
-                    </a>
-                    .
-                  </label>
-                </div>
+                    {/* TERMS CHECKBOX – BANK SAFE */}
+                    <div className="termsRow">
+                      <input
+                        type="checkbox"
+                        id="agree"
+                        checked={agreed}
+                        onChange={(e) => setAgreed(e.target.checked)}
+                      />
+                      <label htmlFor="agree">
+                        I agree to the{' '}
+                        <a href="/terms-and-conditions" target="_blank" rel="noreferrer">
+                          Terms
+                        </a>
+                        ,{' '}
+                        <a href="/refund-policy" target="_blank" rel="noreferrer">
+                          Refund Policy
+                        </a>
+                        , and{' '}
+                        <a href="/privacy-policy" target="_blank" rel="noreferrer">
+                          Privacy Policy
+                        </a>
+                        .
+                      </label>
+                    </div>
 
-                <button
-                  type="button"
-                  className="buyBtn"
-                  onClick={startCheckout}
-                  disabled={isCheckingOut || !agreed}
-                >
-                  {isCheckingOut ? 'Working…' : 'Buy license'}
-                </button>
+                    <button
+                      type="button"
+                      className="buyBtn"
+                      onClick={startCheckout}
+                      disabled={isCheckingOut || !agreed}
+                    >
+                      {isCheckingOut ? 'Working…' : 'Buy license'}
+                    </button>
 
-                <p className="fine">
-                  After payment, you will receive an email with your secure download link.
-                </p>
+                    <p className="fine">
+                      After payment, you will receive an email with your secure download link.
+                    </p>
+                  </>
+                )}
 
                 {/* CONTACT LINE – TRUST SIGNAL */}
                 <p className="fine">
@@ -1250,75 +1284,41 @@ form.action = String(data.actionUrl)
                 </div>
               )}
             </section>
-
-            {/* ZOOM MODAL */}
-            {zoomOpen && (
-              <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
-                <div className="zoomTop">
-                  <div className="zoomTitle">{photo.title}</div>
-                  <div className="zoomActions">
-                    <button
-                      type="button"
-                      className="miniBtn"
-                      onClick={() => setZoom((z) => clamp(z - 0.2, 1, 3))}
-                    >
-                      -
-                    </button>
-                    <div className="zoomPct">{Math.round(zoom * 100)}%</div>
-                    <button
-                      type="button"
-                      className="miniBtn"
-                      onClick={() => setZoom((z) => clamp(z + 0.2, 1, 3))}
-                    >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      className="miniBtn"
-                      onClick={() => {
-                        setZoom(1)
-                        setPan({ x: 0, y: 0 })
-                      }}
-                    >
-                      Reset
-                    </button>
-                    <button type="button" className="closeBtn" onClick={closeZoom}>
-                      ✕
-                    </button>
-                  </div>
-                </div>
-
-                <div className="zoomStage" onWheel={onWheelZoom}>
-                  <div
-                    className="zoomPan"
-                    style={{
-                      transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                    }}
-                    onMouseDown={onMouseDownPan}
-                  >
-                    <img
-                      src={previewSrc || photo.previewUrl || photo.thumbUrl}
-                      alt={photo.title}
-                      draggable={false}
-                      onContextMenu={preventSave}
-                      onDragStart={preventSave}
-                      className="zoomImg"
-                      onError={(e) => {
-                        if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
-                          e.currentTarget.src = photo.previewUrl
-                          return
-                        }
-                        if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
-                      }}
-                    />
-                    {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
-                  </div>
-                </div>
-
-                <div className="zoomHint">Scroll to zoom • Drag to pan • ESC to close</div>
-              </div>
-            )}
           </>
+        )}
+
+        {/* ZOOM OVERLAY */}
+        {zoomOpen && (
+          <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+            <div className="zoomTop">
+              <div className="zoomTitle">{photo?.title || 'Preview'}</div>
+              <div className="zoomActions">
+                <span className="zoomPct">{Math.round(zoom * 100)}%</span>
+                <button type="button" className="miniBtn" onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}>
+                  −
+                </button>
+                <button type="button" className="miniBtn" onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}>
+                  +
+                </button>
+                <button type="button" className="miniBtn" onClick={closeZoom}>
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div className="zoomBody" onWheel={onWheelZoom} onMouseDown={onMouseDownPan}>
+              <img
+                src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
+                alt={photo?.title || 'Preview'}
+                draggable={false}
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  cursor: isPanning ? 'grabbing' : 'grab',
+                }}
+              />
+              {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
+            </div>
+          </div>
         )}
       </main>
 
@@ -1326,150 +1326,141 @@ form.action = String(data.actionUrl)
 
       <style jsx>{`
         .wrap {
-          width: 100%;
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 40px 20px 90px;
+          padding: var(--dl-layout-space-threeunits) var(--dl-layout-space-twounits);
         }
 
         .top {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 16px;
-          margin-bottom: 16px;
+          gap: 12px;
+          margin-bottom: var(--dl-layout-space-twounits);
         }
+
         .back {
+          opacity: 0.85;
           text-decoration: none;
-          opacity: 0.8;
         }
-        .back:hover {
-          opacity: 1;
-          text-decoration: underline;
-          text-underline-offset: 3px;
-        }
+
         .toggle {
           display: inline-flex;
-          border: 1px solid rgba(245, 244, 244, 0.18);
-          border-radius: 999px;
-          overflow: hidden;
+          gap: 8px;
         }
+
         .tbtn {
-          padding: 10px 14px;
-          background: transparent;
-          color: inherit;
-          border: 0;
+          padding: 8px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.15);
+          background: rgba(255, 255, 255, 0.02);
+          color: #f5f4f4;
           cursor: pointer;
-          opacity: 0.75;
         }
+
         .tbtn.active {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.12);
+          border-color: rgba(37, 195, 226, 0.65);
+          background: rgba(37, 195, 226, 0.08);
         }
 
         .state {
-          margin: 18px 0;
-          padding: 14px 16px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          border-radius: 14px;
-          opacity: 0.95;
+          padding: 24px;
+          opacity: 0.9;
         }
 
         .layout {
           display: grid;
-          grid-template-columns: 1.35fr 0.65fr;
-          gap: 20px;
+          grid-template-columns: 1.65fr 1fr;
+          gap: var(--dl-layout-space-threeunits);
           align-items: start;
+        }
+
+        .imageCard {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
         }
 
         .imageFrame {
           position: relative;
-          border-radius: 14px;
+          border-radius: 18px;
           overflow: hidden;
-          border: 1px solid rgba(245, 244, 244, 0.1);
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.35);
         }
+
         .imageFrame img {
           width: 100%;
+          height: auto;
           display: block;
-          border-radius: 14px;
-          -webkit-user-drag: none;
           user-select: none;
-          -webkit-touch-callout: none;
-          cursor: zoom-in;
         }
 
         .zoomBtn {
           position: absolute;
-          z-index: 5;
           top: 12px;
           left: 12px;
-          padding: 8px 12px;
+          z-index: 2;
+          padding: 8px 10px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.18);
           background: rgba(0, 0, 0, 0.35);
-          color: inherit;
+          color: #f5f4f4;
           cursor: pointer;
-          font-weight: 600;
-          font-size: 12px;
-          backdrop-filter: blur(6px);
         }
 
-        .wmTile {
+        .wmTile,
+        .relWm,
+        .zoomWm {
+          pointer-events: none;
           position: absolute;
           inset: 0;
-          background-image: url('/watermark-logo/watermark-logo.png');
+          background-image: url('/jclogo05.png');
           background-repeat: repeat;
-          background-size: 220px;
-          pointer-events: none;
-          transform: rotate(-12deg);
+          background-size: 240px auto;
+          mix-blend-mode: lighten;
+          opacity: 0.08;
         }
 
         .desc {
-          margin: 10px 0 0;
-          opacity: 0.8;
-          line-height: 1.6;
+          margin: 0;
+          opacity: 0.85;
         }
 
         .metaCard {
-          margin-top: 12px;
           border: 1px solid rgba(245, 244, 244, 0.12);
-          border-radius: 16px;
+          border-radius: 18px;
+          overflow: hidden;
           background: rgba(255, 255, 255, 0.02);
-          padding: 12px;
         }
 
         .metaRow {
           display: grid;
-          grid-template-columns: 110px 1fr auto;
-          gap: 10px;
-          align-items: center;
-          padding: 10px 0;
+          grid-template-columns: 160px 1fr 70px;
+          gap: 12px;
+          padding: 14px 16px;
           border-top: 1px solid rgba(245, 244, 244, 0.08);
         }
+
         .metaRow:first-child {
-          border-top: 0;
-          padding-top: 0;
+          border-top: none;
         }
+
         .metaRowTall {
-          align-items: start;
+          grid-template-columns: 160px 1fr;
         }
 
         .metaTitle {
-          font-size: 12px;
-          opacity: 0.8;
+          font-weight: 600;
+          opacity: 0.95;
         }
 
         .metaCell {
           display: flex;
           align-items: center;
-          gap: 10px;
-          justify-content: space-between;
         }
 
         .metaText {
           opacity: 0.9;
-          font-size: 13px;
-          line-height: 1.6;
+          line-height: 1.55;
         }
 
         .wmControls {
@@ -1478,302 +1469,319 @@ form.action = String(data.actionUrl)
         }
 
         .miniBtn {
-          padding: 8px 10px;
+          padding: 7px 10px;
           border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: transparent;
-          color: inherit;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(255, 255, 255, 0.02);
+          color: #f5f4f4;
           cursor: pointer;
-          font-size: 12px;
-          opacity: 0.85;
         }
+
         .miniBtn.active {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.12);
-          border-color: rgba(245, 244, 244, 0.3);
+          border-color: rgba(37, 195, 226, 0.65);
+          background: rgba(37, 195, 226, 0.08);
         }
 
         .range {
           width: 100%;
         }
+
         .rangeVal {
+          opacity: 0.85;
           font-size: 12px;
-          opacity: 0.8;
-          min-width: 44px;
           text-align: right;
         }
 
         .tagRow {
-          margin-top: 10px;
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
         }
 
         .tag {
-          display: inline-block;
+          display: inline-flex;
           padding: 6px 10px;
           border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.14);
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(255, 255, 255, 0.02);
           text-decoration: none;
-          color: inherit;
           font-size: 12px;
-          opacity: 0.85;
-        }
-        .tag:hover {
-          opacity: 1;
-          border-color: rgba(245, 244, 244, 0.35);
         }
 
         .buyCard {
           border: 1px solid rgba(245, 244, 244, 0.12);
           border-radius: 18px;
+          padding: 18px;
           background: rgba(255, 255, 255, 0.02);
-          padding: 16px;
-          position: sticky;
-          top: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
         }
 
         .title {
           margin: 0;
-          font-size: 22px;
+          font-size: 24px;
+          line-height: 1.2;
         }
+
+        .memberBadge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 8px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          letter-spacing: 0.6px;
+          background: rgba(37, 195, 226, 0.14);
+          border: 1px solid rgba(37, 195, 226, 0.55);
+          width: fit-content;
+        }
+
         .sub {
-          margin: 8px 0 0;
-          opacity: 0.75;
+          margin: 0;
+          opacity: 0.82;
         }
 
         .block {
-          margin-top: 16px;
-          padding-top: 14px;
-          border-top: 1px solid rgba(245, 244, 244, 0.12);
-        }
-        .label {
-          font-size: 13px;
-          opacity: 0.85;
-        }
-
-        .options {
-          margin-top: 10px;
-          display: grid;
+          display: flex;
+          flex-direction: column;
           gap: 10px;
         }
-        .options3 {
-          grid-template-columns: repeat(3, 1fr);
-        }
-        .options2 {
-          grid-template-columns: repeat(2, 1fr);
-        }
 
-        .opt {
-          padding: 10px;
-          border-radius: 12px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: transparent;
-          color: inherit;
-          cursor: pointer;
-          opacity: 0.85;
-        }
-        .opt.active {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.12);
-          border-color: rgba(245, 244, 244, 0.3);
-        }
-
-        .opt.disabled {
-          opacity: 0.45;
-          cursor: not-allowed;
+        .label {
+          font-size: 12px;
+          opacity: 0.9;
+          letter-spacing: 0.5px;
         }
 
         .field {
           width: 100%;
-          margin-top: 10px;
-          padding: 12px;
+          padding: 12px 14px;
           border-radius: 12px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: rgba(0, 0, 0, 0.2);
-          color: inherit;
+          border: 1px solid rgba(245, 244, 244, 0.15);
+          background: rgba(255, 255, 255, 0.02);
+          color: #f5f4f4;
           outline: none;
         }
 
-        .fileInfo {
-          margin-top: 8px;
-          font-size: 12px;
-          opacity: 0.8;
-          line-height: 1.6;
-        }
-
         .row2 {
-          margin-top: 10px;
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 10px;
         }
 
-        .memberBox {
-          margin-top: 14px;
-          padding: 12px;
-          border-radius: 14px;
-          border: 1px solid rgba(245, 244, 244, 0.14);
-          background: rgba(255, 255, 255, 0.02);
+        .options {
+          display: grid;
+          gap: 10px;
         }
 
-        .memberLine {
+        .options2 {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .options3 {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .opt {
+          padding: 12px 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.15);
+          background: rgba(255, 255, 255, 0.02);
+          color: #f5f4f4;
+          cursor: pointer;
+        }
+
+        .opt.active {
+          border-color: rgba(37, 195, 226, 0.65);
+          background: rgba(37, 195, 226, 0.08);
+        }
+
+        .opt.disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .licenseTable {
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 14px;
+          overflow: hidden;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+        }
+
+        th,
+        td {
+          padding: 10px 12px;
+          border-top: 1px solid rgba(245, 244, 244, 0.08);
+          text-align: left;
+        }
+
+        thead th {
+          border-top: none;
+          background: rgba(255, 255, 255, 0.03);
+        }
+
+        .priceRow {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          gap: 10px;
+        }
+
+        .price {
+          font-size: 28px;
+          font-weight: 700;
+        }
+
+        .small {
+          font-size: 12px;
+          opacity: 0.85;
+        }
+
+        .fileInfo {
+          display: grid;
+          gap: 6px;
           font-size: 12px;
           opacity: 0.9;
         }
 
-        .memberBtn {
-          margin-top: 10px;
+        .digitalNotice {
+          margin: 0;
+          font-size: 12px;
+          opacity: 0.8;
+          line-height: 1.5;
+        }
+
+        .termsRow {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          font-size: 12px;
+          opacity: 0.9;
+        }
+
+        .buyBtn {
           width: 100%;
+          padding: 14px 14px;
+          border-radius: 14px;
+          border: none;
+          background: rgba(37, 195, 226, 0.9);
+          color: #081316;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .buyBtn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .fine {
+          margin: 0;
+          font-size: 12px;
+          opacity: 0.82;
+          line-height: 1.55;
+        }
+
+        .memberBox {
+          border: 1px solid rgba(37, 195, 226, 0.3);
+          background: rgba(37, 195, 226, 0.06);
+          border-radius: 14px;
           padding: 12px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.22);
-          background: transparent;
-          color: inherit;
+        }
+
+        .memberLine {
+          font-size: 13px;
+          font-weight: 600;
+          margin-bottom: 10px;
+          opacity: 0.95;
+        }
+
+        .memberBtn {
+          width: 100%;
+          padding: 12px 12px;
+          border-radius: 14px;
+          border: 1px solid rgba(37, 195, 226, 0.5);
+          background: rgba(37, 195, 226, 0.2);
+          color: #f5f4f4;
           font-weight: 700;
           cursor: pointer;
         }
 
         .memberBtn:disabled {
-          opacity: 0.6;
+          opacity: 0.55;
           cursor: not-allowed;
-        }
-
-        .priceRow {
-          margin-top: 16px;
-          padding-top: 14px;
-          border-top: 1px solid rgba(245, 244, 244, 0.12);
-          display: flex;
-          justify-content: space-between;
-          align-items: baseline;
-          gap: 12px;
-        }
-
-        .price {
-          font-size: 22px;
-          font-weight: 700;
-        }
-        .small {
-          opacity: 0.7;
-          font-size: 12px;
-        }
-
-        .buyBtn {
-          margin-top: 14px;
-          width: 100%;
-          padding: 12px;
-          border-radius: 999px;
-          border: 0;
-          background: #f5f4f4;
-          color: #222;
-          font-weight: 700;
-          cursor: pointer;
-        }
-        .buyBtn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .fine {
-          margin-top: 12px;
-          opacity: 0.7;
-          font-size: 12px;
-          line-height: 1.6;
         }
 
         .relBlock {
-          margin-top: 16px;
-          padding: 14px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.02);
+          margin-top: var(--dl-layout-space-fourunits);
         }
 
         .relHead {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
-          gap: 10px;
+          align-items: baseline;
+          gap: 12px;
+          margin-bottom: 14px;
         }
+
         .seeAll {
-          font-size: 12px;
-          opacity: 0.75;
+          opacity: 0.85;
           text-decoration: none;
-        }
-        .seeAll:hover {
-          opacity: 1;
-          text-decoration: underline;
-          text-underline-offset: 3px;
         }
 
         .relState {
-          opacity: 0.75;
-          font-size: 13px;
-          padding: 6px 0;
+          opacity: 0.85;
+          padding: 10px 0;
         }
 
         .relGrid {
           display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 12px;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
         }
 
         .relCard {
-          display: block;
           text-decoration: none;
-          color: inherit;
-          transition: transform 0.18s ease;
-        }
-        .relCard:hover {
-          transform: translateY(-4px);
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 14px;
+          overflow: hidden;
+          background: rgba(255, 255, 255, 0.02);
+          display: grid;
         }
 
         .relThumb {
           position: relative;
-          border-radius: 12px;
+          aspect-ratio: 4 / 3;
           overflow: hidden;
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          transition: border-color 0.18s ease, box-shadow 0.18s ease;
-        }
-        .relCard:hover .relThumb {
-          border-color: rgba(245, 244, 244, 0.35);
-          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
         }
 
         .relThumb img {
           width: 100%;
-          aspect-ratio: 16/10;
+          height: 100%;
           object-fit: cover;
           display: block;
-          transition: transform 0.35s ease;
-        }
-        .relCard:hover .relThumb img {
-          transform: scale(1.06);
-        }
-
-        .relWm {
-          position: absolute;
-          inset: 0;
-          background-image: url('/watermark-logo/watermark-logo.png');
-          background-repeat: repeat;
-          background-size: 140px;
-          pointer-events: none;
-          transform: rotate(-12deg);
         }
 
         .relMeta {
-          margin-top: 6px;
+          padding: 10px 12px;
+          display: grid;
+          gap: 4px;
         }
+
         .relName {
-          font-size: 13px;
-          line-height: 1.3;
-          opacity: 0.95;
+          font-weight: 600;
         }
+
         .relTag {
           font-size: 12px;
-          opacity: 0.7;
+          opacity: 0.8;
         }
 
         /* Zoom modal */
@@ -1813,178 +1821,37 @@ form.action = String(data.actionUrl)
 
         .zoomPct {
           font-size: 12px;
-          opacity: 0.85;
-          min-width: 54px;
-          text-align: center;
         }
 
-        .closeBtn {
-          padding: 8px 12px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.18);
-          background: rgba(245, 244, 244, 0.14);
-          color: inherit;
-          cursor: pointer;
-          font-weight: 800;
-        }
-
-        .zoomStage {
+        .zoomBody {
+          position: relative;
+          overflow: hidden;
           display: grid;
           place-items: center;
-          overflow: hidden;
+        }
+
+        .zoomBody img {
+          max-width: none;
+          max-height: none;
+          width: auto;
+          height: auto;
           user-select: none;
-        }
-
-        .zoomPan {
-          position: relative;
-          cursor: grab;
-          transform-origin: center;
-        }
-        .zoomPan:active {
-          cursor: grabbing;
-        }
-
-        .zoomImg {
-          max-width: 92vw;
-          max-height: 78vh;
-          display: block;
-          border-radius: 14px;
-          border: 1px solid rgba(245, 244, 244, 0.14);
         }
 
         .zoomWm {
           position: absolute;
           inset: 0;
-          background-image: url('/watermark-logo/watermark-logo.png');
-          background-repeat: repeat;
-          background-size: 220px;
-          pointer-events: none;
-          transform: rotate(-12deg);
-          border-radius: 14px;
-        }
-
-        .zoomHint {
-          padding: 10px 16px;
-          font-size: 12px;
-          opacity: 0.75;
-          border-top: 1px solid rgba(245, 244, 244, 0.12);
-        }
-
-        .digitalNotice {
-          font-size: 0.85rem;
-          opacity: 0.8;
-          margin: 10px 0;
-        }
-
-        .termsRow {
-          display: flex;
-          gap: 8px;
-          font-size: 0.8rem;
-          margin: 10px 0;
-          align-items: flex-start;
-        }
-
-        .termsRow a {
-          text-decoration: underline;
-        }
-
-        .licenseTable table {
-          width: 100%;
-          font-size: 0.75rem;
-          margin: 10px 0;
-          border-collapse: collapse;
-        }
-
-        .licenseTable th,
-        .licenseTable td {
-          border-bottom: 1px solid #333;
-          padding: 4px;
-          text-align: left;
         }
 
         @media (max-width: 991px) {
           .layout {
             grid-template-columns: 1fr;
           }
-          .buyCard {
-            position: static;
-          }
-          .options3 {
-            grid-template-columns: 1fr;
-          }
-          .options2 {
-            grid-template-columns: 1fr;
-          }
-          .row2 {
-            grid-template-columns: 1fr;
-          }
           .relGrid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-        }
-
-        @media (max-width: 520px) {
-          .relGrid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .metaRow {
             grid-template-columns: 1fr;
-          }
-          .metaCell {
-            justify-content: flex-start;
-          }
-          .rangeVal {
-            text-align: left;
           }
         }
       `}</style>
     </>
   )
-}
-
-export async function getServerSideProps(ctx) {
-  const pid = String(ctx.params?.id || '').trim()
-  if (!pid) {
-    return { props: { initialPhoto: null, initialError: 'Missing photo id' } }
-  }
-
-  try {
-    const proto = (ctx.req.headers['x-forwarded-proto'] || 'https')
-      .toString()
-      .split(',')[0]
-      .trim()
-    const host = (ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '')
-      .toString()
-      .split(',')[0]
-      .trim()
-
-    const base = host ? `${proto}://${host}` : 'https://jeevanchandimal.com'
-    const url = `${base}/api/store/photo?id=${encodeURIComponent(pid)}`
-
-    const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
-    const json = await r.json().catch(() => null)
-
-    if (!r.ok || !json?.ok) {
-      return {
-        props: {
-          initialPhoto: null,
-          initialError: json?.error || 'Failed to load photo',
-        },
-      }
-    }
-
-    const normalized = normalizePhotoPayload(json)
-    if (!normalized?.id) {
-      return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
-    }
-
-    return {
-      props: {
-        initialPhoto: normalized,
-        initialError: '',
-      },
-    }
-  } catch {
-    return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
-  }
 }
