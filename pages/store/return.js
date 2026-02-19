@@ -1,5 +1,4 @@
 // pages/store/return.js
-
 import React from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
@@ -7,19 +6,9 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
-const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED'])
-const FAIL_STATUSES = new Set(['FAILED', 'CANCELED', 'CANCELLED', 'EXPIRED'])
-
-function readOrderId(q) {
-  const v = q?.order_id
-  if (typeof v === 'string') return v.trim()
-  if (Array.isArray(v) && typeof v[0] === 'string') return v[0].trim()
-  return ''
-}
-
 export default function StoreReturn() {
   const router = useRouter()
-  const orderId = readOrderId(router.query)
+  const orderId = typeof router.query.order_id === 'string' ? router.query.order_id.trim() : ''
 
   const [status, setStatus] = React.useState('PENDING')
   const [msg, setMsg] = React.useState('')
@@ -30,11 +19,9 @@ export default function StoreReturn() {
     let cancelled = false
     let tries = 0
     const maxTries = 30
-    let timer = null
 
     async function poll() {
       tries += 1
-
       try {
         const url = `/api/orders/status?order_id=${encodeURIComponent(orderId)}&t=${Date.now()}`
         const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
@@ -44,18 +31,16 @@ export default function StoreReturn() {
         if (!r.ok || data?.ok === false) {
           setMsg(data?.error ? String(data.error) : `Order check failed (${r.status}).`)
         } else {
-          // ✅ Support both shapes: {status} or {order:{status}}
-          const raw = data?.status ?? data?.order?.status ?? 'PENDING'
-          const s = String(raw).trim().toUpperCase()
-
+          const s = String(data?.status ?? data?.order?.status ?? 'PENDING').trim().toUpperCase()
           setStatus(s)
 
-          if (PAID_STATUSES.has(s)) {
-            router.replace(`/store/download?order_id=${encodeURIComponent(orderId)}`)
+          if (s === 'PAID') {
+            // ✅ most reliable redirect
+            window.location.href = `/store/download?order_id=${encodeURIComponent(orderId)}`
             return
           }
 
-          if (FAIL_STATUSES.has(s)) {
+          if (s === 'FAILED' || s === 'CANCELED' || s === 'CANCELLED' || s === 'EXPIRED') {
             setMsg('Payment not completed. If you were charged, please contact support with your Order ID.')
             return
           }
@@ -64,21 +49,15 @@ export default function StoreReturn() {
         if (!cancelled) setMsg(e?.message || 'Error checking payment.')
       }
 
-      if (cancelled) return
-
-      if (tries < maxTries) {
-        timer = setTimeout(poll, 2000)
-      } else {
-        setMsg('Still waiting for confirmation. You can refresh this page.')
-      }
+      if (!cancelled && tries < maxTries) setTimeout(poll, 2000)
+      else if (!cancelled) setMsg('Still waiting for confirmation. You can refresh this page.')
     }
 
     poll()
     return () => {
       cancelled = true
-      if (timer) clearTimeout(timer)
     }
-  }, [router.isReady, orderId, router])
+  }, [router.isReady, orderId])
 
   return (
     <>
@@ -99,6 +78,13 @@ export default function StoreReturn() {
 
           <div className="badge">Status: {status}</div>
           {msg ? <p className="p2">{msg}</p> : <p className="p2">Please wait…</p>}
+
+          {/* Manual fallback */}
+          {orderId && status === 'PAID' ? (
+            <p className="p2">
+              <a href={`/store/download?order_id=${encodeURIComponent(orderId)}`}>Download</a>
+            </p>
+          ) : null}
         </div>
       </main>
 
@@ -110,7 +96,7 @@ export default function StoreReturn() {
         .title { margin: 0 0 10px; font-size: 22px; }
         .p { margin: 0; opacity: 0.85; line-height: 1.6; }
         .p2 { margin: 10px 0 0; opacity: 0.85; line-height: 1.6; }
-        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; font-size: 13px; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 13px; }
         .badge { display: inline-block; margin-top: 12px; padding: 6px 12px; border-radius: 999px; font-size: 12px; border: 1px solid rgba(245,244,244,0.18); }
       `}</style>
     </>
