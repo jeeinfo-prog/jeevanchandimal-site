@@ -1,3 +1,4 @@
+// pages/membership/cancel.js
 import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
@@ -8,7 +9,15 @@ import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-foot
 
 export default function MembershipCancel() {
   const router = useRouter()
-  const { order_id } = router.query
+  const { order_id, email } = router.query
+
+  // ✅ keep badge consistent (if user typed email before paying)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (typeof email === 'string' && email.trim()) {
+      window.localStorage.setItem('user_email', email.trim().toLowerCase())
+    }
+  }, [email])
 
   return (
     <>
@@ -32,12 +41,21 @@ export default function MembershipCancel() {
             </p>
           ) : null}
 
-          <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/memberships">
-              <a className="thq-button-filled">Try Again</a>
+          <div
+            style={{
+              marginTop: 24,
+              display: 'flex',
+              gap: 12,
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <Link href="/memberships" className="thq-button-filled">
+              Try Again
             </Link>
-            <Link href="/contact">
-              <a className="thq-button-outline">Contact</a>
+
+            <Link href="/contact" className="thq-button-outline">
+              Contact
             </Link>
           </div>
         </div>

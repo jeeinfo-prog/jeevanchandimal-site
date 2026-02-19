@@ -1,3 +1,4 @@
+// pages/membership/success.js
 import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
@@ -39,12 +40,21 @@ export default function MembershipSuccess() {
             </p>
           ) : null}
 
-          <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/store">
-              <a className="thq-button-filled">Go to Store</a>
+          <div
+            style={{
+              marginTop: 24,
+              display: 'flex',
+              gap: 12,
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <Link href="/store" className="thq-button-filled">
+              Go to Store
             </Link>
-            <Link href="/memberships">
-              <a className="thq-button-outline">Back to Membership</a>
+
+            <Link href="/memberships" className="thq-button-outline">
+              Back to Membership
             </Link>
           </div>
         </div>

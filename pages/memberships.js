@@ -2,19 +2,15 @@
 import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 export default function Memberships() {
-  const router = useRouter()
-
   const [email, setEmail] = React.useState('')
   const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
   const [error, setError] = React.useState('')
 
   React.useEffect(() => {
-    // optional: prefill email from localStorage if available
     if (typeof window === 'undefined') return
     const saved = window.localStorage.getItem('user_email')
     if (saved && !email) setEmail(saved)
@@ -35,6 +31,11 @@ export default function Memberships() {
         return
       }
 
+      // ✅ save for badge + member downloads later
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('user_email', cleanEmail)
+      }
+
       setLoadingPlan(plan)
 
       // 1) create order in DB
@@ -52,9 +53,15 @@ export default function Memberships() {
       }
 
       // 2) redirect to PayHere (POST form)
-      const merchantId = process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+      const merchantId = process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID || ''
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : '')
+
+      // For PayHere notify: in prod, this should be your deployed domain (NOT localhost).
+      // You can set NEXT_PUBLIC_WEBHOOK_BASE_URL in Vercel to force it.
       const webhookBase = process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || siteUrl
+
       const isSandbox =
         String(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
           .toLowerCase()
@@ -151,7 +158,12 @@ export default function Memberships() {
               <input
                 className="emailInput"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('user_email', e.target.value)
+                  }
+                }}
                 placeholder="you@example.com"
                 inputMode="email"
               />
