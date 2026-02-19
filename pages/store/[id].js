@@ -598,14 +598,23 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
       const data = await r.json().catch(() => null)
 
-      if (!r.ok || !data?.actionUrl || !data?.fields) {
-        alert(data?.error || 'Checkout init failed')
-        return
-      }
+if (!r.ok || !data?.actionUrl || !data?.fields) {
+  alert(data?.error || 'Checkout init failed')
+  return
+}
 
-      const form = document.createElement('form')
-      form.method = 'POST'
-      form.action = data.actionUrl
+// ✅ IMPORTANT: Save order id for /store/return fallback (PayHere may drop query params)
+const oid = String(data?.orderId || data?.order_id || data?.fields?.order_id || '').trim()
+if (oid) {
+  try {
+    localStorage.setItem('last_order_id', oid)
+  } catch {}
+}
+
+const form = document.createElement('form')
+form.method = 'POST'
+form.action = String(data.actionUrl)
+
 
       Object.entries(data.fields).forEach(([k, v]) => {
         const input = document.createElement('input')
