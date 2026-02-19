@@ -33,6 +33,10 @@ function toBool(v) {
   return String(v || '').trim().toLowerCase() === 'true'
 }
 
+function cleanBaseUrl(v) {
+  return String(v || '').trim().replace(/\/+$/, '')
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
@@ -54,7 +58,8 @@ export default async function handler(req, res) {
     } = req.body || {}
 
     // ✅ Validate request
-    if (!photoId || !license || !format || !currency) {
+    const cleanPhotoId = String(photoId || '').trim()
+    if (!cleanPhotoId || !license || !format || !currency) {
       return res.status(400).json({ ok: false, error: 'Missing required fields' })
     }
     if (!['personal', 'commercial', 'editorial'].includes(license)) {
@@ -78,17 +83,17 @@ export default async function handler(req, res) {
     }
 
     // ✅ Env vars (server)
-    const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
+    const merchantId = cleanBaseUrl(process.env.PAYHERE_MERCHANT_ID) // no harm if not url; we just trim
     const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
 
-    // Prefer server-only SITE_URL; fallback to NEXT_PUBLIC_SITE_URL
-    const siteUrl = String(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim()
+    // Use stable public site URL for return/cancel links
+    const siteUrl = cleanBaseUrl(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL)
 
-    // Webhook base must be public reachable URL (on Vercel use your vercel domain)
-    const webhookBase = String(process.env.WEBHOOK_BASE_URL || siteUrl).trim()
+    // Webhook base must be publicly reachable URL (prefer WEBHOOK_BASE_URL)
+    const webhookBase = cleanBaseUrl(process.env.WEBHOOK_BASE_URL || siteUrl)
 
-    // ✅ Sandbox flag: accept either server or NEXT_PUBLIC to avoid accidental LIVE
-    const sandbox = toBool(process.env.PAYHERE_SANDBOX) || toBool(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX)
+    const sandbox =
+      toBool(process.env.PAYHERE_SANDBOX) || toBool(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX)
 
     if (!merchantId || !merchantSecret || !siteUrl) {
       return res.status(500).json({
@@ -102,25 +107,39 @@ export default async function handler(req, res) {
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, title, status')
-      .eq('id', String(photoId))
+      .eq('id', cleanPhotoId)
       .eq('status', 'published')
       .single()
 
     if (photoErr || !photo) {
-      console.error('Photo lookup failed:', { photoId, photoErr })
+      console.error('Photo lookup failed:', { photoId: cleanPhotoId, photoErr })
       return res.status(404).json({ ok: false, error: 'Photo not found' })
     }
 
     const orderId = uid()
-    const delivery_object_key = getDeliveryObjectKey(String(photoId), format)
+    const delivery_object_key = getDeliveryObjectKey(cleanPhotoId, format)
 
+    // ✅ Store everything you need for emails/receipt in DB
     const { error: insertError } = await supabaseAdmin.from('orders').insert({
       id: orderId,
       status: 'PENDING',
+
+      // type
+      order_kind: 'photo',
+
+      // customer
       email: cleanEmail,
+      first_name: String(firstName || 'Customer').trim(),
+      last_name: String(lastName || 'Guest').trim(),
+      phone: String(phone || '').trim(),
+      address: String(address || '').trim(),
+      city: String(city || '').trim(),
+      country: String(country || '').trim(),
+
+      // item
       currency,
       amount,
-      photo_id: String(photoId),
+      photo_id: cleanPhotoId,
       license,
       format,
       delivery_object_key,
@@ -152,15 +171,16 @@ export default async function handler(req, res) {
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
 
+      // ✅ Critical: PayHere will call this URL on payment status change
       notify_url: `${webhookBase}/api/payhere/notify`,
 
       first_name: String(firstName || 'Customer').trim(),
       last_name: String(lastName || 'Guest').trim(),
       email: cleanEmail,
-      phone,
-      address,
-      city,
-      country,
+      phone: String(phone || '0000000000').trim(),
+      address: String(address || 'N/A').trim(),
+      city: String(city || 'N/A').trim(),
+      country: String(country || 'Sri Lanka').trim(),
 
       order_id: orderId,
       items: `${photo.title || 'Photo'} - ${license.toUpperCase()} - ${format.toUpperCase()}`,
@@ -168,25 +188,34 @@ export default async function handler(req, res) {
       amount: Number(amount).toFixed(2),
       hash,
 
-      custom_1: String(photoId),
-      custom_2: `${license}:${format}`,
+      // ✅ Custom fields used by notify.js (keep consistent)
+      custom_1: 'photo',          // order kind
+      custom_2: cleanPhotoId,     // photo id
     }
 
-    // ✅ Return + safe debug
+    // ✅ Return
     return res.status(200).json({
       ok: true,
       actionUrl,
       fields,
       orderId,
-      debug: {
-        sandbox,
-        merchantIdUsed: merchantId,
-        siteUrl,
-        webhookBase,
-      },
+      // Optional debug only in development
+      ...(process.env.NODE_ENV !== 'production'
+        ? {
+            debug: {
+              sandbox,
+              siteUrl,
+              webhookBase,
+            },
+          }
+        : {}),
     })
   } catch (e) {
     console.error('create-checkout error:', e)
-    return res.status(500).json({ ok: false, error: 'Server error', detail: e?.message || String(e) })
+    return res.status(500).json({
+      ok: false,
+      error: 'Server error',
+      detail: e?.message || String(e),
+    })
   }
 }

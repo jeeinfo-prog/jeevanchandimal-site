@@ -43,23 +43,25 @@ export default async function handler(req, res) {
       return res.status(403).json({ ok: false, error: 'Membership expired' })
     }
 
-    const plan = String(member.plan || '').toLowerCase()
+    const rawPlan = String(member.plan || '').toLowerCase()
 
-    // =========================
-    // 🧠 PLAN LOGIC
-    // =========================
-    const isElite = plan === 'elite'
-    const isPro = plan === 'pro'
-    const isBasic = plan === 'basic'
+    // ✅ map PayHere plans → download tiers
+    let tier = null
+    if (rawPlan === 'monthly') tier = 'basic'
+    if (rawPlan === 'yearly') tier = 'pro'
+    if (rawPlan === 'lifetime') tier = 'elite'
 
-    if (!isElite && !isPro && !isBasic) {
+    // also allow if you later store tier directly
+    if (['basic', 'pro', 'elite'].includes(rawPlan)) tier = rawPlan
+
+    if (!tier) {
       return res.status(403).json({ ok: false, error: 'Invalid plan' })
     }
 
     // =========================
     // 🖼 BASIC + PRO → JPG via resize.js
     // =========================
-    if (!isElite) {
+    if (tier === 'basic' || tier === 'pro') {
       const token = createDownloadToken(
         {
           photoId,
@@ -73,6 +75,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         type: 'jpg',
+        tier,
         url: `/api/photo/${encodeURIComponent(photoId)}/resize?src=original&w=4000&token=${encodeURIComponent(
           token
         )}`,
@@ -80,7 +83,7 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // 🧾 ELITE → RAW ZIP via raw-download
+    // 🧾 ELITE → RAW ZIP
     // =========================
     const token = createDownloadToken(
       {
@@ -95,6 +98,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       type: 'raw',
+      tier,
       url: `/api/raw-download?token=${encodeURIComponent(token)}`,
     })
   } catch (e) {

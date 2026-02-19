@@ -29,15 +29,6 @@ function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
 
-async function safeJson(resp) {
-  const text = await resp.text()
-  try {
-    return { json: JSON.parse(text), text }
-  } catch {
-    return { json: null, text }
-  }
-}
-
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n))
 }
@@ -45,7 +36,6 @@ function clamp(n, a, b) {
 function formatExifDate(exifDate) {
   const s = String(exifDate || '').trim()
   if (!s) return ''
-  // EXIF: "YYYY:MM:DD HH:MM:SS" -> "YYYY-MM-DD HH:MM:SS"
   const isoish = s.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
   const d = new Date(isoish)
   if (String(d) === 'Invalid Date') return s
@@ -54,14 +44,12 @@ function formatExifDate(exifDate) {
 
 function estimateJpgSizeMB(width, height) {
   if (!width || !height) return null
-  // rough compression estimate: 0.35 bytes per pixel
   const bytes = width * height * 0.35
   return (bytes / (1024 * 1024)).toFixed(1)
 }
 
 function estimateRawSizeMB(width, height) {
   if (!width || !height) return null
-  // RAW ~ 2 bytes per pixel (varies by camera, good estimate)
   const bytes = width * height * 2
   return (bytes / (1024 * 1024)).toFixed(1)
 }
@@ -76,11 +64,7 @@ function buildContentLocation(location) {
     }
   }
 
-  const parts = loc
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
-
+  const parts = loc.split(',').map((s) => s.trim()).filter(Boolean)
   const locality = parts[0] || undefined
   const country = parts[1] || 'Sri Lanka'
 
@@ -95,7 +79,6 @@ function buildContentLocation(location) {
   }
 }
 
-// Normalize server/client API shapes into the same "photo" object used by this page.
 function normalizePhotoPayload(payload) {
   const row = payload?.photo || payload
   if (!row) return null
@@ -103,39 +86,39 @@ function normalizePhotoPayload(payload) {
   const cleanedThumb = String(row.thumb_url || row.thumbUrl || '').trim()
   const cleanedPreview = String(row.preview_url || row.previewUrl || '').trim()
 
-  // ✅ RAW availability: support many backend shapes (any one of these makes RAW available)
   const rawAvailable =
-    Boolean(row.raw_available) ||
-    Boolean(row.has_raw) ||
-    Boolean(row.hasRaw) ||
-    Boolean(row.rawUrl) ||
-    Boolean(row.raw_url) ||
-    Boolean(row.raw_key) ||
-    Boolean(row.rawKey) ||
-    (Array.isArray(row.formats) && row.formats.includes('raw')) ||
-    (Array.isArray(row.available_formats) && row.available_formats.includes('raw'))
-
-  // ✅ tags safe (string/array)
-  const tagsArr = Array.isArray(row.tags)
-    ? row.tags.map((t) => String(t ?? '').trim()).filter(Boolean)
-    : typeof row.tags === 'string'
-    ? row.tags
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : []
+    row.rawAvailable === false
+      ? false
+      : Boolean(row.raw_available) ||
+        Boolean(row.has_raw) ||
+        Boolean(row.hasRaw) ||
+        Boolean(row.rawUrl) ||
+        Boolean(row.raw_url) ||
+        Boolean(row.raw_key) ||
+        Boolean(row.rawKey) ||
+        (Array.isArray(row.formats) && row.formats.includes('raw')) ||
+        (Array.isArray(row.available_formats) && row.available_formats.includes('raw'))
 
   return {
     id: row.id,
     title: row.title || 'Untitled',
     description: row.description || '',
-    tags: tagsArr,
+    tags: Array.isArray(row.tags) ? row.tags : [],
     thumbUrl: cleanedThumb || '',
     previewUrl: cleanedPreview || '',
     createdAt: row.created_at || row.createdAt || null,
     location: row.location || 'Sri Lanka',
     exif: row.exif || null,
     rawAvailable,
+  }
+}
+
+async function safeJson(resp) {
+  const text = await resp.text()
+  try {
+    return { json: JSON.parse(text), text }
+  } catch {
+    return { json: null, text }
   }
 }
 
@@ -152,24 +135,14 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [format, setFormat] = React.useState('jpg')
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
 
-  const [variant] = React.useState('standard')
-
-  const [email, setEmail] = React.useState('')
-  const [firstName, setFirstName] = React.useState('')
-  const [lastName, setLastName] = React.useState('')
-  const [agreed, setAgreed] = React.useState(false)
-
-  const [similar, setSimilar] = React.useState([])
-  const [recommended, setRecommended] = React.useState([])
-  const [relLoading, setRelLoading] = React.useState(false)
-
+  const [variant] = React.useState('standard') // for preview API
   const [naturalDims, setNaturalDims] = React.useState({ w: null, h: null })
 
-  // Watermark controls
+  // watermark controls
   const [wmOn, setWmOn] = React.useState(true)
   const [wmOpacity, setWmOpacity] = React.useState(0.08)
 
-  // Zoom modal
+  // zoom modal
   const [zoomOpen, setZoomOpen] = React.useState(false)
   const [zoom, setZoom] = React.useState(1)
   const [pan, setPan] = React.useState({ x: 0, y: 0 })
@@ -177,25 +150,44 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const panStart = React.useRef({ x: 0, y: 0 })
   const panOrigin = React.useRef({ x: 0, y: 0 })
 
-  // ✅ Membership state
+  // checkout fields
+  const [email, setEmail] = React.useState('')
+  const [firstName, setFirstName] = React.useState('')
+  const [lastName, setLastName] = React.useState('')
+  const [agreed, setAgreed] = React.useState(false)
+
+  // related
+  const [similar, setSimilar] = React.useState([])
+  const [recommended, setRecommended] = React.useState([])
+  const [relLoading, setRelLoading] = React.useState(false)
+
+  // membership
   const [memberLoading, setMemberLoading] = React.useState(false)
   const [isMember, setIsMember] = React.useState(false)
   const [memberPlan, setMemberPlan] = React.useState(null)
   const memberTimer = React.useRef(null)
 
-  // ✅ Prefill email from membership / last checkout
+  // preview
+  const previewSrc = photo?.id
+    ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${encodeURIComponent(variant)}`
+    : ''
+
+  const firstTag = (photo?.tags || []).find(Boolean) || ''
+  const rawAvailable = photo?.rawAvailable !== false
+
+  // force jpg if raw not available
+  React.useEffect(() => {
+    if (photo && rawAvailable === false && format === 'raw') setFormat('jpg')
+  }, [photo, rawAvailable, format])
+
+  // prefill email
   React.useEffect(() => {
     if (typeof window === 'undefined') return
     try {
       const saved = window.localStorage.getItem('user_email')
-      if (saved && !email) setEmail(String(saved).trim().toLowerCase())
+      if (saved) setEmail(String(saved).trim().toLowerCase())
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  function validEmailQuick(v) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
-  }
 
   function preventSave(e) {
     e.preventDefault()
@@ -245,11 +237,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
 
-  // ✅ Client refresh for navigation or edge cases (SSR already gives first paint + SEO)
+  // client refresh (for navigation)
   React.useEffect(() => {
     if (!router.isReady || !id) return
-
-    // If SSR already provided correct photo for this id, skip refetch.
     if (photo?.id && photo.id === id) return
 
     let alive = true
@@ -263,7 +253,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         const r = await fetch(`/api/store/photo?id=${encodeURIComponent(id)}`, {
           headers: { 'Cache-Control': 'no-store' },
         })
-
         const { json, text } = await safeJson(r)
         if (!alive) return
 
@@ -296,22 +285,21 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, id])
 
-  // ✅ Load EXIF from endpoint (gets ORIGINAL file bytes + ORIGINAL dimensions)
+  // load EXIF (original bytes + dims)
   React.useEffect(() => {
     if (!photo?.id) return
 
-    // If we already have useful original dims + bytes, skip
     const hasW = Number(
       photo?.exif?.width || photo?.exif?.ExifImageWidth || photo?.exif?.PixelXDimension
     )
     const hasH = Number(
       photo?.exif?.height || photo?.exif?.ExifImageHeight || photo?.exif?.PixelYDimension
     )
-    const hasBytes = typeof photo?.exif?.bytes === 'number' || typeof photo?.exif?.size === 'number'
+    const hasBytes =
+      typeof photo?.exif?.bytes === 'number' || typeof photo?.exif?.size === 'number'
     if (photo?.exif && hasW && hasH && hasBytes) return
 
     let alive = true
-
     async function loadExif() {
       try {
         const r = await fetch(`/api/photo/${encodeURIComponent(photo.id)}/exif`, {
@@ -321,14 +309,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         if (!alive) return
         if (!j?.ok || !j?.exif) return
 
-        // Map into the keys your UI reads
         const mapped = {
           make: j.exif?.make || j.exif?.Make || null,
           model: j.exif?.model || j.exif?.Model || null,
           lensModel: j.exif?.lensModel || j.exif?.LensModel || null,
           settingsLine: j.exif?.settingsLine || null,
           dateTimeOriginal: j.exif?.dateTimeOriginal || j.exif?.DateTimeOriginal || null,
-
           width:
             j.exif?.width ||
             j.exif?.ImageWidth ||
@@ -341,7 +327,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
             j.exif?.PixelYDimension ||
             j.exif?.ExifImageHeight ||
             null,
-
           bytes: typeof j.size === 'number' ? j.size : null,
         }
 
@@ -355,12 +340,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
   }, [photo?.id])
 
-  // ✅ Load similar + recommended (normalized)
+  // related
   React.useEffect(() => {
     if (!photo?.id) return
 
     let alive = true
-
     async function loadRelated() {
       try {
         setRelLoading(true)
@@ -369,14 +353,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           headers: { 'Cache-Control': 'no-store' },
         })
         const s = await sResp.json().catch(() => ({}))
-        const similarRaw = Array.isArray(s?.photos) ? s.photos : []
-        const similarList = similarRaw.map(normalizePhotoPayload).filter(Boolean)
-
+        const similarList = Array.isArray(s?.photos) ? s.photos : []
         if (!alive) return
         setSimilar(similarList)
 
         const similarIds = similarList.map((p) => p.id).filter(Boolean).join(',')
-
         const rResp = await fetch(
           `/api/store/recommended?excludeId=${encodeURIComponent(
             photo.id
@@ -384,11 +365,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           { headers: { 'Cache-Control': 'no-store' } }
         )
         const r = await rResp.json().catch(() => ({}))
-        const recRaw = Array.isArray(r?.photos) ? r.photos : []
-        const recList = recRaw.map(normalizePhotoPayload).filter(Boolean)
-
         if (!alive) return
-        setRecommended(recList)
+        setRecommended(Array.isArray(r?.photos) ? r.photos : [])
       } catch {
         if (!alive) return
         setSimilar([])
@@ -405,72 +383,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
   }, [photo?.id])
 
-  // Uses your preview API route
-  const previewSrc = photo?.id
-    ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${variant}`
-    : ''
+  // membership check (debounced)
+  function validEmailQuick(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+  }
 
-  const tagsArr = Array.isArray(photo?.tags) ? photo.tags : []
-  const firstTag = String(tagsArr[0] ?? '').trim()
-
-  const rawAvailable = photo?.rawAvailable !== false // default true unless explicitly false
-
-  // ✅ If RAW isn't available but user is on RAW, force JPG
-  React.useEffect(() => {
-    if (photo && rawAvailable === false && format === 'raw') {
-      setFormat('jpg')
-    }
-  }, [photo, rawAvailable, format])
-
-  // ✅ SEO-safe canonical (never blank)
-  const SITE_URL = 'https://jeevanchandimal.com'
-  const canonicalId = photo?.id || id
-  const canonicalUrl = `${SITE_URL}/store/${canonicalId || ''}`
-
-  // ✅ Licensable image URLs (Google Images)
-  const licenseUrl = `${SITE_URL}/terms-and-conditions`
-  const acquireLicensePage = canonicalUrl
-
-  // ✅ Social/Schema image should be PUBLIC + stable + absolute for bots
-  const absolutePreviewForBots = canonicalId
-    ? `${SITE_URL}/api/photo/${encodeURIComponent(canonicalId)}/preview?variant=${variant}`
-    : ''
-
-  const ogImageFromDb = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
-  const ogImage = ogImageFromDb || absolutePreviewForBots
-
-  // ✅ ORIGINAL width/height (prefer EXIF; fallback to preview natural dims)
-  const exifW =
-    Number(
-      photo?.exif?.width ||
-        photo?.exif?.ImageWidth ||
-        photo?.exif?.PixelXDimension ||
-        photo?.exif?.ExifImageWidth
-    ) || null
-
-  const exifH =
-    Number(
-      photo?.exif?.height ||
-        photo?.exif?.ImageHeight ||
-        photo?.exif?.PixelYDimension ||
-        photo?.exif?.ExifImageHeight
-    ) || null
-
-  const finalW = exifW || naturalDims.w || null
-  const finalH = exifH || naturalDims.h || null
-
-  const imgW = finalW
-  const imgH = finalH
-
-  const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
-
-  const exactJpgMB =
-    typeof photo?.exif?.bytes === 'number' ? (photo.exif.bytes / (1024 * 1024)).toFixed(1) : null
-
-  const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
-  const rawSizeMB = estimateRawSizeMB(finalW, finalH)
-
-  // ✅ Check membership when email changes (debounced)
   React.useEffect(() => {
     const em = String(email || '').trim().toLowerCase()
 
@@ -487,12 +404,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     memberTimer.current = setTimeout(async () => {
       try {
         setMemberLoading(true)
-
         const r = await fetch(`/api/membership/check?email=${encodeURIComponent(em)}`, {
           headers: { 'Cache-Control': 'no-store' },
         })
         const j = await r.json().catch(() => null)
-
         if (j?.ok && j?.member) {
           setIsMember(true)
           setMemberPlan(j?.plan || null)
@@ -546,7 +461,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
   }
 
-  // ✅ IMPORTANT: this must exist (your live error was missing startCheckout)
   async function startCheckout() {
     if (!photo) return
 
@@ -588,7 +502,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
       })
 
       const data = await r.json().catch(() => null)
-
       if (!r.ok || !data?.actionUrl || !data?.fields) {
         alert(data?.error || 'Checkout init failed')
         return
@@ -623,7 +536,24 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
   }
 
-  // ✅ Always make OG/LD image absolute for bots
+  /* ---------------- SEO / OG / JSON-LD ---------------- */
+
+  const SITE_URL = 'https://jeevanchandimal.com'
+  const canonicalId = photo?.id || id
+  const canonicalUrl = `${SITE_URL}/store/${encodeURIComponent(canonicalId || '')}`
+
+  const licenseUrl = `${SITE_URL}/terms-and-conditions`
+  const acquireLicensePage = canonicalUrl
+
+  const absolutePreviewForBots = canonicalId
+    ? `${SITE_URL}/api/photo/${encodeURIComponent(canonicalId)}/preview?variant=${encodeURIComponent(
+        variant
+      )}`
+    : ''
+
+  const ogImageFromDb = String(photo?.previewUrl || photo?.thumbUrl || '').trim()
+  const ogImage = ogImageFromDb || absolutePreviewForBots
+
   const ogRaw = ogImage || ''
   const ogAbs =
     ogRaw && /^https?:\/\//i.test(ogRaw)
@@ -640,6 +570,36 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
       ? `${SITE_URL}${thumbRaw.startsWith('/') ? '' : '/'}${thumbRaw}`
       : ogAbs
 
+  const exifW =
+    Number(
+      photo?.exif?.width ||
+        photo?.exif?.ImageWidth ||
+        photo?.exif?.PixelXDimension ||
+        photo?.exif?.ExifImageWidth
+    ) || null
+  const exifH =
+    Number(
+      photo?.exif?.height ||
+        photo?.exif?.ImageHeight ||
+        photo?.exif?.PixelYDimension ||
+        photo?.exif?.ExifImageHeight
+    ) || null
+
+  const finalW = exifW || naturalDims.w || null
+  const finalH = exifH || naturalDims.h || null
+  const imgW = finalW
+  const imgH = finalH
+
+  const resolution = finalW && finalH ? `${finalW}×${finalH}` : null
+
+  const exactJpgMB =
+    typeof photo?.exif?.bytes === 'number'
+      ? (photo.exif.bytes / (1024 * 1024)).toFixed(1)
+      : null
+
+  const jpgSizeMB = estimateJpgSizeMB(finalW, finalH)
+  const rawSizeMB = estimateRawSizeMB(finalW, finalH)
+
   const imageObjectJsonLd =
     photo && ogAbs
       ? {
@@ -653,7 +613,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           name: photo.title,
           description:
             photo.description || `${photo.title} – Sri Lanka photography by Jeevan Chandimal`,
-          keywords: tagsArr.length ? tagsArr.join(', ') : undefined,
+          keywords: Array.isArray(photo.tags) ? photo.tags.join(', ') : undefined,
           creator: { '@type': 'Person', name: 'Jeevan Chandimal', url: SITE_URL },
           copyrightHolder: { '@type': 'Person', name: 'Jeevan Chandimal' },
           creditText: 'Jeevan Chandimal',
@@ -663,12 +623,13 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           isAccessibleForFree: false,
           width: imgW || undefined,
           height: imgH || undefined,
-          contentLocation: buildContentLocation(photo?.location || null),
+          contentLocation: buildContentLocation(photo.location),
         }
       : null
 
-  const effectiveFormat = rawAvailable === false && format === 'raw' ? 'jpg' : format
-  const price = Number(PRICES?.[currency]?.[license]?.[effectiveFormat] ?? 0)
+  /* ---------------- pricing ---------------- */
+
+  const price = PRICES?.[currency]?.[license]?.[format] ?? 0
 
   return (
     <>
@@ -693,12 +654,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           property="og:description"
           content={
             photo?.description ||
-            'Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.'
+            `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
           }
         />
-        <meta property="og:url" content={String(canonicalUrl || '')} />
+        <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="article" />
-        {ogAbs ? <meta property="og:image" content={String(ogAbs)} /> : null}
+        {ogAbs ? <meta property="og:image" content={ogAbs} /> : null}
         {ogAbs && imgW ? <meta property="og:image:width" content={String(imgW)} /> : null}
         {ogAbs && imgH ? <meta property="og:image:height" content={String(imgH)} /> : null}
 
@@ -709,30 +670,31 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           name="twitter:description"
           content={
             photo?.description ||
-            'Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.'
+            `Professional photography by Jeevan Chandimal. License this image for commercial, editorial, or personal use.`
           }
         />
-        {ogAbs ? <meta name="twitter:image" content={String(ogAbs)} /> : null}
+        {ogAbs ? <meta name="twitter:image" content={ogAbs} /> : null}
 
         {/* Canonical */}
-        <link rel="canonical" href={String(canonicalUrl || '')} />
+        <link rel="canonical" href={canonicalUrl} />
 
-        {/* Preload main preview image for faster LCP */}
-        {photo?.id && previewSrc ? <link rel="preload" as="image" href={String(previewSrc)} /> : null}
+        {/* Preload preview (optional) */}
+        {photo?.id && previewSrc ? <link rel="preload" as="image" href={previewSrc} /> : null}
 
-        {/* ✅ Licensable ImageObject JSON-LD (Google Images) */}
-        {imageObjectJsonLd && (
+        {/* Licensable ImageObject JSON-LD */}
+        {imageObjectJsonLd ? (
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(imageObjectJsonLd) }}
           />
-        )}
+        ) : null}
       </Head>
 
       <JeevanChandimalNavi />
 
       <main className="wrap">
         <div className="top">
+          {/* ✅ safest Link across Next versions */}
           <Link href="/store" legacyBehavior>
             <a className="back">← Back to store</a>
           </Link>
@@ -843,7 +805,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <div className="metaTitle">Photo details</div>
                     <div className="metaText">
                       <div>
-                        <strong>ID:</strong> {String(photo.id || '')}
+                        <strong>ID:</strong> {photo.id}
                       </div>
 
                       {photo.createdAt ? (
@@ -855,22 +817,19 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                       {photo.exif?.make || photo.exif?.model ? (
                         <div>
                           <strong>Camera:</strong>{' '}
-                          {[photo.exif?.make, photo.exif?.model]
-                            .map((x) => String(x ?? '').trim())
-                            .filter(Boolean)
-                            .join(' ')}
+                          {[photo.exif?.make, photo.exif?.model].filter(Boolean).join(' ')}
                         </div>
                       ) : null}
 
                       {photo.exif?.lensModel ? (
                         <div>
-                          <strong>Lens:</strong> {String(photo.exif.lensModel)}
+                          <strong>Lens:</strong> {photo.exif.lensModel}
                         </div>
                       ) : null}
 
                       {photo.exif?.settingsLine ? (
                         <div>
-                          <strong>Settings:</strong> {String(photo.exif.settingsLine)}
+                          <strong>Settings:</strong> {photo.exif.settingsLine}
                         </div>
                       ) : null}
 
@@ -895,15 +854,15 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <div className="metaText">
                       {Array.isArray(photo.tags) && photo.tags.length > 0 ? (
                         <div className="tagRow">
-                          {photo.tags
-                            .map((t) => String(t ?? '').trim())
-                            .filter(Boolean)
-                            .slice(0, 14)
-                            .map((t) => (
-                              <Link key={t} href={`/store?tag=${encodeURIComponent(t)}`} legacyBehavior>
-                                <a className="tag">#{t}</a>
-                              </Link>
-                            ))}
+                          {photo.tags.slice(0, 14).map((t) => (
+                            <Link
+                              key={t}
+                              href={`/store?tag=${encodeURIComponent(t)}`}
+                              legacyBehavior
+                            >
+                              <a className="tag">#{t}</a>
+                            </Link>
+                          ))}
                         </div>
                       ) : (
                         <div style={{ opacity: 0.75 }}>No tags</div>
@@ -929,11 +888,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               {/* BUY CARD */}
               <aside className="buyCard">
                 <h1 className="title">{photo.title}</h1>
-
                 {isMember ? (
                   <div className="memberBadge">{String(memberPlan || 'member').toUpperCase()}</div>
                 ) : null}
-
                 <p className="sub">
                   {isMember ? 'Download included with your membership' : 'Choose license + format'}
                 </p>
@@ -1049,7 +1006,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                   </>
                 )}
 
-                {/* ✅ MEMBERSHIP DOWNLOAD */}
+                {/* MEMBERSHIP DOWNLOAD */}
                 {memberLoading ? (
                   <p className="fine">Checking membership…</p>
                 ) : isMember ? (
@@ -1112,14 +1069,14 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                         </div>
                       )}
 
-                      {effectiveFormat === 'jpg' && (exactJpgMB || jpgSizeMB) && (
+                      {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
                         <div>
                           <strong>JPG size:</strong>{' '}
                           {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
                         </div>
                       )}
 
-                      {effectiveFormat === 'raw' && rawSizeMB && rawAvailable && (
+                      {format === 'raw' && rawSizeMB && rawAvailable && (
                         <div>
                           <strong>RAW size:</strong> ~{rawSizeMB} MB
                         </div>
@@ -1197,23 +1154,22 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 <div className="relState">No similar photos found yet.</div>
               ) : (
                 <div className="relGrid">
-                  {similar.map((p) => {
-                    const tag0 = String(p?.tags?.[0] ?? '').trim()
-                    return (
-                      <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
-                        <a className="relCard">
-                          <div className="relThumb">
-                            <img src={p.thumbUrl || p.previewUrl} alt={p.title || 'Photo'} loading="lazy" />
-                            {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
+                  {similar.map((p) => (
+                    <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
+                      <a className="relCard">
+                        <div className="relThumb">
+                          <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
+                          {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
+                        </div>
+                        <div className="relMeta">
+                          <div className="relName">{p.title || 'Untitled'}</div>
+                          <div className="relTag">
+                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
                           </div>
-                          <div className="relMeta">
-                            <div className="relName">{p.title || 'Untitled'}</div>
-                            <div className="relTag">{tag0 ? `#${tag0}` : 'Photo'}</div>
-                          </div>
-                        </a>
-                      </Link>
-                    )
-                  })}
+                        </div>
+                      </a>
+                    </Link>
+                  ))}
                 </div>
               )}
             </section>
@@ -1233,23 +1189,22 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 <div className="relState">No recommendations yet.</div>
               ) : (
                 <div className="relGrid">
-                  {recommended.map((p) => {
-                    const tag0 = String(p?.tags?.[0] ?? '').trim()
-                    return (
-                      <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
-                        <a className="relCard">
-                          <div className="relThumb">
-                            <img src={p.thumbUrl || p.previewUrl} alt={p.title || 'Photo'} loading="lazy" />
-                            {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
+                  {recommended.map((p) => (
+                    <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
+                      <a className="relCard">
+                        <div className="relThumb">
+                          <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
+                          {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
+                        </div>
+                        <div className="relMeta">
+                          <div className="relName">{p.title || 'Untitled'}</div>
+                          <div className="relTag">
+                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
                           </div>
-                          <div className="relMeta">
-                            <div className="relName">{p.title || 'Untitled'}</div>
-                            <div className="relTag">{tag0 ? `#${tag0}` : 'Photo'}</div>
-                          </div>
-                        </a>
-                      </Link>
-                    )
-                  })}
+                        </div>
+                      </a>
+                    </Link>
+                  ))}
                 </div>
               )}
             </section>
@@ -1493,6 +1448,15 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           display: flex;
           flex-direction: column;
           gap: 14px;
+
+          /* ✅ no internal scroll */
+          overflow: visible;
+          max-height: none;
+
+          /* ✅ keep it visible while scrolling (optional) */
+          position: sticky;
+          top: 18px;
+          align-self: start;
         }
 
         .title {
@@ -1731,6 +1695,14 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           overflow: hidden;
           background: rgba(255, 255, 255, 0.02);
           display: grid;
+
+          transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+        }
+
+        .relCard:hover {
+          transform: translateY(-3px);
+          border-color: rgba(37, 195, 226, 0.45);
+          background: rgba(37, 195, 226, 0.06);
         }
 
         .relThumb {
@@ -1744,21 +1716,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           height: 100%;
           object-fit: cover;
           display: block;
+
+          transition: transform 220ms ease;
         }
 
-        .relMeta {
-          padding: 10px 12px;
-          display: grid;
-          gap: 4px;
-        }
-
-        .relName {
-          font-weight: 600;
-        }
-
-        .relTag {
-          font-size: 12px;
-          opacity: 0.8;
+        .relCard:hover .relThumb img {
+          transform: scale(1.03);
         }
 
         /* Zoom modal */
@@ -1805,7 +1768,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           overflow: hidden;
           display: grid;
           place-items: center;
-          touch-action: none;
         }
 
         .zoomBody img {
@@ -1828,38 +1790,54 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           .relGrid {
             grid-template-columns: 1fr;
           }
+          .buyCard {
+            position: static;
+          }
         }
       `}</style>
     </>
   )
 }
 
-// ✅ SSR for SEO + first paint
+/**
+ * ✅ SSR initial load (optional but recommended)
+ * Uses server-side Supabase without bundling keys to client.
+ */
 export async function getServerSideProps(ctx) {
   try {
     const id = String(ctx?.params?.id || '').trim()
     if (!id) return { props: { initialPhoto: null, initialError: 'Missing photo id' } }
 
-    const proto =
-      (ctx?.req?.headers?.['x-forwarded-proto'] || 'https').toString().split(',')[0].trim() || 'https'
-    const host = (ctx?.req?.headers?.['x-forwarded-host'] || ctx?.req?.headers?.host || '').toString()
-    const base = host ? `${proto}://${host}` : 'https://jeevanchandimal.com'
+    // require inside SSR only
+    // eslint-disable-next-line global-require
+    const { supabaseAdmin } = require('../../lib/supabaseAdmin')
 
-    const r = await fetch(`${base}/api/store/photo?id=${encodeURIComponent(id)}`, {
-      headers: { 'Cache-Control': 'no-store' },
+    const { data, error } = await supabaseAdmin
+      .from('photos')
+      .select('id, title, description, tags, preview_url, thumb_url, created_at, location, exif, raw_available')
+      .eq('id', id)
+      .single()
+
+    if (error || !data) {
+      return { props: { initialPhoto: null, initialError: 'Photo not found' } }
+    }
+
+    const initialPhoto = normalizePhotoPayload({
+      photo: {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        tags: data.tags,
+        preview_url: data.preview_url,
+        thumb_url: data.thumb_url,
+        created_at: data.created_at,
+        location: data.location,
+        exif: data.exif,
+        raw_available: data.raw_available,
+      },
     })
-    const { json, text } = await safeJson(r)
 
-    if (!r.ok || !json?.ok) {
-      return { props: { initialPhoto: null, initialError: json?.error || text || 'Failed to load photo' } }
-    }
-
-    const normalized = normalizePhotoPayload(json)
-    if (!normalized?.id) {
-      return { props: { initialPhoto: null, initialError: json?.error || 'Failed to load photo' } }
-    }
-
-    return { props: { initialPhoto: normalized, initialError: '' } }
+    return { props: { initialPhoto, initialError: '' } }
   } catch (e) {
     return { props: { initialPhoto: null, initialError: 'Failed to load photo' } }
   }

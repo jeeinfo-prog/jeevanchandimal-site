@@ -7,8 +7,10 @@ import { sendDownloadEmail, sendReceiptEmail } from '../../../lib/email'
 import { payhereVerifyMd5Sig } from '../../../lib/payhere'
 
 export const config = {
-  api: { bodyParser: false }, // ✅ PayHere posts x-www-form-urlencoded
+  api: { bodyParser: false }, // PayHere posts x-www-form-urlencoded
 }
+
+/* ---------------- helpers ---------------- */
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -26,15 +28,19 @@ function parseForm(body) {
   return obj
 }
 
+function cleanBaseUrl(v) {
+  return String(v || '').trim().replace(/\/+$/, '')
+}
+
 function getBaseUrl(req) {
-  const webhook = (process.env.WEBHOOK_BASE_URL || '').trim()
-  if (webhook) return webhook.replace(/\/+$/, '')
+  const webhook = cleanBaseUrl(process.env.WEBHOOK_BASE_URL)
+  if (webhook) return webhook
 
   const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
   if (host) return `${proto}://${host}`
 
-  return (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '')
+  return cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL)
 }
 
 function buildDownloadUrl(token, req) {
@@ -81,9 +87,10 @@ function addYearsFrom(baseDate, n) {
 
 function normalizePayhereAmount(v) {
   // Must match PayHere signature formatting: "1234.00" (no commas)
-  const n = Number(v || 0)
-  return n.toFixed(2)
+  return Number(v || 0).toFixed(2)
 }
+
+/* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
   // PayHere expects 200 always
@@ -120,10 +127,10 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
-    // 2) Verify signature (CRITICAL)
-    const merchantSecret = (process.env.PAYHERE_MERCHANT_SECRET || '').trim()
+    // 2) Verify signature
+    const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
     if (!merchantSecret) {
-      console.error('Missing PAYHERE_MERCHANT_SECRET in env; cannot verify signature.')
+      console.error('Missing PAYHERE_MERCHANT_SECRET; cannot verify signature.')
       return res.status(200).send('OK')
     }
 
@@ -155,13 +162,14 @@ export default async function handler(req, res) {
 
     const statusCodeNum = Number(status_code)
 
-    // =========================
-    // ✅ PAYMENT SUCCESS
-    // =========================
+    /* =========================================================
+       ✅ PAYMENT SUCCESS
+    ========================================================= */
+
     if (statusCodeNum === 2) {
-      // Idempotency: if already PAID, don't run membership extend again
       const wasPaidAlready = order.status === 'PAID'
 
+      // mark order paid once
       if (!wasPaidAlready) {
         await supabaseAdmin
           .from('orders')
@@ -175,7 +183,7 @@ export default async function handler(req, res) {
           .eq('id', order_id)
       }
 
-      // Re-fetch latest order
+      // re-fetch for latest flags/timestamps
       const { data: fresh } = await supabaseAdmin
         .from('orders')
         .select('*')
@@ -183,39 +191,57 @@ export default async function handler(req, res) {
         .single()
 
       const o = fresh || order
-      const email = (o.email || '').trim().toLowerCase()
+      const email = String(o.email || '').trim().toLowerCase()
 
+      // Determine membership vs photo order (support multiple shapes)
       const isMembership =
         String(o.order_kind || '').toLowerCase() === 'membership' ||
         String(custom_1 || '').toLowerCase() === 'membership'
 
-      // =========================
-      // 🔓 MEMBERSHIP UNLOCK (schema: start_date/end_date/created_at)
-      // =========================
+      /* =========================================================
+         🔓 MEMBERSHIP UNLOCK (tier + term)
+      ========================================================= */
+
       if (isMembership) {
         if (!email) {
           console.error('Membership order has no email:', o.id)
           return res.status(200).send('OK')
         }
 
-        // Prevent double-extension on webhook retries
+        // prevent double-extension on webhook retries
         if (wasPaidAlready) {
           console.log('Membership webhook repeat ignored (already PAID):', o.id)
           return res.status(200).send('OK')
         }
 
-        const plan =
-          String(o.membership_plan || '').trim().toLowerCase() ||
-          String(custom_2 || '').trim().toLowerCase()
+        const tierPlans = ['basic', 'pro', 'elite']
+        const timePlans = ['monthly', 'yearly', 'lifetime']
 
-        if (!['monthly', 'yearly', 'lifetime'].includes(plan)) {
-          console.error('Invalid membership plan:', plan, 'order:', o.id)
-          return res.status(200).send('OK')
+        // Prefer new columns, fallback to old/custom fields
+        let tier = String(o.membership_tier || o.membership_plan || '').trim().toLowerCase()
+        let term = String(o.membership_term || '').trim().toLowerCase()
+
+        // custom_2 fallback:
+        // - could be "monthly" (old)
+        // - could be "pro:monthly" (if you ever used this)
+        const c2 = String(custom_2 || '').trim().toLowerCase()
+        if ((!tier || !term) && c2) {
+          if (c2.includes(':')) {
+            const [a, b] = c2.split(':').map((x) => String(x || '').trim().toLowerCase())
+            if (!tier) tier = a
+            if (!term) term = b
+          } else {
+            // old format: custom_2 = monthly/yearly/lifetime
+            if (!term) term = c2
+          }
         }
+
+        if (!tierPlans.includes(tier)) tier = 'basic'
+        if (!timePlans.includes(term)) term = 'monthly'
 
         const now = new Date()
 
-        // Read existing membership (if any)
+        // Read existing membership (include created_at!)
         const { data: existing, error: exErr } = await supabaseAdmin
           .from('memberships')
           .select('email, plan, status, start_date, end_date, created_at')
@@ -224,30 +250,26 @@ export default async function handler(req, res) {
 
         if (exErr) console.error('Membership read failed:', exErr.message)
 
-        // Extend from existing end_date if in the future, else from now
         const existingEnd = existing?.end_date ? new Date(existing.end_date) : null
         const base = existingEnd && existingEnd > now ? existingEnd : now
 
         let endDate = null
-        if (plan === 'monthly') endDate = addMonthsFrom(base, 1)
-        if (plan === 'yearly') endDate = addYearsFrom(base, 1)
-        if (plan === 'lifetime') endDate = null
+        if (term === 'monthly') endDate = addMonthsFrom(base, 1)
+        if (term === 'yearly') endDate = addYearsFrom(base, 1)
+        if (term === 'lifetime') endDate = null
 
-        // start_date: keep existing if present, otherwise now
         const startDate = existing?.start_date ? new Date(existing.start_date) : now
 
+        // plan stored = tier (basic/pro/elite) so download logic is simple
         const payload = {
           email,
-          plan,
+          plan: tier,
           status: 'active',
           start_date: startDate.toISOString(),
           end_date: endDate ? endDate.toISOString() : null,
+          created_at: existing?.created_at ? new Date(existing.created_at).toISOString() : now.toISOString(),
         }
 
-        // Only set created_at when inserting brand-new row
-        if (!existing) payload.created_at = now.toISOString()
-
-        // ✅ UPSERT (requires memberships.email UNIQUE)
         const { error: memErr } = await supabaseAdmin
           .from('memberships')
           .upsert(payload, { onConflict: 'email' })
@@ -255,15 +277,15 @@ export default async function handler(req, res) {
         if (memErr) {
           console.error('Membership upsert failed:', memErr.message)
         } else {
-          console.log('✅ Membership active:', email, plan, 'end:', payload.end_date || 'LIFETIME')
+          console.log('✅ Membership active:', email, tier, term, 'end:', payload.end_date || 'LIFETIME')
         }
 
         return res.status(200).send('OK')
       }
 
-      // =========================
-      // 🖼️ PHOTO ORDER DELIVERY
-      // =========================
+      /* =========================================================
+         🖼️ PHOTO ORDER DELIVERY (receipt + download)
+      ========================================================= */
 
       const objectKey = o.delivery_object_key || fallbackObjectKey(o)
       if (!objectKey) {
@@ -280,43 +302,20 @@ export default async function handler(req, res) {
         await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
       }
 
-      let invoiceNo = o.invoice_no
-      if (!invoiceNo) {
-        invoiceNo = genInvoiceNo(o.id)
-        await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', o.id)
-      }
+      if (!email) return res.status(200).send('OK')
 
-      // ✅ INVOICE EMAIL (ONCE)
-      if (email && !o.invoice_email_sent_at) {
-        try {
-          await sendReceiptEmail({
-            to: email,
-            orderId: o.id,
-            invoiceNo,
-            amount: o.amount,
-            currency: o.currency,
-            photoTitle: o.photo_id,
-            license: o.license,
-            format: o.format,
-            paymentId: payment_id || null,
-          })
-
-          await supabaseAdmin
-            .from('orders')
-            .update({ invoice_email_sent_at: new Date().toISOString() })
-            .eq('id', o.id)
-
-          console.log('✅ Invoice email sent (one-time):', order_id, invoiceNo)
-        } catch (e) {
-          console.error('Invoice email failed:', order_id, e)
+      // Ensure both emails are sent reliably
+      try {
+        // ensure invoice number
+        let invoiceNo = o.invoice_no
+        if (!invoiceNo) {
+          invoiceNo = genInvoiceNo(o.id)
+          await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', o.id)
         }
-      }
 
-      // ✅ DOWNLOAD EMAIL (ONCE)
-      if (email && !o.download_email_sent_at) {
+        // Create token first (so download email always has a link)
         const jti = crypto.randomUUID()
-        const expiresMinutes = 60
-        const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
         const ins = await supabaseAdmin.from('download_tokens').insert({
           jti,
@@ -324,10 +323,7 @@ export default async function handler(req, res) {
           expires_at: expiresAt.toISOString(),
         })
 
-        if (ins.error) {
-          console.error('download_tokens insert failed:', ins.error.message)
-          return res.status(200).send('OK')
-        }
+        if (ins.error) throw new Error(`download_tokens insert failed: ${ins.error.message}`)
 
         const fmt = (o.format || 'jpg') === 'raw' ? 'raw' : 'jpg'
         const ext = fmt === 'raw' ? 'zip' : 'jpg'
@@ -348,34 +344,55 @@ export default async function handler(req, res) {
 
         const downloadUrl = buildDownloadUrl(token, req)
 
-        await sendDownloadEmail({
-          to: email,
-          orderId: o.id,
-          photoTitle: o.photo_id,
-          downloadUrl,
-          license: o.license,
-          format: o.format,
-        })
+        // Receipt email (once)
+        if (!o.invoice_email_sent_at) {
+          await sendReceiptEmail({
+            to: email,
+            orderId: o.id,
+            invoiceNo,
+            amount: o.amount,
+            currency: o.currency,
+            photoTitle: o.photo_id,
+            license: o.license,
+            format: o.format,
+            paymentId: payment_id || null,
+          })
 
-        await supabaseAdmin
-          .from('orders')
-          .update({ download_email_sent_at: new Date().toISOString() })
-          .eq('id', o.id)
+          await supabaseAdmin
+            .from('orders')
+            .update({ invoice_email_sent_at: new Date().toISOString() })
+            .eq('id', o.id)
+        }
 
-        console.log('✅ Download email sent (one-time):', order_id)
-      } else {
-        console.log('Order PAID (download email skipped):', order_id, {
-          hasEmail: !!email,
-          alreadySent: !!o.download_email_sent_at,
-        })
+        // Download email (once)
+        if (!o.download_email_sent_at) {
+          await sendDownloadEmail({
+            to: email,
+            orderId: o.id,
+            photoTitle: o.photo_id,
+            downloadUrl,
+            license: o.license,
+            format: o.format,
+          })
+
+          await supabaseAdmin
+            .from('orders')
+            .update({ download_email_sent_at: new Date().toISOString() })
+            .eq('id', o.id)
+        }
+
+        console.log('✅ Receipt + Download emails ensured:', o.id)
+      } catch (e) {
+        console.error('❌ Photo delivery email block failed:', o.id, e)
       }
 
       return res.status(200).send('OK')
     }
 
-    // =========================
-    // ❌ PAYMENT FAILED / CANCELED
-    // =========================
+    /* =========================================================
+       ❌ PAYMENT FAILED / CANCELED
+    ========================================================= */
+
     if (statusCodeNum < 0 && order.status !== 'FAILED') {
       await supabaseAdmin
         .from('orders')
@@ -388,7 +405,6 @@ export default async function handler(req, res) {
         .eq('id', order_id)
 
       console.log('Order FAILED:', order_id)
-      return res.status(200).send('OK')
     }
 
     return res.status(200).send('OK')

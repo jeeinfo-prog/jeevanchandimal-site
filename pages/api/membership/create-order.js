@@ -4,15 +4,41 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { payhereInitHash } from '../../../lib/payhere'
 
-// ✅ Prices (match your UI Pro plan)
-const PLAN_PRICES = {
-  monthly: { LKR: 18500, USD: 55 },
-  yearly: { LKR: 185000, USD: 550 }, // optional
-  lifetime: { LKR: 450000, USD: 1500 }, // optional
+/**
+ * Membership pricing:
+ * tier:  basic | pro | elite
+ * term:  monthly | yearly | lifetime
+ */
+const PRICES = {
+  basic: {
+    monthly: { LKR: 9500, USD: 29 },
+    yearly: { LKR: 95000, USD: 290 },
+    lifetime: { LKR: 250000, USD: 850 },
+  },
+  pro: {
+    monthly: { LKR: 18500, USD: 55 },
+    yearly: { LKR: 185000, USD: 550 },
+    lifetime: { LKR: 450000, USD: 1500 },
+  },
+  elite: {
+    monthly: { LKR: 28500, USD: 85 },
+    yearly: { LKR: 285000, USD: 850 },
+    lifetime: { LKR: 650000, USD: 2200 },
+  },
 }
 
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+}
+
+function cleanUpper(v, fallback) {
+  const s = String(v || '').trim().toUpperCase()
+  return s || fallback
+}
+
+function cleanLower(v, fallback) {
+  const s = String(v || '').trim().toLowerCase()
+  return s || fallback
 }
 
 export default async function handler(req, res) {
@@ -21,32 +47,53 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, plan, currency = 'LKR' } = req.body || {}
+    // ✅ accept both old + new request shapes
+    // old: { email, plan, currency } where plan was monthly/yearly/lifetime (pro assumed)
+    // new: { email, tier, term, currency }
+    const body = req.body || {}
 
-    const cleanEmail = String(email || '').trim().toLowerCase()
-    const cleanPlan = String(plan || '').trim().toLowerCase()
-    const cleanCurrency = String(currency || 'LKR').trim().toUpperCase()
+    const email = String(body.email || '').trim().toLowerCase()
+    const currency = cleanUpper(body.currency, 'LKR')
 
-    if (!cleanEmail || !cleanPlan) {
-      return res.status(400).json({ ok: false, error: 'Missing email or plan' })
+    // tier/term normalization
+    let tier = cleanLower(body.tier, '')
+    let term = cleanLower(body.term, '')
+
+    // Backward compatibility:
+    // if UI still sends { plan: 'monthly' }, treat it as term and default tier to 'pro'
+    if (!term && body.plan) term = cleanLower(body.plan, '')
+    if (!tier) tier = 'pro'
+    if (!term) term = 'monthly'
+
+    if (!email || !tier || !term) {
+      return res.status(400).json({ ok: false, error: 'Missing email, tier, or term' })
     }
-
-    if (!isValidEmail(cleanEmail)) {
+    if (!isValidEmail(email)) {
       return res.status(400).json({ ok: false, error: 'Invalid email' })
     }
 
-    if (!PLAN_PRICES[cleanPlan]) {
-      return res.status(400).json({ ok: false, error: 'Invalid plan' })
+    const validTiers = ['basic', 'pro', 'elite']
+    const validTerms = ['monthly', 'yearly', 'lifetime']
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({ ok: false, error: 'Invalid tier' })
     }
-
-    const amount = PLAN_PRICES[cleanPlan][cleanCurrency]
-    if (!amount) {
+    if (!validTerms.includes(term)) {
+      return res.status(400).json({ ok: false, error: 'Invalid term' })
+    }
+    if (!['LKR', 'USD'].includes(currency)) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
-    // ✅ Server env (NOT NEXT_PUBLIC_*)
+    const amount = PRICES?.[tier]?.[term]?.[currency]
+    if (!amount) {
+      return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+    }
+
+    // ✅ server env only
     const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
     const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
+    const siteUrl = String(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim()
+    const webhookBase = String(process.env.WEBHOOK_BASE_URL || siteUrl || '').trim().replace(/\/+$/, '')
 
     if (!merchantId || !merchantSecret) {
       return res.status(500).json({
@@ -57,19 +104,27 @@ export default async function handler(req, res) {
 
     const orderId = crypto.randomUUID()
 
-    // ✅ Orders table placeholders for NOT NULL photo-order fields
+    // ✅ IMPORTANT:
+    // Save tier + term into orders so notify.js can activate membership correctly.
+    // Keep your "placeholders" if your orders schema has NOT NULL photo fields.
     const payload = {
       id: orderId,
-      email: cleanEmail,
+      email,
 
       order_kind: 'membership',
-      membership_plan: cleanPlan,
 
-      currency: cleanCurrency,
+      // tier & term (notify.js will use these)
+      membership_tier: tier,
+      membership_term: term,
+
+      // keep for older code paths if you use it anywhere
+      membership_plan: tier,
+
+      currency,
       amount,
       status: 'PENDING',
 
-      // placeholders for NOT NULL fields in your orders schema
+      // placeholders for NOT NULL fields in orders schema
       photo_id: 'membership',
       license: 'membership',
       format: 'membership',
@@ -78,25 +133,31 @@ export default async function handler(req, res) {
 
     const { error } = await supabaseAdmin.from('orders').insert(payload)
     if (error) {
+      console.error('membership order insert error:', error)
       return res.status(500).json({ ok: false, error: error.message })
     }
 
-    // ✅ PayHere init hash (required to avoid "Unauthorized payment request")
     const hash = payhereInitHash({
       merchantId,
       merchantSecret,
       orderId,
       amount,
-      currency: cleanCurrency,
+      currency,
     })
 
+    // Return info required by your client to post to PayHere
     return res.status(200).json({
       ok: true,
       orderId,
       amount,
-      currency: cleanCurrency,
-      plan: cleanPlan,
+      currency,
+      tier,
+      term,
       hash,
+
+      // ✅ optional: send URLs so client can build PayHere fields consistently
+      // (if you build fields client-side)
+      notifyUrl: webhookBase ? `${webhookBase}/api/payhere/notify` : undefined,
     })
   } catch (e) {
     console.error('membership/create-order error:', e)
