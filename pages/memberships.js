@@ -1,13 +1,25 @@
+// pages/memberships.js
 import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
-export default function Membership() {
+export default function Memberships() {
+  const router = useRouter()
+
   const [email, setEmail] = React.useState('')
   const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
   const [error, setError] = React.useState('')
+
+  React.useEffect(() => {
+    // optional: prefill email from localStorage if available
+    if (typeof window === 'undefined') return
+    const saved = window.localStorage.getItem('user_email')
+    if (saved && !email) setEmail(saved)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function isValidEmail(v) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
@@ -40,12 +52,18 @@ export default function Membership() {
       }
 
       // 2) redirect to PayHere (POST form)
-      // NOTE: Update merchant_id + return/cancel/notify URLs to match your project
       const merchantId = process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+      const webhookBase = process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || siteUrl
+      const isSandbox =
+        String(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
+          .toLowerCase()
+          .trim() === 'true'
 
       if (!merchantId || !siteUrl) {
-        setError('Missing PayHere env variables (NEXT_PUBLIC_PAYHERE_MERCHANT_ID / NEXT_PUBLIC_SITE_URL).')
+        setError(
+          'Missing PayHere env variables (NEXT_PUBLIC_PAYHERE_MERCHANT_ID / NEXT_PUBLIC_SITE_URL).'
+        )
         setLoadingPlan('')
         return
       }
@@ -54,13 +72,20 @@ export default function Membership() {
       const amount = json.amount
       const currency = json.currency
 
-      const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(orderId)}`
-      const cancelUrl = `${siteUrl}/membership/cancel?order_id=${encodeURIComponent(orderId)}`
-      const notifyUrl = `${siteUrl}/api/payhere/notify`
+      // ✅ include email so success page can set localStorage + badge works
+      const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(
+        orderId
+      )}&email=${encodeURIComponent(cleanEmail)}`
+      const cancelUrl = `${siteUrl}/membership/cancel?order_id=${encodeURIComponent(
+        orderId
+      )}&email=${encodeURIComponent(cleanEmail)}`
+      const notifyUrl = `${webhookBase}/api/payhere/notify`
 
       const form = document.createElement('form')
       form.method = 'POST'
-      form.action = 'https://www.payhere.lk/pay/checkout' // (sandbox uses a different URL if you use sandbox)
+      form.action = isSandbox
+        ? 'https://sandbox.payhere.lk/pay/checkout'
+        : 'https://www.payhere.lk/pay/checkout'
 
       const fields = {
         merchant_id: merchantId,
@@ -93,7 +118,7 @@ export default function Membership() {
       document.body.appendChild(form)
       form.submit()
     } catch (e) {
-      setError(e.message || 'Something went wrong.')
+      setError(e?.message || 'Something went wrong.')
       setLoadingPlan('')
     }
   }
@@ -175,7 +200,9 @@ export default function Membership() {
                 {loadingPlan === 'monthly' ? 'Redirecting…' : 'Get Pro Access'}
               </button>
 
-              <p className="smallNote">You’ll be redirected to PayHere to complete payment.</p>
+              <p className="smallNote">
+                You’ll be redirected to PayHere to complete payment.
+              </p>
             </div>
 
             {/* ELITE */}
