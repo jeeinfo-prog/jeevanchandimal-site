@@ -27,10 +27,14 @@ function parseForm(body) {
 }
 
 function getBaseUrl(req) {
+  // Prefer a dedicated webhook base URL if you set it (more reliable for PayHere callbacks)
+  const webhook = (process.env.WEBHOOK_BASE_URL || '').trim()
+  if (webhook) return webhook.replace(/\/+$/, '')
+
   const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
   if (host) return `${proto}://${host}`
-  return process.env.NEXT_PUBLIC_SITE_URL || ''
+  return (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '')
 }
 
 function buildDownloadUrl(token, req) {
@@ -64,6 +68,18 @@ function genInvoiceNo(orderId) {
       .slice(-6)
       .toUpperCase() || crypto.randomUUID().slice(0, 6).toUpperCase()
   return `INV-${yyyy}${mm}${dd}-${tail}`
+}
+
+function addMonthsFrom(baseDate, n) {
+  const d = new Date(baseDate)
+  d.setMonth(d.getMonth() + n)
+  return d
+}
+
+function addYearsFrom(baseDate, n) {
+  const d = new Date(baseDate)
+  d.setFullYear(d.getFullYear() + n)
+  return d
 }
 
 export default async function handler(req, res) {
@@ -160,7 +176,7 @@ export default async function handler(req, res) {
       const email = (o.email || '').trim().toLowerCase()
 
       // =========================
-      // 🔓 MEMBERSHIP UNLOCK
+      // 🔓 MEMBERSHIP UNLOCK (NO DUPLICATES)
       // =========================
       if (o.order_kind === 'membership') {
         const plan = (o.membership_plan || '').trim().toLowerCase()
@@ -170,13 +186,24 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
+        // Read existing membership (if any)
+        const { data: existing } = await supabaseAdmin
+          .from('memberships')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle()
+
+        // Choose renewal base date:
+        // If existing end_date is in the future, extend from there; otherwise from now.
+        const now = new Date()
+        const existingEnd = existing?.end_date ? new Date(existing.end_date) : null
+        const base = existingEnd && existingEnd > now ? existingEnd : now
+
         let endDate = null
         if (plan === 'monthly') {
-          endDate = new Date()
-          endDate.setMonth(endDate.getMonth() + 1)
+          endDate = addMonthsFrom(base, 1)
         } else if (plan === 'yearly') {
-          endDate = new Date()
-          endDate.setFullYear(endDate.getFullYear() + 1)
+          endDate = addYearsFrom(base, 1)
         } else if (plan === 'lifetime') {
           endDate = null
         } else {
@@ -184,22 +211,37 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
-        const { error: memErr } = await supabaseAdmin.from('memberships').insert({
+        // ✅ UPSERT prevents duplicates
+        // IMPORTANT: memberships.email should be UNIQUE in Supabase for onConflict to work.
+        const payload = {
           email,
           plan,
           status: 'active',
           end_date: endDate ? endDate.toISOString() : null,
-        })
+          updated_at: new Date().toISOString(),
+        }
+
+        // Keep created_at if exists in your schema (harmless if column doesn't exist? -> Supabase will error)
+        // If your memberships table does NOT have created_at, remove this line.
+        if (!existing) payload.created_at = new Date().toISOString()
+
+        const { error: memErr } = await supabaseAdmin
+          .from('memberships')
+          .upsert(payload, { onConflict: 'email' })
 
         if (memErr) {
-          console.error('Membership insert failed:', memErr.message)
+          console.error('Membership upsert failed:', memErr.message)
         } else {
-          console.log('✅ Membership unlocked:', email, plan, 'order:', o.id)
+          console.log('✅ Membership active:', email, plan, 'end:', payload.end_date || 'LIFETIME')
         }
 
         // Membership orders do not send photo download links
         return res.status(200).send('OK')
       }
+
+      // =========================
+      // 🖼️ PHOTO ORDER DELIVERY
+      // =========================
 
       // Ensure delivery_object_key exists
       const objectKey = o.delivery_object_key || fallbackObjectKey(o)
@@ -304,9 +346,7 @@ export default async function handler(req, res) {
 
         await supabaseAdmin
           .from('orders')
-          .update({
-            download_email_sent_at: new Date().toISOString(),
-          })
+          .update({ download_email_sent_at: new Date().toISOString() })
           .eq('id', o.id)
 
         console.log('✅ Download email sent (one-time):', order_id)
