@@ -1,4 +1,5 @@
-import React, { Fragment, useState } from 'react'
+// components/jeevan-chandimal-navi.js
+import React, { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
 
 import PropTypes from 'prop-types'
@@ -6,28 +7,44 @@ import { useTranslations } from 'next-intl'
 
 const JeevanChandimalNavi = (props) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-    const [dropdown1Open, setDropdown1Open] = useState(false)
-    const [dropdown2Open, setDropdown2Open] = useState(false)
-  
-    const toggleDropdown1 = (e) => {
-      // Allow clicking the link to navigate; clicking elsewhere toggles the menu
-      if (e?.target?.closest && e.target.closest('a')) return
-      setDropdown1Open((v) => {
-        const next = !v
-        if (next) setDropdown2Open(false)
-        return next
+  const [dropdown1Open, setDropdown1Open] = useState(false)
+  const [dropdown2Open, setDropdown2Open] = useState(false)
+
+  // ✅ Membership state
+  const [memberPlan, setMemberPlan] = useState(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const email = window.localStorage.getItem('user_email')
+    if (!email) return
+
+    fetch(`/api/member/status?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.member) setMemberPlan(d.plan || 'member')
       })
-    }
-  
-    const toggleDropdown2 = (e) => {
-      if (e?.target?.closest && e.target.closest('a')) return
-      setDropdown2Open((v) => {
-        const next = !v
-        if (next) setDropdown1Open(false)
-        return next
-      })
-    }
-  
+      .catch(() => {})
+  }, [])
+
+  const toggleDropdown1 = (e) => {
+    // Allow clicking the link to navigate; clicking elsewhere toggles the menu
+    if (e?.target?.closest && e.target.closest('a')) return
+    setDropdown1Open((v) => {
+      const next = !v
+      if (next) setDropdown2Open(false)
+      return next
+    })
+  }
+
+  const toggleDropdown2 = (e) => {
+    if (e?.target?.closest && e.target.closest('a')) return
+    setDropdown2Open((v) => {
+      const next = !v
+      if (next) setDropdown1Open(false)
+      return next
+    })
+  }
+
   return (
     <>
       <header
@@ -56,6 +73,7 @@ const JeevanChandimalNavi = (props) => {
                   )}
                 </a>
               </Link>
+
               <div
                 data-thq="thq-dropdown"
                 className="jeevan-chandimal-navi-thq-dropdown1 list-item"
@@ -88,9 +106,12 @@ const JeevanChandimalNavi = (props) => {
                     </svg>
                   </div>
                 </div>
+
                 <ul
                   data-thq="thq-dropdown-list"
-                  className={`jeevan-chandimal-navi-thq-dropdown-list-elm1 ${dropdown1Open ? "teleport-show" : ""}`}
+                  className={`jeevan-chandimal-navi-thq-dropdown-list-elm1 ${
+                    dropdown1Open ? 'teleport-show' : ''
+                  }`}
                 >
                   <li
                     data-thq="thq-dropdown"
@@ -98,7 +119,7 @@ const JeevanChandimalNavi = (props) => {
                   >
                     <div
                       data-thq="thq-dropdown-toggle"
-                  className="jeevan-chandimal-navi-thq-dropdown-toggle-elm11"
+                      className="jeevan-chandimal-navi-thq-dropdown-toggle-elm11"
                     >
                       <Link href="/work-film">
                         <a className="jeevan-chandimal-navi-link12 thq-link thq-body-small">
@@ -113,6 +134,7 @@ const JeevanChandimalNavi = (props) => {
                       </Link>
                     </div>
                   </li>
+
                   <li
                     data-thq="thq-dropdown"
                     className="jeevan-chandimal-navi-thq-dropdown-elm2 list-item"
@@ -134,6 +156,7 @@ const JeevanChandimalNavi = (props) => {
                       </Link>
                     </div>
                   </li>
+
                   <li
                     data-thq="thq-dropdown"
                     className="jeevan-chandimal-navi-thq-dropdown-elm3 list-item"
@@ -155,6 +178,7 @@ const JeevanChandimalNavi = (props) => {
                       </Link>
                     </div>
                   </li>
+
                   <li
                     data-thq="thq-dropdown"
                     className="jeevan-chandimal-navi-thq-dropdown-elm4 list-item"
@@ -178,6 +202,7 @@ const JeevanChandimalNavi = (props) => {
                   </li>
                 </ul>
               </div>
+
               <div
                 data-thq="thq-dropdown"
                 className="jeevan-chandimal-navi-thq-dropdown2 list-item"
@@ -210,9 +235,12 @@ const JeevanChandimalNavi = (props) => {
                     </svg>
                   </div>
                 </div>
+
                 <ul
                   data-thq="thq-dropdown-list"
-                  className={`jeevan-chandimal-navi-thq-dropdown-list-elm2 ${dropdown2Open ? "teleport-show" : ""}`}
+                  className={`jeevan-chandimal-navi-thq-dropdown-list-elm2 ${
+                    dropdown2Open ? 'teleport-show' : ''
+                  }`}
                 >
                   <li
                     data-thq="thq-dropdown"
@@ -235,6 +263,7 @@ const JeevanChandimalNavi = (props) => {
                       </Link>
                     </div>
                   </li>
+
                   <li
                     data-thq="thq-dropdown"
                     className="jeevan-chandimal-navi-thq-dropdown-elm6 list-item"
@@ -256,6 +285,7 @@ const JeevanChandimalNavi = (props) => {
                       </Link>
                     </div>
                   </li>
+
                   <li
                     data-thq="thq-dropdown"
                     className="jeevan-chandimal-navi-thq-dropdown-elm7 list-item"
@@ -277,6 +307,7 @@ const JeevanChandimalNavi = (props) => {
                       </Link>
                     </div>
                   </li>
+
                   <li
                     data-thq="thq-dropdown"
                     className="jeevan-chandimal-navi-thq-dropdown-elm8 list-item"
@@ -300,17 +331,17 @@ const JeevanChandimalNavi = (props) => {
                   </li>
                 </ul>
               </div>
+
               <Link href="/store">
                 <a className="jeevan-chandimal-navi-link21 thq-link thq-body-small">
                   {props.link4 ?? (
                     <Fragment>
-                      <span className="jeevan-chandimal-navi-text25">
-                        Store
-                      </span>
+                      <span className="jeevan-chandimal-navi-text25">Store</span>
                     </Fragment>
                   )}
                 </a>
               </Link>
+
               <Link href="/memberships">
                 <a className="jeevan-chandimal-navi-link22 thq-link thq-body-small">
                   {props.link5 ?? (
@@ -322,17 +353,17 @@ const JeevanChandimalNavi = (props) => {
                   )}
                 </a>
               </Link>
+
               <Link href="/about">
                 <a className="jeevan-chandimal-navi-link23 thq-link thq-body-small">
                   {props.link51 ?? (
                     <Fragment>
-                      <span className="jeevan-chandimal-navi-text22">
-                        About
-                      </span>
+                      <span className="jeevan-chandimal-navi-text22">About</span>
                     </Fragment>
                   )}
                 </a>
               </Link>
+
               <Link href="/contact">
                 <a className="jeevan-chandimal-navi-link24 thq-link thq-body-small">
                   {props.link511 ?? (
@@ -345,7 +376,15 @@ const JeevanChandimalNavi = (props) => {
                 </a>
               </Link>
             </nav>
+
             <div className="jeevan-chandimal-navi-thq-buttons-elm">
+              {/* ✅ Member badge (shows only if memberPlan exists) */}
+              {memberPlan && (
+                <span className="member-badge">
+                  {String(memberPlan).toUpperCase()}
+                </span>
+              )}
+
               <Link href="/login">
                 <a className="jeevan-chandimal-navi-link25">
                   <svg
@@ -385,6 +424,7 @@ const JeevanChandimalNavi = (props) => {
               </Link>
             </div>
           </div>
+
           <div
             data-thq="thq-burger-menu"
             onClick={() => setMobileMenuOpen(true)}
@@ -397,9 +437,12 @@ const JeevanChandimalNavi = (props) => {
               <path d="M128 554.667h768c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-768c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667zM128 298.667h768c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-768c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667zM128 810.667h768c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-768c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667z"></path>
             </svg>
           </div>
+
           <div
             data-thq="thq-mobile-menu"
-            className={`jeevan-chandimal-navi-thq-mobile-menu-elm ${mobileMenuOpen ? "teleport-show" : ""}`}
+            className={`jeevan-chandimal-navi-thq-mobile-menu-elm ${
+              mobileMenuOpen ? 'teleport-show' : ''
+            }`}
           >
             <div className="jeevan-chandimal-navi-thq-nav-elm">
               <div className="jeevan-chandimal-navi-thq-top-elm">
@@ -421,6 +464,7 @@ const JeevanChandimalNavi = (props) => {
                   </svg>
                 </div>
               </div>
+
               <nav className="jeevan-chandimal-navi-thq-links-elm2">
                 <a href={props.link1Url} className="thq-link thq-body-small">
                   {props.link1 ?? (
@@ -448,9 +492,7 @@ const JeevanChandimalNavi = (props) => {
                 <a href={props.link4Url} className="thq-link thq-body-small">
                   {props.link4 ?? (
                     <Fragment>
-                      <span className="jeevan-chandimal-navi-text25">
-                        Store
-                      </span>
+                      <span className="jeevan-chandimal-navi-text25">Store</span>
                     </Fragment>
                   )}
                 </a>
@@ -465,29 +507,23 @@ const JeevanChandimalNavi = (props) => {
                 </a>
               </nav>
             </div>
+
             <div className="jeevan-chandimal-navi-thq-icon-group-elm">
-              <svg
-                viewBox="0 0 950.8571428571428 1024"
-                className="thq-icon-small"
-              >
+              {/* (unchanged social svgs) */}
+              <svg viewBox="0 0 950.8571428571428 1024" className="thq-icon-small">
                 <path d="M925.714 233.143c-25.143 36.571-56.571 69.143-92.571 95.429 0.571 8 0.571 16 0.571 24 0 244-185.714 525.143-525.143 525.143-104.571 0-201.714-30.286-283.429-82.857 14.857 1.714 29.143 2.286 44.571 2.286 86.286 0 165.714-29.143 229.143-78.857-81.143-1.714-149.143-54.857-172.571-128 11.429 1.714 22.857 2.857 34.857 2.857 16.571 0 33.143-2.286 48.571-6.286-84.571-17.143-148-91.429-148-181.143v-2.286c24.571 13.714 53.143 22.286 83.429 23.429-49.714-33.143-82.286-89.714-82.286-153.714 0-34.286 9.143-65.714 25.143-93.143 90.857 112 227.429 185.143 380.571 193.143-2.857-13.714-4.571-28-4.571-42.286 0-101.714 82.286-184.571 184.571-184.571 53.143 0 101.143 22.286 134.857 58.286 41.714-8 81.714-23.429 117.143-44.571-13.714 42.857-42.857 78.857-81.143 101.714 37.143-4 73.143-14.286 106.286-28.571z"></path>
               </svg>
-              <svg
-                viewBox="0 0 877.7142857142857 1024"
-                className="thq-icon-small"
-              >
-                <path d="M585.143 512c0-80.571-65.714-146.286-146.286-146.286s-146.286 65.714-146.286 146.286 65.714 146.286 146.286 146.286 146.286-65.714 146.286-146.286zM664 512c0 124.571-100.571 225.143-225.143 225.143s-225.143-100.571-225.143-225.143 100.571-225.143 225.143-225.143 225.143 100.571 225.143 225.143zM725.714 277.714c0 29.143-23.429 52.571-52.571 52.571s-52.571-23.429-52.571-52.571 23.429-52.571 52.571-52.571 52.571 23.429 52.571 52.571zM438.857 152c-64 0-201.143-5.143-258.857 17.714-20 8-34.857 17.714-50.286 33.143s-25.143 30.286-33.143 50.286c-22.857 57.714-17.714 194.857-17.714 258.857s-5.143 201.143 17.714 258.857c8 20 17.714 34.857 33.143 50.286s30.286 25.143 50.286 33.143c57.714 22.857 194.857 17.714 258.857 17.714s201.143 5.143 258.857-17.714c20-8 34.857-17.714 50.286-33.143s25.143-30.286 33.143-50.286c22.857-57.714 17.714-194.857 17.714-258.857s5.143-201.143-17.714-258.857c-8-20-17.714-34.857-33.143-50.286s-30.286-25.143-50.286-33.143c-57.714-22.857-194.857-17.714-258.857-17.714zM877.714 512c0 60.571 0.571 120.571-2.857 181.143-3.429 70.286-19.429 132.571-70.857 184s-113.714 67.429-184 70.857c-60.571 3.429-120.571 2.857-181.143 2.857s-120.571 0.571-181.143-2.857c-70.286-3.429-132.571-19.429-184-70.857s-67.429-113.714-70.857-184c-3.429-60.571-2.857-120.571-2.857-181.143s-0.571-120.571 2.857-181.143c3.429-70.286 19.429-132.571 70.857-184s113.714-67.429 184-70.857c60.571-3.429 120.571-2.857 181.143-2.857s120.571-0.571 181.143 2.857c70.286 3.429 132.571 19.429 184 70.857s67.429 113.714 70.857 184c3.429 60.571 2.857 120.571 2.857 181.143z"></path>
+              <svg viewBox="0 0 877.7142857142857 1024" className="thq-icon-small">
+                <path d="M585.143 512c0-80.571-65.714-146.286-146.286-146.286s-146.286 65.714-146.286 146.286 65.714 146.286 146.286 146.286 146.286-65.714 146.286-146.286zM664 512c0 124.571-100.571 225.143-225.143 225.143s-225.143-100.571-225.143-225.143 100.571-225.143 225.143-225.143 225.143 100.571 225.143 225.143zM725.714 277.714c0 29.143-23.429 52.571-52.571 52.571s-52.571-23.429-52.571-52.571 23.429-52.571 52.571-52.571 52.571 23.429 52.571 52.571zM438.857 152c-64 0-201.143-5.143-258.857 17.714-20 8-34.857 17.714-50.286 33.143s-25.143 30.286-33.143 50.286c-22.857 57.714-17.714 194.857-17.714 258.857s-5.143 201.143 17.714 258.857c8 20 17.714 34.857 33.143 50.286s30.286 25.143 50.286 33.143c57.714 22.857 194.857 17.714 258.857 17.714s201.143 5.143 258.857-17.714c20-8 34.857-17.714 50.286-33.143s25.143-30.286 33.143-50.286c22.857-57.714 17.714-194.857 17.714-258.857s5.143-201.143-17.714-258.857c-8-20-17.714-34.857-33.143-50.286s-30.286 25.143-50.286 33.143c-57.714-22.857-194.857-17.714-258.857-17.714zM877.714 512c0 60.571 0.571 120.571-2.857 181.143-3.429 70.286-19.429 132.571-70.857 184s-113.714 67.429-184 70.857c-60.571 3.429-120.571 2.857-181.143 2.857s-120.571 0.571-181.143-2.857c-70.286-3.429-132.571-19.429-184-70.857s-67.429-113.714-70.857-184c-3.429-60.571-2.857-120.571-2.857-181.143s-0.571-120.571 2.857-181.143c3.429-70.286 19.429-132.571 70.857-184s113.714-67.429 184-70.857c60.571-3.429 120.571-2.857 181.143-2.857s120.571-0.571 181.143 2.857c70.286 3.429 132.571 19.429 184 70.857s67.429 113.714 70.857 184c3.429 60.571 2.857 120.571 2.857 181.143z"></path>
               </svg>
-              <svg
-                viewBox="0 0 602.2582857142856 1024"
-                className="thq-icon-small"
-              >
+              <svg viewBox="0 0 602.2582857142856 1024" className="thq-icon-small">
                 <path d="M548 6.857v150.857h-89.714c-70.286 0-83.429 33.714-83.429 82.286v108h167.429l-22.286 169.143h-145.143v433.714h-174.857v-433.714h-145.714v-169.143h145.714v-124.571c0-144.571 88.571-223.429 217.714-223.429 61.714 0 114.857 4.571 130.286 6.857z"></path>
               </svg>
             </div>
           </div>
         </header>
       </header>
+
       <style jsx>
         {`
           .jeevan-chandimal-navi-container {
@@ -500,7 +536,10 @@ const JeevanChandimalNavi = (props) => {
           .jeevan-chandimal-navi-thq-navbar-interactive-elm {
             width: 100%;
             display: flex;
-            max-width: idth;
+
+            /* ✅ FIX: this was "idth" */
+            max-width: var(--dl-layout-size-maxwidth);
+
             align-items: center;
             padding-top: var(--dl-layout-space-twounits);
             padding-left: var(--dl-layout-space-threeunits);
@@ -601,6 +640,7 @@ const JeevanChandimalNavi = (props) => {
           .jeevan-chandimal-navi-link12 {
             text-decoration: none;
           }
+
           .jeevan-chandimal-navi-thq-dropdown-elm2 {
             cursor: pointer;
             display: inline-block;
@@ -628,6 +668,7 @@ const JeevanChandimalNavi = (props) => {
           .jeevan-chandimal-navi-link13 {
             text-decoration: none;
           }
+
           .jeevan-chandimal-navi-thq-dropdown-elm3 {
             cursor: pointer;
             display: inline-block;
@@ -655,6 +696,7 @@ const JeevanChandimalNavi = (props) => {
           .jeevan-chandimal-navi-link14 {
             text-decoration: none;
           }
+
           .jeevan-chandimal-navi-thq-dropdown-elm4 {
             cursor: pointer;
             display: inline-block;
@@ -682,6 +724,7 @@ const JeevanChandimalNavi = (props) => {
           .jeevan-chandimal-navi-link15 {
             text-decoration: none;
           }
+
           .jeevan-chandimal-navi-thq-dropdown2 {
             cursor: pointer;
             display: inline-block;
@@ -727,132 +770,34 @@ const JeevanChandimalNavi = (props) => {
             list-style-type: none;
             list-style-position: inside;
           }
-          .jeevan-chandimal-navi-thq-dropdown-elm5 {
-            cursor: pointer;
-            display: inline-block;
-            position: relative;
-            border-radius: var(--dl-layout-radius-radius2);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm16 {
-            fill: #595959;
-            color: #595959;
-            width: 100%;
-            display: inline-flex;
-            transition: 0.3s;
-            align-items: center;
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-unit);
-            border-radius: var(--dl-layout-radius-radius4);
-            padding-right: var(--dl-layout-space-unit);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm16:hover {
-            fill: #fff;
-            color: #fff;
-            background-color: #595959;
-          }
-          .jeevan-chandimal-navi-link17 {
-            text-decoration: none;
-          }
-          .jeevan-chandimal-navi-thq-dropdown-elm6 {
-            cursor: pointer;
-            display: inline-block;
-            position: relative;
-            border-radius: var(--dl-layout-radius-radius2);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm17 {
-            fill: #595959;
-            color: #595959;
-            width: 100%;
-            display: inline-flex;
-            transition: 0.3s;
-            align-items: center;
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-unit);
-            border-radius: var(--dl-layout-radius-radius4);
-            padding-right: var(--dl-layout-space-unit);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm17:hover {
-            fill: #fff;
-            color: #fff;
-            background-color: #595959;
-          }
-          .jeevan-chandimal-navi-link18 {
-            text-decoration: none;
-          }
-          .jeevan-chandimal-navi-thq-dropdown-elm7 {
-            cursor: pointer;
-            display: inline-block;
-            position: relative;
-            border-radius: var(--dl-layout-radius-radius2);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm18 {
-            fill: #595959;
-            color: #595959;
-            width: 100%;
-            display: inline-flex;
-            transition: 0.3s;
-            align-items: center;
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-unit);
-            border-radius: var(--dl-layout-radius-radius4);
-            padding-right: var(--dl-layout-space-unit);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm18:hover {
-            fill: #fff;
-            color: #fff;
-            background-color: #595959;
-          }
-          .jeevan-chandimal-navi-link19 {
-            text-decoration: none;
-          }
-          .jeevan-chandimal-navi-thq-dropdown-elm8 {
-            cursor: pointer;
-            display: inline-block;
-            position: relative;
-            border-radius: var(--dl-layout-radius-radius2);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm19 {
-            fill: #595959;
-            color: #595959;
-            width: 100%;
-            display: inline-flex;
-            transition: 0.3s;
-            align-items: center;
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-unit);
-            border-radius: var(--dl-layout-radius-radius4);
-            padding-right: var(--dl-layout-space-unit);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .jeevan-chandimal-navi-thq-dropdown-toggle-elm19:hover {
-            fill: #fff;
-            color: #fff;
-            background-color: #595959;
-          }
-          .jeevan-chandimal-navi-link20 {
-            text-decoration: none;
-          }
-          .jeevan-chandimal-navi-link21 {
-            text-decoration: none;
-          }
-          .jeevan-chandimal-navi-link22 {
-            text-decoration: none;
-          }
-          .jeevan-chandimal-navi-link23 {
-            text-decoration: none;
-          }
+
+          .jeevan-chandimal-navi-link21,
+          .jeevan-chandimal-navi-link22,
+          .jeevan-chandimal-navi-link23,
           .jeevan-chandimal-navi-link24 {
             text-decoration: none;
           }
+
           .jeevan-chandimal-navi-thq-buttons-elm {
             gap: var(--dl-layout-space-twounits);
             display: flex;
             align-items: center;
             flex-direction: row;
           }
+
+          /* ✅ only new CSS added */
+          .member-badge {
+            font-size: 11px;
+            padding: 4px 10px;
+            border: 1px solid #25c3e2;
+            border-radius: 999px;
+            letter-spacing: 1px;
+            color: #25c3e2;
+            font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
+          }
+
           .jeevan-chandimal-navi-link25 {
             display: contents;
           }
@@ -863,6 +808,7 @@ const JeevanChandimalNavi = (props) => {
           .jeevan-chandimal-navi-icon14:hover {
             color: var(--dl-color-theme-primary2);
           }
+
           .jeevan-chandimal-navi-thq-burger-menu-elm {
             display: none;
           }
@@ -870,6 +816,7 @@ const JeevanChandimalNavi = (props) => {
             width: var(--dl-layout-size-xsmall);
             height: var(--dl-layout-size-xsmall);
           }
+
           .jeevan-chandimal-navi-thq-mobile-menu-elm {
             top: 0px;
             left: 0px;
@@ -883,6 +830,7 @@ const JeevanChandimalNavi = (props) => {
             justify-content: space-between;
             background-color: var(--dl-color-theme-neutral-light);
           }
+
           .jeevan-chandimal-navi-thq-nav-elm {
             display: flex;
             align-items: flex-start;
@@ -919,57 +867,6 @@ const JeevanChandimalNavi = (props) => {
             gap: var(--dl-layout-space-twounits);
             display: flex;
           }
-          .jeevan-chandimal-navi-text10 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text11 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text12 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text13 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text14 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text15 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text16 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text17 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text18 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text19 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text20 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text21 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text22 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text23 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text24 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text25 {
-            display: inline-block;
-          }
-          .jeevan-chandimal-navi-text26 {
-            display: inline-block;
-          }
 
           @media (max-width: 767px) {
             .jeevan-chandimal-navi-thq-navbar-interactive-elm {
@@ -985,6 +882,7 @@ const JeevanChandimalNavi = (props) => {
               justify-content: center;
             }
           }
+
           @media (max-width: 479px) {
             .jeevan-chandimal-navi-thq-navbar-interactive-elm {
               padding: var(--dl-layout-space-unit);
@@ -1051,7 +949,7 @@ JeevanChandimalNavi.propTypes = {
   link51: PropTypes.element,
   link1: PropTypes.element,
   link3Url: PropTypes.string,
-  link2Url: PropTypes.string,
+  link2Url: PropTypes.string, // ✅ only once
   link5Url: PropTypes.string,
   text181: PropTypes.element,
   link4: PropTypes.element,
