@@ -2,11 +2,13 @@
 
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
+import { payhereInitHash } from '../../../lib/payhere'
 
+// ✅ Prices (match your UI Pro plan)
 const PLAN_PRICES = {
-  monthly: { LKR: 5000, USD: 15 },
-  yearly: { LKR: 50000, USD: 150 },
-  lifetime: { LKR: 120000, USD: 400 },
+  monthly: { LKR: 18500, USD: 55 },
+  yearly: { LKR: 185000, USD: 550 }, // optional
+  lifetime: { LKR: 450000, USD: 1500 }, // optional
 }
 
 function isValidEmail(v) {
@@ -42,10 +44,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
+    // ✅ Server env (NOT NEXT_PUBLIC_*)
+    const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
+    const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
+
+    if (!merchantId || !merchantSecret) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Missing PAYHERE_MERCHANT_ID or PAYHERE_MERCHANT_SECRET (server env).',
+      })
+    }
+
     const orderId = crypto.randomUUID()
 
-    // ✅ IMPORTANT: your orders table has NOT NULL columns (license/format/etc).
-    // For membership orders we store harmless placeholder strings.
+    // ✅ Orders table placeholders for NOT NULL photo-order fields
     const payload = {
       id: orderId,
       email: cleanEmail,
@@ -57,7 +69,7 @@ export default async function handler(req, res) {
       amount,
       status: 'PENDING',
 
-      // placeholders for NOT NULL photo-order fields
+      // placeholders for NOT NULL fields in your orders schema
       photo_id: 'membership',
       license: 'membership',
       format: 'membership',
@@ -65,10 +77,18 @@ export default async function handler(req, res) {
     }
 
     const { error } = await supabaseAdmin.from('orders').insert(payload)
-
     if (error) {
       return res.status(500).json({ ok: false, error: error.message })
     }
+
+    // ✅ PayHere init hash (required to avoid "Unauthorized payment request")
+    const hash = payhereInitHash({
+      merchantId,
+      merchantSecret,
+      orderId,
+      amount,
+      currency: cleanCurrency,
+    })
 
     return res.status(200).json({
       ok: true,
@@ -76,8 +96,10 @@ export default async function handler(req, res) {
       amount,
       currency: cleanCurrency,
       plan: cleanPlan,
+      hash,
     })
   } catch (e) {
+    console.error('membership/create-order error:', e)
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
 }

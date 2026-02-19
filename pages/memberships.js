@@ -5,6 +5,15 @@ import Link from 'next/link'
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+}
+
+function formatPayhereAmount(n) {
+  const x = Number(n || 0)
+  return x.toFixed(2)
+}
+
 export default function Memberships() {
   const [email, setEmail] = React.useState('')
   const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
@@ -16,10 +25,6 @@ export default function Memberships() {
     if (saved && !email) setEmail(saved)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  function isValidEmail(v) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
-  }
 
   async function startMembershipCheckout(plan) {
     try {
@@ -38,7 +43,7 @@ export default function Memberships() {
 
       setLoadingPlan(plan)
 
-      // 1) create order in DB
+      // 1) create order in DB (server returns hash)
       const res = await fetch('/api/membership/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,20 +57,19 @@ export default function Memberships() {
         return
       }
 
-      // 2) redirect to PayHere (POST form)
-      const merchantId = process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID || ''
+      const merchantId = String(process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID || '').trim()
       const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ||
+        String(process.env.NEXT_PUBLIC_SITE_URL || '').trim() ||
         (typeof window !== 'undefined' ? window.location.origin : '')
 
-      // For PayHere notify: in prod, this should be your deployed domain (NOT localhost).
-      // You can set NEXT_PUBLIC_WEBHOOK_BASE_URL in Vercel to force it.
-      const webhookBase = process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || siteUrl
+      // In prod this should be your deployed domain (NOT localhost)
+      const webhookBase = String(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || '').trim() || siteUrl
 
-      const isSandbox =
-        String(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
-          .toLowerCase()
-          .trim() === 'true'
+      // ✅ safe default: sandbox true if env missing
+      const sandboxFlag = String(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX ?? 'true')
+        .toLowerCase()
+        .trim()
+      const isSandbox = sandboxFlag === 'true'
 
       if (!merchantId || !siteUrl) {
         setError(
@@ -78,6 +82,13 @@ export default function Memberships() {
       const orderId = json.orderId
       const amount = json.amount
       const currency = json.currency
+      const hash = json.hash
+
+      if (!orderId || !amount || !currency || !hash) {
+        setError('Missing order details from server (orderId/amount/currency/hash).')
+        setLoadingPlan('')
+        return
+      }
 
       // ✅ include email so success page can set localStorage + badge works
       const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(
@@ -103,15 +114,23 @@ export default function Memberships() {
         order_id: orderId,
         items: `Membership (${plan})`,
         currency,
-        amount: String(amount),
+        amount: formatPayhereAmount(amount),
 
+        // ✅ REQUIRED (fixes Unauthorized payment request)
+        hash,
+
+        // Buyer details (PayHere can be picky if empty)
         first_name: cleanEmail.split('@')[0] || 'Member',
         last_name: 'User',
         email: cleanEmail,
-        phone: '',
-        address: '',
-        city: '',
+        phone: '0000000000',
+        address: 'N/A',
+        city: 'Colombo',
         country: 'Sri Lanka',
+
+        // Helpful for webhook routing
+        custom_1: 'membership',
+        custom_2: String(plan || ''),
       }
 
       Object.entries(fields).forEach(([name, value]) => {
@@ -148,8 +167,8 @@ export default function Memberships() {
           <div className="membership-hero">
             <h1 className="thq-heading-1">Membership</h1>
             <p className="thq-body-large">
-              Unlimited access to a curated archive of cinematic photography.
-              Built for filmmakers, agencies, brands, and publishers.
+              Unlimited access to a curated archive of cinematic photography. Built for filmmakers,
+              agencies, brands, and publishers.
             </p>
 
             {/* Email input */}
@@ -212,9 +231,7 @@ export default function Memberships() {
                 {loadingPlan === 'monthly' ? 'Redirecting…' : 'Get Pro Access'}
               </button>
 
-              <p className="smallNote">
-                You’ll be redirected to PayHere to complete payment.
-              </p>
+              <p className="smallNote">You’ll be redirected to PayHere to complete payment.</p>
             </div>
 
             {/* ELITE */}

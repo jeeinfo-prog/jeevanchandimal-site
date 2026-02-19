@@ -27,13 +27,13 @@ function parseForm(body) {
 }
 
 function getBaseUrl(req) {
-  // Prefer a dedicated webhook base URL if you set it (more reliable for PayHere callbacks)
   const webhook = (process.env.WEBHOOK_BASE_URL || '').trim()
   if (webhook) return webhook.replace(/\/+$/, '')
 
   const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
   if (host) return `${proto}://${host}`
+
   return (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '')
 }
 
@@ -42,21 +42,18 @@ function buildDownloadUrl(token, req) {
   return `${base}/api/download?token=${encodeURIComponent(token)}`
 }
 
-// If delivery_object_key wasn't set at checkout, infer a safe default
 function fallbackObjectKey(order) {
   if (!order?.photo_id) return null
   if ((order.format || 'jpg') === 'raw') return `photos/original/${order.photo_id}.zip`
   return `photos/original/${order.photo_id}.jpg`
 }
 
-// ✅ Per-license download limits
 function limitForLicense(license) {
-  if (license === 'commercial') return 0 // unlimited
+  if (license === 'commercial') return 0
   if (license === 'editorial') return 5
-  return 3 // personal
+  return 3
 }
 
-// ✅ Invoice number generator
 function genInvoiceNo(orderId) {
   const d = new Date()
   const yyyy = d.getUTCFullYear()
@@ -82,6 +79,12 @@ function addYearsFrom(baseDate, n) {
   return d
 }
 
+function normalizePayhereAmount(v) {
+  // Must match PayHere signature formatting: "1234.00" (no commas)
+  const n = Number(v || 0)
+  return n.toFixed(2)
+}
+
 export default async function handler(req, res) {
   // PayHere expects 200 always
   if (req.method !== 'POST') return res.status(200).send('OK')
@@ -99,6 +102,8 @@ export default async function handler(req, res) {
       merchant_id,
       payhere_amount,
       payhere_currency,
+      custom_1,
+      custom_2,
     } = data
 
     if (!order_id) return res.status(200).send('OK')
@@ -116,33 +121,36 @@ export default async function handler(req, res) {
     }
 
     // 2) Verify signature (CRITICAL)
-    const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET
-    if (merchantSecret) {
-      const ok = payhereVerifyMd5Sig({
-        merchantSecret,
-        merchant_id,
-        order_id,
-        payhere_amount,
-        payhere_currency,
-        status_code,
-        md5sig,
-      })
+    const merchantSecret = (process.env.PAYHERE_MERCHANT_SECRET || '').trim()
+    if (!merchantSecret) {
+      console.error('Missing PAYHERE_MERCHANT_SECRET in env; cannot verify signature.')
+      return res.status(200).send('OK')
+    }
 
-      if (!ok) {
-        console.error('MD5 signature mismatch for order:', order_id)
+    const ok = payhereVerifyMd5Sig({
+      merchantSecret,
+      merchant_id,
+      order_id,
+      payhere_amount: normalizePayhereAmount(payhere_amount),
+      payhere_currency,
+      status_code,
+      md5sig,
+    })
 
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            status: 'INVALID_SIG',
-            payhere_payment_id: payment_id || null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('id', order_id)
+    if (!ok) {
+      console.error('MD5 signature mismatch for order:', order_id)
 
-        return res.status(200).send('OK')
-      }
+      await supabaseAdmin
+        .from('orders')
+        .update({
+          status: 'INVALID_SIG',
+          payhere_payment_id: payment_id || null,
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
+        })
+        .eq('id', order_id)
+
+      return res.status(200).send('OK')
     }
 
     const statusCodeNum = Number(status_code)
@@ -151,8 +159,10 @@ export default async function handler(req, res) {
     // ✅ PAYMENT SUCCESS
     // =========================
     if (statusCodeNum === 2) {
-      // Mark PAID if not already
-      if (order.status !== 'PAID') {
+      // Idempotency: if already PAID, don't run membership extend again
+      const wasPaidAlready = order.status === 'PAID'
+
+      if (!wasPaidAlready) {
         await supabaseAdmin
           .from('orders')
           .update({
@@ -166,65 +176,78 @@ export default async function handler(req, res) {
       }
 
       // Re-fetch latest order
-      const { data: fresh, error: freshErr } = await supabaseAdmin
+      const { data: fresh } = await supabaseAdmin
         .from('orders')
         .select('*')
         .eq('id', order_id)
         .single()
 
-      const o = !freshErr && fresh ? fresh : order
+      const o = fresh || order
       const email = (o.email || '').trim().toLowerCase()
 
-      // =========================
-      // 🔓 MEMBERSHIP UNLOCK (NO DUPLICATES)
-      // =========================
-      if (o.order_kind === 'membership') {
-        const plan = (o.membership_plan || '').trim().toLowerCase()
+      const isMembership =
+        String(o.order_kind || '').toLowerCase() === 'membership' ||
+        String(custom_1 || '').toLowerCase() === 'membership'
 
+      // =========================
+      // 🔓 MEMBERSHIP UNLOCK (schema: start_date/end_date/created_at)
+      // =========================
+      if (isMembership) {
         if (!email) {
           console.error('Membership order has no email:', o.id)
           return res.status(200).send('OK')
         }
 
+        // Prevent double-extension on webhook retries
+        if (wasPaidAlready) {
+          console.log('Membership webhook repeat ignored (already PAID):', o.id)
+          return res.status(200).send('OK')
+        }
+
+        const plan =
+          String(o.membership_plan || '').trim().toLowerCase() ||
+          String(custom_2 || '').trim().toLowerCase()
+
+        if (!['monthly', 'yearly', 'lifetime'].includes(plan)) {
+          console.error('Invalid membership plan:', plan, 'order:', o.id)
+          return res.status(200).send('OK')
+        }
+
+        const now = new Date()
+
         // Read existing membership (if any)
-        const { data: existing } = await supabaseAdmin
+        const { data: existing, error: exErr } = await supabaseAdmin
           .from('memberships')
-          .select('*')
+          .select('email, plan, status, start_date, end_date, created_at')
           .eq('email', email)
           .maybeSingle()
 
-        // Choose renewal base date:
-        // If existing end_date is in the future, extend from there; otherwise from now.
-        const now = new Date()
+        if (exErr) console.error('Membership read failed:', exErr.message)
+
+        // Extend from existing end_date if in the future, else from now
         const existingEnd = existing?.end_date ? new Date(existing.end_date) : null
         const base = existingEnd && existingEnd > now ? existingEnd : now
 
         let endDate = null
-        if (plan === 'monthly') {
-          endDate = addMonthsFrom(base, 1)
-        } else if (plan === 'yearly') {
-          endDate = addYearsFrom(base, 1)
-        } else if (plan === 'lifetime') {
-          endDate = null
-        } else {
-          console.error('Invalid membership_plan:', plan, 'order:', o.id)
-          return res.status(200).send('OK')
-        }
+        if (plan === 'monthly') endDate = addMonthsFrom(base, 1)
+        if (plan === 'yearly') endDate = addYearsFrom(base, 1)
+        if (plan === 'lifetime') endDate = null
 
-        // ✅ UPSERT prevents duplicates
-        // IMPORTANT: memberships.email should be UNIQUE in Supabase for onConflict to work.
+        // start_date: keep existing if present, otherwise now
+        const startDate = existing?.start_date ? new Date(existing.start_date) : now
+
         const payload = {
           email,
           plan,
           status: 'active',
+          start_date: startDate.toISOString(),
           end_date: endDate ? endDate.toISOString() : null,
-          updated_at: new Date().toISOString(),
         }
 
-        // Keep created_at if exists in your schema (harmless if column doesn't exist? -> Supabase will error)
-        // If your memberships table does NOT have created_at, remove this line.
-        if (!existing) payload.created_at = new Date().toISOString()
+        // Only set created_at when inserting brand-new row
+        if (!existing) payload.created_at = now.toISOString()
 
+        // ✅ UPSERT (requires memberships.email UNIQUE)
         const { error: memErr } = await supabaseAdmin
           .from('memberships')
           .upsert(payload, { onConflict: 'email' })
@@ -235,7 +258,6 @@ export default async function handler(req, res) {
           console.log('✅ Membership active:', email, plan, 'end:', payload.end_date || 'LIFETIME')
         }
 
-        // Membership orders do not send photo download links
         return res.status(200).send('OK')
       }
 
@@ -243,34 +265,28 @@ export default async function handler(req, res) {
       // 🖼️ PHOTO ORDER DELIVERY
       // =========================
 
-      // Ensure delivery_object_key exists
       const objectKey = o.delivery_object_key || fallbackObjectKey(o)
       if (!objectKey) {
         console.error('Missing delivery_object_key for order:', order_id)
         return res.status(200).send('OK')
       }
 
-      // ✅ Ensure per-license download_limit is set (or corrected)
       const desiredLimit = limitForLicense(o.license)
       if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
         await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
       }
 
-      // Always persist inferred key (even if no email)
       if (!o.delivery_object_key) {
         await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
       }
 
-      // ✅ INVOICE: generate + store invoice_no (once)
       let invoiceNo = o.invoice_no
       if (!invoiceNo) {
         invoiceNo = genInvoiceNo(o.id)
         await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', o.id)
       }
 
-      // =========================
       // ✅ INVOICE EMAIL (ONCE)
-      // =========================
       if (email && !o.invoice_email_sent_at) {
         try {
           await sendReceiptEmail({
@@ -296,15 +312,12 @@ export default async function handler(req, res) {
         }
       }
 
-      // =========================
       // ✅ DOWNLOAD EMAIL (ONCE)
-      // =========================
       if (email && !o.download_email_sent_at) {
         const jti = crypto.randomUUID()
         const expiresMinutes = 60
         const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
 
-        // Store one-time token record
         const ins = await supabaseAdmin.from('download_tokens').insert({
           jti,
           order_id: o.id,
@@ -381,6 +394,6 @@ export default async function handler(req, res) {
     return res.status(200).send('OK')
   } catch (err) {
     console.error('PayHere notify error:', err)
-    return res.status(200).send('OK') // Always 200 for PayHere
+    return res.status(200).send('OK')
   }
 }
