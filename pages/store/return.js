@@ -9,30 +9,37 @@ import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-foot
 
 const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED'])
 const FAIL_STATUSES = new Set(['FAILED', 'CANCELED', 'CANCELLED', 'EXPIRED'])
+const TERMINAL_STATUSES = new Set([...PAID_STATUSES, ...FAIL_STATUSES])
+
+function readOrderId(q) {
+  const v = q?.order_id
+  if (typeof v === 'string') return v.trim()
+  if (Array.isArray(v) && typeof v[0] === 'string') return v[0].trim()
+  return ''
+}
 
 export default function StoreReturn() {
   const router = useRouter()
-  const orderId =
-    typeof router.query.order_id === 'string' ? router.query.order_id.trim() : ''
+  const orderId = readOrderId(router.query)
 
   const [status, setStatus] = React.useState('PENDING')
   const [msg, setMsg] = React.useState('')
+  const [notFound, setNotFound] = React.useState(false)
 
   React.useEffect(() => {
-    if (!router.isReady || !orderId) return
+    if (!router.isReady) return
+    if (!orderId) return
 
     let cancelled = false
     let tries = 0
-    const maxTries = 30 // 60s (30 * 2s)
+    const maxTries = 30 // ~60s
+    let timer = null
 
     async function poll() {
       tries += 1
 
       try {
-        // ✅ Poll a stable status endpoint
-        const url = `/api/orders/status?order_id=${encodeURIComponent(
-          orderId
-        )}&t=${Date.now()}`
+        const url = `/api/orders/status?order_id=${encodeURIComponent(orderId)}&t=${Date.now()}`
 
         const r = await fetch(url, {
           method: 'GET',
@@ -40,24 +47,36 @@ export default function StoreReturn() {
         })
 
         const data = await r.json().catch(() => ({}))
-
         if (cancelled) return
 
         if (!r.ok || !data?.ok) {
-          setMsg(data?.error ? String(data.error) : `Order check failed (${r.status}).`)
+          const err = data?.error ? String(data.error) : `Order check failed (${r.status}).`
+
+          // Helpful UX for the most common case
+          if (r.status === 404 || /not found/i.test(err)) {
+            setNotFound(true)
+            setMsg('Order not found. Please use the latest return link from PayHere, or check your email receipt.')
+            setStatus('PENDING')
+            return
+          }
+
+          setMsg(err)
         } else {
+          setNotFound(false)
+
           const s = String(data?.order?.status || data?.status || 'PENDING').toUpperCase()
           setStatus(s)
 
-          // ✅ Auto redirect when paid
           if (PAID_STATUSES.has(s)) {
+            // Redirect to download page
             router.replace(`/store/download?order_id=${encodeURIComponent(orderId)}`)
             return
           }
 
-          // Stop polling on failure states
           if (FAIL_STATUSES.has(s)) {
-            setMsg('Payment not completed. If you were charged, please contact support with your Order ID.')
+            setMsg(
+              'Payment not completed. If you were charged, please contact support with your Order ID.'
+            )
             return
           }
         }
@@ -65,18 +84,26 @@ export default function StoreReturn() {
         if (!cancelled) setMsg(e?.message || 'Error checking payment.')
       }
 
-      if (!cancelled && tries < maxTries) {
-        setTimeout(poll, 2000)
-      } else if (!cancelled) {
+      if (cancelled) return
+      if (TERMINAL_STATUSES.has(status)) return
+
+      if (tries < maxTries) {
+        timer = setTimeout(poll, 2000)
+      } else {
         setMsg('Still waiting for confirmation. You can refresh this page.')
       }
     }
 
     poll()
+
     return () => {
       cancelled = true
+      if (timer) clearTimeout(timer)
     }
-  }, [router.isReady, orderId, router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, orderId])
+
+  const downloadHref = orderId ? `/store/download?order_id=${encodeURIComponent(orderId)}` : '#'
 
   return (
     <>
@@ -101,8 +128,25 @@ export default function StoreReturn() {
 
           {!orderId ? (
             <p className="p2">
-              Missing order_id. Please return from PayHere again or contact support.
+              Missing <span className="mono">order_id</span>. Please return from PayHere again or contact support.
             </p>
+          ) : null}
+
+          {/* Manual fallback button (rare, but helpful) */}
+          {orderId && PAID_STATUSES.has(status) ? (
+            <div style={{ marginTop: 14 }}>
+              <a className="btn" href={downloadHref}>
+                Download
+              </a>
+            </div>
+          ) : null}
+
+          {orderId && notFound ? (
+            <div style={{ marginTop: 14 }}>
+              <a className="btn" href="/store">
+                Back to Store
+              </a>
+            </div>
           ) : null}
         </div>
       </main>
@@ -147,6 +191,14 @@ export default function StoreReturn() {
           border-radius: 999px;
           font-size: 12px;
           border: 1px solid rgba(245, 244, 244, 0.18);
+        }
+        .btn {
+          display: inline-block;
+          padding: 10px 14px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          text-decoration: none;
+          color: inherit;
         }
       `}</style>
     </>
