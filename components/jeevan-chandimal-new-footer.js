@@ -481,11 +481,12 @@ JeevanChandimalNewFooter.defaultProps = {
   logoSrc: '/JC/jc%20logo%20web%2004-1500h.png',
   logoAlt: 'Company Logo',
   rootClassName: '',
-  facebookUrl: '',
-  instagramUrl: '',
-  xUrl: '',
-  linkedinUrl: '',
-  youtubeUrl: '',
+
+  facebookUrl: 'https://web.facebook.com/jeevan.chandimal.2025',
+  instagramUrl: 'https://www.instagram.com/jeeinfo/?hl=en',
+  xUrl: '', // (leave empty until you have X/Twitter)
+  linkedinUrl: 'https://www.linkedin.com/in/jeevanchandimal/',
+  youtubeUrl: 'https://www.youtube.com/@jeevanchandimal8145',
 }
 
 JeevanChandimalNewFooter.propTypes = {
