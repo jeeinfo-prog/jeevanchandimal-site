@@ -1,5 +1,7 @@
 // pages/admin/upload.js
-// ✅ Corrected: commit auth header, folder picker attrs, dark UI, auto description + smart tags
+// ✅ Final: commit auth header, folder picker attrs, dark UI,
+// auto description + smart tags, queue with progress + concurrency,
+// compatible with FINAL create-upload.js + commit.js
 
 import React from 'react'
 import Head from 'next/head'
@@ -31,7 +33,7 @@ function stripExt(name) {
 }
 function toTitleCase(s) {
   return String(s)
-    .replace(/__.+$/, '') // remove __JC000100 etc.
+    .replace(/__.+$/, '')
     .replace(/[_\-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -44,9 +46,6 @@ function autoTitleFromFile(file) {
   return toTitleCase(base)
 }
 
-// ✅ normalize tags from input (comma-separated in UI)
-// - spaces -> hyphen
-// - fixes sri-anka -> sri-lanka
 function normalizeTags(input) {
   const arr = Array.isArray(input)
     ? input
@@ -59,7 +58,7 @@ function normalizeTags(input) {
 
   for (const raw of arr) {
     let t = String(raw || '').trim().toLowerCase()
-    t = t.replace(/\s+/g, '-') // spaces -> hyphen
+    t = t.replace(/\s+/g, '-')
     if (!t) continue
     if (t === 'sri-anka') t = 'sri-lanka'
     if (seen.has(t)) continue
@@ -70,14 +69,42 @@ function normalizeTags(input) {
   return out
 }
 
-/**
- * ✅ Smart tags: folder + filename → tags + helpers
- * - folder "history/xxx.jpg" adds "history"
- * - "landscape-..." adds nature + travel
- * - "wildlife-..." adds nature
- * - fixes sri anka / sri-anka → sri-lanka
- * - creates a few combined tags like beira-lake
- */
+function smartEnhanceTags(tagsArr) {
+  const tags = Array.isArray(tagsArr) ? tagsArr.slice() : []
+  const set = new Set(tags)
+  const add = (t) => {
+    const v = String(t || '').trim().toLowerCase()
+    if (!v) return
+    if (set.has(v)) return
+    set.add(v)
+    tags.push(v)
+  }
+
+  if (set.has('landscape')) {
+    add('nature')
+    add('travel')
+  }
+  if (set.has('wildlife')) add('nature')
+
+  const combinePairs = [
+    ['beira', 'lake'],
+    ['lion', 'rock'],
+    ['train', 'bridge'],
+    ['tea', 'plantation'],
+  ]
+  for (const [a, b] of combinePairs) {
+    if (set.has(a) && set.has(b)) add(`${a}-${b}`)
+  }
+
+  if (set.has('sri') && set.has('lanka')) {
+    const cleaned = tags.filter((t) => t !== 'sri' && t !== 'lanka')
+    cleaned.unshift('sri-lanka')
+    return cleaned
+  }
+
+  return tags
+}
+
 function smartTagsFromFile(file, relativePath = '') {
   const base0 = stripExt(file?.name || '')
     .replace(/__.+$/, '')
@@ -143,7 +170,6 @@ function smartTagsFromFile(file, relativePath = '') {
     if (tags.length >= 20) break
   }
 
-  // join sri+lanka -> sri-lanka
   if (seen.has('sri') && seen.has('lanka')) {
     const filtered = tags.filter((t) => t !== 'sri' && t !== 'lanka')
     filtered.unshift('sri-lanka')
@@ -153,44 +179,6 @@ function smartTagsFromFile(file, relativePath = '') {
   return smartEnhanceTags(tags)
 }
 
-function smartEnhanceTags(tagsArr) {
-  const tags = Array.isArray(tagsArr) ? tagsArr.slice() : []
-  const set = new Set(tags)
-  const add = (t) => {
-    const v = String(t || '').trim().toLowerCase()
-    if (!v) return
-    if (set.has(v)) return
-    set.add(v)
-    tags.push(v)
-  }
-
-  if (set.has('landscape')) {
-    add('nature')
-    add('travel')
-  }
-  if (set.has('wildlife')) add('nature')
-
-  const combinePairs = [
-    ['beira', 'lake'],
-    ['lion', 'rock'],
-    ['train', 'bridge'],
-    ['tea', 'plantation'],
-  ]
-  for (const [a, b] of combinePairs) {
-    if (set.has(a) && set.has(b)) add(`${a}-${b}`)
-  }
-
-  // normalize sri-lanka again if user had both
-  if (set.has('sri') && set.has('lanka')) {
-    const cleaned = tags.filter((t) => t !== 'sri' && t !== 'lanka')
-    cleaned.unshift('sri-lanka')
-    return cleaned
-  }
-
-  return tags
-}
-
-// ✅ Auto description from filename + folder
 function autoDescriptionFromFile(file, relativePath = '') {
   const base = stripExt(file?.name || '')
     .replace(/__.+$/, '')
@@ -224,10 +212,17 @@ function autoDescriptionFromFile(file, relativePath = '') {
   return `Photograph of ${placeTitle}.`
 }
 
-// ✅ collections quick tags
-const COLLECTION_TAGS = ['nature', 'wildlife', 'landscape', 'travel', 'culture', 'history', 'lifestyle', 'fineart']
+const COLLECTION_TAGS = [
+  'nature',
+  'wildlife',
+  'landscape',
+  'travel',
+  'culture',
+  'history',
+  'lifestyle',
+  'fineart',
+]
 
-// ---------------- component ----------------
 export default function AdminUploadPage() {
   // Auth
   const [email, setEmail] = React.useState('')
@@ -295,7 +290,15 @@ export default function AdminUploadPage() {
     setQueue((q) =>
       q.map((it) =>
         it.status === 'ERROR'
-          ? { ...it, status: 'QUEUED', error: '', errorType: '', progress: 0, speedBps: 0, etaSec: 0 }
+          ? {
+              ...it,
+              status: 'QUEUED',
+              error: '',
+              errorType: '',
+              progress: 0,
+              speedBps: 0,
+              etaSec: 0,
+            }
           : it
       )
     )
@@ -368,7 +371,12 @@ export default function AdminUploadPage() {
         setIsAdmin(false)
         return
       }
-      const { data, error } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+
       if (error) {
         log(`❌ Profile check failed: ${error.message}`)
         setIsAdmin(false)
@@ -528,7 +536,6 @@ export default function AdminUploadPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.length, autoStart, paused, busy, stopAfterCurrent, session?.access_token, isAdmin])
 
-  // ✅ commit section included here (search for "commitResp")
   async function uploadSingleItem(item, token) {
     const file = item.file
 
@@ -546,7 +553,7 @@ export default function AdminUploadPage() {
     log(`Preparing upload: ${file.name}`)
 
     // 1) create-upload
-    let photoId, uploadUrl
+    let photoId, uploadUrl, objectKey
     try {
       const createResp = await fetch('/api/admin/photos/create-upload', {
         method: 'POST',
@@ -568,6 +575,8 @@ export default function AdminUploadPage() {
 
       photoId = json.photoId
       uploadUrl = json.uploadUrl
+      objectKey = json.objectKey
+
       log(`✅ create-upload OK — photoId=${photoId}`)
       setItem(item.id, { photoId })
     } catch (e) {
@@ -580,13 +589,13 @@ export default function AdminUploadPage() {
       await putToR2WithProgress(item.id, uploadUrl, file, ({ pct, loaded, total, speedBps, etaSec }) => {
         setItem(item.id, { progress: pct, loaded, total, speedBps, etaSec })
       })
-      log('✅ R2 PUT OK')
+      log(`✅ R2 PUT OK (${objectKey || 'key'})`)
     } catch (e) {
       if (String(e?.message || '').toLowerCase().includes('aborted')) throw e
       throw Object.assign(new Error(e.message), { _type: e?._type || 'R2' })
     }
 
-    // 3) ✅ COMMIT (AUTH HEADER INCLUDED)
+    // 3) COMMIT (publish)
     try {
       setItem(item.id, { status: 'COMMITTING', speedBps: 0, etaSec: 0 })
       log(`Commit: ${file.name}`)
@@ -598,12 +607,11 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(commitResp)
-      if (!commitResp.ok)
-        throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
+      if (!commitResp.ok) throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
 
       log('✅ Done: commit complete')
-      log(`thumbUrl: ${json?.thumbUrl || json?.thumb_url || '(none)'}`)
-      log(`previewUrl: ${json?.previewUrl || json?.preview_url || '(none)'}`)
+      log(`thumbUrl: ${json?.thumb_url || json?.thumbUrl || json?.photo?.thumb_url || '(none)'}`)
+      log(`previewUrl: ${json?.preview_url || json?.previewUrl || json?.photo?.preview_url || '(none)'}`)
     } catch (e) {
       throw Object.assign(new Error(e.message), { _type: e?._type || 'COMMIT' })
     }
@@ -869,7 +877,6 @@ export default function AdminUploadPage() {
 
                   <label style={{ display: 'inline-block' }}>
                     <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>Select folder</div>
-                    {/* ✅ corrected folder picker attrs */}
                     <input
                       type="file"
                       multiple
@@ -1063,25 +1070,20 @@ export default function AdminUploadPage() {
         </div>
       </main>
 
-      {/* ✅ dark theme + readable inputs/buttons/icons */}
       <style jsx global>{`
         .adminUpload {
           color: #e8edf7;
         }
-
         .adminUpload a {
           color: #e8edf7;
         }
-
         .adminUpload .card {
           border: 1px solid rgba(245, 244, 244, 0.16);
           background: rgba(255, 255, 255, 0.02);
         }
-
         .adminUpload .dropZone {
           border: 1px dashed rgba(245, 244, 244, 0.25);
         }
-
         .adminUpload input,
         .adminUpload textarea,
         .adminUpload select {
@@ -1091,12 +1093,10 @@ export default function AdminUploadPage() {
           border-radius: 10px;
           outline: none;
         }
-
         .adminUpload input::placeholder,
         .adminUpload textarea::placeholder {
           color: rgba(232, 237, 247, 0.55);
         }
-
         .adminUpload button {
           color: #e8edf7 !important;
           border: 1px solid rgba(245, 244, 244, 0.18);
@@ -1104,24 +1104,15 @@ export default function AdminUploadPage() {
           border-radius: 10px;
           cursor: pointer;
         }
-
         .adminUpload button:hover {
           background: rgba(255, 255, 255, 0.08);
         }
-
         .adminUpload .pill {
           padding: 4px 10px;
           font-size: 12px;
           border-radius: 999px;
           background: transparent;
         }
-
-        .adminUpload svg,
-        .adminUpload svg * {
-          stroke: currentColor;
-          fill: currentColor;
-        }
-
         .spinner {
           display: inline-block;
           width: 10px;

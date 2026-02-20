@@ -1,5 +1,4 @@
 // pages/api/admin/photos/create-upload.js
-
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { getPresignedPutUrl } from '../../../../lib/r2'
 
@@ -42,7 +41,6 @@ function isUnknownColumn(err) {
   return err?.code === '42703' || msg.includes('does not exist') || msg.includes('schema cache')
 }
 
-// ✅ best-effort: try to store original_filename if the column exists; otherwise ignore
 async function trySaveOriginalFilename(photoId, safeName) {
   if (!photoId || !safeName) return
   const up = await supabaseAdmin
@@ -69,7 +67,7 @@ export default async function handler(req, res) {
 
     const safeName = sanitizeFilename(filename)
 
-    // Optional: preserve folder structure from folder picker (webkitdirectory)
+    // Folder support (webkitdirectory)
     const relativePath = body.relativePath ? sanitizePath(body.relativePath) : ''
     const pathPart = relativePath && relativePath.includes('/') ? relativePath : safeName
 
@@ -82,6 +80,11 @@ export default async function handler(req, res) {
           .map((t) => t.trim().toLowerCase())
       : null
 
+    // Optional licensing fields (best-effort: only update if columns exist)
+    const licensePreset = typeof body.licensePreset === 'string' ? body.licensePreset.trim() : ''
+    const priceLkr = body.priceLkr != null ? Number(body.priceLkr) : null
+    const priceUsd = body.priceUsd != null ? Number(body.priceUsd) : null
+
     // 1) Insert draft photo row
     let photoId = null
     {
@@ -89,6 +92,9 @@ export default async function handler(req, res) {
       if (title) insertPayload.title = title
       if (description) insertPayload.description = description
       if (tags) insertPayload.tags = tags
+      if (licensePreset) insertPayload.license_preset = licensePreset
+      if (Number.isFinite(priceLkr)) insertPayload.price_lkr = priceLkr
+      if (Number.isFinite(priceUsd)) insertPayload.price_usd = priceUsd
 
       const first = await supabaseAdmin.from('photos').insert([insertPayload]).select('id').single()
 
@@ -98,7 +104,7 @@ export default async function handler(req, res) {
           return res.status(500).json({ ok: false, error: first.error.message })
         }
 
-        // fallback insert with only columns that are guaranteed
+        // fallback insert with only guaranteed columns
         const fallback = await supabaseAdmin
           .from('photos')
           .insert([{ status: 'draft' }])
@@ -112,11 +118,14 @@ export default async function handler(req, res) {
 
         photoId = fallback.data.id
 
-        // best-effort update title/tags/description if possible
+        // best-effort update metadata
         const updatePayload = {}
         if (title) updatePayload.title = title
         if (description) updatePayload.description = description
         if (tags) updatePayload.tags = tags
+        if (licensePreset) updatePayload.license_preset = licensePreset
+        if (Number.isFinite(priceLkr)) updatePayload.price_lkr = priceLkr
+        if (Number.isFinite(priceUsd)) updatePayload.price_usd = priceUsd
 
         if (Object.keys(updatePayload).length) {
           const up = await supabaseAdmin.from('photos').update(updatePayload).eq('id', photoId)
@@ -129,17 +138,21 @@ export default async function handler(req, res) {
       }
     }
 
-    // ✅ best-effort store filename in DB if column exists (won’t break if it doesn’t)
+    // best-effort store filename
     await trySaveOriginalFilename(photoId, safeName)
 
-    // 2) Object key (folder structure kept under the photoId namespace)
+    // 2) Object key (folder structure kept under photoId namespace)
     const objectKey = `photos/original/${photoId}/${pathPart}`
 
-    // 3) Update photos row with original_jpg_key (exists in your schema)
+    // 3) Update photos row with original_jpg_key (required by resize/thumb/preview generation)
     {
-      const up = await supabaseAdmin.from('photos').update({ original_jpg_key: objectKey }).eq('id', photoId)
+      const up = await supabaseAdmin
+        .from('photos')
+        .update({ original_jpg_key: objectKey })
+        .eq('id', photoId)
+
       if (up.error) {
-        console.error('photos update error:', up.error)
+        console.error('photos update original_jpg_key error:', up.error)
         return res.status(500).json({ ok: false, error: up.error.message })
       }
     }
@@ -147,13 +160,13 @@ export default async function handler(req, res) {
     // 4) Presigned PUT URL
     const uploadUrl = await getPresignedPutUrl({ key: objectKey })
 
-    // 5) Asset row
+    // 5) Asset row (best-effort; if table exists)
     {
       const asset = await supabaseAdmin
         .from('photo_assets')
         .insert([{ photo_id: photoId, original_key: objectKey }])
 
-      if (asset.error) {
+      if (asset.error && !isUnknownColumn(asset.error)) {
         console.error('photo_assets insert error:', asset.error)
         return res.status(500).json({ ok: false, error: asset.error.message })
       }
