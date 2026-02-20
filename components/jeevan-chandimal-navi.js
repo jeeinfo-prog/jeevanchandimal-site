@@ -14,15 +14,10 @@ const JeevanChandimalNavi = (props) => {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // 1) Try email from localStorage
     const email = window.localStorage.getItem('user_email')
-
-    // 2) Fallback: allow storing plan directly (set on membership success page)
     const cachedPlan = window.localStorage.getItem('member_plan')
-    if (cachedPlan && !memberPlan) {
-      setMemberPlan(cachedPlan)
-    }
 
+    if (cachedPlan && !memberPlan) setMemberPlan(cachedPlan)
     if (!email) return
 
     fetch(`/api/member/status?email=${encodeURIComponent(email)}`)
@@ -31,10 +26,8 @@ const JeevanChandimalNavi = (props) => {
         if (d?.member) {
           const plan = d?.plan || cachedPlan || 'member'
           setMemberPlan(plan)
-          // cache it so badge still shows next time
           window.localStorage.setItem('member_plan', plan)
         } else {
-          // if not member, ensure it's cleared
           window.localStorage.removeItem('member_plan')
           setMemberPlan(null)
         }
@@ -90,7 +83,7 @@ const JeevanChandimalNavi = (props) => {
                 </a>
               </Link>
 
-              {/* ✅ WORK DROPDOWN */}
+              {/* WORK DROPDOWN (hover opens on desktop + click fallback) */}
               <div data-thq="thq-dropdown" className="jeevan-chandimal-navi-thq-dropdown1 list-item">
                 <div
                   data-thq="thq-dropdown-toggle"
@@ -109,7 +102,10 @@ const JeevanChandimalNavi = (props) => {
                     </a>
                   </Link>
 
-                  <div data-thq="thq-dropdown-arrow" className="jeevan-chandimal-navi-thq-dropdown-arrow-elm1">
+                  <div
+                    data-thq="thq-dropdown-arrow"
+                    className={`jeevan-chandimal-navi-thq-dropdown-arrow-elm1 ${dropdown1Open ? 'open' : ''}`}
+                  >
                     <svg viewBox="0 0 1024 1024" className="jeevan-chandimal-navi-icon10" aria-hidden="true">
                       <path d="M426 726v-428l214 214z"></path>
                     </svg>
@@ -178,7 +174,7 @@ const JeevanChandimalNavi = (props) => {
                 </ul>
               </div>
 
-              {/* SERVICES DROPDOWN */}
+              {/* SERVICES DROPDOWN (hover opens on desktop + click fallback) */}
               <div data-thq="thq-dropdown" className="jeevan-chandimal-navi-thq-dropdown2 list-item">
                 <div
                   data-thq="thq-dropdown-toggle"
@@ -197,7 +193,10 @@ const JeevanChandimalNavi = (props) => {
                     </a>
                   </Link>
 
-                  <div data-thq="thq-dropdown-arrow" className="jeevan-chandimal-navi-thq-dropdown-arrow-elm2">
+                  <div
+                    data-thq="thq-dropdown-arrow"
+                    className={`jeevan-chandimal-navi-thq-dropdown-arrow-elm2 ${dropdown2Open ? 'open' : ''}`}
+                  >
                     <svg viewBox="0 0 1024 1024" className="jeevan-chandimal-navi-icon12" aria-hidden="true">
                       <path d="M426 726v-428l214 214z"></path>
                     </svg>
@@ -326,13 +325,7 @@ const JeevanChandimalNavi = (props) => {
                         <animate dur="0.4s" fill="freeze" values="28;0" attributeName="stroke-dashoffset" />
                       </path>
                       <path d="M12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7C16 9.20914 14.2091 11 12 11Z">
-                        <animate
-                          dur="0.4s"
-                          fill="freeze"
-                          begin="0.5s"
-                          values="28;0"
-                          attributeName="stroke-dashoffset"
-                        />
+                        <animate dur="0.4s" fill="freeze" begin="0.5s" values="28;0" attributeName="stroke-dashoffset" />
                       </path>
                     </g>
                   </svg>
@@ -375,56 +368,21 @@ const JeevanChandimalNavi = (props) => {
                   </a>
                 </Link>
 
-                <div
-                  data-thq="thq-close-menu"
-                  onClick={closeMobileMenu}
-                  className="jeevan-chandimal-navi-thq-close-menu-elm"
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Close menu"
-                >
+                <button type="button" onClick={closeMobileMenu} className="closeBtn" aria-label="Close menu">
                   <svg viewBox="0 0 1024 1024" className="jeevan-chandimal-navi-icon22" aria-hidden="true">
                     <path d="M810 274l-238 238 238 238-60 60-238-238-238 238-60-60 238-238-238-238 60-60 238 238 238-238z" />
                   </svg>
-                </div>
+                </button>
               </div>
 
               <nav className="jeevan-chandimal-navi-thq-links-elm2">
-                <Link href="/">
-                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
-                    Home
-                  </a>
-                </Link>
-                <Link href="/work">
-                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
-                    Work
-                  </a>
-                </Link>
-                <Link href="/services">
-                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
-                    Services
-                  </a>
-                </Link>
-                <Link href="/store">
-                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
-                    Store
-                  </a>
-                </Link>
-                <Link href="/memberships">
-                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
-                    Membership
-                  </a>
-                </Link>
-                <Link href="/about">
-                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
-                    About
-                  </a>
-                </Link>
-                <Link href="/contact">
-                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
-                    Contact
-                  </a>
-                </Link>
+                <Link href="/"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Home</a></Link>
+                <Link href="/work"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Work</a></Link>
+                <Link href="/services"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Services</a></Link>
+                <Link href="/store"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Store</a></Link>
+                <Link href="/memberships"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Membership</a></Link>
+                <Link href="/about"><a onClick={closeMobileMenu} className="thq-link thq-body-small">About</a></Link>
+                <Link href="/contact"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Contact</a></Link>
               </nav>
 
               {memberPlan && <div className="member-badge mobileBadge">{String(memberPlan).toUpperCase()}</div>}
@@ -514,16 +472,17 @@ const JeevanChandimalNavi = (props) => {
         .jeevan-chandimal-navi-thq-dropdown-arrow-elm2 {
           display: inline-flex;
           align-items: center;
-          transition: 0.3s;
+          transition: 0.2s;
         }
 
         .jeevan-chandimal-navi-icon10,
         .jeevan-chandimal-navi-icon12 {
           width: 18px;
           height: 18px;
-          transition: 0.3s;
+          transition: transform 0.2s;
         }
 
+        /* Dropdown list base */
         .jeevan-chandimal-navi-thq-dropdown-list-elm1,
         .jeevan-chandimal-navi-thq-dropdown-list-elm2 {
           left: 0%;
@@ -544,8 +503,29 @@ const JeevanChandimalNavi = (props) => {
           background: var(--dl-color-theme-neutral-light);
         }
 
+        /* Teleport show */
         :global(.teleport-show) {
           display: flex !important;
+        }
+
+        /* ✅ Desktop hover dropdown + arrow rotation (only desktop) */
+        @media (min-width: 768px) {
+          .jeevan-chandimal-navi-thq-dropdown1:hover .jeevan-chandimal-navi-thq-dropdown-list-elm1 {
+            display: flex;
+          }
+          .jeevan-chandimal-navi-thq-dropdown2:hover .jeevan-chandimal-navi-thq-dropdown-list-elm2 {
+            display: flex;
+          }
+
+          .jeevan-chandimal-navi-thq-dropdown1:hover .jeevan-chandimal-navi-icon10,
+          .jeevan-chandimal-navi-thq-dropdown-arrow-elm1.open .jeevan-chandimal-navi-icon10 {
+            transform: rotate(90deg);
+          }
+
+          .jeevan-chandimal-navi-thq-dropdown2:hover .jeevan-chandimal-navi-icon12,
+          .jeevan-chandimal-navi-thq-dropdown-arrow-elm2.open .jeevan-chandimal-navi-icon12 {
+            transform: rotate(90deg);
+          }
         }
 
         .jeevan-chandimal-navi-thq-dropdown-toggle-elm11,
@@ -626,7 +606,7 @@ const JeevanChandimalNavi = (props) => {
           height: var(--dl-layout-size-xsmall);
         }
 
-        /* ✅ FIXED OVERLAY MENU (important for click navigation) */
+        /* ✅ FIXED OVERLAY MENU (and correct layout) */
         .jeevan-chandimal-navi-thq-mobile-menu-elm {
           inset: 0;
           width: 100%;
@@ -636,8 +616,54 @@ const JeevanChandimalNavi = (props) => {
           z-index: 9999;
           position: fixed;
           flex-direction: column;
-          justify-content: space-between;
+          justify-content: flex-start; /* ✅ not bottom */
           background-color: var(--dl-color-theme-neutral-light);
+          overflow: auto; /* ✅ safe on small phones */
+        }
+
+        .jeevan-chandimal-navi-thq-nav-elm {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          min-height: 100%;
+        }
+
+        .jeevan-chandimal-navi-thq-top-elm {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .closeBtn {
+          border: 0;
+          padding: 8px;
+          background: transparent;
+          color: inherit;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .jeevan-chandimal-navi-icon22 {
+          width: 30px;
+          height: 30px;
+        }
+
+        /* ✅ mobile links vertical */
+        .jeevan-chandimal-navi-thq-links-elm2 {
+          margin-top: 22px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .jeevan-chandimal-navi-thq-links-elm2 :global(a) {
+          display: block;
+          padding: 10px 0;
+          font-size: 18px;
+          text-decoration: none;
         }
 
         @media (max-width: 767px) {
