@@ -43,6 +43,12 @@ const JeevanChandimalNavi = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false)
+    setDropdown1Open(false)
+    setDropdown2Open(false)
+  }
+
   const toggleDropdown1 = (e) => {
     // Allow clicking the link to navigate; clicking elsewhere toggles the menu
     if (e?.target?.closest && e.target.closest('a')) return
@@ -68,11 +74,7 @@ const JeevanChandimalNavi = (props) => {
         <header data-thq="thq-navbar" className="jeevan-chandimal-navi-thq-navbar-interactive-elm">
           <Link href="/">
             <a className="logoWrap" aria-label="Home">
-              <img
-                alt={props.logoAlt}
-                src={props.logoSrc}
-                className="jeevan-chandimal-navi-thq-image1-elm"
-              />
+              <img alt={props.logoAlt} src={props.logoSrc} className="jeevan-chandimal-navi-thq-image1-elm" />
             </a>
           </Link>
 
@@ -88,7 +90,7 @@ const JeevanChandimalNavi = (props) => {
                 </a>
               </Link>
 
-              {/* ✅ WORK DROPDOWN (now styled same as Services) */}
+              {/* ✅ WORK DROPDOWN */}
               <div data-thq="thq-dropdown" className="jeevan-chandimal-navi-thq-dropdown1 list-item">
                 <div
                   data-thq="thq-dropdown-toggle"
@@ -307,9 +309,7 @@ const JeevanChandimalNavi = (props) => {
 
             {/* RIGHT SIDE */}
             <div className="jeevan-chandimal-navi-thq-buttons-elm">
-              {memberPlan && (
-                <span className="member-badge">{String(memberPlan).toUpperCase()}</span>
-              )}
+              {memberPlan && <span className="member-badge">{String(memberPlan).toUpperCase()}</span>}
 
               <Link href="/login">
                 <a className="jeevan-chandimal-navi-link25" aria-label="Login">
@@ -344,7 +344,11 @@ const JeevanChandimalNavi = (props) => {
           {/* BURGER */}
           <div
             data-thq="thq-burger-menu"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => {
+              setMobileMenuOpen(true)
+              setDropdown1Open(false)
+              setDropdown2Open(false)
+            }}
             className="jeevan-chandimal-navi-thq-burger-menu-elm"
             role="button"
             tabIndex={0}
@@ -359,18 +363,21 @@ const JeevanChandimalNavi = (props) => {
           <div
             data-thq="thq-mobile-menu"
             className={`jeevan-chandimal-navi-thq-mobile-menu-elm ${mobileMenuOpen ? 'teleport-show' : ''}`}
+            onClick={closeMobileMenu}
+            role="dialog"
+            aria-modal="true"
           >
-            <div className="jeevan-chandimal-navi-thq-nav-elm">
+            <div className="jeevan-chandimal-navi-thq-nav-elm" onClick={(e) => e.stopPropagation()}>
               <div className="jeevan-chandimal-navi-thq-top-elm">
                 <Link href="/">
-                  <a className="logoWrap" aria-label="Home">
+                  <a className="logoWrap" aria-label="Home" onClick={closeMobileMenu}>
                     <img alt={props.logoAlt} src={props.logoSrc} className="jeevan-chandimal-navi-thq-logo-elm" />
                   </a>
                 </Link>
 
                 <div
                   data-thq="thq-close-menu"
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={closeMobileMenu}
                   className="jeevan-chandimal-navi-thq-close-menu-elm"
                   role="button"
                   tabIndex={0}
@@ -383,13 +390,41 @@ const JeevanChandimalNavi = (props) => {
               </div>
 
               <nav className="jeevan-chandimal-navi-thq-links-elm2">
-                <Link href="/"><a className="thq-link thq-body-small">Home</a></Link>
-                <Link href="/work"><a className="thq-link thq-body-small">Work</a></Link>
-                <Link href="/services"><a className="thq-link thq-body-small">Services</a></Link>
-                <Link href="/store"><a className="thq-link thq-body-small">Store</a></Link>
-                <Link href="/memberships"><a className="thq-link thq-body-small">Membership</a></Link>
-                <Link href="/about"><a className="thq-link thq-body-small">About</a></Link>
-                <Link href="/contact"><a className="thq-link thq-body-small">Contact</a></Link>
+                <Link href="/">
+                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
+                    Home
+                  </a>
+                </Link>
+                <Link href="/work">
+                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
+                    Work
+                  </a>
+                </Link>
+                <Link href="/services">
+                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
+                    Services
+                  </a>
+                </Link>
+                <Link href="/store">
+                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
+                    Store
+                  </a>
+                </Link>
+                <Link href="/memberships">
+                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
+                    Membership
+                  </a>
+                </Link>
+                <Link href="/about">
+                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
+                    About
+                  </a>
+                </Link>
+                <Link href="/contact">
+                  <a onClick={closeMobileMenu} className="thq-link thq-body-small">
+                    Contact
+                  </a>
+                </Link>
               </nav>
 
               {memberPlan && <div className="member-badge mobileBadge">{String(memberPlan).toUpperCase()}</div>}
@@ -460,7 +495,6 @@ const JeevanChandimalNavi = (props) => {
           border-radius: var(--dl-layout-radius-radius2);
         }
 
-        /* ✅ Make Work + Services toggles consistent */
         .jeevan-chandimal-navi-thq-dropdown-toggle-elm10,
         .jeevan-chandimal-navi-thq-dropdown-toggle-elm15 {
           fill: #595959;
@@ -490,7 +524,6 @@ const JeevanChandimalNavi = (props) => {
           transition: 0.3s;
         }
 
-        /* Dropdown list base */
         .jeevan-chandimal-navi-thq-dropdown-list-elm1,
         .jeevan-chandimal-navi-thq-dropdown-list-elm2 {
           left: 0%;
@@ -511,7 +544,6 @@ const JeevanChandimalNavi = (props) => {
           background: var(--dl-color-theme-neutral-light);
         }
 
-        /* ✅ This is what Teleport expects */
         :global(.teleport-show) {
           display: flex !important;
         }
@@ -594,15 +626,15 @@ const JeevanChandimalNavi = (props) => {
           height: var(--dl-layout-size-xsmall);
         }
 
+        /* ✅ FIXED OVERLAY MENU (important for click navigation) */
         .jeevan-chandimal-navi-thq-mobile-menu-elm {
-          top: 0px;
-          left: 0px;
+          inset: 0;
           width: 100%;
           height: 100vh;
           display: none;
           padding: var(--dl-layout-space-twounits);
-          z-index: 100;
-          position: absolute;
+          z-index: 9999;
+          position: fixed;
           flex-direction: column;
           justify-content: space-between;
           background-color: var(--dl-color-theme-neutral-light);
