@@ -28,9 +28,7 @@ const JeevanChandimalNewFooter = (props) => {
     dropdowns.forEach((dd) => {
       const list = dd.querySelector('[data-thq="thq-dropdown-list"]')
       const arrow = dd.querySelector('[data-thq="thq-dropdown-arrow"]')
-      const toggle = dd.querySelector('[data-thq="thq-dropdown-toggle"]')
-
-      if (!list) return
+      if (!list || !arrow) return
 
       const onToggle = (e) => {
         e.preventDefault()
@@ -41,27 +39,16 @@ const JeevanChandimalNewFooter = (props) => {
 
         if (willOpen) {
           list.classList.add('teleport-show')
-          if (arrow) arrow.classList.add('teleport-rotate')
+          arrow.classList.add('teleport-rotate')
         } else {
           list.classList.remove('teleport-show')
-          if (arrow) arrow.classList.remove('teleport-rotate')
+          arrow.classList.remove('teleport-rotate')
         }
       }
 
-      if (arrow) {
-        arrow.style.cursor = 'pointer'
-        arrow.addEventListener('click', onToggle)
-        handlers.push(() => arrow.removeEventListener('click', onToggle))
-      } else if (toggle) {
-        const fallback = (e) => {
-          const target = e.target
-          if (target && target.closest && target.closest('a')) return
-          onToggle(e)
-        }
-        toggle.style.cursor = 'pointer'
-        toggle.addEventListener('click', fallback)
-        handlers.push(() => toggle.removeEventListener('click', fallback))
-      }
+      arrow.style.cursor = 'pointer'
+      arrow.addEventListener('click', onToggle)
+      handlers.push(() => arrow.removeEventListener('click', onToggle))
     })
 
     const onDocClick = (e) => {
@@ -77,7 +64,7 @@ const JeevanChandimalNewFooter = (props) => {
     <>
       <footer ref={footerRef} className={`jcFooter ${props.rootClassName || ''}`}>
         <div className="jcInner">
-          {/* TOP ROW (logo + nav + socials) */}
+          {/* TOP ROW */}
           <div className="jcTop">
             <Link href="/">
               <a className="jcBrand" aria-label="Home">
@@ -86,217 +73,122 @@ const JeevanChandimalNewFooter = (props) => {
             </Link>
 
             <nav className="jcNav" aria-label="Footer navigation">
-              <Link href="/">
-                <a className="jcLink">
-                  {props.link11 ?? (
-                    <Fragment>
-                      <span>Home</span>
-                    </Fragment>
-                  )}
-                </a>
-              </Link>
+              <Link href="/"><a className="jcLink">Home</a></Link>
 
-              {/* Work dropdown */}
+              {/* WORK */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
-                  <Link href="/work">
-                    <a className="jcLink">
-                      {props.text16 ?? (
-                        <Fragment>
-                          <span>Work</span>
-                        </Fragment>
-                      )}
-                    </a>
-                  </Link>
-
-                  <div
-                    data-thq="thq-dropdown-arrow"
-                    className="jcArrow"
-                    role="button"
-                    aria-label="Toggle Work menu"
-                    tabIndex={0}
-                  >
-                    <span className="jcArrowIcon" aria-hidden="true">▾</span>
+                  <Link href="/work"><a className="jcLink">Work</a></Link>
+                  <div data-thq="thq-dropdown-arrow" className="jcArrow" role="button" tabIndex={0} aria-label="Toggle Work">
+                    <svg viewBox="0 0 1024 1024" className="jcArrowSvg" aria-hidden="true">
+                      <path d="M426 726v-428l214 214z"></path>
+                    </svg>
                   </div>
                 </div>
 
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
-                  <li>
-                    <Link href="/work-film">
-                      <a className="jcMenuItem">
-                        {props.text17 ?? <Fragment><span>Film</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/work-audio">
-                      <a className="jcMenuItem">
-                        {props.text18 ?? <Fragment><span>Audio</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/work-animation">
-                      <a className="jcMenuItem">
-                        {props.text19 ?? <Fragment><span>Animation</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/work-photography">
-                      <a className="jcMenuItem">
-                        {props.text191 ?? <Fragment><span>Photography</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
+                  <li><Link href="/work-film"><a className="jcMenuItem">Film</a></Link></li>
+                  <li><Link href="/work-audio"><a className="jcMenuItem">Audio</a></Link></li>
+                  <li><Link href="/work-animation"><a className="jcMenuItem">Animation</a></Link></li>
+                  <li><Link href="/work-photography"><a className="jcMenuItem">Photography</a></Link></li>
                 </ul>
               </div>
 
-              {/* Services dropdown */}
+              {/* SERVICES */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
-                  <Link href="/services">
-                    <a className="jcLink">
-                      {props.text161 ?? (
-                        <Fragment>
-                          <span>Services</span>
-                        </Fragment>
-                      )}
-                    </a>
-                  </Link>
-
-                  <div
-                    data-thq="thq-dropdown-arrow"
-                    className="jcArrow"
-                    role="button"
-                    aria-label="Toggle Services menu"
-                    tabIndex={0}
-                  >
-                    <span className="jcArrowIcon" aria-hidden="true">▾</span>
+                  <Link href="/services"><a className="jcLink">Services</a></Link>
+                  <div data-thq="thq-dropdown-arrow" className="jcArrow" role="button" tabIndex={0} aria-label="Toggle Services">
+                    <svg viewBox="0 0 1024 1024" className="jcArrowSvg" aria-hidden="true">
+                      <path d="M426 726v-428l214 214z"></path>
+                    </svg>
                   </div>
                 </div>
 
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
-                  <li>
-                    <Link href="/services-film-production">
-                      <a className="jcMenuItem">
-                        {props.text171 ?? <Fragment><span>Film Production</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/services-audio">
-                      <a className="jcMenuItem">
-                        {props.text181 ?? <Fragment><span>Audio Production</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/services-animation">
-                      <a className="jcMenuItem">
-                        {props.text192 ?? <Fragment><span>Animation &amp; Motion</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href="/services-photography">
-                      <a className="jcMenuItem">
-                        {props.text1911 ?? <Fragment><span>Photography</span></Fragment>}
-                      </a>
-                    </Link>
-                  </li>
+                  <li><Link href="/services-film-production"><a className="jcMenuItem">Film Production</a></Link></li>
+                  <li><Link href="/services-audio"><a className="jcMenuItem">Audio Production</a></Link></li>
+                  <li><Link href="/services-animation"><a className="jcMenuItem">Animation &amp; Motion</a></Link></li>
+                  <li><Link href="/services-photography"><a className="jcMenuItem">Photography</a></Link></li>
                 </ul>
               </div>
 
-              <Link href="/store">
-                <a className="jcLink">
-                  {props.link41 ?? <Fragment><span>Store</span></Fragment>}
-                </a>
-              </Link>
-
-              <Link href="/memberships">
-                <a className="jcLink">
-                  {props.link51 ?? <Fragment><span>Membership</span></Fragment>}
-                </a>
-              </Link>
-
-              <Link href="/about">
-                <a className="jcLink">
-                  {props.link511 ?? <Fragment><span>About</span></Fragment>}
-                </a>
-              </Link>
-
-              <Link href="/contact">
-                <a className="jcLink">
-                  {props.link5111 ?? <Fragment><span>Contact</span></Fragment>}
-                </a>
-              </Link>
+              <Link href="/store"><a className="jcLink">Store</a></Link>
+              <Link href="/memberships"><a className="jcLink">Membership</a></Link>
+              <Link href="/about"><a className="jcLink">About</a></Link>
+              <Link href="/contact"><a className="jcLink">Contact</a></Link>
             </nav>
 
-            {/* Socials (same icons) */}
+            {/* SOCIAL ICONS (nice, same size) */}
             <div className="jcSocial" aria-label="Social links">
-              <svg width="56" height="56" viewBox="0 0 56 56" className="jcSocialIcon" aria-hidden="true">
-                <path
-                  d="M3 7.007A4.007 4.007 0 0 1 7.007 3h41.986A4.007 4.007 0 0 1 53 7.007v41.986A4.007 4.007 0 0 1 48.993 53H7.007A4.007 4.007 0 0 1 3 48.993zM37.28 51V31.842h6.486l.971-7.466H37.28v-4.767c0-2.162.605-3.635 3.732-3.635L45 15.972V9.294C44.31 9.204 41.943 9 39.189 9c-5.75 0-9.686 3.48-9.686 9.87v5.506H23v7.466h6.503V51z"
-                  fill="currentColor"
-                  fillRule="evenodd"
-                ></path>
-              </svg>
+              {/* You can wrap each in <a href="..."> later when you have URLs */}
+              <span className="jcSocialBtn" title="Facebook" aria-label="Facebook">
+                <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89c1.09 0 2.23.2 2.23.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0 0 22 12z"
+                  />
+                </svg>
+              </span>
 
-              <svg width="24" height="24" viewBox="0 0 24 24" className="jcSocialIcon" aria-hidden="true">
-                <path
-                  d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4zm9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8A1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3"
-                  fill="currentColor"
-                ></path>
-              </svg>
+              <span className="jcSocialBtn" title="Instagram" aria-label="Instagram">
+                <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9A5.5 5.5 0 0 1 16.5 22h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2zm9 2h-9A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4zM12 7a5 5 0 1 1 0 10a5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6a3 3 0 0 0 0-6zm5.2-.9a1.1 1.1 0 1 1 0 2.2a1.1 1.1 0 0 1 0-2.2z"
+                  />
+                </svg>
+              </span>
 
-              <svg width="24" height="24" viewBox="0 0 24 24" className="jcSocialIcon" aria-hidden="true">
-                <path
-                  d="M21.98 4.003a16.6 16.6 0 0 1-2.66 1.015a4.22 4.22 0 0 0-3.698-1.28a4.316 4.316 0 0 0-3.477 4.945a.4.4 0 0 0 0 .11a11.88 11.88 0 0 1-8.666-4.338a4.184 4.184 0 0 0 1.292 5.597a4.14 4.14 0 0 1-1.899-.519v.056a4.23 4.23 0 0 0 3.312 4.117c-.361.09-.732.135-1.104.133a3.7 3.7 0 0 1-.795-.066a4.23 4.23 0 0 0 3.919 2.914a8.47 8.47 0 0 1-5.2 1.788A8 8 0 0 1 2 18.42a11.73 11.73 0 0 0 6.425 1.888A11.855 11.855 0 0 0 20.457 8.374v-.54a4.55 4.55 0 0 0 1.524-3.831"
-                  fill="currentColor"
-                ></path>
-              </svg>
+              <span className="jcSocialBtn" title="X" aria-label="X">
+                <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M18.3 2H21l-6.9 7.9L22 22h-6.7l-5.2-6.8L4.2 22H2l7.4-8.5L2 2h6.9l4.7 6.2L18.3 2zm-1.2 18h1.5L7.7 3.9H6.1L17.1 20z"
+                  />
+                </svg>
+              </span>
 
-              <svg width="24" height="24" viewBox="0 0 24 24" className="jcSocialIcon" aria-hidden="true">
-                <path
-                  d="M1 2.838A1.84 1.84 0 0 1 2.838 1H21.16A1.837 1.837 0 0 1 23 2.838V21.16A1.84 1.84 0 0 1 21.161 23H2.838A1.84 1.84 0 0 1 1 21.161zm8.708 6.55h2.979v1.496c.43-.86 1.53-1.634 3.183-1.634c3.169 0 3.92 1.713 3.92 4.856v5.822h-3.207v-5.106c0-1.79-.43-2.8-1.522-2.8c-1.515 0-2.145 1.089-2.145 2.8v5.106H9.708zm-5.5 10.403h3.208V9.25H4.208zM7.875 5.812a2.063 2.063 0 1 1-4.125 0a2.063 2.063 0 0 1 4.125 0"
-                  fill="currentColor"
-                  clipRule="evenodd"
-                  fillRule="evenodd"
-                ></path>
-              </svg>
+              <span className="jcSocialBtn" title="LinkedIn" aria-label="LinkedIn">
+                <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M6.94 6.5A2.44 2.44 0 1 1 7 1.62a2.44 2.44 0 0 1-.06 4.88zM4.5 22V8.5H9V22H4.5zm7.5 0V8.5h4.3v1.9h.06c.6-1.1 2.06-2.3 4.24-2.3C22.6 8.1 24 10 24 13.1V22h-4.5v-7.5c0-1.8 0-4.1-2.5-4.1c-2.5 0-2.9 2-2.9 4V22H12z"
+                  />
+                </svg>
+              </span>
 
-              <svg width="432" height="384" viewBox="0 0 432 384" className="jcSocialIcon" aria-hidden="true">
-                <path
-                  d="M422 107q5 35 5 69v32l-5 69q-4 29-17 42q-14 14-42 18q-27 2-64.5 3t-61.5 1h-24q-111-1-145-4l-8-1l-13-2l-12.5-5l-13-10l-10-16.5L6 284l-2-7q-4-35-4-69v-32l4-69q4-29 17-42q14-15 43-18q27-2 64-3t61-1h24q90 0 150 4q28 3 42 18q4 4 7 9.5t5 11t3 10.5t2 8zm-151 88l14-7l-115-60v120z"
-                  fill="currentColor"
-                ></path>
-              </svg>
+              <span className="jcSocialBtn" title="YouTube" aria-label="YouTube">
+                <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M21.8 8.1a3 3 0 0 0-2.1-2.1C17.9 5.5 12 5.5 12 5.5s-5.9 0-7.7.5A3 3 0 0 0 2.2 8.1A31.2 31.2 0 0 0 1.8 12c0 1.3.1 2.6.4 3.9a3 3 0 0 0 2.1 2.1c1.8.5 7.7.5 7.7.5s5.9 0 7.7-.5a3 3 0 0 0 2.1-2.1c.3-1.3.4-2.6.4-3.9c0-1.3-.1-2.6-.4-3.9zM10 15.2V8.8L15.5 12L10 15.2z"
+                  />
+                </svg>
+              </span>
             </div>
           </div>
 
-          {/* DIVIDER */}
           <div className="jcDivider" />
 
-          {/* BOTTOM ROW (left aligned) */}
-          <div className="jcBottom">
-            <div className="jcBottomLeft">
+          {/* CENTERED BOTTOM */}
+          <div className="jcLegalWrap">
+            <div className="jcLegalLinks">
+              <Link href="/privacy-policy"><a className="jcLegal">Privacy Policy</a></Link>
+              <Link href="/terms-and-conditions"><a className="jcLegal">Terms &amp; Conditions</a></Link>
+              <Link href="/refund-policy"><a className="jcLegal">Refund Policy</a></Link>
+              <Link href="/cookies-policy"><a className="jcLegal">Cookies Policy</a></Link>
+            </div>
+
+            <div className="jcCopy">
               <span className="thq-body-small">© 2026 Jeevan Chandimal</span>
             </div>
 
-            <div className="jcBottomRight">
-              <Link href="/privacy-policy"><a className="thq-body-small legalLink">Privacy Policy</a></Link>
-              <Link href="/terms-and-conditions"><a className="thq-body-small legalLink">Terms &amp; Conditions</a></Link>
-              <Link href="/refund-policy"><a className="thq-body-small legalLink">Refund Policy</a></Link>
-              <Link href="/cookies-policy"><a className="thq-body-small legalLink">Cookies Policy</a></Link>
+            <div className="jcLastLine">
+              <span className="thq-body-small jcLastText">
+                Payments are processed securely via third-party gateways (e.g., PayHere). We do not store card details.
+              </span>
             </div>
-          </div>
-
-          {/* last line LEFT aligned */}
-          <div className="jcLastLine">
-            <span className="thq-body-small jcLastText">
-              Payments are processed securely via third-party gateways (e.g., PayHere). We do not store card details.
-            </span>
           </div>
         </div>
       </footer>
@@ -304,7 +196,7 @@ const JeevanChandimalNewFooter = (props) => {
       <style jsx>{`
         .jcFooter {
           width: 100%;
-          padding: 42px 18px 34px;
+          padding: 34px 18px 26px;
           background: rgba(34, 34, 34, 0.92);
           border-top: 1px solid rgba(245, 244, 244, 0.08);
           backdrop-filter: blur(10px);
@@ -315,7 +207,7 @@ const JeevanChandimalNewFooter = (props) => {
           margin: 0 auto;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 14px;
         }
 
         .jcTop {
@@ -337,7 +229,7 @@ const JeevanChandimalNewFooter = (props) => {
           display: block;
         }
 
-        /* nav like navbar (clean text) */
+        /* nav like navbar */
         .jcNav {
           display: flex;
           align-items: center;
@@ -364,7 +256,7 @@ const JeevanChandimalNewFooter = (props) => {
           background: rgba(245, 244, 244, 0.06);
         }
 
-        /* dropdown */
+        /* dropdown arrow & list */
         .jcDrop {
           position: relative;
           display: inline-flex;
@@ -386,17 +278,24 @@ const JeevanChandimalNewFooter = (props) => {
           justify-content: center;
           border: 1px solid rgba(245, 244, 244, 0.12);
           background: rgba(0, 0, 0, 0.18);
+          transition: background 0.15s, border-color 0.15s;
         }
 
-        .jcArrowIcon {
-          font-size: 12px;
-          color: rgba(245, 244, 244, 0.85);
+        .jcArrow:hover {
+          background: rgba(245, 244, 244, 0.06);
+          border-color: rgba(245, 244, 244, 0.18);
+        }
+
+        .jcArrowSvg {
+          width: 16px;
+          height: 16px;
+          fill: rgba(245, 244, 244, 0.85);
           transform: rotate(0deg);
           transition: transform 0.18s ease;
         }
 
-        .teleport-rotate .jcArrowIcon {
-          transform: rotate(180deg);
+        .teleport-rotate .jcArrowSvg {
+          transform: rotate(90deg);
         }
 
         .jcMenu {
@@ -437,7 +336,7 @@ const JeevanChandimalNewFooter = (props) => {
           background: rgba(245, 244, 244, 0.08);
         }
 
-        /* socials right */
+        /* social (same size buttons) */
         .jcSocial {
           display: inline-flex;
           align-items: center;
@@ -446,16 +345,28 @@ const JeevanChandimalNewFooter = (props) => {
           flex-wrap: wrap;
         }
 
-        .jcSocialIcon {
-          color: rgba(245, 244, 244, 0.85);
-          opacity: 0.9;
-          transition: transform 0.15s, color 0.15s, opacity 0.15s;
+        .jcSocialBtn {
+          width: 36px;
+          height: 36px;
+          border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.18);
+          transition: background 0.15s, border-color 0.15s, transform 0.15s;
         }
 
-        .jcSocialIcon:hover {
-          color: #25c3e2;
+        .jcSocialBtn:hover {
+          background: rgba(245, 244, 244, 0.06);
+          border-color: rgba(245, 244, 244, 0.18);
           transform: translateY(-1px);
-          opacity: 1;
+        }
+
+        .jcSocialSvg {
+          width: 18px;
+          height: 18px;
+          color: rgba(245, 244, 244, 0.88);
         }
 
         .jcDivider {
@@ -464,60 +375,55 @@ const JeevanChandimalNewFooter = (props) => {
           background: rgba(245, 244, 244, 0.1);
         }
 
-        /* bottom line: LEFT aligned last line request */
-        .jcBottom {
+        /* centered bottom */
+        .jcLegalWrap {
           display: flex;
+          flex-direction: column;
           align-items: center;
-          justify-content: space-between;
-          gap: 14px;
-          flex-wrap: wrap;
+          gap: 10px;
+          text-align: center;
         }
 
-        .jcBottomLeft {
-          color: rgba(245, 244, 244, 0.85);
-        }
-
-        .jcBottomRight {
+        .jcLegalLinks {
           display: flex;
-          gap: 14px;
           flex-wrap: wrap;
+          gap: 14px;
+          justify-content: center;
           align-items: center;
         }
 
-        .legalLink {
+        .jcLegal {
           color: rgba(245, 244, 244, 0.85);
           text-decoration: none !important;
           opacity: 0.9;
           transition: opacity 0.15s, color 0.15s;
+          font-size: 13px;
         }
 
-        .legalLink:hover {
+        .jcLegal:hover {
           color: #25c3e2;
           opacity: 1;
           text-decoration: underline !important;
           text-underline-offset: 3px;
         }
 
+        .jcCopy {
+          color: rgba(245, 244, 244, 0.85);
+        }
+
         .jcLastLine {
-          display: flex;
-          justify-content: flex-start; /* ✅ left align */
+          max-width: 900px;
         }
 
         .jcLastText {
           opacity: 0.75;
           line-height: 1.6;
-          text-align: left; /* ✅ left align */
-          max-width: 920px;
         }
 
         @media (max-width: 991px) {
           .jcTop {
             grid-template-columns: 1fr;
             justify-items: center;
-            text-align: center;
-          }
-          .jcNav {
-            justify-content: center;
           }
           .jcSocial {
             justify-content: center;
@@ -526,23 +432,11 @@ const JeevanChandimalNewFooter = (props) => {
             left: 50%;
             transform: translateX(-50%);
           }
-          .jcLastLine {
-            justify-content: center;
-          }
-          .jcLastText {
-            text-align: center;
-          }
         }
 
         @media (max-width: 479px) {
-          .jcNav {
-            gap: 10px;
-          }
           .jcMenu {
             min-width: 92vw;
-          }
-          .jcBottomRight {
-            justify-content: center;
           }
         }
       `}</style>
