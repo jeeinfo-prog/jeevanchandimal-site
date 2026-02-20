@@ -564,29 +564,31 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .mBackdrop {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.62);
-          border: 0;
-          padding: 0;
-          margin: 0;
-          cursor: pointer;
-        }
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 0; /* ✅ behind panel */
+}
 
-        .mPanel {
-          position: fixed;
-          top: 0;
-          right: 0;
-          height: 100vh;
-          width: min(420px, 92vw);
-          background: #151515;
-          border-left: 1px solid rgba(245, 244, 244, 0.1);
-          box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
-          padding: 18px;
-          display: flex;
-          flex-direction: column;
-          animation: slideIn 180ms ease forwards;
-        }
+.mPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(420px, 92vw);
+  background: #151515;
+  border-left: 1px solid rgba(245, 244, 244, 0.1);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 180ms ease forwards;
+  z-index: 1; /* ✅ above backdrop */
+}
 
         @keyframes slideIn {
           from {
