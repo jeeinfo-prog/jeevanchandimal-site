@@ -1,5 +1,5 @@
 // components/jeevan-chandimal-navi.js
-import React, { Fragment, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
@@ -23,6 +23,7 @@ export default function JeevanChandimalNavi(props) {
   const router = useRouter()
 
   const [mobileOpen, setMobileOpen] = useState(false)
+
   const [deskWorkOpen, setDeskWorkOpen] = useState(false)
   const [deskServicesOpen, setDeskServicesOpen] = useState(false)
 
@@ -31,12 +32,28 @@ export default function JeevanChandimalNavi(props) {
 
   const [memberPlan, setMemberPlan] = useState(null)
 
+  const closeTimers = useRef({ work: null, services: null })
+
   const closeAll = () => {
     setMobileOpen(false)
     setDeskWorkOpen(false)
     setDeskServicesOpen(false)
     setMWorkOpen(false)
     setMServicesOpen(false)
+  }
+
+  const cancelCloseTimer = (key) => {
+    const t = closeTimers.current?.[key]
+    if (t) clearTimeout(t)
+    closeTimers.current[key] = null
+  }
+
+  const scheduleClose = (key) => {
+    cancelCloseTimer(key)
+    closeTimers.current[key] = setTimeout(() => {
+      if (key === 'work') setDeskWorkOpen(false)
+      if (key === 'services') setDeskServicesOpen(false)
+    }, 140) // ✅ small delay removes flicker
   }
 
   useEffect(() => {
@@ -101,7 +118,7 @@ export default function JeevanChandimalNavi(props) {
     }
   }
 
-  // close dropdowns if click outside (desktop)
+  // close desktop dropdowns if click outside
   useEffect(() => {
     const onDoc = (e) => {
       const el = e.target
@@ -137,8 +154,12 @@ export default function JeevanChandimalNavi(props) {
             {/* Work dropdown */}
             <div
               className="drop"
-              onMouseEnter={() => setDeskWorkOpen(true)}
-              onMouseLeave={() => setDeskWorkOpen(false)}
+              onMouseEnter={() => {
+                cancelCloseTimer('work')
+                setDeskWorkOpen(true)
+                setDeskServicesOpen(false)
+              }}
+              onMouseLeave={() => scheduleClose('work')}
             >
               <div
                 className={`dropToggle ${activeClass('/work')}`}
@@ -155,10 +176,17 @@ export default function JeevanChandimalNavi(props) {
                 <Link href="/work">
                   <a className="dropLabel">Work</a>
                 </Link>
-                <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">▾</span>
+                <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
+                  ▾
+                </span>
               </div>
 
-              <div className={`menu ${deskWorkOpen ? 'show' : ''}`} role="menu">
+              <div
+                className={`menu ${deskWorkOpen ? 'show' : ''}`}
+                role="menu"
+                onMouseEnter={() => cancelCloseTimer('work')}
+                onMouseLeave={() => scheduleClose('work')}
+              >
                 {workItems.map((it) => (
                   <Link href={it.href} key={it.href}>
                     <a className="menuItem" role="menuitem">
@@ -172,8 +200,12 @@ export default function JeevanChandimalNavi(props) {
             {/* Services dropdown */}
             <div
               className="drop"
-              onMouseEnter={() => setDeskServicesOpen(true)}
-              onMouseLeave={() => setDeskServicesOpen(false)}
+              onMouseEnter={() => {
+                cancelCloseTimer('services')
+                setDeskServicesOpen(true)
+                setDeskWorkOpen(false)
+              }}
+              onMouseLeave={() => scheduleClose('services')}
             >
               <div
                 className={`dropToggle ${activeClass('/services')}`}
@@ -190,10 +222,17 @@ export default function JeevanChandimalNavi(props) {
                 <Link href="/services">
                   <a className="dropLabel">Services</a>
                 </Link>
-                <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">▾</span>
+                <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
+                  ▾
+                </span>
               </div>
 
-              <div className={`menu ${deskServicesOpen ? 'show' : ''}`} role="menu">
+              <div
+                className={`menu ${deskServicesOpen ? 'show' : ''}`}
+                role="menu"
+                onMouseEnter={() => cancelCloseTimer('services')}
+                onMouseLeave={() => scheduleClose('services')}
+              >
                 {serviceItems.map((it) => (
                   <Link href={it.href} key={it.href}>
                     <a className="menuItem" role="menuitem">
@@ -218,9 +257,10 @@ export default function JeevanChandimalNavi(props) {
             </Link>
           </nav>
 
-          {/* right desktop */}
+          {/* right */}
           <div className="navRight">
             {memberPlan && <span className="badge">{String(memberPlan).toUpperCase()}</span>}
+
             <Link href="/login">
               <a className="iconBtn" aria-label="Login">
                 <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
@@ -354,7 +394,7 @@ export default function JeevanChandimalNavi(props) {
           top: 0;
           z-index: 9999;
           width: 100%;
-          background: rgba(34, 34, 34, 0.72); /* your #222 theme */
+          background: rgba(34, 34, 34, 0.72);
           backdrop-filter: blur(12px);
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
@@ -366,12 +406,13 @@ export default function JeevanChandimalNavi(props) {
           display: flex;
           align-items: center;
           gap: 14px;
+          position: relative;
         }
 
         .brand {
           display: inline-flex;
           align-items: center;
-          text-decoration: none;
+          text-decoration: none !important;
         }
 
         .brandLogo {
@@ -398,7 +439,7 @@ export default function JeevanChandimalNavi(props) {
           opacity: 0.92;
           padding: 10px 8px;
           border-radius: 10px;
-          transition: opacity 0.15s, background 0.15s, transform 0.15s;
+          transition: opacity 0.15s, background 0.15s;
           display: inline-flex;
           align-items: center;
         }
@@ -413,6 +454,7 @@ export default function JeevanChandimalNavi(props) {
           color: #25c3e2 !important;
           opacity: 1;
           background: rgba(37, 195, 226, 0.12);
+          font-weight: 700;
         }
 
         /* ========= DROPDOWN ========= */
@@ -420,6 +462,16 @@ export default function JeevanChandimalNavi(props) {
           position: relative;
           display: inline-flex;
           align-items: center;
+        }
+
+        /* ✅ hover bridge prevents flicker when moving into menu */
+        .drop::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 100%;
+          height: 14px;
+          width: 100%;
         }
 
         .dropToggle {
@@ -438,7 +490,6 @@ export default function JeevanChandimalNavi(props) {
         .chev {
           color: rgba(245, 244, 244, 0.75);
           font-size: 12px;
-          margin-left: -2px;
           transform: rotate(0deg);
           transition: transform 0.16s ease;
           padding-right: 8px;
@@ -462,6 +513,8 @@ export default function JeevanChandimalNavi(props) {
           flex-direction: column;
           gap: 2px;
           animation: dropIn 160ms ease forwards;
+          z-index: 99999;          /* ✅ clickable on top */
+          pointer-events: auto;    /* ✅ clickable */
         }
 
         .menu.show {
@@ -486,7 +539,7 @@ export default function JeevanChandimalNavi(props) {
           padding: 10px 10px;
           border-radius: 10px;
           opacity: 0.92;
-          transition: background 0.15s, opacity 0.15s, transform 0.15s;
+          transition: background 0.15s, opacity 0.15s;
         }
 
         .menuItem:hover {
@@ -564,31 +617,31 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .mBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.62);
-  border: 0;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  z-index: 0; /* ✅ behind panel */
-}
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.62);
+          border: 0;
+          padding: 0;
+          margin: 0;
+          cursor: pointer;
+          z-index: 0; /* ✅ behind panel */
+        }
 
-.mPanel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  height: 100vh;
-  width: min(420px, 92vw);
-  background: #151515;
-  border-left: 1px solid rgba(245, 244, 244, 0.1);
-  box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  animation: slideIn 180ms ease forwards;
-  z-index: 1; /* ✅ above backdrop */
-}
+        .mPanel {
+          position: fixed;
+          top: 0;
+          right: 0;
+          height: 100vh;
+          width: min(420px, 92vw);
+          background: #151515;
+          border-left: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
+          padding: 18px;
+          display: flex;
+          flex-direction: column;
+          animation: slideIn 180ms ease forwards;
+          z-index: 1; /* ✅ above backdrop */
+        }
 
         @keyframes slideIn {
           from {
@@ -611,7 +664,7 @@ export default function JeevanChandimalNavi(props) {
         .mBrand {
           display: inline-flex;
           align-items: center;
-          text-decoration: none;
+          text-decoration: none !important;
         }
 
         .mLogo {
@@ -660,10 +713,6 @@ export default function JeevanChandimalNavi(props) {
           border-color: rgba(37, 195, 226, 0.18);
           opacity: 1;
           font-weight: 700;
-        }
-
-        .mDrop {
-          cursor: pointer;
         }
 
         .mChev {
