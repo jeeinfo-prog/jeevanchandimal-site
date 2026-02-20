@@ -67,28 +67,27 @@ export default async function handler(req, res) {
 
     if (!photoId) return res.status(400).json({ ok: false, error: 'Missing photoId' })
 
-    // ✅ Read row (retry a few times to avoid serverless timing issues)
-    const read = await withRetry(async () => {
-      const { data: row, error: readErr } = await supabaseAdmin
+    // ✅ Read row (retry to avoid serverless timing)
+    const row = await withRetry(async () => {
+      const { data, error } = await supabaseAdmin
         .from('photos')
-        .select('id, status, original_filename, filename, file_name, original_jpg_key')
+        // ✅ IMPORTANT: do NOT select file_name (it doesn't exist in your schema)
+        .select('id, status, original_filename, filename, original_jpg_key')
         .eq('id', photoId)
-        .maybeSingle() // ✅ important: do not throw if not found yet
+        .maybeSingle()
 
-      if (readErr) throw readErr
-      if (!row) throw new Error('Photo not found')
-      return row
+      if (error) throw error
+      if (!data) throw new Error('Photo not found')
+      return data
     })
 
-    const row = read
-
     // ✅ If filename not provided, read from DB; FINAL fallback = derive from original_jpg_key
-    let originalKeyFromDb = String(row?.original_jpg_key || '').trim()
+    const originalKeyFromDb = String(row?.original_jpg_key || '').trim()
 
     if (!filename) {
-      filename = String(row?.original_filename || row?.filename || row?.file_name || '').trim()
+      filename = String(row?.original_filename || row?.filename || '').trim()
 
-      // ✅ FINAL fallback: derive filename from original_jpg_key = photos/original/{photoId}/{filename}
+      // Final fallback: derive from original_jpg_key = photos/original/{photoId}/{filename}
       if (!filename && originalKeyFromDb) filename = originalKeyFromDb.split('/').pop()
     }
 
@@ -96,12 +95,11 @@ export default async function handler(req, res) {
       return res.status(400).json({
         ok: false,
         error: 'Missing filename (not in request and not found in DB)',
-        hint:
-          'Send filename to commit OR ensure create-upload stores original_filename OR ensure original_jpg_key is saved',
+        hint: 'Send filename to commit OR ensure create-upload stores original_filename OR original_jpg_key is saved',
       })
     }
 
-    // ✅ Your real R2 key pattern
+    // ✅ Canonical original_key path
     const original_key = `photos/original/${photoId}/${filename}`
 
     const title = String(body.title || '').trim() || smartTitleFromFilename(filename)
@@ -110,7 +108,7 @@ export default async function handler(req, res) {
       `${title} – premium Sri Lanka photography by Jeevan Chandimal. Available for licensing.`
     const tags = Array.isArray(body.tags) && body.tags.length > 0 ? body.tags : smartTagsFromFilename(filename)
 
-    // ✅ Use your preview/thumb endpoints
+    // ✅ endpoints
     const preview_url = `/api/photo/${encodeURIComponent(photoId)}/preview?variant=standard`
     const thumb_url = `/api/photo/${encodeURIComponent(photoId)}/thumb`
 
@@ -125,23 +123,22 @@ export default async function handler(req, res) {
       thumb_url,
     }
 
-    // ✅ Update (retry also, but usually not needed)
-    const { data, error } = await withRetry(async () => {
-      const out = await supabaseAdmin
-        .from('photos')
-        .update(updatePayload)
-        .eq('id', photoId)
-        .select('id, title, description, tags, status, original_key, original_filename, preview_url, thumb_url, created_at')
-        .single()
-      if (out.error) throw out.error
-      return out
-    })
+    const { data: updated, error: upErr } = await supabaseAdmin
+      .from('photos')
+      .update(updatePayload)
+      .eq('id', photoId)
+      .select('id, title, description, tags, status, original_key, original_filename, preview_url, thumb_url, created_at')
+      .single()
+
+    if (upErr || !updated) {
+      return res.status(500).json({ ok: false, error: upErr?.message || 'Commit failed' })
+    }
 
     return res.status(200).json({
       ok: true,
-      photo: data,
-      thumbUrl: data?.thumb_url,
-      previewUrl: data?.preview_url,
+      photo: updated,
+      thumbUrl: updated?.thumb_url,
+      previewUrl: updated?.preview_url,
     })
   } catch (e) {
     console.error('commit error:', e)
