@@ -28,11 +28,9 @@ const JeevanChandimalNewFooter = (props) => {
       const list = dd.querySelector('[data-thq="thq-dropdown-list"]')
       const arrow = dd.querySelector('[data-thq="thq-dropdown-arrow"]')
       const toggle = dd.querySelector('[data-thq="thq-dropdown-toggle"]')
-
       if (!list) return
 
       const onToggle = (e) => {
-        // Allow clicking the link text to navigate; only the arrow toggles.
         e.preventDefault()
         e.stopPropagation()
 
@@ -53,7 +51,6 @@ const JeevanChandimalNewFooter = (props) => {
         arrow.addEventListener('click', onToggle)
         handlers.push(() => arrow.removeEventListener('click', onToggle))
       } else if (toggle) {
-        // Fallback: toggle container click (but don't block link navigation)
         const fallback = (e) => {
           const target = e.target
           if (target && target.closest && target.closest('a')) return
@@ -78,36 +75,39 @@ const JeevanChandimalNewFooter = (props) => {
     <>
       <footer
         ref={footerRef}
-        className={`jeevan-chandimal-new-footer-thq-footer4-elm thq-section-padding ${props.rootClassName} `}
+        className={`jcFooter thq-section-padding ${props.rootClassName || ''}`}
       >
-        <div className="jeevan-chandimal-new-footer-thq-max-width-elm thq-section-max-width">
-          <div className="jeevan-chandimal-new-footer-thq-content-elm">
-            <div className="jeevan-chandimal-new-footer-thq-logo-elm">
-              <img
-                alt={props.logoAlt}
-                src={props.logoSrc}
-                className="jeevan-chandimal-new-footer-thq-image1-elm"
-              />
+        <div className="jcFooterInner thq-section-max-width">
+          {/* Top row */}
+          <div className="jcTop">
+            {/* Logo */}
+            <div className="jcBrand">
+              <img alt={props.logoAlt} src={props.logoSrc} className="jcLogo" />
+              <div className="jcTagline thq-body-small">
+                Film • Video • Audio • Photography • Animation
+              </div>
             </div>
 
-            <nav className="jeevan-chandimal-new-footer-thq-links-elm" aria-label="Footer navigation">
+            {/* Links */}
+            <nav className="jcNav" aria-label="Footer navigation">
               <Link href="/">
-                <a className="jeevan-chandimal-new-footer-link10 thq-link thq-body-small nav-link">
+                <a className="jcLink nav-link">
                   {props.link11 ?? (
                     <Fragment>
-                      <span className="jeevan-chandimal-new-footer-text11">Home</span>
+                      <span>Home</span>
                     </Fragment>
                   )}
                 </a>
               </Link>
 
-              <div data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown1 list-item">
-                <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm10">
+              {/* Work dropdown */}
+              <div data-thq="thq-dropdown" className="jcDrop list-item">
+                <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
                   <Link href="/work">
-                    <a className="jeevan-chandimal-new-footer-link11 thq-link thq-body-small nav-link">
+                    <a className="jcLink nav-link">
                       {props.text16 ?? (
                         <Fragment>
-                          <span className="jeevan-chandimal-new-footer-text27">Work</span>
+                          <span>Work</span>
                         </Fragment>
                       )}
                     </a>
@@ -115,83 +115,55 @@ const JeevanChandimalNewFooter = (props) => {
 
                   <div
                     data-thq="thq-dropdown-arrow"
-                    className="jeevan-chandimal-new-footer-thq-dropdown-arrow-elm1"
+                    className="jcDropArrow"
                     role="button"
                     aria-label="Toggle Work menu"
                     tabIndex={0}
                   >
-                    <svg viewBox="0 0 1024 1024" className="jeevan-chandimal-new-footer-icon10">
-                      <path d="M426 726v-428l214 214z"></path>
-                    </svg>
+                    <span className="jcArrowIcon" aria-hidden="true">▾</span>
                   </div>
                 </div>
 
-                <ul data-thq="thq-dropdown-list" className="jeevan-chandimal-new-footer-thq-dropdown-list-elm1">
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm1 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm11">
-                      <Link href="/work-film">
-                        <a className="jeevan-chandimal-new-footer-link12 thq-link thq-body-small dropdown-link">
-                          {props.text17 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text21">Film</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                <ul data-thq="thq-dropdown-list" className="jcDropList">
+                  <li className="list-item">
+                    <Link href="/work-film">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text17 ?? <Fragment><span>Film</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
-
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm2 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm12">
-                      <Link href="/work-audio">
-                        <a className="jeevan-chandimal-new-footer-link13 thq-link thq-body-small dropdown-link">
-                          {props.text18 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text18">Audio</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                  <li className="list-item">
+                    <Link href="/work-audio">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text18 ?? <Fragment><span>Audio</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
-
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm3 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm13">
-                      <Link href="/work-animation">
-                        <a className="jeevan-chandimal-new-footer-link14 thq-link thq-body-small dropdown-link">
-                          {props.text19 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text15">Animation</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                  <li className="list-item">
+                    <Link href="/work-animation">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text19 ?? <Fragment><span>Animation</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
-
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm4 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm14">
-                      <Link href="/work-photography">
-                        <a className="jeevan-chandimal-new-footer-link15 thq-link thq-body-small dropdown-link">
-                          {props.text191 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text22">Photography</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                  <li className="list-item">
+                    <Link href="/work-photography">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text191 ?? <Fragment><span>Photography</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
                 </ul>
               </div>
 
-              <div data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown2 list-item">
-                <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm15">
+              {/* Services dropdown */}
+              <div data-thq="thq-dropdown" className="jcDrop list-item">
+                <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
                   <Link href="/services">
-                    <a className="jeevan-chandimal-new-footer-link16 thq-link thq-body-small nav-link">
+                    <a className="jcLink nav-link">
                       {props.text161 ?? (
                         <Fragment>
-                          <span className="jeevan-chandimal-new-footer-text20">Services</span>
+                          <span>Services</span>
                         </Fragment>
                       )}
                     </a>
@@ -199,119 +171,75 @@ const JeevanChandimalNewFooter = (props) => {
 
                   <div
                     data-thq="thq-dropdown-arrow"
-                    className="jeevan-chandimal-new-footer-thq-dropdown-arrow-elm2"
+                    className="jcDropArrow"
                     role="button"
                     aria-label="Toggle Services menu"
                     tabIndex={0}
                   >
-                    <svg viewBox="0 0 1024 1024" className="jeevan-chandimal-new-footer-icon12">
-                      <path d="M426 726v-428l214 214z"></path>
-                    </svg>
+                    <span className="jcArrowIcon" aria-hidden="true">▾</span>
                   </div>
                 </div>
 
-                <ul data-thq="thq-dropdown-list" className="jeevan-chandimal-new-footer-thq-dropdown-list-elm2">
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm5 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm16">
-                      <Link href="/services-film-production">
-                        <a className="jeevan-chandimal-new-footer-link17 thq-link thq-body-small dropdown-link">
-                          {props.text171 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text23">Film Production</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                <ul data-thq="thq-dropdown-list" className="jcDropList">
+                  <li className="list-item">
+                    <Link href="/services-film-production">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text171 ?? <Fragment><span>Film Production</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
-
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm6 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm17">
-                      <Link href="/services-audio">
-                        <a className="jeevan-chandimal-new-footer-link18 thq-link thq-body-small dropdown-link">
-                          {props.text181 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text12">Audio Production</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                  <li className="list-item">
+                    <Link href="/services-audio">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text181 ?? <Fragment><span>Audio Production</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
-
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm7 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm18">
-                      <Link href="/services-animation">
-                        <a className="jeevan-chandimal-new-footer-link19 thq-link thq-body-small dropdown-link">
-                          {props.text192 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text14">Animation &amp; Motion</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                  <li className="list-item">
+                    <Link href="/services-animation">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text192 ?? <Fragment><span>Animation &amp; Motion</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
-
-                  <li data-thq="thq-dropdown" className="jeevan-chandimal-new-footer-thq-dropdown-elm8 list-item">
-                    <div data-thq="thq-dropdown-toggle" className="jeevan-chandimal-new-footer-thq-dropdown-toggle-elm19">
-                      <Link href="/services-photography">
-                        <a className="jeevan-chandimal-new-footer-link20 thq-link thq-body-small dropdown-link">
-                          {props.text1911 ?? (
-                            <Fragment>
-                              <span className="jeevan-chandimal-new-footer-text13">Photography</span>
-                            </Fragment>
-                          )}
-                        </a>
-                      </Link>
-                    </div>
+                  <li className="list-item">
+                    <Link href="/services-photography">
+                      <a className="jcDropItem dropdown-link">
+                        {props.text1911 ?? <Fragment><span>Photography</span></Fragment>}
+                      </a>
+                    </Link>
                   </li>
                 </ul>
               </div>
 
               <Link href="/store">
-                <a className="jeevan-chandimal-new-footer-link21 thq-link thq-body-small nav-link">
-                  {props.link41 ?? (
-                    <Fragment>
-                      <span className="jeevan-chandimal-new-footer-text17">Store</span>
-                    </Fragment>
-                  )}
+                <a className="jcLink nav-link">
+                  {props.link41 ?? <Fragment><span>Store</span></Fragment>}
                 </a>
               </Link>
 
               <Link href="/memberships">
-                <a className="jeevan-chandimal-new-footer-link22 thq-link thq-body-small nav-link">
-                  {props.link51 ?? (
-                    <Fragment>
-                      <span className="jeevan-chandimal-new-footer-text26">Membership</span>
-                    </Fragment>
-                  )}
+                <a className="jcLink nav-link">
+                  {props.link51 ?? <Fragment><span>Membership</span></Fragment>}
                 </a>
               </Link>
 
               <Link href="/about">
-                <a className="jeevan-chandimal-new-footer-link23 thq-link thq-body-small nav-link">
-                  {props.link511 ?? (
-                    <Fragment>
-                      <span className="jeevan-chandimal-new-footer-text24">About</span>
-                    </Fragment>
-                  )}
+                <a className="jcLink nav-link">
+                  {props.link511 ?? <Fragment><span>About</span></Fragment>}
                 </a>
               </Link>
 
               <Link href="/contact">
-                <a className="jeevan-chandimal-new-footer-link24 thq-link thq-body-small nav-link">
-                  {props.link5111 ?? (
-                    <Fragment>
-                      <span className="jeevan-chandimal-new-footer-text16">Contact</span>
-                    </Fragment>
-                  )}
+                <a className="jcLink nav-link">
+                  {props.link5111 ?? <Fragment><span>Contact</span></Fragment>}
                 </a>
               </Link>
             </nav>
 
-            <div className="jeevan-chandimal-new-footer-thq-social-links-elm" aria-label="Social links">
-              <svg width="56" height="56" viewBox="0 0 56 56" className="jeevan-chandimal-new-footer-icon14 thq-link thq-icon-small">
+            {/* Socials (kept your icons) */}
+            <div className="jcSocial" aria-label="Social links">
+              <svg width="56" height="56" viewBox="0 0 56 56" className="jcSocialIcon thq-link thq-icon-small" aria-hidden="true">
                 <path
                   d="M3 7.007A4.007 4.007 0 0 1 7.007 3h41.986A4.007 4.007 0 0 1 53 7.007v41.986A4.007 4.007 0 0 1 48.993 53H7.007A4.007 4.007 0 0 1 3 48.993zM37.28 51V31.842h6.486l.971-7.466H37.28v-4.767c0-2.162.605-3.635 3.732-3.635L45 15.972V9.294C44.31 9.204 41.943 9 39.189 9c-5.75 0-9.686 3.48-9.686 9.87v5.506H23v7.466h6.503V51z"
                   fill="currentColor"
@@ -319,21 +247,21 @@ const JeevanChandimalNewFooter = (props) => {
                 ></path>
               </svg>
 
-              <svg width="24" height="24" viewBox="0 0 24 24" className="jeevan-chandimal-new-footer-icon16 thq-link thq-icon-small">
+              <svg width="24" height="24" viewBox="0 0 24 24" className="jcSocialIcon thq-link thq-icon-small" aria-hidden="true">
                 <path
                   d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4zm9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8A1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5a5 5 0 0 1-5 5a5 5 0 0 1-5-5a5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3a3 3 0 0 0 3 3a3 3 0 0 0 3-3a3 3 0 0 0-3-3"
                   fill="currentColor"
                 ></path>
               </svg>
 
-              <svg width="24" height="24" viewBox="0 0 24 24" className="jeevan-chandimal-new-footer-icon18 thq-link thq-icon-small">
+              <svg width="24" height="24" viewBox="0 0 24 24" className="jcSocialIcon thq-link thq-icon-small" aria-hidden="true">
                 <path
                   d="M21.98 4.003a16.6 16.6 0 0 1-2.66 1.015a4.22 4.22 0 0 0-3.698-1.28a4.316 4.316 0 0 0-3.477 4.945a.4.4 0 0 0 0 .11a11.88 11.88 0 0 1-8.666-4.338a4.184 4.184 0 0 0 1.292 5.597a4.14 4.14 0 0 1-1.899-.519v.056a4.23 4.23 0 0 0 3.312 4.117c-.361.09-.732.135-1.104.133a3.7 3.7 0 0 1-.795-.066a4.23 4.23 0 0 0 3.919 2.914a8.47 8.47 0 0 1-5.2 1.788A8 8 0 0 1 2 18.42a11.73 11.73 0 0 0 6.425 1.888A11.855 11.855 0 0 0 20.457 8.374v-.54a4.55 4.55 0 0 0 1.524-3.831"
                   fill="currentColor"
                 ></path>
               </svg>
 
-              <svg width="24" height="24" viewBox="0 0 24 24" className="jeevan-chandimal-new-footer-icon20 thq-link thq-icon-small">
+              <svg width="24" height="24" viewBox="0 0 24 24" className="jcSocialIcon thq-link thq-icon-small" aria-hidden="true">
                 <path
                   d="M1 2.838A1.84 1.84 0 0 1 2.838 1H21.16A1.837 1.837 0 0 1 23 2.838V21.16A1.84 1.84 0 0 1 21.161 23H2.838A1.84 1.84 0 0 1 1 21.161zm8.708 6.55h2.979v1.496c.43-.86 1.53-1.634 3.183-1.634c3.169 0 3.92 1.713 3.92 4.856v5.822h-3.207v-5.106c0-1.79-.43-2.8-1.522-2.8c-1.515 0-2.145 1.089-2.145 2.8v5.106H9.708zm-5.5 10.403h3.208V9.25H4.208zM7.875 5.812a2.063 2.063 0 1 1-4.125 0a2.063 2.063 0 0 1 4.125 0"
                   fill="currentColor"
@@ -342,7 +270,7 @@ const JeevanChandimalNewFooter = (props) => {
                 ></path>
               </svg>
 
-              <svg width="432" height="384" viewBox="0 0 432 384" className="jeevan-chandimal-new-footer-icon22 thq-link thq-icon-small">
+              <svg width="432" height="384" viewBox="0 0 432 384" className="jcSocialIcon thq-link thq-icon-small" aria-hidden="true">
                 <path
                   d="M422 107q5 35 5 69v32l-5 69q-4 29-17 42q-14 14-42 18q-27 2-64.5 3t-61.5 1h-24q-111-1-145-4l-8-1l-13-2l-12.5-5l-13-10l-10-16.5L6 284l-2-7q-4-35-4-69v-32l4-69q4-29 17-42q14-15 43-18q27-2 64-3t61-1h24q90 0 150 4q28 3 42 18q4 4 7 9.5t5 11t3 10.5t2 8zm-151 88l14-7l-115-60v120z"
                   fill="currentColor"
@@ -351,56 +279,44 @@ const JeevanChandimalNewFooter = (props) => {
             </div>
           </div>
 
-          <div className="jeevan-chandimal-new-footer-thq-credits-elm">
-            <div className="thq-divider-horizontal"></div>
+          {/* Bottom row */}
+          <div className="jcBottom">
+            <div className="jcDivider" />
 
-            <div className="jeevan-chandimal-new-footer-thq-row-elm">
-              <div className="jeevan-chandimal-new-footer-thq-footer-links-elm">
+            <div className="jcLegalRow">
+              <div className="jcLegalLeft">
                 <span className="thq-body-small">© 2026 Jeevan Chandimal</span>
+              </div>
 
-                {/* Legal links (fixed) */}
+              <div className="jcLegalLinks">
                 <Link href="/privacy-policy">
                   <a className="thq-body-small legal-link">
-                    {props.privacyLink ?? (
-                      <Fragment>
-                        <span className="jeevan-chandimal-new-footer-text25">Privacy Policy</span>
-                      </Fragment>
-                    )}
+                    {props.privacyLink ?? <Fragment><span>Privacy Policy</span></Fragment>}
                   </a>
                 </Link>
 
                 <Link href="/terms-and-conditions">
                   <a className="thq-body-small legal-link">
-                    {props.termsLink ?? (
-                      <Fragment>
-                        <span className="jeevan-chandimal-new-footer-text19">Terms &amp; Conditions</span>
-                      </Fragment>
-                    )}
+                    {props.termsLink ?? <Fragment><span>Terms &amp; Conditions</span></Fragment>}
                   </a>
                 </Link>
 
                 <Link href="/refund-policy">
                   <a className="thq-body-small legal-link">
-                        <span className="jeevan-chandimal-new-footer-text19">Refund Policy</span>
-                      </a>
+                    <span>Refund Policy</span>
+                  </a>
                 </Link>
-
 
                 <Link href="/cookies-policy">
                   <a className="thq-body-small legal-link">
-                    {props.cookiesLink ?? (
-                      <Fragment>
-                        <span className="jeevan-chandimal-new-footer-text10">Cookies Policy</span>
-                      </Fragment>
-                    )}
+                    {props.cookiesLink ?? <Fragment><span>Cookies Policy</span></Fragment>}
                   </a>
                 </Link>
               </div>
             </div>
 
-            {/* Optional tiny compliance hint (doesn't change layout much) */}
-            <div className="jeevan-chandimal-new-footer-compliance">
-              <span className="thq-body-small compliance-text">
+            <div className="jcCompliance">
+              <span className="thq-body-small jcComplianceText">
                 Payments are processed securely via third-party gateways (e.g., PayHere). We do not store card details.
               </span>
             </div>
@@ -408,292 +324,283 @@ const JeevanChandimalNewFooter = (props) => {
         </div>
       </footer>
 
-      <style jsx>
-        {`
-          .jeevan-chandimal-new-footer-thq-footer4-elm {
-            gap: 80px;
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            padding-top: 160px;
-            padding-left: var(--dl-layout-space-fiveunits);
-            padding-right: var(--dl-layout-space-fiveunits);
-            flex-direction: column;
-            padding-bottom: var(--dl-layout-space-fiveunits);
+      <style jsx>{`
+        /* ====== Footer shell ====== */
+        .jcFooter {
+          width: 100%;
+          padding-top: 80px;
+          padding-bottom: 50px;
+          background: linear-gradient(180deg, rgba(34, 34, 34, 0) 0%, rgba(34, 34, 34, 0.55) 40%, rgba(34, 34, 34, 1) 100%);
+        }
+
+        .jcFooterInner {
+          width: 100%;
+          max-width: var(--dl-layout-size-maxwidth);
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+        }
+
+        .jcTop {
+          display: grid;
+          grid-template-columns: 1fr 2fr 1fr;
+          gap: 18px;
+          align-items: start;
+        }
+
+        /* Brand */
+        .jcBrand {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .jcLogo {
+          height: 44px;
+          width: auto;
+          display: block;
+        }
+
+        .jcTagline {
+          opacity: 0.75;
+          line-height: 1.5;
+        }
+
+        /* Nav */
+        .jcNav {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: center;
+          gap: 12px 14px;
+        }
+
+        .jcLink {
+          color: #f5f4f4;
+          text-decoration: none !important;
+          font-size: 14px;
+          opacity: 0.9;
+          padding: 10px 10px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(245, 244, 244, 0.08);
+          transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .jcLink:hover {
+          opacity: 1;
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(245, 244, 244, 0.14);
+        }
+
+        /* Dropdown base */
+        .jcDrop {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+        }
+
+        .jcDropToggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .jcDropArrow {
+          width: 34px;
+          height: 34px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.16);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.15s, border-color 0.15s, transform 0.15s;
+        }
+
+        .jcDropArrow:hover {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(245, 244, 244, 0.18);
+        }
+
+        .jcArrowIcon {
+          color: rgba(245, 244, 244, 0.85);
+          font-size: 14px;
+          transform: rotate(0deg);
+          transition: transform 0.18s ease;
+        }
+
+        /* When open */
+        .teleport-rotate .jcArrowIcon {
+          transform: rotate(180deg);
+        }
+
+        /* Dropdown list */
+        .jcDropList {
+          position: absolute;
+          bottom: calc(100% + 10px);
+          left: 0;
+          min-width: 220px;
+          display: none;
+          flex-direction: column;
+          gap: 4px;
+          padding: 10px;
+          margin: 0;
+          list-style: none;
+          background: rgba(18, 18, 18, 0.95);
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 14px;
+          box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
+          z-index: 9999;
+        }
+
+        .teleport-show {
+          display: flex !important;
+        }
+
+        .jcDropItem {
+          color: #f5f4f4;
+          text-decoration: none !important;
+          font-size: 14px;
+          padding: 10px 10px;
+          border-radius: 12px;
+          opacity: 0.92;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(245, 244, 244, 0.06);
+          transition: background 0.15s, opacity 0.15s, border-color 0.15s;
+          display: block;
+        }
+
+        .jcDropItem:hover {
+          opacity: 1;
+          background: rgba(255, 255, 255, 0.07);
+          border-color: rgba(245, 244, 244, 0.12);
+        }
+
+        /* Social */
+        .jcSocial {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .jcSocialIcon {
+          color: rgba(245, 244, 244, 0.85);
+          transition: transform 0.15s, color 0.15s, opacity 0.15s;
+          opacity: 0.9;
+        }
+
+        .jcSocialIcon:hover {
+          color: #25c3e2;
+          transform: translateY(-1px);
+          opacity: 1;
+        }
+
+        /* Bottom */
+        .jcBottom {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .jcDivider {
+          width: 100%;
+          height: 1px;
+          background: rgba(245, 244, 244, 0.1);
+        }
+
+        .jcLegalRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+
+        .jcLegalLinks {
+          display: flex;
+          gap: 14px;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+
+        .legal-link {
+          color: rgba(245, 244, 244, 0.85);
+          text-decoration: none !important;
+          opacity: 0.9;
+          transition: opacity 0.15s, color 0.15s;
+        }
+
+        .legal-link:hover {
+          color: #25c3e2;
+          opacity: 1;
+          text-decoration: underline !important;
+          text-underline-offset: 3px;
+        }
+
+        .jcCompliance {
+          display: flex;
+          justify-content: center;
+        }
+
+        .jcComplianceText {
+          max-width: 860px;
+          text-align: center;
+          opacity: 0.75;
+          line-height: 1.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 991px) {
+          .jcTop {
+            grid-template-columns: 1fr;
+          }
+          .jcSocial {
             justify-content: center;
           }
-
-          .jeevan-chandimal-new-footer-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
+          .jcBrand {
             align-items: center;
-            flex-direction: column;
-          }
-
-          .jeevan-chandimal-new-footer-thq-content-elm {
-            gap: 32px;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-shrink: 0;
-            justify-content: center;
-          }
-
-          .jeevan-chandimal-new-footer-thq-logo-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-
-          .jeevan-chandimal-new-footer-thq-image1-elm {
-            height: 2rem;
-          }
-
-          .jeevan-chandimal-new-footer-thq-links-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-direction: row;
-            justify-content: center;
-          }
-
-          /* Nav hover (simple + clean) */
-          .nav-link {
-            text-decoration: none;
-            position: relative;
-          }
-          .nav-link:hover {
-            color: var(--dl-color-theme-primary2);
-          }
-
-          .jeevan-chandimal-new-footer-thq-dropdown1,
-          .jeevan-chandimal-new-footer-thq-dropdown2 {
-            display: inline-block;
-            position: relative;
-            border-radius: var(--dl-layout-radius-radius2);
-          }
-
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm10,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm15 {
-            fill: #595959;
-            color: #595959;
-            width: 100%;
-            display: inline-flex;
-            align-items: center;
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: 4px;
-            border-radius: var(--dl-layout-radius-radius2);
-            padding-right: 4px;
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-
-          .jeevan-chandimal-new-footer-thq-dropdown-arrow-elm1,
-          .jeevan-chandimal-new-footer-thq-dropdown-arrow-elm2 {
-            transition: transform 0.25s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-          .teleport-rotate {
-            transform: rotate(-90deg);
-          }
-
-          .jeevan-chandimal-new-footer-icon10,
-          .jeevan-chandimal-new-footer-icon12 {
-            width: 18px;
-            height: 18px;
-            transition: 0.3s;
-          }
-
-          .jeevan-chandimal-new-footer-thq-dropdown-list-elm1,
-          .jeevan-chandimal-new-footer-thq-dropdown-list-elm2 {
-            width: max-content;
-            bottom: 100%;
-            display: none;
-            z-index: 100;
-            position: absolute;
-            min-width: 100%;
-            transition: 0.3s;
-            align-items: stretch;
-            border-color: #d9d9d9;
-            border-width: 1px;
-            border-style: solid;
-            border-radius: var(--dl-layout-radius-radius4);
-            flex-direction: column;
-            list-style-type: none;
-            list-style-position: inside;
-            background: var(--dl-color-theme-neutral-light, #ffffff);
-            padding: 6px 0;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-          }
-
-          /* This is the key fix: dropdown becomes visible */
-          .teleport-show {
-            display: flex !important;
-          }
-
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm11,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm12,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm13,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm14,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm16,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm17,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm18,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm19 {
-            fill: #595959;
-            color: #595959;
-            width: 100%;
-            display: inline-flex;
-            transition: 0.2s;
-            align-items: center;
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-unit);
-            border-radius: var(--dl-layout-radius-radius4);
-            padding-right: var(--dl-layout-space-unit);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-
-          /* Dropdown link hover */
-          .dropdown-link {
-            text-decoration: none;
-            width: 100%;
-          }
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm11:hover,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm12:hover,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm13:hover,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm14:hover,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm16:hover,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm17:hover,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm18:hover,
-          .jeevan-chandimal-new-footer-thq-dropdown-toggle-elm19:hover {
-            fill: #fff;
-            color: #fff;
-            background-color: #595959;
-          }
-
-          .jeevan-chandimal-new-footer-thq-social-links-elm {
-            gap: var(--dl-layout-space-unit);
-            width: 348px;
-            height: auto;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            justify-content: flex-end;
-          }
-
-          .jeevan-chandimal-new-footer-icon14,
-          .jeevan-chandimal-new-footer-icon16,
-          .jeevan-chandimal-new-footer-icon18,
-          .jeevan-chandimal-new-footer-icon20,
-          .jeevan-chandimal-new-footer-icon22 {
-            transition: 0.2s;
-          }
-
-          .jeevan-chandimal-new-footer-icon14:hover,
-          .jeevan-chandimal-new-footer-icon16:hover,
-          .jeevan-chandimal-new-footer-icon18:hover,
-          .jeevan-chandimal-new-footer-icon20:hover,
-          .jeevan-chandimal-new-footer-icon22:hover {
-            color: var(--dl-color-theme-primary2);
-          }
-
-          .jeevan-chandimal-new-footer-thq-credits-elm {
-            gap: var(--dl-layout-space-twounits);
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-direction: column;
-          }
-
-          .jeevan-chandimal-new-footer-thq-row-elm {
-            gap: 24px;
-            display: flex;
-            align-items: flex-start;
-          }
-
-          .jeevan-chandimal-new-footer-thq-footer-links-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-          }
-
-          /* Legal links hover (underline + theme color) */
-          .legal-link {
-            text-decoration: none;
-            cursor: pointer;
-          }
-          .legal-link:hover {
-            color: var(--dl-color-theme-primary2);
-            text-decoration: underline;
-            text-underline-offset: 3px;
-          }
-
-          .jeevan-chandimal-new-footer-compliance {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-          }
-
-          .compliance-text {
-            opacity: 0.8;
             text-align: center;
-            max-width: 760px;
-            line-height: 1.6;
           }
+          .jcNav {
+            justify-content: center;
+          }
+          .jcDropList {
+            left: 50%;
+            transform: translateX(-50%);
+          }
+        }
 
-          .jeevan-chandimal-new-footerroot-class-name {
-            padding-top: 160px;
+        @media (max-width: 479px) {
+          .jcLink {
+            width: 100%;
+            justify-content: space-between;
           }
-
-          @media (max-width: 991px) {
-            .jeevan-chandimal-new-footer-thq-logo-elm {
-              width: auto;
-            }
+          .jcNav {
+            width: 100%;
           }
-
-          @media (max-width: 767px) {
-            .jeevan-chandimal-new-footer-thq-content-elm {
-              flex-direction: column;
-            }
-            .jeevan-chandimal-new-footer-thq-row-elm {
-              flex-direction: column;
-              align-items: center;
-            }
-            .jeevan-chandimal-new-footer-thq-footer-links-elm {
-              align-items: center;
-              flex-direction: column;
-              justify-content: center;
-              gap: 10px;
-            }
-            .jeevan-chandimal-new-footer-thq-social-links-elm {
-              justify-content: center;
-              width: 100%;
-            }
+          .jcDrop {
+            width: 100%;
+            justify-content: space-between;
           }
-
-          @media (max-width: 479px) {
-            .jeevan-chandimal-new-footer-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .jeevan-chandimal-new-footer-thq-content-elm {
-              width: 100%;
-            }
+          .jcDropToggle {
+            width: 100%;
+            justify-content: space-between;
           }
-        `}
-      </style>
+          .jcDropList {
+            width: 100%;
+            min-width: 100%;
+            left: 0;
+            transform: none;
+          }
+        }
+      `}</style>
     </>
   )
 }
