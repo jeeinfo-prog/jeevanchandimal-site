@@ -81,27 +81,38 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing photoId' })
     }
 
-    // ✅ If filename not provided, read it from DB (very important for reliability)
+    // ✅ If filename not provided, read from DB; FINAL fallback = derive from original_jpg_key
+    let originalKeyFromDb = ''
     if (!filename) {
-      const { data: row } = await supabaseAdmin
+      const { data: row, error: readErr } = await supabaseAdmin
         .from('photos')
-        .select('id, original_filename, filename, file_name')
+        .select('id, original_filename, filename, file_name, original_jpg_key')
         .eq('id', photoId)
-        .single()
+        .maybeSingle()
 
-      filename =
-        String(row?.original_filename || row?.filename || row?.file_name || '').trim()
+      if (readErr) {
+        console.error('photos read error:', readErr)
+      }
+
+      filename = String(row?.original_filename || row?.filename || row?.file_name || '').trim()
+      originalKeyFromDb = String(row?.original_jpg_key || '').trim()
+
+      // ✅ FINAL fallback: derive filename from original_jpg_key = photos/original/{photoId}/{filename}
+      if (!filename && originalKeyFromDb) {
+        filename = originalKeyFromDb.split('/').pop()
+      }
     }
 
     if (!filename) {
       return res.status(400).json({
         ok: false,
         error: 'Missing filename (not in request and not found in DB)',
-        hint: 'Ensure create-upload saves original_filename OR send filename to commit',
+        hint:
+          'Send filename to commit OR ensure create-upload stores original_filename OR ensure original_jpg_key is saved',
       })
     }
 
-    // ✅ Your real R2 key pattern:
+    // ✅ Your real R2 key pattern
     const original_key = `photos/original/${photoId}/${filename}`
 
     const title = String(body.title || '').trim() || smartTitleFromFilename(filename)
