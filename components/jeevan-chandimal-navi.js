@@ -292,46 +292,64 @@ const JeevanChandimalNavi = (props) => {
                 <Link href="/"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Home</a></Link>
 
                 {/* MOBILE WORK DROPDOWN */}
-                <button
-                  type="button"
-                  className="mobileDropToggle"
-                  onClick={() => {
-                    setMWorkOpen((v) => !v)
-                    if (!mWorkOpen) setMServicesOpen(false)
-                  }}
-                >
-                  <span>Work</span>
-                  <span className={`mobileArrow ${mWorkOpen ? 'open' : ''}`}>▾</span>
-                </button>
-                {mWorkOpen && (
-                  <div className="mobileSubLinks">
-                    <Link href="/work-film"><a onClick={closeMobileMenu}>Film</a></Link>
-                    <Link href="/work-audio"><a onClick={closeMobileMenu}>Audio</a></Link>
-                    <Link href="/work-animation"><a onClick={closeMobileMenu}>Animation</a></Link>
-                    <Link href="/work-photography"><a onClick={closeMobileMenu}>Photography</a></Link>
-                  </div>
-                )}
+<div className="mobileDropRow">
+  <Link href="/work">
+    <a className="mobileDropLink" onClick={closeMobileMenu}>
+      Work
+    </a>
+  </Link>
+
+  <button
+    type="button"
+    className="mobileDropArrowBtn"
+    aria-label="Toggle Work menu"
+    onClick={() => {
+      setMWorkOpen((v) => !v)
+      setMServicesOpen(false)
+    }}
+  >
+    <span className={`mobileArrow ${mWorkOpen ? 'open' : ''}`}>▾</span>
+  </button>
+</div>
+
+{mWorkOpen && (
+  <div className="mobileSubLinks">
+    <Link href="/work-film"><a onClick={closeMobileMenu}>Film</a></Link>
+    <Link href="/work-audio"><a onClick={closeMobileMenu}>Audio</a></Link>
+    <Link href="/work-animation"><a onClick={closeMobileMenu}>Animation</a></Link>
+    <Link href="/work-photography"><a onClick={closeMobileMenu}>Photography</a></Link>
+  </div>
+)}
 
                 {/* MOBILE SERVICES DROPDOWN */}
-                <button
-                  type="button"
-                  className="mobileDropToggle"
-                  onClick={() => {
-                    setMServicesOpen((v) => !v)
-                    if (!mServicesOpen) setMWorkOpen(false)
-                  }}
-                >
-                  <span>Services</span>
-                  <span className={`mobileArrow ${mServicesOpen ? 'open' : ''}`}>▾</span>
-                </button>
-                {mServicesOpen && (
-                  <div className="mobileSubLinks">
-                    <Link href="/services-film-production"><a onClick={closeMobileMenu}>Film Production</a></Link>
-                    <Link href="/services-audio"><a onClick={closeMobileMenu}>Audio Production</a></Link>
-                    <Link href="/services-animation"><a onClick={closeMobileMenu}>Animation &amp; Motion</a></Link>
-                    <Link href="/services-photography"><a onClick={closeMobileMenu}>Photography</a></Link>
-                  </div>
-                )}
+<div className="mobileDropRow">
+  <Link href="/services">
+    <a className="mobileDropLink" onClick={closeMobileMenu}>
+      Services
+    </a>
+  </Link>
+
+  <button
+    type="button"
+    className="mobileDropArrowBtn"
+    aria-label="Toggle Services menu"
+    onClick={() => {
+      setMServicesOpen((v) => !v)
+      setMWorkOpen(false)
+    }}
+  >
+    <span className={`mobileArrow ${mServicesOpen ? 'open' : ''}`}>▾</span>
+  </button>
+</div>
+
+{mServicesOpen && (
+  <div className="mobileSubLinks">
+    <Link href="/services-film-production"><a onClick={closeMobileMenu}>Film Production</a></Link>
+    <Link href="/services-audio"><a onClick={closeMobileMenu}>Audio Production</a></Link>
+    <Link href="/services-animation"><a onClick={closeMobileMenu}>Animation &amp; Motion</a></Link>
+    <Link href="/services-photography"><a onClick={closeMobileMenu}>Photography</a></Link>
+  </div>
+)}
 
                 <Link href="/store"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Store</a></Link>
                 <Link href="/memberships"><a onClick={closeMobileMenu} className="thq-link thq-body-small">Membership</a></Link>
@@ -581,6 +599,44 @@ const JeevanChandimalNavi = (props) => {
           transform: rotate(180deg);
         }
 
+        /* Mobile dropdown row: link + arrow button */
+.mobileDropRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobileDropLink {
+  flex: 1;
+  display: block;
+  padding: 10px 0;
+  font-size: 18px;
+  text-decoration: none;
+}
+
+.mobileDropArrowBtn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 10px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mobileArrow {
+  transition: transform 0.18s;
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+.mobileArrow.open {
+  transform: rotate(180deg);
+}
+  
         .mobileSubLinks {
           display: flex;
           flex-direction: column;
