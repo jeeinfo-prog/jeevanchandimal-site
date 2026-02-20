@@ -39,7 +39,6 @@ const JeevanChandimalNewFooter = (props) => {
       if (!list || !arrow) return
 
       const onToggle = (e) => {
-        // Only the arrow toggles (parent text link navigates)
         e.preventDefault()
         e.stopPropagation()
 
@@ -97,24 +96,18 @@ const JeevanChandimalNewFooter = (props) => {
             </Link>
 
             <nav className="jcNav" aria-label="Footer navigation">
-              <Link href="/">
-                <a className={`jcLink ${isActive('/') ? 'isActive' : ''}`}>Home</a>
-              </Link>
+              <Link href="/"><a className={`jcLink ${isActive('/') ? 'isActive' : ''}`}>Home</a></Link>
 
               {/* WORK */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
-                  <Link href="/work">
-                    <a className={`jcLink ${isActive('/work') ? 'isActive' : ''}`}>Work</a>
-                  </Link>
-
+                  <Link href="/work"><a className={`jcLink ${isActive('/work') ? 'isActive' : ''}`}>Work</a></Link>
                   <div data-thq="thq-dropdown-arrow" className="jcArrow" role="button" tabIndex={0} aria-label="Toggle Work">
                     <svg viewBox="0 0 1024 1024" className="jcArrowSvg" aria-hidden="true">
                       <path d="M426 726v-428l214 214z" />
                     </svg>
                   </div>
                 </div>
-
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
                   <li><Link href="/work-film"><a className="jcMenuItem">Film</a></Link></li>
                   <li><Link href="/work-audio"><a className="jcMenuItem">Audio</a></Link></li>
@@ -126,23 +119,13 @@ const JeevanChandimalNewFooter = (props) => {
               {/* SERVICES */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
-                  <Link href="/services">
-                    <a className={`jcLink ${isActive('/services') ? 'isActive' : ''}`}>Services</a>
-                  </Link>
-
-                  <div
-                    data-thq="thq-dropdown-arrow"
-                    className="jcArrow"
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Toggle Services"
-                  >
+                  <Link href="/services"><a className={`jcLink ${isActive('/services') ? 'isActive' : ''}`}>Services</a></Link>
+                  <div data-thq="thq-dropdown-arrow" className="jcArrow" role="button" tabIndex={0} aria-label="Toggle Services">
                     <svg viewBox="0 0 1024 1024" className="jcArrowSvg" aria-hidden="true">
                       <path d="M426 726v-428l214 214z" />
                     </svg>
                   </div>
                 </div>
-
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
                   <li><Link href="/services-film-production"><a className="jcMenuItem">Film Production</a></Link></li>
                   <li><Link href="/services-audio"><a className="jcMenuItem">Audio Production</a></Link></li>
@@ -151,30 +134,19 @@ const JeevanChandimalNewFooter = (props) => {
                 </ul>
               </div>
 
-              <Link href="/store">
-                <a className={`jcLink ${isActive('/store') ? 'isActive' : ''}`}>Store</a>
-              </Link>
-
-              <Link href="/memberships">
-                <a className={`jcLink ${isActive('/memberships') ? 'isActive' : ''}`}>Membership</a>
-              </Link>
-
-              <Link href="/about">
-                <a className={`jcLink ${isActive('/about') ? 'isActive' : ''}`}>About</a>
-              </Link>
-
-              <Link href="/contact">
-                <a className={`jcLink ${isActive('/contact') ? 'isActive' : ''}`}>Contact</a>
-              </Link>
+              <Link href="/store"><a className={`jcLink ${isActive('/store') ? 'isActive' : ''}`}>Store</a></Link>
+              <Link href="/memberships"><a className={`jcLink ${isActive('/memberships') ? 'isActive' : ''}`}>Membership</a></Link>
+              <Link href="/about"><a className={`jcLink ${isActive('/about') ? 'isActive' : ''}`}>About</a></Link>
+              <Link href="/contact"><a className={`jcLink ${isActive('/contact') ? 'isActive' : ''}`}>Contact</a></Link>
             </nav>
 
-            {/* SOCIAL ICONS */}
+            {/* SOCIAL ICONS (black square / white icon) */}
             <div className="jcSocial" aria-label="Social links">
               <SocialLink href={props.facebookUrl} label="Facebook">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
                   <path
                     fill="currentColor"
-                    d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.77-3.89c1.09 0 2.23.2 2.23.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0 0 22 12z"
+                    d="M13.5 22v-8h2.7l.4-3H13.5V9.1c0-.9.3-1.6 1.7-1.6h1.4V4.8c-.2 0-1.2-.1-2.3-.1c-2.3 0-3.9 1.4-3.9 4V11H7.9v3h2.5v8h3.1z"
                   />
                 </svg>
               </SocialLink>
@@ -201,7 +173,7 @@ const JeevanChandimalNewFooter = (props) => {
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
                   <path
                     fill="currentColor"
-                    d="M6.94 6.5A2.44 2.44 0 1 1 7 1.62a2.44 2.44 0 0 1-.06 4.88zM4.5 22V8.5H9V22H4.5zm7.5 0V8.5h4.3v1.9h.06c.6-1.1 2.06-2.3 4.24-2.3C22.6 8.1 24 10 24 13.1V22h-4.5v-7.5c0-1.8 0-4.1-2.5-4.1c-2.5 0-2.9 2-2.9 4V22H12z"
+                    d="M6 6.8A2.4 2.4 0 1 1 6 2a2.4 2.4 0 0 1 0 4.8zM4.6 22V9H7.4v13H4.6zM9.3 9H12v1.8h.1c.4-.8 1.5-2 3.4-2c3 0 3.6 2 3.6 4.7V22h-2.8v-7.1c0-1.7 0-3.8-2.3-3.8c-2.3 0-2.7 1.8-2.7 3.7V22H9.3V9z"
                   />
                 </svg>
               </SocialLink>
@@ -219,7 +191,6 @@ const JeevanChandimalNewFooter = (props) => {
 
           <div className="jcDivider" />
 
-          {/* CENTERED BOTTOM */}
           <div className="jcLegalWrap">
             <div className="jcLegalLinks">
               <Link href="/privacy-policy"><a className="jcLegal">Privacy Policy</a></Link>
@@ -261,7 +232,7 @@ const JeevanChandimalNewFooter = (props) => {
           grid-template-columns: auto 1fr auto;
           align-items: center;
           gap: 16px;
-          padding-bottom: 64px; /* ✅ reserved space for dropdown */
+          padding-bottom: 64px; /* ✅ reserve dropdown space */
         }
 
         .jcBrand {
@@ -276,7 +247,6 @@ const JeevanChandimalNewFooter = (props) => {
           display: block;
         }
 
-        /* nav like navbar */
         .jcNav {
           display: flex;
           align-items: center;
@@ -303,14 +273,12 @@ const JeevanChandimalNewFooter = (props) => {
           background: rgba(245, 244, 244, 0.06);
         }
 
-        /* ✅ Active highlight */
         .isActive {
           opacity: 1;
           background: rgba(37, 195, 226, 0.14);
           border: 1px solid rgba(37, 195, 226, 0.25);
         }
 
-        /* dropdown */
         .jcDrop {
           position: relative;
           display: inline-flex;
@@ -354,7 +322,7 @@ const JeevanChandimalNewFooter = (props) => {
 
         .jcMenu {
           position: absolute;
-          top: calc(100% + 10px); /* ✅ open DOWN inside footer */
+          top: calc(100% + 10px);
           left: 0;
           min-width: 220px;
           display: none;
@@ -390,7 +358,6 @@ const JeevanChandimalNewFooter = (props) => {
           background: rgba(245, 244, 244, 0.08);
         }
 
-        /* ✅ Hover-open ONLY on desktop */
         @media (min-width: 992px) {
           .jcDrop:hover .jcMenu {
             display: flex;
@@ -400,7 +367,7 @@ const JeevanChandimalNewFooter = (props) => {
           }
         }
 
-        /* socials */
+        /* ✅ Social icons match your reference: black square + white icon */
         .jcSocial {
           display: inline-flex;
           align-items: center;
@@ -410,24 +377,26 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcSocialBtn {
-          width: 36px;
-          height: 36px;
-          border-radius: 12px;
+          width: 40px;
+          height: 40px;
+          border-radius: 14px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(0, 0, 0, 0.18);
-          transition: background 0.15s, border-color 0.15s, transform 0.15s, color 0.15s;
-          color: rgba(245, 244, 244, 0.9);
+          background: rgba(0, 0, 0, 0.55);
+          border: 1px solid rgba(245, 244, 244, 0.10);
+          color: rgba(245, 244, 244, 0.92);
           text-decoration: none !important;
+          transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+            box-shadow 0.15s ease;
         }
 
         .jcSocialBtn:hover {
-          background: rgba(245, 244, 244, 0.06);
-          border-color: rgba(245, 244, 244, 0.18);
           transform: translateY(-1px);
+          background: rgba(37, 195, 226, 0.10);
+          border-color: rgba(37, 195, 226, 0.35);
           color: #25c3e2;
+          box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
         }
 
         .jcSocialSvg {
