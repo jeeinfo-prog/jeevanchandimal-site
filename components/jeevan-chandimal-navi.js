@@ -86,21 +86,17 @@ export default function JeevanChandimalNavi(props) {
       .catch(() => {})
   }, [])
 
-  // ✅ Used for BOTH:
-  // - top nav items (Home, Store, etc.)
-  // - dropdown child items (work-film, services-audio, etc.)
+  // ✅ Parent + child active highlight
   const isActive = (href) => {
     if (!href) return false
 
-    // Exact match for leaf pages
-    if (router.pathname === href) return true
+    // Parent groups should highlight on any child route
+    if (href === '/work') return router.pathname.startsWith('/work')
+    if (href === '/services') return router.pathname.startsWith('/services')
+    if (href === '/store') return router.pathname.startsWith('/store')
 
-    // Parent groups
-    if (href === '/work' && router.pathname.startsWith('/work')) return true
-    if (href === '/services' && router.pathname.startsWith('/services')) return true
-    if (href === '/store' && router.pathname.startsWith('/store')) return true
-
-    return false
+    // Child / leaf pages: exact match
+    return router.pathname === href
   }
 
   const activeClass = (href) => (isActive(href) ? 'isActive' : '')
@@ -188,7 +184,6 @@ export default function JeevanChandimalNavi(props) {
                   <a className="dropLabel">Work</a>
                 </Link>
 
-                {/* arrow */}
                 <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
                   ▾
                 </span>
@@ -236,7 +231,6 @@ export default function JeevanChandimalNavi(props) {
                   <a className="dropLabel">Services</a>
                 </Link>
 
-                {/* arrow */}
                 <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
                   ▾
                 </span>
@@ -360,10 +354,7 @@ export default function JeevanChandimalNavi(props) {
                 <div className="mSub">
                   {workItems.map((it) => (
                     <Link href={it.href} key={it.href}>
-                      <a
-                        className={`mSubLink ${activeItemClass(it.href)}`}
-                        onClick={closeAll}
-                      >
+                      <a className={`mSubLink ${activeItemClass(it.href)}`} onClick={closeAll}>
                         {it.label}
                       </a>
                     </Link>
@@ -395,10 +386,7 @@ export default function JeevanChandimalNavi(props) {
                 <div className="mSub">
                   {serviceItems.map((it) => (
                     <Link href={it.href} key={it.href}>
-                      <a
-                        className={`mSubLink ${activeItemClass(it.href)}`}
-                        onClick={closeAll}
-                      >
+                      <a className={`mSubLink ${activeItemClass(it.href)}`} onClick={closeAll}>
                         {it.label}
                       </a>
                     </Link>
@@ -431,7 +419,6 @@ export default function JeevanChandimalNavi(props) {
             </nav>
           </div>
 
-          {/* click outside to close */}
           <button type="button" className="mBackdrop" aria-label="Close menu" onClick={closeAll} />
         </div>
       </header>
@@ -544,14 +531,14 @@ export default function JeevanChandimalNavi(props) {
           justify-content: center;
           color: rgba(245, 244, 244, 0.75);
           font-size: 12px;
-          transform: rotate(-90deg); /* closed → right */
+          transform: rotate(-90deg);
           transition: transform 0.16s ease;
           margin-left: 4px;
           padding-right: 0;
         }
 
         .chev.open {
-          transform: rotate(0deg); /* open → down */
+          transform: rotate(0deg);
         }
 
         /* Mobile arrow – same fix */
@@ -618,7 +605,6 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(245, 244, 244, 0.08);
         }
 
-        /* ✅ Dropdown child active highlight */
         .menuItem.isActiveItem {
           color: #25c3e2 !important;
           opacity: 1;
@@ -817,7 +803,6 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(255, 255, 255, 0.06);
         }
 
-        /* ✅ Mobile dropdown child active highlight */
         .mSubLink.isActiveItem {
           color: #25c3e2 !important;
           background: rgba(37, 195, 226, 0.12);
@@ -838,7 +823,6 @@ export default function JeevanChandimalNavi(props) {
           font-weight: 800;
         }
 
-        /* ========= RESPONSIVE ========= */
         @media (min-width: 900px) {
           .navLinks {
             display: flex;
