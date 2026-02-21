@@ -389,68 +389,68 @@ export default function JeevanChandimalNavi(props) {
 
       <style jsx>{`
         /* ========= THEME ========= */
-        .navWrap {
-          position: sticky;
-          top: 0;
-          z-index: 9999;
-          width: 100%;
-          background: rgba(34, 34, 34, 0.72);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(245, 244, 244, 0.08);
-        }
+.navWrap {
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  width: 100%;
+  background: rgba(34, 34, 34, 0.72);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(245, 244, 244, 0.08);
+}
 
-        .navShell {
-          max-width: var(--dl-layout-size-maxwidth);
-          margin: 0 auto;
-          padding: 12px 18px;
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          position: relative;
-        }
+.navShell {
+  max-width: var(--dl-layout-size-maxwidth);
+  margin: 0 auto;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+}
 
-        .brand {
-          display: inline-flex;
-          align-items: center;
-          text-decoration: none !important;
-        }
+.brand {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none !important;
+}
 
-        .brandLogo {
-          height: 44px;
-          width: auto;
-          display: block;
-        }
+.brandLogo {
+  height: 44px;
+  width: auto;
+  display: block;
+}
 
-        /* ========= DESKTOP LINKS ========= */
-        .navLinks {
-          flex: 1;
-          display: none;
-          align-items: center;
-          justify-content: center;
-          gap: 18px;
-        }
+/* ========= DESKTOP LINKS ========= */
+.navLinks {
+  flex: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
 
-        .navLink,
-        .dropLabel {
-          color: #f5f4f4;
-          text-decoration: none !important;
-          font-size: 14px;
-          letter-spacing: 0.2px;
-          opacity: 0.92;
-          padding: 10px 8px;
-          border-radius: 10px;
-          transition: opacity 0.15s, background 0.15s;
-          display: inline-flex;
-          align-items: center;
-        }
+.navLink,
+.dropLabel {
+  color: #f5f4f4;
+  text-decoration: none !important;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  opacity: 0.92;
+  padding: 10px 8px;
+  border-radius: 10px;
+  transition: opacity 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+}
 
-        .navLink:hover,
-        .dropLabel:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-        }
+.navLink:hover,
+.dropLabel:hover {
+  opacity: 1;
+  background: rgba(245, 244, 244, 0.06);
+}
 
-        .isActive {
+.isActive {
   color: #25c3e2;
   opacity: 1;
   background: rgba(37, 195, 226, 0.14);
@@ -458,318 +458,118 @@ export default function JeevanChandimalNavi(props) {
   box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
 }
 
-        /* ========= DROPDOWN ========= */
-        .drop {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-        }
+/* ========= DROPDOWN ========= */
+.drop {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
 
-        /* ✅ hover bridge prevents flicker when moving into menu */
-        .drop::after {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 100%;
-          height: 14px;
-          width: 100%;
-        }
+/* ✅ hover bridge prevents flicker when moving into menu */
+.drop::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 100%;
+  height: 14px;
+  width: 100%;
+}
 
-        .dropToggle {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 0;
-          border-radius: 12px;
-          outline: none;
-        }
+.dropToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border-radius: 12px;
+  outline: none;
+}
 
-        .dropToggle:focus-visible {
-          box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
-        }
+.dropToggle:focus-visible {
+  box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
+}
 
-        .chev {
-          color: rgba(245, 244, 244, 0.75);
-          font-size: 12px;
-          transform: rotate(0deg);
-          transition: transform 0.16s ease;
-          padding-right: 8px;
-        }
+/* ✅ Closed = right (0deg), Open = down (90deg) */
+.chev {
+  color: rgba(245, 244, 244, 0.75);
+  font-size: 12px;
+  transform: rotate(0deg);
+  transition: transform 0.16s ease;
+  padding-right: 8px;
+}
 
-        .chev.open {
-          transform: rotate(180deg);
-        }
+/* when click-opened (if your JS adds .open) */
+.chev.open {
+  transform: rotate(90deg);
+}
 
-        .menu {
-          position: absolute;
-          top: calc(100% + 10px);
-          left: 0;
-          min-width: 220px;
-          background: rgba(18, 18, 18, 0.92);
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          border-radius: 14px;
-          padding: 8px;
-          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
-          display: none;
-          flex-direction: column;
-          gap: 2px;
-          animation: dropIn 160ms ease forwards;
-          z-index: 99999;          /* ✅ clickable on top */
-          pointer-events: auto;    /* ✅ clickable */
-        }
+.menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 220px;
+  background: rgba(18, 18, 18, 0.92);
+  border: 1px solid rgba(245, 244, 244, 0.1);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  animation: dropIn 160ms ease forwards;
+  z-index: 99999;
+  pointer-events: auto;
+}
 
-        .menu.show {
-          display: flex;
-        }
+.menu.show {
+  display: flex;
+}
 
-        @keyframes dropIn {
-          from {
-            opacity: 0;
-            transform: translateY(-6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-        .menuItem {
-          color: #f5f4f4;
-          text-decoration: none !important;
-          font-size: 14px;
-          padding: 10px 10px;
-          border-radius: 10px;
-          opacity: 0.92;
-          transition: background 0.15s, opacity 0.15s;
-        }
+.menuItem {
+  color: #f5f4f4;
+  text-decoration: none !important;
+  font-size: 14px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  opacity: 0.92;
+  transition: background 0.15s, opacity 0.15s;
+}
 
-        .menuItem:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.08);
-        }
+.menuItem:hover {
+  opacity: 1;
+  background: rgba(245, 244, 244, 0.08);
+}
 
-        /* ========= RIGHT ========= */
-        .navRight {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-        }
+/* ========= RESPONSIVE ========= */
+@media (min-width: 900px) {
+  .navLinks {
+    display: flex;
+  }
+  .burger {
+    display: none;
+  }
 
-        .badge {
-          font-size: 11px;
-          padding: 4px 10px;
-          border: 1px solid #25c3e2;
-          border-radius: 999px;
-          letter-spacing: 1px;
-          color: #25c3e2;
-          font-weight: 700;
-          line-height: 1;
-          white-space: nowrap;
-        }
+  /* ✅ keep dropdown open on hover of parent OR menu */
+  .drop:hover .menu,
+  .drop .menu:hover {
+    display: flex;
+  }
 
-        .iconBtn {
-          color: #f5f4f4;
-          opacity: 0.85;
-          border-radius: 12px;
-          padding: 8px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          text-decoration: none !important;
-          transition: opacity 0.15s, background 0.15s;
-        }
-
-        .iconBtn:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-        }
-
-        .burger {
-          width: 44px;
-          height: 42px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: rgba(0, 0, 0, 0.18);
-          border-radius: 14px;
-          display: inline-flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          cursor: pointer;
-        }
-
-        .burger span {
-          width: 18px;
-          height: 2px;
-          background: rgba(245, 244, 244, 0.9);
-          border-radius: 2px;
-        }
-
-        /* ========= MOBILE ========= */
-        .mOverlay {
-          display: none;
-        }
-
-        .mOverlay.show {
-          display: block;
-          position: fixed;
-          inset: 0;
-          z-index: 10000;
-        }
-
-        .mBackdrop {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.62);
-          border: 0;
-          padding: 0;
-          margin: 0;
-          cursor: pointer;
-          z-index: 0; /* ✅ behind panel */
-        }
-
-        .mPanel {
-          position: fixed;
-          top: 0;
-          right: 0;
-          height: 100vh;
-          width: min(420px, 92vw);
-          background: #151515;
-          border-left: 1px solid rgba(245, 244, 244, 0.1);
-          box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
-          padding: 18px;
-          display: flex;
-          flex-direction: column;
-          animation: slideIn 180ms ease forwards;
-          z-index: 1; /* ✅ above backdrop */
-        }
-
-        @keyframes slideIn {
-          from {
-            transform: translateX(12px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-
-        .mTop {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-        }
-
-        .mBrand {
-          display: inline-flex;
-          align-items: center;
-          text-decoration: none !important;
-        }
-
-        .mLogo {
-          height: 40px;
-        }
-
-        .mClose {
-          border: 1px solid rgba(245, 244, 244, 0.14);
-          background: rgba(255, 255, 255, 0.04);
-          color: #f5f4f4;
-          width: 44px;
-          height: 42px;
-          border-radius: 14px;
-          cursor: pointer;
-          font-size: 18px;
-        }
-
-        .mLinks {
-          margin-top: 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .mLink {
-          color: #f5f4f4;
-          text-decoration: none !important;
-          padding: 12px 12px;
-          border-radius: 14px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(245, 244, 244, 0.08);
-          opacity: 0.92;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .mLink:hover {
-          opacity: 1;
-          background: rgba(255, 255, 255, 0.06);
-        }
-
-        .mLink.isActive {
-          color: #25c3e2 !important;
-          background: rgba(37, 195, 226, 0.12);
-          border-color: rgba(37, 195, 226, 0.18);
-          opacity: 1;
-          font-weight: 700;
-        }
-
-        .mChev {
-          opacity: 0.8;
-          transform: rotate(0deg);
-          transition: transform 0.16s ease;
-        }
-
-        .mChev.open {
-          transform: rotate(180deg);
-        }
-
-        .mSub {
-          margin-top: -4px;
-          margin-left: 10px;
-          padding-left: 10px;
-          border-left: 2px solid rgba(245, 244, 244, 0.12);
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .mSubLink {
-          color: rgba(245, 244, 244, 0.92);
-          text-decoration: none !important;
-          padding: 10px 12px;
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(245, 244, 244, 0.06);
-        }
-
-        .mSubLink:hover {
-          background: rgba(255, 255, 255, 0.06);
-        }
-
-        .mBadge {
-          margin-top: 12px;
-          align-self: flex-start;
-          font-size: 11px;
-          padding: 6px 12px;
-          border: 1px solid rgba(37, 195, 226, 0.55);
-          border-radius: 999px;
-          letter-spacing: 1px;
-          color: #25c3e2;
-          font-weight: 800;
-        }
-
-        /* ========= RESPONSIVE ========= */
-        @media (min-width: 900px) {
-          .navLinks {
-            display: flex;
-          }
-          .burger {
-            display: none;
-          }
-        }
+  /* ✅ hover open arrow: right ➜ down */
+  .drop:hover .chev {
+    transform: rotate(90deg);
+  }
+}
       `}</style>
     </>
   )
