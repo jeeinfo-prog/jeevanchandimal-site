@@ -90,6 +90,7 @@ export default function JeevanChandimalNavi(props) {
     if (router.pathname === href) return true
     if (href === '/work' && router.pathname.startsWith('/work')) return true
     if (href === '/services' && router.pathname.startsWith('/services')) return true
+    if (href === '/store' && router.pathname.startsWith('/store')) return true
     return false
   }
 
@@ -176,8 +177,13 @@ export default function JeevanChandimalNavi(props) {
                 <Link href="/work">
                   <a className="dropLabel">Work</a>
                 </Link>
-                <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
-                  ▾
+
+                {/* ✅ Arrow change only */}
+                <span
+                  className={`chev ${deskWorkOpen ? 'open' : ''}`}
+                  aria-hidden="true"
+                >
+                  {deskWorkOpen ? '⌄' : '➜'}
                 </span>
               </div>
 
@@ -222,8 +228,13 @@ export default function JeevanChandimalNavi(props) {
                 <Link href="/services">
                   <a className="dropLabel">Services</a>
                 </Link>
-                <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
-                  ▾
+
+                {/* ✅ Arrow change only */}
+                <span
+                  className={`chev ${deskServicesOpen ? 'open' : ''}`}
+                  aria-hidden="true"
+                >
+                  {deskServicesOpen ? '⌄' : '➜'}
                 </span>
               </div>
 
@@ -315,7 +326,11 @@ export default function JeevanChandimalNavi(props) {
             </div>
 
             <nav className="mLinks">
-              <Link href="/"><a className={`mLink ${activeClass('/')}`} onClick={closeAll}>Home</a></Link>
+              <Link href="/">
+                <a className={`mLink ${activeClass('/')}`} onClick={closeAll}>
+                  Home
+                </a>
+              </Link>
 
               {/* Work: first tap opens, second tap navigates */}
               <Link href="/work">
@@ -332,14 +347,21 @@ export default function JeevanChandimalNavi(props) {
                   }}
                 >
                   <span>Work</span>
-                  <span className={`mChev ${mWorkOpen ? 'open' : ''}`} aria-hidden="true">▾</span>
+                  <span
+                    className={`mChev ${mWorkOpen ? 'open' : ''}`}
+                    aria-hidden="true"
+                  >
+                    {mWorkOpen ? '⌄' : '➜'}
+                  </span>
                 </a>
               </Link>
               {mWorkOpen && (
                 <div className="mSub">
                   {workItems.map((it) => (
                     <Link href={it.href} key={it.href}>
-                      <a className="mSubLink" onClick={closeAll}>{it.label}</a>
+                      <a className="mSubLink" onClick={closeAll}>
+                        {it.label}
+                      </a>
                     </Link>
                   ))}
                 </div>
@@ -360,23 +382,46 @@ export default function JeevanChandimalNavi(props) {
                   }}
                 >
                   <span>Services</span>
-                  <span className={`mChev ${mServicesOpen ? 'open' : ''}`} aria-hidden="true">▾</span>
+                  <span
+                    className={`mChev ${mServicesOpen ? 'open' : ''}`}
+                    aria-hidden="true"
+                  >
+                    {mServicesOpen ? '⌄' : '➜'}
+                  </span>
                 </a>
               </Link>
               {mServicesOpen && (
                 <div className="mSub">
                   {serviceItems.map((it) => (
                     <Link href={it.href} key={it.href}>
-                      <a className="mSubLink" onClick={closeAll}>{it.label}</a>
+                      <a className="mSubLink" onClick={closeAll}>
+                        {it.label}
+                      </a>
                     </Link>
                   ))}
                 </div>
               )}
 
-              <Link href="/store"><a className={`mLink ${activeClass('/store')}`} onClick={closeAll}>Store</a></Link>
-              <Link href="/memberships"><a className={`mLink ${activeClass('/memberships')}`} onClick={closeAll}>Membership</a></Link>
-              <Link href="/about"><a className={`mLink ${activeClass('/about')}`} onClick={closeAll}>About</a></Link>
-              <Link href="/contact"><a className={`mLink ${activeClass('/contact')}`} onClick={closeAll}>Contact</a></Link>
+              <Link href="/store">
+                <a className={`mLink ${activeClass('/store')}`} onClick={closeAll}>
+                  Store
+                </a>
+              </Link>
+              <Link href="/memberships">
+                <a className={`mLink ${activeClass('/memberships')}`} onClick={closeAll}>
+                  Membership
+                </a>
+              </Link>
+              <Link href="/about">
+                <a className={`mLink ${activeClass('/about')}`} onClick={closeAll}>
+                  About
+                </a>
+              </Link>
+              <Link href="/contact">
+                <a className={`mLink ${activeClass('/contact')}`} onClick={closeAll}>
+                  Contact
+                </a>
+              </Link>
 
               {memberPlan && <div className="mBadge">{String(memberPlan).toUpperCase()}</div>}
             </nav>
@@ -493,10 +538,13 @@ export default function JeevanChandimalNavi(props) {
           transform: rotate(0deg);
           transition: transform 0.16s ease;
           padding-right: 8px;
+          display: inline-flex;
+          align-items: center;
         }
 
+        /* ✅ requested: open rotation 90deg */
         .chev.open {
-          transform: rotate(180deg);
+          transform: rotate(90deg);
         }
 
         .menu {
@@ -513,8 +561,8 @@ export default function JeevanChandimalNavi(props) {
           flex-direction: column;
           gap: 2px;
           animation: dropIn 160ms ease forwards;
-          z-index: 99999;          /* ✅ clickable on top */
-          pointer-events: auto;    /* ✅ clickable */
+          z-index: 99999; /* ✅ clickable on top */
+          pointer-events: auto; /* ✅ clickable */
         }
 
         .menu.show {
@@ -722,7 +770,7 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .mChev.open {
-          transform: rotate(180deg);
+          transform: rotate(90deg);
         }
 
         .mSub {
