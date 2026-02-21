@@ -486,18 +486,11 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(245, 244, 244, 0.06);
         }
 
-        /* ✅ blended active pill + blended text (like screenshot) */
         .isActive {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.24),
-            rgba(37, 195, 226, 0.1)
-          );
-          border: 1px solid rgba(37, 195, 226, 0.22);
-          color: rgba(205, 246, 255, 0.92) !important;
+          color: #25c3e2 !important;
           opacity: 1;
+          background: rgba(37, 195, 226, 0.12);
           font-weight: 700;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
         }
 
         /* ========= DROPDOWN ========= */
@@ -612,16 +605,10 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(245, 244, 244, 0.08);
         }
 
-        /* ✅ dropdown child blended active */
         .menuItem.isActiveItem {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.2),
-            rgba(37, 195, 226, 0.08)
-          );
-          border: 1px solid rgba(37, 195, 226, 0.18);
-          color: rgba(205, 246, 255, 0.92) !important;
+          color: #25c3e2 !important;
           opacity: 1;
+          background: rgba(37, 195, 226, 0.12);
           font-weight: 700;
         }
 
@@ -785,18 +772,12 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(255, 255, 255, 0.06);
         }
 
-        /* ✅ mobile blended active pill */
         .mLink.isActive {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.22),
-            rgba(37, 195, 226, 0.1)
-          );
-          border-color: rgba(37, 195, 226, 0.22);
-          color: rgba(205, 246, 255, 0.92) !important;
+          color: #25c3e2 !important;
+          background: rgba(37, 195, 226, 0.12);
+          border-color: rgba(37, 195, 226, 0.18);
           opacity: 1;
           font-weight: 700;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
         }
 
         .mSub {
@@ -822,18 +803,12 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(255, 255, 255, 0.06);
         }
 
-        /* ✅ mobile dropdown child blended active */
         .mSubLink.isActiveItem {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.2),
-            rgba(37, 195, 226, 0.08)
-          );
+          color: #25c3e2 !important;
+          background: rgba(37, 195, 226, 0.12);
           border-color: rgba(37, 195, 226, 0.18);
-          color: rgba(205, 246, 255, 0.92) !important;
           opacity: 1;
           font-weight: 800;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.06);
         }
 
         .mBadge {
