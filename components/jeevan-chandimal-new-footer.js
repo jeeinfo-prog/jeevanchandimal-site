@@ -399,22 +399,32 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcMenu {
-          position: absolute;
-          top: calc(100% + 10px);
-          left: 0;
-          min-width: 220px;
-          display: none;
-          flex-direction: column;
-          gap: 2px;
-          padding: 8px;
-          margin: 0;
-          list-style: none;
-          background: rgba(18, 18, 18, 0.95);
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          border-radius: 14px;
-          box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
-          z-index: 999999;
-        }
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 220px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  margin: 0;
+  list-style: none;
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid rgba(245, 244, 244, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
+  z-index: 999999;
+}
+
+/* ✅ hover bridge (paste THIS right after .jcMenu) */
+.jcMenu::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+}
 
         .teleport-show {
           display: flex !important;
@@ -447,13 +457,17 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         @media (min-width: 992px) {
-          .jcDrop:hover .jcMenu {
-            display: flex;
-          }
-          .jcDrop:hover .jcArrowSvg {
-            transform: rotate(90deg);
-          }
-        }
+  /* open when hovering parent OR the menu itself */
+  .jcDrop:hover .jcMenu,
+  .jcDrop .jcMenu:hover {
+    display: flex;
+  }
+
+  /* arrow rotation */
+  .jcDrop:hover .jcArrowSvg {
+    transform: rotate(90deg);
+  }
+}
 
         .jcSocial {
           display: inline-flex;
