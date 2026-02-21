@@ -178,12 +178,9 @@ export default function JeevanChandimalNavi(props) {
                   <a className="dropLabel">Work</a>
                 </Link>
 
-                {/* ✅ Arrow change only */}
-                <span
-                  className={`chev ${deskWorkOpen ? 'open' : ''}`}
-                  aria-hidden="true"
-                >
-                  {deskWorkOpen ? '⌄' : '➜'}
+                {/* ✅ same arrow, only rotation changes */}
+                <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
+                  ▾
                 </span>
               </div>
 
@@ -229,12 +226,9 @@ export default function JeevanChandimalNavi(props) {
                   <a className="dropLabel">Services</a>
                 </Link>
 
-                {/* ✅ Arrow change only */}
-                <span
-                  className={`chev ${deskServicesOpen ? 'open' : ''}`}
-                  aria-hidden="true"
-                >
-                  {deskServicesOpen ? '⌄' : '➜'}
+                {/* ✅ same arrow, only rotation changes */}
+                <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
+                  ▾
                 </span>
               </div>
 
@@ -347,11 +341,10 @@ export default function JeevanChandimalNavi(props) {
                   }}
                 >
                   <span>Work</span>
-                  <span
-                    className={`mChev ${mWorkOpen ? 'open' : ''}`}
-                    aria-hidden="true"
-                  >
-                    {mWorkOpen ? '⌄' : '➜'}
+
+                  {/* ✅ same arrow, only rotation changes */}
+                  <span className={`mChev ${mWorkOpen ? 'open' : ''}`} aria-hidden="true">
+                    ▾
                   </span>
                 </a>
               </Link>
@@ -382,11 +375,10 @@ export default function JeevanChandimalNavi(props) {
                   }}
                 >
                   <span>Services</span>
-                  <span
-                    className={`mChev ${mServicesOpen ? 'open' : ''}`}
-                    aria-hidden="true"
-                  >
-                    {mServicesOpen ? '⌄' : '➜'}
+
+                  {/* ✅ same arrow, only rotation changes */}
+                  <span className={`mChev ${mServicesOpen ? 'open' : ''}`} aria-hidden="true">
+                    ▾
                   </span>
                 </a>
               </Link>
@@ -532,19 +524,19 @@ export default function JeevanChandimalNavi(props) {
           box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
         }
 
+        /* ✅ Arrow: same character ▾, rotated */
         .chev {
           color: rgba(245, 244, 244, 0.75);
           font-size: 12px;
-          transform: rotate(0deg);
+          transform: rotate(-90deg); /* closed -> looks like ➜ */
           transition: transform 0.16s ease;
           padding-right: 8px;
           display: inline-flex;
           align-items: center;
         }
 
-        /* ✅ requested: open rotation 90deg */
         .chev.open {
-          transform: rotate(90deg);
+          transform: rotate(0deg); /* open -> down */
         }
 
         .menu {
@@ -561,8 +553,8 @@ export default function JeevanChandimalNavi(props) {
           flex-direction: column;
           gap: 2px;
           animation: dropIn 160ms ease forwards;
-          z-index: 99999; /* ✅ clickable on top */
-          pointer-events: auto; /* ✅ clickable */
+          z-index: 99999;
+          pointer-events: auto;
         }
 
         .menu.show {
@@ -672,7 +664,7 @@ export default function JeevanChandimalNavi(props) {
           padding: 0;
           margin: 0;
           cursor: pointer;
-          z-index: 0; /* ✅ behind panel */
+          z-index: 0;
         }
 
         .mPanel {
@@ -688,7 +680,7 @@ export default function JeevanChandimalNavi(props) {
           display: flex;
           flex-direction: column;
           animation: slideIn 180ms ease forwards;
-          z-index: 1; /* ✅ above backdrop */
+          z-index: 1;
         }
 
         @keyframes slideIn {
@@ -763,14 +755,17 @@ export default function JeevanChandimalNavi(props) {
           font-weight: 700;
         }
 
+        /* ✅ Mobile arrow: same ▾, rotated */
         .mChev {
           opacity: 0.8;
-          transform: rotate(0deg);
+          transform: rotate(-90deg); /* closed -> right */
           transition: transform 0.16s ease;
+          display: inline-flex;
+          align-items: center;
         }
 
         .mChev.open {
-          transform: rotate(90deg);
+          transform: rotate(0deg); /* open -> down */
         }
 
         .mSub {
