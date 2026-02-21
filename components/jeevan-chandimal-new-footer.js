@@ -275,10 +275,12 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .isActive {
-          opacity: 1;
-          background: rgba(37, 195, 226, 0.14);
-          border: 1px solid rgba(37, 195, 226, 0.25);
-        }
+  color: #25c3e2;
+  opacity: 1;
+  background: rgba(37, 195, 226, 0.14);
+  border: 1px solid rgba(37, 195, 226, 0.25);
+  box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
+}
 
         .jcDrop {
           position: relative;
