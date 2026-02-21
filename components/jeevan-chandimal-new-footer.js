@@ -399,32 +399,22 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcMenu {
-  position: absolute;
-  top: calc(100% + 10px);
-  left: 0;
-  min-width: 220px;
-  display: none;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px;
-  margin: 0;
-  list-style: none;
-  background: rgba(18, 18, 18, 0.95);
-  border: 1px solid rgba(245, 244, 244, 0.12);
-  border-radius: 14px;
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
-  z-index: 999999;
-}
-
-/* ✅ hover bridge (paste THIS right after .jcMenu) */
-.jcMenu::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -12px;
-  height: 12px;
-}
+          position: absolute;
+          top: calc(100% + 10px);
+          left: 0;
+          min-width: 220px;
+          display: none;
+          flex-direction: column;
+          gap: 2px;
+          padding: 8px;
+          margin: 0;
+          list-style: none;
+          background: rgba(18, 18, 18, 0.95);
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 14px;
+          box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
+          z-index: 999999;
+        }
 
         .teleport-show {
           display: flex !important;
@@ -457,14 +447,19 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         @media (min-width: 992px) {
-  /* open when hovering parent OR the menu itself */
-  .jcDrop:hover .jcMenu,
-  .jcDrop .jcMenu:hover {
+  /* ✅ Open on hover of parent */
+  .jcDrop:hover .jcMenu {
     display: flex;
   }
 
-  /* arrow rotation */
-  .jcDrop:hover .jcArrowSvg {
+  /* ✅ ALSO keep open while hovering the menu itself */
+  .jcMenu:hover {
+    display: flex;
+  }
+
+  /* Rotate arrow when either parent or menu is hovered */
+  .jcDrop:hover .jcArrowSvg,
+  .jcMenu:hover + .jcArrowSvg {
     transform: rotate(90deg);
   }
 }
