@@ -24,7 +24,10 @@ const JeevanChandimalNewFooter = (props) => {
       dropdowns.forEach((dd) => {
         const list = dd.querySelector('[data-thq="thq-dropdown-list"]')
         const arrow = dd.querySelector('[data-thq="thq-dropdown-arrow"]')
-        if (list && list !== exceptList) {
+        if (!list) return
+
+        // ✅ close everything when exceptList is null, otherwise close others
+        if (!exceptList || list !== exceptList) {
           list.classList.remove('teleport-show')
           arrow?.classList.remove('teleport-rotate')
         }
@@ -68,21 +71,20 @@ const JeevanChandimalNewFooter = (props) => {
   }, [])
 
   const SocialLink = ({ href, label, children }) => {
-  if (!href) return null  // ✅ hide icon if no URL
-
-  return (
-    <a
-      className="jcSocialBtn"
-      href={href}
-      aria-label={label}
-      title={label}
-      target="_blank"
-      rel="noreferrer noopener"
-    >
-      {children}
-    </a>
-  )
-}
+    if (!href) return null // ✅ hide icon if no URL
+    return (
+      <a
+        className="jcSocialBtn"
+        href={href}
+        aria-label={label}
+        title={label}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
+        {children}
+      </a>
+    )
+  }
 
   return (
     <>
@@ -97,51 +99,124 @@ const JeevanChandimalNewFooter = (props) => {
             </Link>
 
             <nav className="jcNav" aria-label="Footer navigation">
-              <Link href="/"><a className={`jcLink ${isActive('/') ? 'isActive' : ''}`}>Home</a></Link>
+              <Link href="/">
+                <a className={`jcLink ${isActive('/') ? 'isActive' : ''}`}>Home</a>
+              </Link>
 
               {/* WORK */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
-                  <Link href="/work"><a className={`jcLink ${isActive('/work') ? 'isActive' : ''}`}>Work</a></Link>
-                  <div data-thq="thq-dropdown-arrow" className="jcArrow" role="button" tabIndex={0} aria-label="Toggle Work">
+                  <Link href="/work">
+                    <a className={`jcLink ${isActive('/work') ? 'isActive' : ''}`}>Work</a>
+                  </Link>
+
+                  <div
+                    data-thq="thq-dropdown-arrow"
+                    className="jcArrow"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Toggle Work"
+                  >
                     <svg viewBox="0 0 1024 1024" className="jcArrowSvg" aria-hidden="true">
                       <path d="M426 726v-428l214 214z" />
                     </svg>
                   </div>
                 </div>
+
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
-                  <li><Link href="/work-film"><a className="jcMenuItem">Film</a></Link></li>
-                  <li><Link href="/work-audio"><a className="jcMenuItem">Audio</a></Link></li>
-                  <li><Link href="/work-animation"><a className="jcMenuItem">Animation</a></Link></li>
-                  <li><Link href="/work-photography"><a className="jcMenuItem">Photography</a></Link></li>
+                  <li>
+                    <Link href="/work-film">
+                      <a className={`jcMenuItem ${isActive('/work-film') ? 'isActiveItem' : ''}`}>Film</a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/work-audio">
+                      <a className={`jcMenuItem ${isActive('/work-audio') ? 'isActiveItem' : ''}`}>Audio</a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/work-animation">
+                      <a className={`jcMenuItem ${isActive('/work-animation') ? 'isActiveItem' : ''}`}>Animation</a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/work-photography">
+                      <a className={`jcMenuItem ${isActive('/work-photography') ? 'isActiveItem' : ''}`}>Photography</a>
+                    </Link>
+                  </li>
                 </ul>
               </div>
 
               {/* SERVICES */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
-                  <Link href="/services"><a className={`jcLink ${isActive('/services') ? 'isActive' : ''}`}>Services</a></Link>
-                  <div data-thq="thq-dropdown-arrow" className="jcArrow" role="button" tabIndex={0} aria-label="Toggle Services">
+                  <Link href="/services">
+                    <a className={`jcLink ${isActive('/services') ? 'isActive' : ''}`}>Services</a>
+                  </Link>
+
+                  <div
+                    data-thq="thq-dropdown-arrow"
+                    className="jcArrow"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Toggle Services"
+                  >
                     <svg viewBox="0 0 1024 1024" className="jcArrowSvg" aria-hidden="true">
                       <path d="M426 726v-428l214 214z" />
                     </svg>
                   </div>
                 </div>
+
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
-                  <li><Link href="/services-film-production"><a className="jcMenuItem">Film Production</a></Link></li>
-                  <li><Link href="/services-audio"><a className="jcMenuItem">Audio Production</a></Link></li>
-                  <li><Link href="/services-animation"><a className="jcMenuItem">Animation &amp; Motion</a></Link></li>
-                  <li><Link href="/services-photography"><a className="jcMenuItem">Photography</a></Link></li>
+                  <li>
+                    <Link href="/services-film-production">
+                      <a className={`jcMenuItem ${isActive('/services-film-production') ? 'isActiveItem' : ''}`}>
+                        Film Production
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/services-audio">
+                      <a className={`jcMenuItem ${isActive('/services-audio') ? 'isActiveItem' : ''}`}>
+                        Audio Production
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/services-animation">
+                      <a className={`jcMenuItem ${isActive('/services-animation') ? 'isActiveItem' : ''}`}>
+                        Animation &amp; Motion
+                      </a>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/services-photography">
+                      <a className={`jcMenuItem ${isActive('/services-photography') ? 'isActiveItem' : ''}`}>
+                        Photography
+                      </a>
+                    </Link>
+                  </li>
                 </ul>
               </div>
 
-              <Link href="/store"><a className={`jcLink ${isActive('/store') ? 'isActive' : ''}`}>Store</a></Link>
-              <Link href="/memberships"><a className={`jcLink ${isActive('/memberships') ? 'isActive' : ''}`}>Membership</a></Link>
-              <Link href="/about"><a className={`jcLink ${isActive('/about') ? 'isActive' : ''}`}>About</a></Link>
-              <Link href="/contact"><a className={`jcLink ${isActive('/contact') ? 'isActive' : ''}`}>Contact</a></Link>
+              <Link href="/store">
+                <a className={`jcLink ${isActive('/store') ? 'isActive' : ''}`}>Store</a>
+              </Link>
+
+              <Link href="/memberships">
+                <a className={`jcLink ${isActive('/memberships') ? 'isActive' : ''}`}>Membership</a>
+              </Link>
+
+              <Link href="/about">
+                <a className={`jcLink ${isActive('/about') ? 'isActive' : ''}`}>About</a>
+              </Link>
+
+              <Link href="/contact">
+                <a className={`jcLink ${isActive('/contact') ? 'isActive' : ''}`}>Contact</a>
+              </Link>
             </nav>
 
-            {/* SOCIAL ICONS (black square / white icon) */}
+            {/* SOCIAL ICONS */}
             <div className="jcSocial" aria-label="Social links">
               <SocialLink href={props.facebookUrl} label="Facebook">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
@@ -275,12 +350,12 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .isActive {
-  color: #25c3e2;
-  opacity: 1;
-  background: rgba(37, 195, 226, 0.14);
-  border: 1px solid rgba(37, 195, 226, 0.25);
-  box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
-}
+          color: #25c3e2;
+          opacity: 1;
+          background: rgba(37, 195, 226, 0.14);
+          border: 1px solid rgba(37, 195, 226, 0.25);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
+        }
 
         .jcDrop {
           position: relative;
@@ -352,13 +427,23 @@ const JeevanChandimalNewFooter = (props) => {
           padding: 10px 10px;
           border-radius: 10px;
           opacity: 0.92;
-          transition: background 0.15s, opacity 0.15s;
+          transition: background 0.15s, opacity 0.15s, color 0.15s, border-color 0.15s;
           display: block;
+          border: 1px solid transparent;
         }
 
         .jcMenuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
+        }
+
+        /* ✅ Active dropdown child highlight */
+        .isActiveItem {
+          color: #25c3e2;
+          opacity: 1;
+          background: rgba(37, 195, 226, 0.14);
+          border-color: rgba(37, 195, 226, 0.25);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
         }
 
         @media (min-width: 992px) {
@@ -370,7 +455,6 @@ const JeevanChandimalNewFooter = (props) => {
           }
         }
 
-        /* ✅ Social icons match your reference: black square + white icon */
         .jcSocial {
           display: inline-flex;
           align-items: center;
@@ -387,7 +471,7 @@ const JeevanChandimalNewFooter = (props) => {
           align-items: center;
           justify-content: center;
           background: rgba(0, 0, 0, 0.55);
-          border: 1px solid rgba(245, 244, 244, 0.10);
+          border: 1px solid rgba(245, 244, 244, 0.1);
           color: rgba(245, 244, 244, 0.92);
           text-decoration: none !important;
           transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
@@ -396,7 +480,7 @@ const JeevanChandimalNewFooter = (props) => {
 
         .jcSocialBtn:hover {
           transform: translateY(-1px);
-          background: rgba(37, 195, 226, 0.10);
+          background: rgba(37, 195, 226, 0.1);
           border-color: rgba(37, 195, 226, 0.35);
           color: #25c3e2;
           box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
@@ -487,7 +571,7 @@ JeevanChandimalNewFooter.defaultProps = {
 
   facebookUrl: 'https://web.facebook.com/jeevan.chandimal.2025',
   instagramUrl: 'https://www.instagram.com/jeeinfo/?hl=en',
-  xUrl: '', // (leave empty until you have X/Twitter)
+  xUrl: '',
   linkedinUrl: 'https://www.linkedin.com/in/jeevanchandimal/',
   youtubeUrl: 'https://www.youtube.com/@jeevanchandimal8145',
 }
