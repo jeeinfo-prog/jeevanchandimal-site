@@ -451,12 +451,11 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .isActive {
-  color: #25c3e2;
-  opacity: 1;
-  background: rgba(37, 195, 226, 0.14);
-  border: 1px solid rgba(37, 195, 226, 0.25);
-  box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
-}
+          color: #25c3e2 !important;
+          opacity: 1;
+          background: rgba(37, 195, 226, 0.12);
+          font-weight: 700;
+        }
 
         /* ========= DROPDOWN ========= */
         .drop {
