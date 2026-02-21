@@ -67,21 +67,22 @@ const JeevanChandimalNewFooter = (props) => {
     return () => handlers.forEach((fn) => fn())
   }, [])
 
-  const SocialLink = ({ href, label, children }) => (
+  const SocialLink = ({ href, label, children }) => {
+  if (!href) return null  // ✅ hide icon if no URL
+
+  return (
     <a
       className="jcSocialBtn"
-      href={href || '#'}
+      href={href}
       aria-label={label}
       title={label}
-      target={href ? '_blank' : undefined}
-      rel={href ? 'noreferrer noopener' : undefined}
-      onClick={(e) => {
-        if (!href) e.preventDefault()
-      }}
+      target="_blank"
+      rel="noreferrer noopener"
     >
       {children}
     </a>
   )
+}
 
   return (
     <>
