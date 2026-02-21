@@ -86,15 +86,25 @@ export default function JeevanChandimalNavi(props) {
       .catch(() => {})
   }, [])
 
+  // ✅ Used for BOTH:
+  // - top nav items (Home, Store, etc.)
+  // - dropdown child items (work-film, services-audio, etc.)
   const isActive = (href) => {
+    if (!href) return false
+
+    // Exact match for leaf pages
     if (router.pathname === href) return true
+
+    // Parent groups
     if (href === '/work' && router.pathname.startsWith('/work')) return true
     if (href === '/services' && router.pathname.startsWith('/services')) return true
     if (href === '/store' && router.pathname.startsWith('/store')) return true
+
     return false
   }
 
   const activeClass = (href) => (isActive(href) ? 'isActive' : '')
+  const activeItemClass = (href) => (isActive(href) ? 'isActiveItem' : '')
 
   const onDropdownKey = (which) => (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -178,7 +188,7 @@ export default function JeevanChandimalNavi(props) {
                   <a className="dropLabel">Work</a>
                 </Link>
 
-                {/* ✅ same arrow, only rotation changes */}
+                {/* arrow */}
                 <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
                   ▾
                 </span>
@@ -192,7 +202,7 @@ export default function JeevanChandimalNavi(props) {
               >
                 {workItems.map((it) => (
                   <Link href={it.href} key={it.href}>
-                    <a className="menuItem" role="menuitem">
+                    <a className={`menuItem ${activeItemClass(it.href)}`} role="menuitem">
                       {it.label}
                     </a>
                   </Link>
@@ -226,7 +236,7 @@ export default function JeevanChandimalNavi(props) {
                   <a className="dropLabel">Services</a>
                 </Link>
 
-                {/* ✅ same arrow, only rotation changes */}
+                {/* arrow */}
                 <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
                   ▾
                 </span>
@@ -240,7 +250,7 @@ export default function JeevanChandimalNavi(props) {
               >
                 {serviceItems.map((it) => (
                   <Link href={it.href} key={it.href}>
-                    <a className="menuItem" role="menuitem">
+                    <a className={`menuItem ${activeItemClass(it.href)}`} role="menuitem">
                       {it.label}
                     </a>
                   </Link>
@@ -341,8 +351,6 @@ export default function JeevanChandimalNavi(props) {
                   }}
                 >
                   <span>Work</span>
-
-                  {/* ✅ same arrow, only rotation changes */}
                   <span className={`mChev ${mWorkOpen ? 'open' : ''}`} aria-hidden="true">
                     ▾
                   </span>
@@ -352,7 +360,10 @@ export default function JeevanChandimalNavi(props) {
                 <div className="mSub">
                   {workItems.map((it) => (
                     <Link href={it.href} key={it.href}>
-                      <a className="mSubLink" onClick={closeAll}>
+                      <a
+                        className={`mSubLink ${activeItemClass(it.href)}`}
+                        onClick={closeAll}
+                      >
                         {it.label}
                       </a>
                     </Link>
@@ -375,8 +386,6 @@ export default function JeevanChandimalNavi(props) {
                   }}
                 >
                   <span>Services</span>
-
-                  {/* ✅ same arrow, only rotation changes */}
                   <span className={`mChev ${mServicesOpen ? 'open' : ''}`} aria-hidden="true">
                     ▾
                   </span>
@@ -386,7 +395,10 @@ export default function JeevanChandimalNavi(props) {
                 <div className="mSub">
                   {serviceItems.map((it) => (
                     <Link href={it.href} key={it.href}>
-                      <a className="mSubLink" onClick={closeAll}>
+                      <a
+                        className={`mSubLink ${activeItemClass(it.href)}`}
+                        onClick={closeAll}
+                      >
                         {it.label}
                       </a>
                     </Link>
@@ -501,7 +513,6 @@ export default function JeevanChandimalNavi(props) {
           align-items: center;
         }
 
-        /* ✅ hover bridge prevents flicker when moving into menu */
         .drop::after {
           content: '';
           position: absolute;
@@ -525,39 +536,39 @@ export default function JeevanChandimalNavi(props) {
         }
 
         /* Desktop arrow – fixed box, no movement */
-.chev {
-  width: 14px;
-  height: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(245, 244, 244, 0.75);
-  font-size: 12px;
-  transform: rotate(-90deg); /* closed → right */
-  transition: transform 0.16s ease;
-  margin-left: 4px; /* optional spacing */
-  padding-right: 0; /* remove old padding */
-}
+        .chev {
+          width: 14px;
+          height: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(245, 244, 244, 0.75);
+          font-size: 12px;
+          transform: rotate(-90deg); /* closed → right */
+          transition: transform 0.16s ease;
+          margin-left: 4px;
+          padding-right: 0;
+        }
 
-.chev.open {
-  transform: rotate(0deg); /* open → down */
-}
+        .chev.open {
+          transform: rotate(0deg); /* open → down */
+        }
 
-/* Mobile arrow – same fix */
-.mChev {
-  width: 14px;
-  height: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.8;
-  transform: rotate(-90deg);
-  transition: transform 0.16s ease;
-}
+        /* Mobile arrow – same fix */
+        .mChev {
+          width: 14px;
+          height: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0.8;
+          transform: rotate(-90deg);
+          transition: transform 0.16s ease;
+        }
 
-.mChev.open {
-  transform: rotate(0deg);
-}
+        .mChev.open {
+          transform: rotate(0deg);
+        }
 
         .menu {
           position: absolute;
@@ -605,6 +616,14 @@ export default function JeevanChandimalNavi(props) {
         .menuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
+        }
+
+        /* ✅ Dropdown child active highlight */
+        .menuItem.isActiveItem {
+          color: #25c3e2 !important;
+          opacity: 1;
+          background: rgba(37, 195, 226, 0.12);
+          font-weight: 700;
         }
 
         /* ========= RIGHT ========= */
@@ -775,16 +794,6 @@ export default function JeevanChandimalNavi(props) {
           font-weight: 700;
         }
 
-        /* ✅ Mobile arrow: same ▾, rotated */
-        .mChev {
-          opacity: 0.8;
-          transform: rotate(-90deg); /* closed -> right */
-          transition: transform 0.16s ease;
-          display: inline-flex;
-          align-items: center;
-        }
-
-
         .mSub {
           margin-top: -4px;
           margin-left: 10px;
@@ -806,6 +815,15 @@ export default function JeevanChandimalNavi(props) {
 
         .mSubLink:hover {
           background: rgba(255, 255, 255, 0.06);
+        }
+
+        /* ✅ Mobile dropdown child active highlight */
+        .mSubLink.isActiveItem {
+          color: #25c3e2 !important;
+          background: rgba(37, 195, 226, 0.12);
+          border-color: rgba(37, 195, 226, 0.18);
+          opacity: 1;
+          font-weight: 800;
         }
 
         .mBadge {
