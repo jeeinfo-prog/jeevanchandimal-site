@@ -524,20 +524,40 @@ export default function JeevanChandimalNavi(props) {
           box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
         }
 
-        /* ✅ Arrow: same character ▾, rotated */
-        .chev {
-          color: rgba(245, 244, 244, 0.75);
-          font-size: 12px;
-          transform: rotate(-90deg); /* closed -> looks like ➜ */
-          transition: transform 0.16s ease;
-          padding-right: 8px;
-          display: inline-flex;
-          align-items: center;
-        }
+        /* Desktop arrow – fixed box, no movement */
+.chev {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(245, 244, 244, 0.75);
+  font-size: 12px;
+  transform: rotate(-90deg); /* closed → right */
+  transition: transform 0.16s ease;
+  margin-left: 4px; /* optional spacing */
+  padding-right: 0; /* remove old padding */
+}
 
-        .chev.open {
-          transform: rotate(0deg); /* open -> down */
-        }
+.chev.open {
+  transform: rotate(0deg); /* open → down */
+}
+
+/* Mobile arrow – same fix */
+.mChev {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transform: rotate(-90deg);
+  transition: transform 0.16s ease;
+}
+
+.mChev.open {
+  transform: rotate(0deg);
+}
 
         .menu {
           position: absolute;
@@ -764,9 +784,6 @@ export default function JeevanChandimalNavi(props) {
           align-items: center;
         }
 
-        .mChev.open {
-          transform: rotate(0deg); /* open -> down */
-        }
 
         .mSub {
           margin-top: -4px;
