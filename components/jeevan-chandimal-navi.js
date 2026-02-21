@@ -723,7 +723,7 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .mChev.open {
-          transform: rotate(90deg);
+          transform: rotate(180deg);
         }
 
         .mSub {
@@ -763,17 +763,13 @@ export default function JeevanChandimalNavi(props) {
 
         /* ========= RESPONSIVE ========= */
         @media (min-width: 900px) {
-  /* keep dropdown open on hover of parent OR menu */
-  .drop:hover .menu,
-  .drop .menu:hover {
-    display: flex;
-  }
-
-  /* rotate chevron right ➜ down */
-  .drop:hover .chev {
-    transform: rotate(90deg);
-  }
-}
+          .navLinks {
+            display: flex;
+          }
+          .burger {
+            display: none;
+          }
+        }
       `}</style>
     </>
   )
