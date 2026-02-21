@@ -68,27 +68,18 @@ const JeevanChandimalNewFooter = (props) => {
   }, [])
 
   const SocialLink = ({ href, label, children }) => {
-  if (!href) return null  // ✅ hide icon if no URL
-
-  return (
-    <a
-      className="jcSocialBtn"
-      href={href}
-      aria-label={label}
-      title={label}
-      target="_blank"
-      rel="noreferrer noopener"
-    >
-      {children}
-    </a>
-  )
-}
+    if (!href) return null
+    return (
+      <a className="jcSocialBtn" href={href} aria-label={label} title={label} target="_blank" rel="noreferrer noopener">
+        {children}
+      </a>
+    )
+  }
 
   return (
     <>
       <footer ref={footerRef} className={`jcFooter ${props.rootClassName || ''}`}>
         <div className="jcInner">
-          {/* TOP ROW */}
           <div className="jcTop">
             <Link href="/">
               <a className="jcBrand" aria-label="Home">
@@ -99,7 +90,6 @@ const JeevanChandimalNewFooter = (props) => {
             <nav className="jcNav" aria-label="Footer navigation">
               <Link href="/"><a className={`jcLink ${isActive('/') ? 'isActive' : ''}`}>Home</a></Link>
 
-              {/* WORK */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
                   <Link href="/work"><a className={`jcLink ${isActive('/work') ? 'isActive' : ''}`}>Work</a></Link>
@@ -109,6 +99,7 @@ const JeevanChandimalNewFooter = (props) => {
                     </svg>
                   </div>
                 </div>
+
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
                   <li><Link href="/work-film"><a className="jcMenuItem">Film</a></Link></li>
                   <li><Link href="/work-audio"><a className="jcMenuItem">Audio</a></Link></li>
@@ -117,7 +108,6 @@ const JeevanChandimalNewFooter = (props) => {
                 </ul>
               </div>
 
-              {/* SERVICES */}
               <div data-thq="thq-dropdown" className="jcDrop">
                 <div data-thq="thq-dropdown-toggle" className="jcDropToggle">
                   <Link href="/services"><a className={`jcLink ${isActive('/services') ? 'isActive' : ''}`}>Services</a></Link>
@@ -127,6 +117,7 @@ const JeevanChandimalNewFooter = (props) => {
                     </svg>
                   </div>
                 </div>
+
                 <ul data-thq="thq-dropdown-list" className="jcMenu">
                   <li><Link href="/services-film-production"><a className="jcMenuItem">Film Production</a></Link></li>
                   <li><Link href="/services-audio"><a className="jcMenuItem">Audio Production</a></Link></li>
@@ -141,14 +132,10 @@ const JeevanChandimalNewFooter = (props) => {
               <Link href="/contact"><a className={`jcLink ${isActive('/contact') ? 'isActive' : ''}`}>Contact</a></Link>
             </nav>
 
-            {/* SOCIAL ICONS (black square / white icon) */}
             <div className="jcSocial" aria-label="Social links">
               <SocialLink href={props.facebookUrl} label="Facebook">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M13.5 22v-8h2.7l.4-3H13.5V9.1c0-.9.3-1.6 1.7-1.6h1.4V4.8c-.2 0-1.2-.1-2.3-.1c-2.3 0-3.9 1.4-3.9 4V11H7.9v3h2.5v8h3.1z"
-                  />
+                  <path fill="currentColor" d="M13.5 22v-8h2.7l.4-3H13.5V9.1c0-.9.3-1.6 1.7-1.6h1.4V4.8c-.2 0-1.2-.1-2.3-.1c-2.3 0-3.9 1.4-3.9 4V11H7.9v3h2.5v8h3.1z" />
                 </svg>
               </SocialLink>
 
@@ -161,30 +148,15 @@ const JeevanChandimalNewFooter = (props) => {
                 </svg>
               </SocialLink>
 
-              <SocialLink href={props.xUrl} label="X">
-                <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M18.3 2H21l-6.9 7.9L22 22h-6.7l-5.2-6.8L4.2 22H2l7.4-8.5L2 2h6.9l4.7 6.2L18.3 2zm-1.2 18h1.5L7.7 3.9H6.1L17.1 20z"
-                  />
-                </svg>
-              </SocialLink>
-
               <SocialLink href={props.linkedinUrl} label="LinkedIn">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M6 6.8A2.4 2.4 0 1 1 6 2a2.4 2.4 0 0 1 0 4.8zM4.6 22V9H7.4v13H4.6zM9.3 9H12v1.8h.1c.4-.8 1.5-2 3.4-2c3 0 3.6 2 3.6 4.7V22h-2.8v-7.1c0-1.7 0-3.8-2.3-3.8c-2.3 0-2.7 1.8-2.7 3.7V22H9.3V9z"
-                  />
+                  <path fill="currentColor" d="M6 6.8A2.4 2.4 0 1 1 6 2a2.4 2.4 0 0 1 0 4.8zM4.6 22V9H7.4v13H4.6zM9.3 9H12v1.8h.1c.4-.8 1.5-2 3.4-2c3 0 3.6 2 3.6 4.7V22h-2.8v-7.1c0-1.7 0-3.8-2.3-3.8c-2.3 0-2.7 1.8-2.7 3.7V22H9.3V9z" />
                 </svg>
               </SocialLink>
 
               <SocialLink href={props.youtubeUrl} label="YouTube">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M21.8 8.1a3 3 0 0 0-2.1-2.1C17.9 5.5 12 5.5 12 5.5s-5.9 0-7.7.5A3 3 0 0 0 2.2 8.1A31.2 31.2 0 0 0 1.8 12c0 1.3.1 2.6.4 3.9a3 3 0 0 0 2.1 2.1c1.8.5 7.7.5 7.7.5s5.9 0 7.7-.5a3 3 0 0 0 2.1-2.1c.3-1.3.4-2.6.4-3.9c0-1.3-.1-2.6-.4-3.9zM10 15.2V8.8L15.5 12L10 15.2z"
-                  />
+                  <path fill="currentColor" d="M21.8 8.1a3 3 0 0 0-2.1-2.1C17.9 5.5 12 5.5 12 5.5s-5.9 0-7.7.5A3 3 0 0 0 2.2 8.1A31.2 31.2 0 0 0 1.8 12c0 1.3.1 2.6.4 3.9a3 3 0 0 0 2.1 2.1c1.8.5 7.7.5 7.7.5s5.9 0 7.7-.5a3 3 0 0 0 2.1-2.1c.3-1.3.4-2.6.4-3.9c0-1.3-.1-2.6-.4-3.9zM10 15.2V8.8L15.5 12L10 15.2z" />
                 </svg>
               </SocialLink>
             </div>
@@ -233,7 +205,7 @@ const JeevanChandimalNewFooter = (props) => {
           grid-template-columns: auto 1fr auto;
           align-items: center;
           gap: 16px;
-          padding-bottom: 64px; /* ✅ reserve dropdown space */
+          padding-bottom: 64px;
         }
 
         .jcBrand {
@@ -257,7 +229,7 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcLink {
-          color: #f5f4f4;
+          color: rgba(245, 244, 244, 0.9);
           text-decoration: none !important;
           font-size: 14px;
           opacity: 0.9;
@@ -266,7 +238,6 @@ const JeevanChandimalNewFooter = (props) => {
           transition: opacity 0.15s, background 0.15s, color 0.15s;
           display: inline-flex;
           align-items: center;
-          gap: 6px;
         }
 
         .jcLink:hover {
@@ -274,10 +245,10 @@ const JeevanChandimalNewFooter = (props) => {
           background: rgba(245, 244, 244, 0.06);
         }
 
+        /* ✅ Active page text color = navbar style */
         .isActive {
+          color: #25c3e2;
           opacity: 1;
-          background: rgba(37, 195, 226, 0.14);
-          border: 1px solid rgba(37, 195, 226, 0.25);
         }
 
         .jcDrop {
@@ -344,19 +315,20 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcMenuItem {
-          color: #f5f4f4;
+          color: rgba(245, 244, 244, 0.92);
           text-decoration: none !important;
           font-size: 14px;
           padding: 10px 10px;
           border-radius: 10px;
           opacity: 0.92;
-          transition: background 0.15s, opacity 0.15s;
+          transition: background 0.15s, opacity 0.15s, color 0.15s;
           display: block;
         }
 
         .jcMenuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
+          color: #fff;
         }
 
         @media (min-width: 992px) {
@@ -368,7 +340,6 @@ const JeevanChandimalNewFooter = (props) => {
           }
         }
 
-        /* ✅ Social icons match your reference: black square + white icon */
         .jcSocial {
           display: inline-flex;
           align-items: center;
@@ -385,7 +356,7 @@ const JeevanChandimalNewFooter = (props) => {
           align-items: center;
           justify-content: center;
           background: rgba(0, 0, 0, 0.55);
-          border: 1px solid rgba(245, 244, 244, 0.10);
+          border: 1px solid rgba(245, 244, 244, 0.1);
           color: rgba(245, 244, 244, 0.92);
           text-decoration: none !important;
           transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
@@ -394,7 +365,7 @@ const JeevanChandimalNewFooter = (props) => {
 
         .jcSocialBtn:hover {
           transform: translateY(-1px);
-          background: rgba(37, 195, 226, 0.10);
+          background: rgba(37, 195, 226, 0.1);
           border-color: rgba(37, 195, 226, 0.35);
           color: #25c3e2;
           box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
@@ -482,10 +453,8 @@ JeevanChandimalNewFooter.defaultProps = {
   logoSrc: '/JC/jc%20logo%20web%2004-1500h.png',
   logoAlt: 'Company Logo',
   rootClassName: '',
-
   facebookUrl: 'https://web.facebook.com/jeevan.chandimal.2025',
   instagramUrl: 'https://www.instagram.com/jeeinfo/?hl=en',
-  xUrl: '', // (leave empty until you have X/Twitter)
   linkedinUrl: 'https://www.linkedin.com/in/jeevanchandimal/',
   youtubeUrl: 'https://www.youtube.com/@jeevanchandimal8145',
 }
@@ -496,7 +465,6 @@ JeevanChandimalNewFooter.propTypes = {
   rootClassName: PropTypes.string,
   facebookUrl: PropTypes.string,
   instagramUrl: PropTypes.string,
-  xUrl: PropTypes.string,
   linkedinUrl: PropTypes.string,
   youtubeUrl: PropTypes.string,
 }
