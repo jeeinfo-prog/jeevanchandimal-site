@@ -70,14 +70,13 @@ export default function JeevanChandimalNavi(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router?.events])
 
-  // ✅ Keep cart badge updated (same-tab + other tabs)
+  // ✅ Keep cart badge updated (same-tab + other tabs) — NO INTERVAL (prevents hydration mismatch)
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const refresh = () => {
       try {
-        const n = typeof cartCount === 'function' ? cartCount() : 0
-        setCartNum(Number.isFinite(n) ? n : 0)
+        setCartNum(cartCount())
       } catch {
         setCartNum(0)
       }
@@ -86,6 +85,9 @@ export default function JeevanChandimalNavi(props) {
     refresh()
 
     const onStorage = (e) => {
+      // cross-tab updates
+      if (e?.key === 'jc_cart_v1') refresh()
+      // fallback if something else writes different key names
       if (e?.key && String(e.key).includes('cart')) refresh()
       if (e?.key && String(e.key).includes('jc_cart')) refresh()
     }
@@ -95,13 +97,9 @@ export default function JeevanChandimalNavi(props) {
     window.addEventListener('storage', onStorage)
     window.addEventListener('jc_cart_updated', onCustom)
 
-    // same-tab changes won't trigger storage -> keep a light poll as backup
-    const t = setInterval(refresh, 1200)
-
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('jc_cart_updated', onCustom)
-      clearInterval(t)
     }
   }, [])
 
@@ -228,17 +226,14 @@ export default function JeevanChandimalNavi(props) {
                 tabIndex={0}
                 aria-haspopup="menu"
                 aria-expanded={deskWorkOpen ? 'true' : 'false'}
-                onClick={(e) => {
-                  e.preventDefault() // ✅ prevent accidental navigation
+                onClick={() => {
                   setDeskWorkOpen((v) => !v)
                   setDeskServicesOpen(false)
                 }}
                 onKeyDown={onDropdownKey('work')}
               >
                 <Link href="/work" legacyBehavior>
-                  <a className="dropLabel" onClick={(e) => e.preventDefault()}>
-                    Work
-                  </a>
+                  <a className="dropLabel">Work</a>
                 </Link>
 
                 <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
@@ -278,17 +273,14 @@ export default function JeevanChandimalNavi(props) {
                 tabIndex={0}
                 aria-haspopup="menu"
                 aria-expanded={deskServicesOpen ? 'true' : 'false'}
-                onClick={(e) => {
-                  e.preventDefault() // ✅ prevent accidental navigation
+                onClick={() => {
                   setDeskServicesOpen((v) => !v)
                   setDeskWorkOpen(false)
                 }}
                 onKeyDown={onDropdownKey('services')}
               >
                 <Link href="/services" legacyBehavior>
-                  <a className="dropLabel" onClick={(e) => e.preventDefault()}>
-                    Services
-                  </a>
+                  <a className="dropLabel">Services</a>
                 </Link>
 
                 <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
@@ -432,7 +424,6 @@ export default function JeevanChandimalNavi(props) {
                       return
                     }
                     closeAll()
-                    router.push('/work')
                   }}
                 >
                   <span>Work</span>
@@ -465,7 +456,6 @@ export default function JeevanChandimalNavi(props) {
                       return
                     }
                     closeAll()
-                    router.push('/services')
                   }}
                 >
                   <span>Services</span>
@@ -593,11 +583,7 @@ export default function JeevanChandimalNavi(props) {
 
         /* keep highlighted text BLUE */
         .isActive {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.24),
-            rgba(37, 195, 226, 0.1)
-          );
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
           border: 1px solid rgba(37, 195, 226, 0.22);
           color: #25c3e2 !important;
           opacity: 1;
@@ -715,11 +701,7 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .menuItem.isActiveItem {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.2),
-            rgba(37, 195, 226, 0.08)
-          );
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
           border: 1px solid rgba(37, 195, 226, 0.18);
           color: #25c3e2 !important;
           opacity: 1;
@@ -948,10 +930,6 @@ export default function JeevanChandimalNavi(props) {
           justify-content: space-between;
         }
 
-        .mDrop {
-          cursor: pointer;
-        }
-
         .mCartBadge {
           min-width: 22px;
           height: 22px;
@@ -973,11 +951,7 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .mLink.isActive {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.22),
-            rgba(37, 195, 226, 0.1)
-          );
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.22), rgba(37, 195, 226, 0.1));
           border-color: rgba(37, 195, 226, 0.22);
           color: #25c3e2 !important;
           opacity: 1;
@@ -1009,11 +983,7 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .mSubLink.isActiveItem {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.2),
-            rgba(37, 195, 226, 0.08)
-          );
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
           border-color: rgba(37, 195, 226, 0.18);
           color: #25c3e2 !important;
           opacity: 1;
