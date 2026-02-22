@@ -2,6 +2,9 @@
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
+  // no-cache (prevents weird 304 behavior)
+  res.setHeader('Cache-Control', 'no-store, max-age=0')
+
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
@@ -28,14 +31,14 @@ export default async function handler(req, res) {
         ok: true,
         id: byId.data.id,
         order_id: byId.data.order_id || null,
-        code: byId.data.order_id || null, // ✅ backward compatibility
+        code: byId.data.order_id || null, // backward compat
         status: byId.data.status,
         paid_at: byId.data.paid_at,
         payhere_status_code: byId.data.payhere_status_code ?? null,
       })
     }
 
-    // 2) Try by order_id (PayHere order id / cart flow)
+    // 2) Try by order_id (PayHere order ref like ORD_...)
     const byOrderId = await supabaseAdmin
       .from('orders')
       .select('id,order_id,status,paid_at,payhere_status_code')
@@ -54,7 +57,7 @@ export default async function handler(req, res) {
       ok: true,
       id: byOrderId.data.id,
       order_id: byOrderId.data.order_id || null,
-      code: byOrderId.data.order_id || null, // ✅ backward compatibility
+      code: byOrderId.data.order_id || null, // backward compat
       status: byOrderId.data.status,
       paid_at: byOrderId.data.paid_at,
       payhere_status_code: byOrderId.data.payhere_status_code ?? null,
