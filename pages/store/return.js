@@ -17,6 +17,19 @@ function readQueryOrderId(q) {
   return ''
 }
 
+function safeSet(key, value) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {}
+}
+function safeGet(key) {
+  try {
+    return localStorage.getItem(key) || ''
+  } catch {
+    return ''
+  }
+}
+
 export default function StoreReturn() {
   const router = useRouter()
 
@@ -35,17 +48,19 @@ export default function StoreReturn() {
     // If URL has order_id, prefer it and store it
     if (urlOrderId) {
       setOrderId(urlOrderId)
-      try {
-        localStorage.setItem('last_order_id', urlOrderId)
-      } catch {}
+
+      // ✅ Save under both keys (backward + forward compatible)
+      safeSet('last_order_ref', urlOrderId) // new
+      safeSet('last_order_id', urlOrderId) // old (keep)
       return
     }
 
     // Otherwise recover from localStorage
-    try {
-      const saved = localStorage.getItem('last_order_id') || ''
-      if (saved) setOrderId(saved)
-    } catch {}
+    const saved =
+      safeGet('last_order_ref') || // new
+      safeGet('last_order_id') // old fallback
+
+    if (saved) setOrderId(saved)
   }, [router.isReady, urlOrderId])
 
   React.useEffect(() => {
@@ -71,8 +86,13 @@ export default function StoreReturn() {
           const s = String(raw).trim().toUpperCase()
           setStatus(s)
 
-          // ✅ Paid → go to download (most reliable redirect)
+          // ✅ Paid → clear cart + go to download
           if (PAID_STATUSES.has(s)) {
+            // Safe to clear cart now (prevents accidental double orders)
+            try {
+              localStorage.removeItem('jc_cart_v1')
+            } catch {}
+
             window.location.href = `/store/download?order_id=${encodeURIComponent(orderId)}`
             return
           }
@@ -124,9 +144,7 @@ export default function StoreReturn() {
           {/* Manual fallback button (in case redirect is blocked) */}
           {orderId && PAID_STATUSES.has(status) ? (
             <p className="p2">
-              <a href={`/store/download?order_id=${encodeURIComponent(orderId)}`}>
-                Download
-              </a>
+              <a href={`/store/download?order_id=${encodeURIComponent(orderId)}`}>Download</a>
             </p>
           ) : null}
 

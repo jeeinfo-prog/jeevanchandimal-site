@@ -7,6 +7,8 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
+import { addToCart } from '../../lib/cart'
+
 const PRICES = {
   LKR: {
     personal: { jpg: 2500, raw: 4000 },
@@ -166,6 +168,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [isMember, setIsMember] = React.useState(false)
   const [memberPlan, setMemberPlan] = React.useState(null)
   const memberTimer = React.useRef(null)
+
+  // ✅ cart ui
+  const [cartQty, setCartQty] = React.useState(1)
+  const [cartMsg, setCartMsg] = React.useState('')
 
   // preview
   const previewSrc = photo?.id
@@ -534,6 +540,42 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     } finally {
       setIsCheckingOut(false)
     }
+  }
+
+  // ✅ Add to Cart handler (uses current selections)
+  function addCurrentToCart() {
+    if (!photo?.id) return
+
+    if (format === 'raw' && rawAvailable === false) {
+      alert('RAW is not available for this image. Please choose JPG.')
+      return
+    }
+
+    const unitPrice = PRICES?.[currency]?.[license]?.[format] ?? 0
+    if (!unitPrice || Number(unitPrice) <= 0) {
+      alert('Price not available.')
+      return
+    }
+
+    const qty = clamp(Number(cartQty || 1), 1, 99)
+
+    addToCart({
+      photoId: photo.id,
+      title: photo.title || 'Untitled',
+      thumbUrl: String(photo.thumbUrl || photo.previewUrl || '').trim(),
+      license,
+      format,
+      currency,
+      unitPrice: Number(unitPrice),
+      qty,
+    })
+
+    try {
+      window.dispatchEvent(new Event('jc_cart_updated'))
+    } catch {}
+
+    setCartMsg('Added to cart ✅')
+    setTimeout(() => setCartMsg(''), 1200)
   }
 
   /* ---------------- SEO / OG / JSON-LD ---------------- */
@@ -1062,6 +1104,38 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                       <span className="small">Instant digital download</span>
                     </div>
 
+                    {/* ✅ ADD TO CART UI (added, everything else unchanged) */}
+                    <div className="cartRow">
+                      <div className="cartLeft">
+                        <span className="cartLabel">Qty</span>
+                        <input
+                          className="cartQty"
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={cartQty}
+                          onChange={(e) => setCartQty(clamp(Number(e.target.value || 1), 1, 99))}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        className="cartBtn"
+                        onClick={addCurrentToCart}
+                        disabled={isCheckingOut}
+                        title="Add this selection to cart"
+                      >
+                        Add to cart
+                      </button>
+                    </div>
+
+                    <div className="cartLinks">
+                      <Link href="/cart" legacyBehavior>
+                        <a className="cartLink">Go to cart →</a>
+                      </Link>
+                      {cartMsg ? <span className="cartMsg">{cartMsg}</span> : null}
+                    </div>
+
                     <div className="fileInfo">
                       {resolution && (
                         <div>
@@ -1585,6 +1659,74 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           opacity: 0.85;
         }
 
+        /* ✅ cart ui styles (added) */
+        .cartRow {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .cartLeft {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .cartLabel {
+          font-size: 12px;
+          opacity: 0.85;
+        }
+
+        .cartQty {
+          width: 80px;
+          padding: 10px 10px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.15);
+          background: rgba(255, 255, 255, 0.02);
+          color: #f5f4f4;
+          outline: none;
+          text-align: center;
+        }
+
+        .cartBtn {
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px solid rgba(37, 195, 226, 0.55);
+          background: rgba(37, 195, 226, 0.14);
+          color: #f5f4f4;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .cartBtn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .cartLinks {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .cartLink {
+          opacity: 0.9;
+          text-decoration: none;
+        }
+
+        .cartMsg {
+          font-size: 12px;
+          opacity: 0.85;
+          white-space: nowrap;
+        }
+
         .fileInfo {
           display: grid;
           gap: 6px;
@@ -1779,16 +1921,16 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         }
 
         .imageFrame:hover .wmTile {
-  opacity: 0;
-}
+          opacity: 0;
+        }
 
-.relThumb:hover .relWm {
-  opacity: 0;
-}
+        .relThumb:hover .relWm {
+          opacity: 0;
+        }
 
-.zoomBody:hover .zoomWm {
-  opacity: 0;
-}
+        .zoomBody:hover .zoomWm {
+          opacity: 0;
+        }
 
         .zoomWm {
           position: absolute;
@@ -1826,7 +1968,9 @@ export async function getServerSideProps(ctx) {
 
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, title, description, tags, preview_url, thumb_url, created_at, location, exif, raw_available')
+      .select(
+        'id, title, description, tags, preview_url, thumb_url, created_at, location, exif, raw_available'
+      )
       .eq('id', id)
       .single()
 

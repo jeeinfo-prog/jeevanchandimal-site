@@ -1,3 +1,4 @@
+// pages/store/index.js
 import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
@@ -6,7 +7,22 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
+import { addToCart } from '../../lib/cart'
+
 const PLACEHOLDER = '/placeholder.png'
+
+const PRICES = {
+  LKR: {
+    personal: { jpg: 2500, raw: 4000 },
+    commercial: { jpg: 7500, raw: 10500 },
+    editorial: { jpg: 4000, raw: 6000 },
+  },
+  USD: {
+    personal: { jpg: 8, raw: 13 },
+    commercial: { jpg: 25, raw: 35 },
+    editorial: { jpg: 13, raw: 20 },
+  },
+}
 
 function normalizeUrl(url, origin) {
   if (!url || typeof url !== 'string') return ''
@@ -15,6 +31,12 @@ function normalizeUrl(url, origin) {
   if (u.startsWith('http://') || u.startsWith('https://')) return u
   if (u.startsWith('/')) return `${origin}${u}`
   return u
+}
+
+function money(currency, amount) {
+  const n = Number(amount || 0)
+  if (currency === 'LKR') return `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  return `$${n}`
 }
 
 export default function StoreIndex() {
@@ -47,13 +69,18 @@ export default function StoreIndex() {
         setLoading(true)
         setError('')
 
-        const r = await fetch('/api/store/photos')
-        const data = await r.json()
+        const r = await fetch('/api/store/photos', { headers: { 'Cache-Control': 'no-store' } })
+        let data = null
+        try {
+          data = await r.json()
+        } catch {
+          data = null
+        }
 
         if (!alive) return
 
-        if (!data?.ok) {
-          setError(data?.error || 'Failed to load photos')
+        if (!r.ok || !data?.ok) {
+          setError(data?.error || `Failed to load photos (${r.status})`)
           setPhotos([])
           return
         }
@@ -145,8 +172,8 @@ export default function StoreIndex() {
               aria-label="Search photos"
             />
 
-            <Link href="/store/collections">
-              <a className="collectionsLink">Browse Collections →</a>
+            <Link href="/store/collections" className="collectionsLink">
+              Browse Collections →
             </Link>
           </div>
         </header>
@@ -178,54 +205,67 @@ export default function StoreIndex() {
                 const imgSrc = p.thumbUrl || p.previewUrl || PLACEHOLDER
 
                 return (
-                  <Link key={p.id} href={`/store/${p.id}`}>
-                    <a className="card">
-                      <div className="thumb">
-                        <img
-                          src={imgSrc}
-                          alt={p.title}
-                          loading="lazy"
-                          onError={(e) => {
-                            if (e.currentTarget.src.endsWith(PLACEHOLDER)) return
-                            e.currentTarget.src = PLACEHOLDER
-                          }}
-                        />
+                  <Link key={p.id} href={`/store/${p.id}`} className="card">
+                    <div className="thumb">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imgSrc}
+                        alt={p.title}
+                        loading="lazy"
+                        onError={(e) => {
+                          if (e.currentTarget.src.endsWith(PLACEHOLDER)) return
+                          e.currentTarget.src = PLACEHOLDER
+                        }}
+                      />
 
-                        <div className="overlay" aria-hidden="true">
-                          <div className="overlayInner">
-                            <div className="ovTitle">{p.title}</div>
-                            <div className="ovMeta">{firstTag ? `#${firstTag}` : 'View details'}</div>
-                          </div>
+                      <div className="overlay" aria-hidden="true">
+                        <div className="overlayInner">
+                          <div className="ovTitle">{p.title}</div>
+                          <div className="ovMeta">{firstTag ? `#${firstTag}` : 'View details'}</div>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="meta">
-                        <div className="meta-top">
-                          <h3 className="name">{p.title}</h3>
-                          <span className="pill">{p.orientation}</span>
-                        </div>
-
-                        <div className="tagRow">
-                          {(p.tags || []).slice(0, 3).map((t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              className="tagChip"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                router.replace({ pathname: '/store', query: { tag: t } }, undefined, {
-                                  shallow: true,
-                                })
-                                setQuery(t)
-                              }}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
+                    <div className="meta">
+                      <div className="meta-top">
+                        <h3 className="name">{p.title}</h3>
+                        <span className="pill">{p.orientation}</span>
                       </div>
-                    </a>
+
+                      <div className="tagRow">
+                        {(p.tags || []).slice(0, 3).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            className="tagChip"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              router.replace(
+                                { pathname: '/store', query: { tag: t } },
+                                undefined,
+                                { shallow: true }
+                              )
+                              setQuery(t)
+                            }}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* ✅ Add to Cart (compact) */}
+                      <div
+                        className="cartBox"
+                        onClick={(e) => {
+                          // stop Link navigation
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }}
+                      >
+                        <CartMini photo={p} />
+                      </div>
+                    </div>
                   </Link>
                 )
               })}
@@ -447,6 +487,12 @@ export default function StoreIndex() {
           background: rgba(245, 244, 244, 0.08);
         }
 
+        .cartBox {
+          margin-top: 12px;
+          border-top: 1px solid rgba(245, 244, 244, 0.1);
+          padding-top: 12px;
+        }
+
         .empty {
           margin-top: 28px;
           padding: 14px 16px;
@@ -482,5 +528,112 @@ export default function StoreIndex() {
         }
       `}</style>
     </>
+  )
+}
+
+/* ---------------- small inline cart UI ---------------- */
+
+function CartMini({ photo }) {
+  const [license, setLicense] = React.useState('personal')
+  const [format, setFormat] = React.useState('jpg')
+  const [currency, setCurrency] = React.useState('LKR')
+  const [msg, setMsg] = React.useState('')
+
+  const unitPrice =
+    PRICES?.[currency]?.[license]?.[format] != null ? Number(PRICES[currency][license][format]) : 0
+
+  function onAdd() {
+    addToCart({
+      photoId: photo.id,
+      title: photo.title || '',
+      thumbUrl: photo.thumbUrl || '',
+      license,
+      format,
+      currency,
+      unitPrice,
+      qty: 1,
+    })
+
+    try {
+      window.dispatchEvent(new Event('jc_cart_updated'))
+    } catch {}
+
+    setMsg('Added ✅')
+    setTimeout(() => setMsg(''), 1000)
+  }
+
+  return (
+    <div className="cm">
+      <div className="row">
+        <select className="sel" value={license} onChange={(e) => setLicense(e.target.value)}>
+          <option value="personal">Personal</option>
+          <option value="editorial">Editorial</option>
+          <option value="commercial">Commercial</option>
+        </select>
+
+        <select className="sel" value={format} onChange={(e) => setFormat(e.target.value)}>
+          <option value="jpg">JPG</option>
+          <option value="raw">RAW</option>
+        </select>
+
+        <select className="sel" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+          <option value="LKR">LKR</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
+
+      <div className="row2">
+        <button className="btn" type="button" onClick={onAdd}>
+          Add to cart • {money(currency, unitPrice)}
+        </button>
+        {msg ? <span className="msg">{msg}</span> : null}
+      </div>
+
+      <style jsx>{`
+        .cm {
+          display: grid;
+          gap: 10px;
+        }
+        .row {
+          display: grid;
+          grid-template-columns: 1.2fr 0.9fr 0.9fr;
+          gap: 8px;
+        }
+        .sel {
+          padding: 10px 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(0, 0, 0, 0.28);
+          color: #fff;
+          outline: none;
+          font-size: 12px;
+        }
+        .row2 {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .btn {
+          width: 100%;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(0, 120, 255, 0.22);
+          color: #fff;
+          font-weight: 800;
+          cursor: pointer;
+          font-size: 12px;
+          text-align: center;
+        }
+        .btn:hover {
+          background: rgba(0, 120, 255, 0.28);
+        }
+        .msg {
+          font-size: 12px;
+          opacity: 0.85;
+          white-space: nowrap;
+        }
+      `}</style>
+    </div>
   )
 }

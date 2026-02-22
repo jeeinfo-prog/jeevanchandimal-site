@@ -1,82 +1,161 @@
 // pages/store/download.js
 
-import React from "react";
-import Head from "next/head";
-import Link from "next/link";
-import { useRouter } from "next/router";
+import React from 'react'
+import Head from 'next/head'
+import Link from 'next/link'
+import { useRouter } from 'next/router'
 
-import JeevanChandimalNavi from "../../components/jeevan-chandimal-navi";
-import JeevanChandimalNewFooter from "../../components/jeevan-chandimal-new-footer";
+import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
+import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
+
+function readQueryOrderId(q) {
+  const v = q?.order_id
+  if (typeof v === 'string') return v.trim()
+  if (Array.isArray(v) && typeof v[0] === 'string') return v[0].trim()
+  return ''
+}
+
+function normalizeLinksFromTokenApi(data) {
+  // Supports multiple shapes:
+  // - { token }
+  // - { url }
+  // - { tokens: [] }
+  // - { urls: [] }
+  // - { items: [{ token|url, title }] }
+  const links = []
+
+  const addUrl = (u, label) => {
+    if (!u || typeof u !== 'string') return
+    links.push({ url: u, label: label || 'Download' })
+  }
+
+  const tokenToUrl = (t) => `/api/download?token=${encodeURIComponent(t)}`
+
+  if (typeof data?.url === 'string' && data.url.includes('/api/download?token=')) {
+    addUrl(data.url, 'Download file')
+    return links
+  }
+
+  if (typeof data?.token === 'string' && data.token.length > 10) {
+    addUrl(tokenToUrl(data.token), 'Download file')
+    return links
+  }
+
+  if (Array.isArray(data?.urls)) {
+    data.urls.forEach((u, i) => addUrl(u, `Download item ${i + 1}`))
+    return links
+  }
+
+  if (Array.isArray(data?.tokens)) {
+    data.tokens.forEach((t, i) => {
+      if (typeof t === 'string' && t.length > 10) addUrl(tokenToUrl(t), `Download item ${i + 1}`)
+    })
+    return links
+  }
+
+  if (Array.isArray(data?.items)) {
+    data.items.forEach((x, i) => {
+      const label = x?.title ? String(x.title) : `Download item ${i + 1}`
+      if (typeof x?.url === 'string') addUrl(x.url, label)
+      else if (typeof x?.token === 'string' && x.token.length > 10) addUrl(tokenToUrl(x.token), label)
+    })
+    return links
+  }
+
+  return links
+}
 
 export default function StoreDownload() {
-  const router = useRouter();
-  const orderId = typeof router.query.order_id === "string" ? router.query.order_id : "";
+  const router = useRouter()
+  const orderRef = readQueryOrderId(router.query) // can be UUID or JC-... code
 
-  const [status, setStatus] = React.useState("PENDING");
-  const [msg, setMsg] = React.useState("");
-  const [downloadUrl, setDownloadUrl] = React.useState("");
+  const [status, setStatus] = React.useState('PENDING')
+  const [msg, setMsg] = React.useState('')
+  const [downloadLinks, setDownloadLinks] = React.useState([])
+
+  // resolved UUID (real orders.id)
+  const [resolvedId, setResolvedId] = React.useState('')
 
   async function load() {
-    if (!orderId) return;
+    if (!orderRef) return
 
-    setMsg("");
-    setDownloadUrl("");
+    setMsg('')
+    setDownloadLinks([])
 
-    const r = await fetch(`/api/orders/${encodeURIComponent(orderId)}`, {
-      headers: { "Cache-Control": "no-store" },
-    });
+    // 1) Resolve order by id OR code
+    const sr = await fetch(
+      `/api/orders/status?order_id=${encodeURIComponent(orderRef)}&t=${Date.now()}`,
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
 
-    if (!r.ok) {
-      setStatus("ERROR");
-      setMsg("Order not found.");
-      return;
+    const sdata = await sr.json().catch(() => ({}))
+    if (!sr.ok || sdata?.ok === false) {
+      setStatus('ERROR')
+      setMsg(sdata?.error || 'Order not found.')
+      return
     }
 
-    const order = await r.json();
-    setStatus(order.status || "PENDING");
+    const oid = String(sdata?.id || '').trim()
+    const st = String(sdata?.status || 'PENDING').trim().toUpperCase()
+    setResolvedId(oid)
+    setStatus(st)
 
-    if (order.status !== "PAID") {
-      setMsg("This order is not paid yet. Please complete payment first.");
-      return;
+    if (st !== 'PAID') {
+      setMsg('This order is not paid yet. Please complete payment first.')
+      return
     }
 
-    // Create secure token
-    const t = await fetch("/api/download/create-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId }),
-    });
+    if (!oid) {
+      setMsg('Missing internal order id. Please contact support.')
+      return
+    }
 
-    const data = await t.json();
+    // 2) (Optional) Fetch order details (keeps your old behavior; safe if endpoint expects UUID)
+    // If /api/orders/:id isn’t required, you can remove this block.
+    try {
+      const r = await fetch(`/api/orders/${encodeURIComponent(oid)}`, {
+        headers: { 'Cache-Control': 'no-store' },
+      })
+      if (!r.ok) {
+        // not fatal
+        console.warn('Order details not found for id:', oid)
+      }
+    } catch (e) {
+      console.warn('Order details fetch error:', e)
+    }
+
+    // 3) Create secure token(s)
+    const t = await fetch('/api/download/create-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // IMPORTANT: pass UUID to token API
+      body: JSON.stringify({ orderId: oid }),
+    })
+
+    const data = await t.json().catch(() => ({}))
 
     if (!t.ok) {
-      setMsg(data?.error || "Failed to create download link.");
-      return;
+      setMsg(data?.error || 'Failed to create download link.')
+      return
     }
 
-    // ✅ Fix: ensure we always use the correct download endpoint
-    // Preferred: API returns { token }
-    // Backward compat: API might return { url } but old url may point to /api/download/file (deleted)
-    const token = data?.token;
-    const url = data?.url;
+    const links = normalizeLinksFromTokenApi(data)
 
-    if (typeof url === "string" && url.includes("/api/download?token=")) {
-      setDownloadUrl(url);
-      return;
+    if (links.length > 0) {
+      setDownloadLinks(links)
+      return
     }
 
-    if (typeof token === "string" && token.length > 10) {
-      setDownloadUrl(`/api/download?token=${encodeURIComponent(token)}`);
-      return;
-    }
-
-    setMsg("Download token missing. Please try again.");
+    setMsg('Download token missing. Please try again.')
   }
 
   React.useEffect(() => {
-    load();
+    if (!router.isReady) return
+    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId]);
+  }, [router.isReady, orderRef])
+
+  const paid = status === 'PAID'
 
   return (
     <>
@@ -91,41 +170,52 @@ export default function StoreDownload() {
         <div className="card">
           <h1 className="title">Download</h1>
 
-          {!orderId ? (
+          {!orderRef ? (
             <p className="p">
-              Missing order id. Go back to the{" "}
-              <Link href="/store">
-                <a className="link">store</a>
+              Missing order id. Go back to the{' '}
+              <Link href="/store" className="link">
+                store
               </Link>
               .
             </p>
           ) : (
             <>
               <p className="p">
-                Order: <span className="mono">{orderId}</span>
+                Order: <span className="mono">{orderRef}</span>
               </p>
 
-              {status !== "PAID" && (
+              {resolvedId && resolvedId !== orderRef ? (
+                <p className="p2">
+                  Internal ID: <span className="mono">{resolvedId}</span>
+                </p>
+              ) : null}
+
+              {!paid ? (
                 <>
                   <div className="badge pending">Status: {status}</div>
-                  <p className="p2">{msg || "Waiting for payment confirmation."}</p>
+                  <p className="p2">{msg || 'Waiting for payment confirmation.'}</p>
                   <p className="p2">
-                    <Link href={`/store/return?order_id=${encodeURIComponent(orderId)}`}>
-                      <a className="link">Back to payment status</a>
+                    <Link
+                      href={`/store/return?order_id=${encodeURIComponent(orderRef)}`}
+                      className="link"
+                    >
+                      Back to payment status
                     </Link>
                   </p>
                 </>
-              )}
-
-              {status === "PAID" && (
+              ) : (
                 <>
                   <div className="badge paid">Payment confirmed ✅</div>
                   <p className="p2">Your secure link expires in 10 minutes.</p>
 
-                  {downloadUrl ? (
-                    <a className="btn" href={downloadUrl}>
-                      Download file
-                    </a>
+                  {downloadLinks.length > 0 ? (
+                    <div className="btnList">
+                      {downloadLinks.map((x, idx) => (
+                        <a key={idx} className="btn" href={x.url}>
+                          {x.label || `Download item ${idx + 1}`}
+                        </a>
+                      ))}
+                    </div>
                   ) : (
                     <button className="btn" onClick={load} type="button">
                       Generate download link
@@ -169,8 +259,8 @@ export default function StoreDownload() {
           line-height: 1.6;
         }
         .mono {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-            monospace;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+            'Liberation Mono', 'Courier New', monospace;
           font-size: 13px;
           opacity: 0.95;
         }
@@ -188,9 +278,14 @@ export default function StoreDownload() {
         .paid {
           opacity: 0.95;
         }
+        .btnList {
+          margin-top: 14px;
+          display: grid;
+          gap: 10px;
+          max-width: 420px;
+        }
         .btn {
           display: inline-block;
-          margin-top: 14px;
           padding: 12px 16px;
           border-radius: 999px;
           background: #f5f4f4;
@@ -199,6 +294,7 @@ export default function StoreDownload() {
           text-decoration: none;
           border: 0;
           cursor: pointer;
+          text-align: center;
         }
         .btn:hover {
           opacity: 0.95;
@@ -212,5 +308,5 @@ export default function StoreDownload() {
         }
       `}</style>
     </>
-  );
+  )
 }
