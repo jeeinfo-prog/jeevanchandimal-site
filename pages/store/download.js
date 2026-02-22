@@ -8,6 +8,8 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
+const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED', 'CONFIRMED', '2'])
+
 function readQueryOrderId(q) {
   const v = q?.order_id
   if (typeof v === 'string') return v.trim()
@@ -16,12 +18,6 @@ function readQueryOrderId(q) {
 }
 
 function normalizeLinksFromTokenApi(data) {
-  // Supports multiple shapes:
-  // - { token }
-  // - { url }
-  // - { tokens: [] }
-  // - { urls: [] }
-  // - { items: [{ token|url, title }] }
   const links = []
 
   const addUrl = (u, label) => {
@@ -31,7 +27,7 @@ function normalizeLinksFromTokenApi(data) {
 
   const tokenToUrl = (t) => `/api/download?token=${encodeURIComponent(t)}`
 
-  if (typeof data?.url === 'string' && data.url.includes('/api/download?token=')) {
+  if (typeof data?.url === 'string') {
     addUrl(data.url, 'Download file')
     return links
   }
@@ -65,88 +61,91 @@ function normalizeLinksFromTokenApi(data) {
   return links
 }
 
+function normStatus(s) {
+  const v = String(s ?? 'PENDING').trim()
+  if (v === '2') return 'PAID'
+  return v.toUpperCase()
+}
+
 export default function StoreDownload() {
   const router = useRouter()
-  const orderRef = readQueryOrderId(router.query) // can be UUID or JC-... code
+
+  // can be ORD_* (your DB id) OR old UUID OR code
+  const orderRef = readQueryOrderId(router.query)
 
   const [status, setStatus] = React.useState('PENDING')
   const [msg, setMsg] = React.useState('')
   const [downloadLinks, setDownloadLinks] = React.useState([])
-
-  // resolved UUID (real orders.id)
   const [resolvedId, setResolvedId] = React.useState('')
+  const [loading, setLoading] = React.useState(false)
 
   async function load() {
     if (!orderRef) return
+    if (loading) return
 
+    setLoading(true)
     setMsg('')
     setDownloadLinks([])
 
-    // 1) Resolve order by id OR code
-    const sr = await fetch(
-      `/api/orders/status?order_id=${encodeURIComponent(orderRef)}&t=${Date.now()}`,
-      { headers: { 'Cache-Control': 'no-store' } }
-    )
-
-    const sdata = await sr.json().catch(() => ({}))
-    if (!sr.ok || sdata?.ok === false) {
-      setStatus('ERROR')
-      setMsg(sdata?.error || 'Order not found.')
-      return
-    }
-
-    const oid = String(sdata?.id || '').trim()
-    const st = String(sdata?.status || 'PENDING').trim().toUpperCase()
-    setResolvedId(oid)
-    setStatus(st)
-
-    if (st !== 'PAID') {
-      setMsg('This order is not paid yet. Please complete payment first.')
-      return
-    }
-
-    if (!oid) {
-      setMsg('Missing internal order id. Please contact support.')
-      return
-    }
-
-    // 2) (Optional) Fetch order details (keeps your old behavior; safe if endpoint expects UUID)
-    // If /api/orders/:id isn’t required, you can remove this block.
     try {
-      const r = await fetch(`/api/orders/${encodeURIComponent(oid)}`, {
-        headers: { 'Cache-Control': 'no-store' },
-      })
-      if (!r.ok) {
-        // not fatal
-        console.warn('Order details not found for id:', oid)
+      // 1) Resolve + verify paid
+      const sr = await fetch(
+        `/api/orders/status?order_id=${encodeURIComponent(orderRef)}&t=${Date.now()}`,
+        { headers: { 'Cache-Control': 'no-store' } }
+      )
+
+      const sdata = await sr.json().catch(() => ({}))
+
+      if (!sr.ok || sdata?.ok === false) {
+        setStatus('ERROR')
+        setMsg(sdata?.error || `Order check failed (${sr.status})`)
+        return
       }
+
+      const oid = String(sdata?.id || '').trim() // IMPORTANT: this is the real orders.id in your DB
+      const st = normStatus(sdata?.status)
+
+      setResolvedId(oid)
+      setStatus(st)
+
+      if (!PAID_STATUSES.has(st)) {
+        setMsg('This order is not paid yet. Please complete payment first.')
+        return
+      }
+
+      if (!oid) {
+        setMsg('Missing internal order id. Please contact support.')
+        return
+      }
+
+      // 2) Create secure token(s) using the REAL orders.id
+      const tr = await fetch('/api/download/create-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: oid }),
+      })
+
+      const tdata = await tr.json().catch(() => ({}))
+
+      if (!tr.ok || tdata?.ok === false) {
+        setMsg(tdata?.error || `Failed to create download link (${tr.status}).`)
+        return
+      }
+
+      const links = normalizeLinksFromTokenApi(tdata)
+
+      if (links.length > 0) {
+        setDownloadLinks(links)
+        setMsg('')
+        return
+      }
+
+      setMsg('Download token missing. Please try again.')
     } catch (e) {
-      console.warn('Order details fetch error:', e)
+      setMsg(e?.message || 'Something went wrong.')
+    } finally {
+      setLoading(false)
     }
-
-    // 3) Create secure token(s)
-    const t = await fetch('/api/download/create-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // IMPORTANT: pass UUID to token API
-      body: JSON.stringify({ orderId: oid }),
-    })
-
-    const data = await t.json().catch(() => ({}))
-
-    if (!t.ok) {
-      setMsg(data?.error || 'Failed to create download link.')
-      return
-    }
-
-    const links = normalizeLinksFromTokenApi(data)
-
-    if (links.length > 0) {
-      setDownloadLinks(links)
-      return
-    }
-
-    setMsg('Download token missing. Please try again.')
   }
 
   React.useEffect(() => {
@@ -155,7 +154,7 @@ export default function StoreDownload() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, orderRef])
 
-  const paid = status === 'PAID'
+  const paid = PAID_STATUSES.has(status)
 
   return (
     <>
@@ -206,19 +205,24 @@ export default function StoreDownload() {
               ) : (
                 <>
                   <div className="badge paid">Payment confirmed ✅</div>
-                  <p className="p2">Your secure link expires in 10 minutes.</p>
+                  <p className="p2">Your secure link expires in about 1 hour.</p>
 
                   {downloadLinks.length > 0 ? (
                     <div className="btnList">
                       {downloadLinks.map((x, idx) => (
-                        <a key={idx} className="btn" href={x.url}>
+                        <a
+                          key={idx}
+                          className="btn"
+                          href={x.url}
+                          rel="noreferrer"
+                        >
                           {x.label || `Download item ${idx + 1}`}
                         </a>
                       ))}
                     </div>
                   ) : (
-                    <button className="btn" onClick={load} type="button">
-                      Generate download link
+                    <button className="btn" onClick={load} type="button" disabled={loading}>
+                      {loading ? 'Generating…' : 'Generate download link'}
                     </button>
                   )}
 
@@ -272,12 +276,6 @@ export default function StoreDownload() {
           font-size: 12px;
           border: 1px solid rgba(245, 244, 244, 0.18);
         }
-        .pending {
-          opacity: 0.9;
-        }
-        .paid {
-          opacity: 0.95;
-        }
         .btnList {
           margin-top: 14px;
           display: grid;
@@ -295,6 +293,10 @@ export default function StoreDownload() {
           border: 0;
           cursor: pointer;
           text-align: center;
+        }
+        button.btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
         .btn:hover {
           opacity: 0.95;
