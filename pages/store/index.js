@@ -70,12 +70,7 @@ export default function StoreIndex() {
         setError('')
 
         const r = await fetch('/api/store/photos', { headers: { 'Cache-Control': 'no-store' } })
-        let data = null
-        try {
-          data = await r.json()
-        } catch {
-          data = null
-        }
+        const data = await r.json().catch(() => null)
 
         if (!alive) return
 
@@ -172,8 +167,9 @@ export default function StoreIndex() {
               aria-label="Search photos"
             />
 
-            <Link href="/store/collections" className="collectionsLink">
-              Browse Collections →
+            {/* ✅ Next-safe Link */}
+            <Link href="/store/collections" legacyBehavior>
+              <a className="collectionsLink">Browse Collections →</a>
             </Link>
           </div>
         </header>
@@ -205,67 +201,71 @@ export default function StoreIndex() {
                 const imgSrc = p.thumbUrl || p.previewUrl || PLACEHOLDER
 
                 return (
-                  <Link key={p.id} href={`/store/${p.id}`} className="card">
-                    <div className="thumb">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={imgSrc}
-                        alt={p.title}
-                        loading="lazy"
-                        onError={(e) => {
-                          if (e.currentTarget.src.endsWith(PLACEHOLDER)) return
-                          e.currentTarget.src = PLACEHOLDER
-                        }}
-                      />
+                  <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
+                    <a className="card">
+                      <div className="thumb">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imgSrc}
+                          alt={p.title}
+                          loading="lazy"
+                          onError={(e) => {
+                            if (e.currentTarget.src.endsWith(PLACEHOLDER)) return
+                            e.currentTarget.src = PLACEHOLDER
+                          }}
+                        />
 
-                      <div className="overlay" aria-hidden="true">
-                        <div className="overlayInner">
-                          <div className="ovTitle">{p.title}</div>
-                          <div className="ovMeta">{firstTag ? `#${firstTag}` : 'View details'}</div>
+                        <div className="overlay" aria-hidden="true">
+                          <div className="overlayInner">
+                            <div className="ovTitle">{p.title}</div>
+                            <div className="ovMeta">
+                              {firstTag ? `#${firstTag}` : 'View details'}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="meta">
-                      <div className="meta-top">
-                        <h3 className="name">{p.title}</h3>
-                        <span className="pill">{p.orientation}</span>
-                      </div>
+                      <div className="meta">
+                        <div className="meta-top">
+                          <h3 className="name">{p.title}</h3>
+                          <span className="pill">{p.orientation}</span>
+                        </div>
 
-                      <div className="tagRow">
-                        {(p.tags || []).slice(0, 3).map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            className="tagChip"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              router.replace(
-                                { pathname: '/store', query: { tag: t } },
-                                undefined,
-                                { shallow: true }
-                              )
-                              setQuery(t)
-                            }}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
+                        <div className="tagRow">
+                          {(p.tags || []).slice(0, 3).map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              className="tagChip"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                router.replace(
+                                  { pathname: '/store', query: { tag: t } },
+                                  undefined,
+                                  { shallow: true }
+                                )
+                                setQuery(t)
+                              }}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
 
-                      {/* ✅ Add to Cart (compact) */}
-                      <div
-                        className="cartBox"
-                        onClick={(e) => {
-                          // stop Link navigation
-                          e.preventDefault()
-                          e.stopPropagation()
-                        }}
-                      >
-                        <CartMini photo={p} />
+                        {/* ✅ Add to Cart (compact) */}
+                        <div
+                          className="cartBox"
+                          onClick={(e) => {
+                            // stop Link navigation
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                        >
+                          <CartMini photo={p} />
+                        </div>
                       </div>
-                    </div>
+                    </a>
                   </Link>
                 )
               })}
@@ -337,6 +337,9 @@ export default function StoreIndex() {
             background 0.18s ease, transform 0.18s ease;
           background: rgba(255, 255, 255, 0.02);
           white-space: nowrap;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
         .collectionsLink:hover {
           opacity: 1;
@@ -518,7 +521,6 @@ export default function StoreIndex() {
           }
           .collectionsLink {
             width: 100%;
-            text-align: center;
           }
         }
         @media (max-width: 520px) {
@@ -554,9 +556,11 @@ function CartMini({ photo }) {
       qty: 1,
     })
 
-    try {
-      window.dispatchEvent(new Event('jc_cart_updated'))
-    } catch {}
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new Event('jc_cart_updated'))
+      } catch {}
+    }
 
     setMsg('Added ✅')
     setTimeout(() => setMsg(''), 1000)
