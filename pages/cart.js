@@ -63,14 +63,28 @@ function normalizeItem(it) {
   // price can be item.price OR item.prices[currency][license][format]
   const price = Number(it.price || 0)
 
-  return { ...it, _id: id, _title: title, _thumb: thumb, _license: license, _format: format, _qty: qty, _price: price }
+  return {
+    ...it,
+    _id: id,
+    _title: title,
+    _thumb: thumb,
+    _license: license,
+    _format: format,
+    _qty: qty,
+    _price: price,
+  }
 }
 
 function getUnitPrice(item, currency) {
   if (Number(item._price) > 0) return Number(item._price)
 
   const prices = item.prices || item.PRICES || item.priceMap
-  if (prices && prices[currency] && prices[currency][item._license] && prices[currency][item._license][item._format]) {
+  if (
+    prices &&
+    prices[currency] &&
+    prices[currency][item._license] &&
+    prices[currency][item._license][item._format]
+  ) {
     return Number(prices[currency][item._license][item._format])
   }
 
@@ -102,7 +116,10 @@ function getCartAdapter() {
     clear() {
       if (typeof CartLib.clearCart === 'function') return CartLib.clearCart()
       if (typeof CartLib.cartClear === 'function') return CartLib.cartClear()
-      return fallbackWriteCart({ currency: localStorage.getItem(STORAGE_CCY_KEY) || 'LKR', items: [] })
+      return fallbackWriteCart({
+        currency: localStorage.getItem(STORAGE_CCY_KEY) || 'LKR',
+        items: [],
+      })
     },
   }
   return api
@@ -121,7 +138,14 @@ export default function CartPage() {
 
   const load = React.useCallback(() => {
     const cart = cartApi.read() || { currency: 'LKR', items: [] }
-    const ccy = cart.currency || (typeof window !== 'undefined' ? localStorage.getItem(STORAGE_CCY_KEY) : null) || 'LKR'
+
+    // Your lib/cart.js stores: { items: [...] } (no currency)
+    // So currency is stored separately here.
+    const ccy =
+      cart.currency ||
+      (typeof window !== 'undefined' ? localStorage.getItem(STORAGE_CCY_KEY) : null) ||
+      'LKR'
+
     setCurrency(ccy)
     setItems(Array.isArray(cart.items) ? cart.items.map(normalizeItem) : [])
   }, [cartApi])
@@ -129,6 +153,7 @@ export default function CartPage() {
   React.useEffect(() => {
     setReady(true)
     load()
+
     // cross-tab sync
     const onStorage = (e) => {
       if (e.key === STORAGE_CART_KEY || e.key === STORAGE_CCY_KEY) load()
@@ -150,10 +175,11 @@ export default function CartPage() {
   }
 
   function setQty(photoId, qty) {
+    const nextQty = clamp(qty, 1, 99)
     const next = items.map((x) => {
       const id = x._id || x.id || x.photoId
       if (id !== photoId) return x
-      return { ...x, qty: clamp(qty, 1, 99), _qty: clamp(qty, 1, 99) }
+      return { ...x, qty: nextQty, _qty: nextQty }
     })
     persist(next)
   }
@@ -187,7 +213,10 @@ export default function CartPage() {
     <>
       <Head>
         <title>Cart — Jeevan Chandimal</title>
-        <meta name="description" content="Your cart — review items, adjust quantity and proceed to checkout." />
+        <meta
+          name="description"
+          content="Your cart — review items, adjust quantity and proceed to checkout."
+        />
         <meta name="robots" content="noindex,nofollow" />
       </Head>
 
@@ -226,8 +255,8 @@ export default function CartPage() {
               <div className="emptyTitle">Your cart is empty</div>
               <div className="emptyText">Go to the store and add a photo to get started.</div>
               <div className="emptyActions">
-                <Link href="/store" className="btnPrimary">
-                  Browse Store
+                <Link href="/store" legacyBehavior>
+                  <a className="btnPrimary">Browse Store</a>
                 </Link>
               </div>
             </div>
@@ -279,7 +308,10 @@ export default function CartPage() {
                               <input
                                 className="qtyInput"
                                 value={it._qty}
-                                onChange={(e) => setQty(id, e.target.value)}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/[^\d]/g, '')
+                                  setQty(id, v ? Number(v) : 1)
+                                }}
                                 inputMode="numeric"
                               />
                               <button
@@ -295,8 +327,8 @@ export default function CartPage() {
                               Remove
                             </button>
 
-                            <Link className="link" href={`/store/${id}`}>
-                              View
+                            <Link href={`/store/${id}`} legacyBehavior>
+                              <a className="link">View</a>
                             </Link>
                           </div>
                         </div>
@@ -316,8 +348,8 @@ export default function CartPage() {
                     Clear cart
                   </button>
 
-                  <Link href="/store" className="btnGhost">
-                    Continue shopping
+                  <Link href="/store" legacyBehavior>
+                    <a className="btnGhost">Continue shopping</a>
                   </Link>
                 </div>
               </section>
@@ -587,9 +619,6 @@ export default function CartPage() {
           opacity: 0.9;
           color: #fff;
         }
-        .linkDanger {
-          opacity: 0.9;
-        }
         .linkDanger:hover {
           opacity: 1;
         }
@@ -614,6 +643,7 @@ export default function CartPage() {
           text-decoration: none;
           border: 1px solid rgba(245, 244, 244, 0.16);
           cursor: pointer;
+          color: inherit;
         }
         .btnPrimary {
           background: rgba(0, 120, 255, 0.22);
