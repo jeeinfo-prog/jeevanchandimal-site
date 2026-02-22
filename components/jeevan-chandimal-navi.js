@@ -76,7 +76,8 @@ export default function JeevanChandimalNavi(props) {
 
     const refresh = () => {
       try {
-        setCartNum(cartCount())
+        const n = typeof cartCount === 'function' ? cartCount() : 0
+        setCartNum(Number.isFinite(n) ? n : 0)
       } catch {
         setCartNum(0)
       }
@@ -227,14 +228,17 @@ export default function JeevanChandimalNavi(props) {
                 tabIndex={0}
                 aria-haspopup="menu"
                 aria-expanded={deskWorkOpen ? 'true' : 'false'}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault() // ✅ prevent accidental navigation
                   setDeskWorkOpen((v) => !v)
                   setDeskServicesOpen(false)
                 }}
                 onKeyDown={onDropdownKey('work')}
               >
                 <Link href="/work" legacyBehavior>
-                  <a className="dropLabel">Work</a>
+                  <a className="dropLabel" onClick={(e) => e.preventDefault()}>
+                    Work
+                  </a>
                 </Link>
 
                 <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
@@ -274,14 +278,17 @@ export default function JeevanChandimalNavi(props) {
                 tabIndex={0}
                 aria-haspopup="menu"
                 aria-expanded={deskServicesOpen ? 'true' : 'false'}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault() // ✅ prevent accidental navigation
                   setDeskServicesOpen((v) => !v)
                   setDeskWorkOpen(false)
                 }}
                 onKeyDown={onDropdownKey('services')}
               >
                 <Link href="/services" legacyBehavior>
-                  <a className="dropLabel">Services</a>
+                  <a className="dropLabel" onClick={(e) => e.preventDefault()}>
+                    Services
+                  </a>
                 </Link>
 
                 <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
@@ -425,6 +432,7 @@ export default function JeevanChandimalNavi(props) {
                       return
                     }
                     closeAll()
+                    router.push('/work')
                   }}
                 >
                   <span>Work</span>
@@ -457,6 +465,7 @@ export default function JeevanChandimalNavi(props) {
                       return
                     }
                     closeAll()
+                    router.push('/services')
                   }}
                 >
                   <span>Services</span>
@@ -937,6 +946,10 @@ export default function JeevanChandimalNavi(props) {
           display: flex;
           align-items: center;
           justify-content: space-between;
+        }
+
+        .mDrop {
+          cursor: pointer;
         }
 
         .mCartBadge {
