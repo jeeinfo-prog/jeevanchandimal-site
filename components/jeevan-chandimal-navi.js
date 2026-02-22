@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
+import { cartCount } from '@/lib/cart'
 
 const NAV = {
   work: [
@@ -32,6 +33,9 @@ export default function JeevanChandimalNavi(props) {
 
   const [memberPlan, setMemberPlan] = useState(null)
   const [userEmail, setUserEmail] = useState('')
+
+  // ✅ Cart count
+  const [cartNum, setCartNum] = useState(0)
 
   const closeTimers = useRef({ work: null, services: null })
 
@@ -65,6 +69,37 @@ export default function JeevanChandimalNavi(props) {
     return () => router.events.off('routeChangeStart', onRoute)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router?.events])
+
+  // ✅ Keep cart badge updated (same-tab + other tabs)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const refresh = () => {
+      try {
+        setCartNum(cartCount())
+      } catch {
+        setCartNum(0)
+      }
+    }
+
+    refresh()
+
+    const onStorage = (e) => {
+      // storage fires only across tabs, but we still handle it
+      if (e?.key && String(e.key).includes('cart')) refresh()
+      if (e?.key && String(e.key).includes('jc_cart')) refresh()
+    }
+
+    window.addEventListener('storage', onStorage)
+
+    // same-tab changes won't trigger storage -> poll lightly
+    const t = setInterval(refresh, 800)
+
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      clearInterval(t)
+    }
+  }, [])
 
   // Read local user + member plan
   useEffect(() => {
@@ -110,6 +145,7 @@ export default function JeevanChandimalNavi(props) {
     if (href === '/work') return router.pathname.startsWith('/work')
     if (href === '/services') return router.pathname.startsWith('/services')
     if (href === '/store') return router.pathname.startsWith('/store')
+    if (href === '/cart') return router.pathname.startsWith('/cart')
     return router.pathname === href
   }
 
@@ -282,6 +318,16 @@ export default function JeevanChandimalNavi(props) {
 
           {/* right */}
           <div className="navRight">
+            {/* ✅ Cart button (always visible) */}
+            <Link href="/cart">
+              <a className={`cartBtn ${activeClass('/cart')}`} aria-label="Cart">
+                <span className="cartText">Cart</span>
+                <span className="cartBadge" aria-label={`Cart items: ${cartNum}`}>
+                  {cartNum}
+                </span>
+              </a>
+            </Link>
+
             {memberPlan && <span className="badge">{String(memberPlan).toUpperCase()}</span>}
 
             {/* ✅ Logged-in: email + logout */}
@@ -353,6 +399,14 @@ export default function JeevanChandimalNavi(props) {
               <Link href="/">
                 <a className={`mLink ${activeClass('/')}`} onClick={closeAll}>
                   Home
+                </a>
+              </Link>
+
+              {/* ✅ Mobile Cart */}
+              <Link href="/cart">
+                <a className={`mLink ${activeClass('/cart')}`} onClick={closeAll}>
+                  <span>Cart</span>
+                  <span className="mCartBadge">{cartNum}</span>
                 </a>
               </Link>
 
@@ -667,6 +721,45 @@ export default function JeevanChandimalNavi(props) {
           gap: 10px;
         }
 
+        /* ✅ CART */
+        .cartBtn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          padding: 8px 12px;
+          border-radius: 999px;
+          text-decoration: none !important;
+          color: #f5f4f4;
+          background: rgba(255, 255, 255, 0.02);
+          opacity: 0.92;
+          line-height: 1;
+        }
+
+        .cartBtn:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.06);
+        }
+
+        .cartText {
+          font-size: 12px;
+        }
+
+        .cartBadge {
+          min-width: 20px;
+          height: 20px;
+          padding: 0 6px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 800;
+          border: 1px solid rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.14);
+          color: #25c3e2;
+        }
+
         .badge {
           font-size: 11px;
           padding: 4px 10px;
@@ -841,6 +934,21 @@ export default function JeevanChandimalNavi(props) {
           display: flex;
           align-items: center;
           justify-content: space-between;
+        }
+
+        .mCartBadge {
+          min-width: 22px;
+          height: 22px;
+          padding: 0 7px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 800;
+          border: 1px solid rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.14);
+          color: #25c3e2;
         }
 
         .mLink:hover {
