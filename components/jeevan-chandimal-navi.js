@@ -31,6 +31,7 @@ export default function JeevanChandimalNavi(props) {
   const [mServicesOpen, setMServicesOpen] = useState(false)
 
   const [memberPlan, setMemberPlan] = useState(null)
+  const [userEmail, setUserEmail] = useState('')
 
   const closeTimers = useRef({ work: null, services: null })
 
@@ -53,9 +54,10 @@ export default function JeevanChandimalNavi(props) {
     closeTimers.current[key] = setTimeout(() => {
       if (key === 'work') setDeskWorkOpen(false)
       if (key === 'services') setDeskServicesOpen(false)
-    }, 140) // ✅ small delay removes flicker
+    }, 140) // small delay removes flicker
   }
 
+  // Close menus on route change
   useEffect(() => {
     if (!router?.events) return
     const onRoute = () => closeAll()
@@ -64,13 +66,18 @@ export default function JeevanChandimalNavi(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router?.events])
 
+  // Read local user + member plan
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const email = window.localStorage.getItem('user_email')
+
+    const email = window.localStorage.getItem('user_email') || ''
+    setUserEmail(email)
+
     const cachedPlan = window.localStorage.getItem('member_plan')
     if (cachedPlan) setMemberPlan(cachedPlan)
 
     if (!email) return
+
     fetch(`/api/member/status?email=${encodeURIComponent(email)}`)
       .then((r) => r.json())
       .then((d) => {
@@ -84,9 +91,20 @@ export default function JeevanChandimalNavi(props) {
         }
       })
       .catch(() => {})
-  }, [])
+  }, [router.asPath])
 
-  // ✅ Parent + child active highlight
+  const logout = () => {
+    try {
+      window.localStorage.removeItem('user_email')
+      window.localStorage.removeItem('member_plan')
+    } catch (e) {}
+    setUserEmail('')
+    setMemberPlan(null)
+    closeAll()
+    router.push('/login')
+  }
+
+  // Parent + child active highlight
   const isActive = (href) => {
     if (!href) return false
     if (href === '/work') return router.pathname.startsWith('/work')
@@ -121,7 +139,7 @@ export default function JeevanChandimalNavi(props) {
     }
   }
 
-  // close desktop dropdowns if click outside
+  // Close desktop dropdowns if click outside
   useEffect(() => {
     const onDoc = (e) => {
       const el = e.target
@@ -266,26 +284,38 @@ export default function JeevanChandimalNavi(props) {
           <div className="navRight">
             {memberPlan && <span className="badge">{String(memberPlan).toUpperCase()}</span>}
 
-            <Link href="/login">
-              <a className="iconBtn" aria-label="Login">
-                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M4 21v-1c0-3.313 2.687-6 6-6h4c3.313 0 6 2.687 6 6v1"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M12 11c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </a>
-            </Link>
+            {/* ✅ Logged-in: email + logout */}
+            {userEmail ? (
+              <>
+                <span className="userEmail" title={userEmail}>
+                  {userEmail}
+                </span>
+                <button type="button" className="logoutBtn" onClick={logout}>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link href="/login">
+                <a className="iconBtn" aria-label="Login">
+                  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M4 21v-1c0-3.313 2.687-6 6-6h4c3.313 0 6 2.687 6 6v1"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M12 11c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </a>
+              </Link>
+            )}
 
             <button
               type="button"
@@ -412,6 +442,19 @@ export default function JeevanChandimalNavi(props) {
               </Link>
 
               {memberPlan && <div className="mBadge">{String(memberPlan).toUpperCase()}</div>}
+
+              {/* ✅ Mobile logout */}
+              {userEmail ? (
+                <button type="button" className="mLogout" onClick={logout}>
+                  Logout
+                </button>
+              ) : (
+                <Link href="/login">
+                  <a className="mLink" onClick={closeAll}>
+                    Login
+                  </a>
+                </Link>
+              )}
             </nav>
           </div>
 
@@ -482,7 +525,7 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(245, 244, 244, 0.06);
         }
 
-        /* ✅ keep highlighted text BLUE */
+        /* keep highlighted text BLUE */
         .isActive {
           background: linear-gradient(
             180deg,
@@ -490,7 +533,7 @@ export default function JeevanChandimalNavi(props) {
             rgba(37, 195, 226, 0.1)
           );
           border: 1px solid rgba(37, 195, 226, 0.22);
-          color: #25c3e2 !important; /* ✅ blue text */
+          color: #25c3e2 !important;
           opacity: 1;
           font-weight: 700;
           box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
@@ -525,7 +568,6 @@ export default function JeevanChandimalNavi(props) {
           box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
         }
 
-        /* Desktop arrow – fixed box, no movement */
         .chev {
           width: 14px;
           height: 14px;
@@ -537,14 +579,12 @@ export default function JeevanChandimalNavi(props) {
           transform: rotate(-90deg);
           transition: transform 0.16s ease;
           margin-left: 4px;
-          padding-right: 0;
         }
 
         .chev.open {
           transform: rotate(0deg);
         }
 
-        /* Mobile arrow – same fix */
         .mChev {
           width: 14px;
           height: 14px;
@@ -608,7 +648,6 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(245, 244, 244, 0.08);
         }
 
-        /* ✅ dropdown child active: keep BLUE text */
         .menuItem.isActiveItem {
           background: linear-gradient(
             180deg,
@@ -616,7 +655,7 @@ export default function JeevanChandimalNavi(props) {
             rgba(37, 195, 226, 0.08)
           );
           border: 1px solid rgba(37, 195, 226, 0.18);
-          color: #25c3e2 !important; /* ✅ blue text */
+          color: #25c3e2 !important;
           opacity: 1;
           font-weight: 700;
         }
@@ -638,6 +677,34 @@ export default function JeevanChandimalNavi(props) {
           font-weight: 700;
           line-height: 1;
           white-space: nowrap;
+        }
+
+        .userEmail {
+          font-size: 12px;
+          opacity: 0.85;
+          padding: 6px 10px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          border-radius: 999px;
+          max-width: 220px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .logoutBtn {
+          font-size: 12px;
+          padding: 8px 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(255, 255, 255, 0.03);
+          color: #f5f4f4;
+          cursor: pointer;
+          opacity: 0.9;
+        }
+
+        .logoutBtn:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.06);
         }
 
         .iconBtn {
@@ -781,7 +848,6 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(255, 255, 255, 0.06);
         }
 
-        /* ✅ mobile active: keep BLUE text */
         .mLink.isActive {
           background: linear-gradient(
             180deg,
@@ -789,7 +855,7 @@ export default function JeevanChandimalNavi(props) {
             rgba(37, 195, 226, 0.1)
           );
           border-color: rgba(37, 195, 226, 0.22);
-          color: #25c3e2 !important; /* ✅ blue text */
+          color: #25c3e2 !important;
           opacity: 1;
           font-weight: 700;
           box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
@@ -818,7 +884,6 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(255, 255, 255, 0.06);
         }
 
-        /* ✅ mobile dropdown child active: keep BLUE text */
         .mSubLink.isActiveItem {
           background: linear-gradient(
             180deg,
@@ -826,7 +891,7 @@ export default function JeevanChandimalNavi(props) {
             rgba(37, 195, 226, 0.08)
           );
           border-color: rgba(37, 195, 226, 0.18);
-          color: #25c3e2 !important; /* ✅ blue text */
+          color: #25c3e2 !important;
           opacity: 1;
           font-weight: 800;
           box-shadow: 0 8px 18px rgba(37, 195, 226, 0.06);
@@ -842,6 +907,23 @@ export default function JeevanChandimalNavi(props) {
           letter-spacing: 1px;
           color: #25c3e2;
           font-weight: 800;
+        }
+
+        .mLogout {
+          margin-top: 8px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.04);
+          color: #f5f4f4;
+          border-radius: 14px;
+          padding: 12px 12px;
+          cursor: pointer;
+          text-align: left;
+          opacity: 0.92;
+        }
+
+        .mLogout:hover {
+          opacity: 1;
+          background: rgba(255, 255, 255, 0.07);
         }
 
         @media (min-width: 900px) {

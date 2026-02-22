@@ -6,14 +6,30 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
+const PLACEHOLDER = '/placeholder.png'
+
+function normalizeUrl(url, origin) {
+  if (!url || typeof url !== 'string') return ''
+  const u = url.trim()
+  if (!u) return ''
+  if (u.startsWith('http://') || u.startsWith('https://')) return u
+  if (u.startsWith('/')) return `${origin}${u}`
+  return u
+}
+
 export default function StoreIndex() {
   const router = useRouter()
 
   const [query, setQuery] = React.useState('')
-
   const [photos, setPhotos] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
+  const [origin, setOrigin] = React.useState('') // ✅ for normalizing relative URLs
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    setOrigin(window.location.origin)
+  }, [])
 
   // ✅ Read q or tag from URL on load
   React.useEffect(() => {
@@ -21,7 +37,7 @@ export default function StoreIndex() {
     const q = typeof router.query.q === 'string' ? router.query.q : ''
     const tag = typeof router.query.tag === 'string' ? router.query.tag : ''
     setQuery(q || tag || '')
-  }, [router.isReady])
+  }, [router.isReady, router.query.q, router.query.tag])
 
   React.useEffect(() => {
     let alive = true
@@ -42,15 +58,23 @@ export default function StoreIndex() {
           return
         }
 
-        const normalized = (data.photos || []).map((row) => ({
-          id: row.id,
-          title: row.title || 'Untitled',
-          tags: Array.isArray(row.tags) ? row.tags : [],
-          orientation: 'photo',
-          thumbUrl: row.thumb_url,
-          previewUrl: row.preview_url,
-          created_at: row.created_at,
-        }))
+        const normalized = (data.photos || []).map((row) => {
+          const thumbRaw = row.thumb_url || ''
+          const previewRaw = row.preview_url || ''
+
+          const thumbUrl = origin ? normalizeUrl(thumbRaw, origin) : thumbRaw
+          const previewUrl = origin ? normalizeUrl(previewRaw, origin) : previewRaw
+
+          return {
+            id: row.id,
+            title: row.title || 'Untitled',
+            tags: Array.isArray(row.tags) ? row.tags : [],
+            orientation: 'photo',
+            thumbUrl,
+            previewUrl,
+            created_at: row.created_at,
+          }
+        })
 
         setPhotos(normalized)
       } catch (e) {
@@ -63,11 +87,13 @@ export default function StoreIndex() {
       }
     }
 
-    run()
+    // only run once we know origin (so URLs normalize correctly)
+    if (origin) run()
+
     return () => {
       alive = false
     }
-  }, [])
+  }, [origin])
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -109,15 +135,16 @@ export default function StoreIndex() {
                 const val = e.target.value
                 setQuery(val)
 
-                router.replace({ pathname: '/store', query: val ? { q: val } : {} }, undefined, {
-                  shallow: true,
-                })
+                router.replace(
+                  { pathname: '/store', query: val ? { q: val } : {} },
+                  undefined,
+                  { shallow: true }
+                )
               }}
               placeholder="Search (e.g. Sigiriya, night, portrait)…"
               aria-label="Search photos"
             />
 
-            {/* ✅ Collections link near the search bar */}
             <Link href="/store/collections">
               <a className="collectionsLink">Browse Collections →</a>
             </Link>
@@ -127,7 +154,6 @@ export default function StoreIndex() {
         {loading && <div className="empty">Loading photos…</div>}
         {!loading && error && <div className="empty">{error}</div>}
 
-        {/* ✅ Active filter banner */}
         {!loading && !error && query && (
           <div className="activeFilter">
             Showing results for <strong>{query}</strong>
@@ -149,19 +175,26 @@ export default function StoreIndex() {
             <section className="grid">
               {filtered.map((p) => {
                 const firstTag = Array.isArray(p.tags) ? p.tags.find(Boolean) : ''
+                const imgSrc = p.thumbUrl || p.previewUrl || PLACEHOLDER
+
                 return (
                   <Link key={p.id} href={`/store/${p.id}`}>
                     <a className="card">
                       <div className="thumb">
-                        <img src={p.thumbUrl} alt={p.title} loading="lazy" />
+                        <img
+                          src={imgSrc}
+                          alt={p.title}
+                          loading="lazy"
+                          onError={(e) => {
+                            if (e.currentTarget.src.endsWith(PLACEHOLDER)) return
+                            e.currentTarget.src = PLACEHOLDER
+                          }}
+                        />
 
-                        {/* ✅ Getty-style hover overlay */}
                         <div className="overlay" aria-hidden="true">
                           <div className="overlayInner">
                             <div className="ovTitle">{p.title}</div>
-                            <div className="ovMeta">
-                              {firstTag ? `#${firstTag}` : 'View details'}
-                            </div>
+                            <div className="ovMeta">{firstTag ? `#${firstTag}` : 'View details'}</div>
                           </div>
                         </div>
                       </div>
@@ -172,7 +205,6 @@ export default function StoreIndex() {
                           <span className="pill">{p.orientation}</span>
                         </div>
 
-                        {/* ✅ clickable tag chips */}
                         <div className="tagRow">
                           {(p.tags || []).slice(0, 3).map((t) => (
                             <button
@@ -181,11 +213,10 @@ export default function StoreIndex() {
                               className="tagChip"
                               onClick={(e) => {
                                 e.preventDefault()
-                                router.replace(
-                                  { pathname: '/store', query: { tag: t } },
-                                  undefined,
-                                  { shallow: true }
-                                )
+                                e.stopPropagation()
+                                router.replace({ pathname: '/store', query: { tag: t } }, undefined, {
+                                  shallow: true,
+                                })
                                 setQuery(t)
                               }}
                             >
@@ -193,8 +224,6 @@ export default function StoreIndex() {
                             </button>
                           ))}
                         </div>
-
-                        {/* ✅ remove price hint completely (clean grid) */}
                       </div>
                     </a>
                   </Link>
@@ -328,6 +357,7 @@ export default function StoreIndex() {
           aspect-ratio: 4 / 3;
           overflow: hidden;
           position: relative;
+          background: rgba(255, 255, 255, 0.03);
         }
         .thumb img {
           width: 100%;
@@ -340,7 +370,6 @@ export default function StoreIndex() {
           transform: scale(1.06);
         }
 
-        /* ✅ Overlay */
         .overlay {
           position: absolute;
           inset: 0;
