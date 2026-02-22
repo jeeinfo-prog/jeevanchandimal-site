@@ -20,50 +20,29 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Use the same lookup logic as notify.js: id OR order_id OR code
-    // ✅ Keep select list safe (only columns you know exist)
-    const selectCols =
-      'id,code,order_id,status,photo_id,license,format,currency,amount,paid_at,payhere_payment_id,kind,order_kind,items'
+    // ✅ ONLY select columns that exist in your DB (based on your working file)
+    const selectCols = 'id,code,order_id,status,photo_id,license,format,currency,amount,paid_at,payhere_payment_id'
 
-    // 1) orders.id
-    let q = await supabaseAdmin.from('orders').select(selectCols).eq('id', ref).maybeSingle()
-    let data = q?.data
-
-    // 2) orders.order_id
-    if (!data) {
-      q = await supabaseAdmin.from('orders').select(selectCols).eq('order_id', ref).maybeSingle()
-      data = q?.data
+    async function fetchBy(field) {
+      const { data, error } = await supabaseAdmin.from('orders').select(selectCols).eq(field, ref).maybeSingle()
+      if (error) throw new Error(error.message)
+      return data
     }
 
-    // 3) orders.code
-    if (!data) {
-      q = await supabaseAdmin.from('orders').select(selectCols).eq('code', ref).maybeSingle()
-      data = q?.data
-    }
+    // ✅ Find by id OR order_id OR code (same as notify.js)
+    let data = await fetchBy('id')
+    if (!data) data = await fetchBy('order_id')
+    if (!data) data = await fetchBy('code')
 
-    if (q?.error) {
-      return res.status(500).json({ ok: false, error: q.error.message })
-    }
     if (!data) {
       return res.status(404).json({ ok: false, error: 'Order not found' })
     }
 
-    // Determine kind safely
-    const kind =
-      String(data.kind || data.order_kind || '').toLowerCase() === 'cart' ||
-      Array.isArray(data.items) ||
-      (data.items && typeof data.items === 'object')
-        ? 'cart'
-        : String(data.kind || data.order_kind || 'single').toLowerCase() === 'membership'
-        ? 'membership'
-        : 'single'
-
-    // If cart, keep items, else null (to match your frontend expectation)
-    const items = kind === 'cart' ? (Array.isArray(data.items) ? data.items : []) : null
+    // Your current schema for this endpoint = single-style response
+    const kind = 'single'
 
     return res.status(200).json({
       ok: true,
-
       id: data.id,
 
       // ✅ fallback so frontend always has a usable ref
@@ -72,20 +51,18 @@ export default async function handler(req, res) {
 
       kind,
       status: data.status,
-
       photoId: data.photo_id || null,
       license: data.license || null,
       format: data.format || null,
-
-      items,
+      items: null,
 
       currency: data.currency || null,
       amount: Number(data.amount || 0),
-
       paidAt: data.paid_at || null,
       paymentId: data.payhere_payment_id || null,
     })
   } catch (e) {
+    console.error('orders/[id] error:', e)
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
 }
