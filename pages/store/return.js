@@ -7,8 +7,8 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
 
-const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED'])
-const FAIL_STATUSES = new Set(['FAILED', 'CANCELED', 'CANCELLED', 'EXPIRED'])
+const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED', 'CONFIRMED', '2'])
+const FAIL_STATUSES = new Set(['FAILED', 'CANCELED', 'CANCELLED', 'EXPIRED', '-1', '-2', '-3'])
 
 function readQueryOrderId(q) {
   const v = q?.order_id
@@ -19,106 +19,139 @@ function readQueryOrderId(q) {
 
 function safeSet(key, value) {
   try {
-    localStorage.setItem(key, value)
+    window.localStorage.setItem(key, value)
   } catch {}
 }
 function safeGet(key) {
   try {
-    return localStorage.getItem(key) || ''
+    return window.localStorage.getItem(key) || ''
   } catch {
     return ''
   }
 }
 
+function normalizeStatus(data) {
+  const raw =
+    data?.status ??
+    data?.order?.status ??
+    data?.payhere_status_code ?? // sometimes exposed
+    'PENDING'
+
+  const s = String(raw).trim()
+
+  // If backend returns numeric status_code (like 2)
+  if (s === '2') return 'PAID'
+  if (s === '-1' || s === '-2' || s === '-3') return 'FAILED'
+
+  return s.toUpperCase()
+}
+
 export default function StoreReturn() {
   const router = useRouter()
 
-  // 1) Try URL first
   const urlOrderId = readQueryOrderId(router.query)
-
-  // 2) Fallback to localStorage if PayHere drops query params
-  const [orderId, setOrderId] = React.useState(urlOrderId)
-
+  const [orderId, setOrderId] = React.useState(urlOrderId || '')
   const [status, setStatus] = React.useState('PENDING')
   const [msg, setMsg] = React.useState('')
 
+  // Resolve orderId from URL -> localStorage fallback
   React.useEffect(() => {
     if (!router.isReady) return
 
-    // If URL has order_id, prefer it and store it
     if (urlOrderId) {
       setOrderId(urlOrderId)
-
-      // ✅ Save under both keys (backward + forward compatible)
-      safeSet('last_order_ref', urlOrderId) // new
-      safeSet('last_order_id', urlOrderId) // old (keep)
+      safeSet('last_order_ref', urlOrderId)
+      safeSet('last_order_id', urlOrderId) // backward compat
       return
     }
 
-    // Otherwise recover from localStorage
-    const saved =
-      safeGet('last_order_ref') || // new
-      safeGet('last_order_id') // old fallback
-
+    const saved = safeGet('last_order_ref') || safeGet('last_order_id')
     if (saved) setOrderId(saved)
   }, [router.isReady, urlOrderId])
 
+  // Poll status
   React.useEffect(() => {
     if (!router.isReady || !orderId) return
 
-    let cancelled = false
+    let stopped = false
     let tries = 0
-    const maxTries = 30 // ~60s
+    const maxTries = 45 // ~90s
 
-    async function poll() {
+    const tick = async () => {
+      if (stopped) return
       tries += 1
 
       try {
         const url = `/api/orders/status?order_id=${encodeURIComponent(orderId)}&t=${Date.now()}`
         const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
         const data = await r.json().catch(() => ({}))
-        if (cancelled) return
+        if (stopped) return
 
         if (!r.ok || data?.ok === false) {
           setMsg(data?.error ? String(data.error) : `Order check failed (${r.status}).`)
         } else {
-          const raw = data?.status ?? data?.order?.status ?? 'PENDING'
-          const s = String(raw).trim().toUpperCase()
+          const s = normalizeStatus(data)
           setStatus(s)
 
-          // ✅ Paid → clear cart + go to download
+          // ✅ PAID
           if (PAID_STATUSES.has(s)) {
-            // Safe to clear cart now (prevents accidental double orders)
+            stopped = true
+
+            // clear cart only after confirmed paid
             try {
-              localStorage.removeItem('jc_cart_v1')
+              window.localStorage.removeItem('jc_cart_v1')
             } catch {}
 
-            window.location.href = `/store/download?order_id=${encodeURIComponent(orderId)}`
+            // Prefer Next router navigation
+            const target = `/store/download?order_id=${encodeURIComponent(orderId)}`
+            try {
+              router.replace(target)
+            } catch {
+              // ignore
+            }
+
+            // Hard fallback (Safari-safe)
+            setTimeout(() => {
+              try {
+                window.location.href = target
+              } catch {}
+            }, 150)
+
             return
           }
 
-          // ✅ Failure states
+          // ✅ FAILED/CANCELED
           if (FAIL_STATUSES.has(s)) {
-            setMsg('Payment not completed. If you were charged, please contact support with your Order ID.')
+            stopped = true
+            setMsg(
+              'Payment not completed. If you were charged, please contact support with your Order ID.'
+            )
             return
           }
+
+          setMsg('Please wait…')
         }
       } catch (e) {
-        if (!cancelled) setMsg(e?.message || 'Error checking payment.')
+        if (!stopped) setMsg(e?.message || 'Error checking payment.')
       }
 
-      if (!cancelled && tries < maxTries) {
-        setTimeout(poll, 2000)
-      } else if (!cancelled) {
+      if (!stopped && tries >= maxTries) {
+        stopped = true
         setMsg('Still waiting for confirmation. You can refresh this page.')
       }
     }
 
-    poll()
+    // run immediately, then interval
+    tick()
+    const iv = setInterval(tick, 2000)
+
     return () => {
-      cancelled = true
+      stopped = true
+      clearInterval(iv)
     }
-  }, [router.isReady, orderId])
+  }, [router.isReady, orderId, router])
+
+  const isPaid = PAID_STATUSES.has(status)
 
   return (
     <>
@@ -131,7 +164,7 @@ export default function StoreReturn() {
 
       <main className="wrap">
         <div className="card">
-          <h1 className="title">Confirming payment…</h1>
+          <h1 className="title">{isPaid ? 'Payment confirmed ✅' : 'Confirming payment…'}</h1>
 
           <p className="p">
             Order ID: <span className="mono">{orderId || '-'}</span>
@@ -141,18 +174,16 @@ export default function StoreReturn() {
 
           {msg ? <p className="p2">{msg}</p> : <p className="p2">Please wait…</p>}
 
-          {/* Manual fallback button (in case redirect is blocked) */}
-          {orderId && PAID_STATUSES.has(status) ? (
+          {/* Manual fallback (always show if we have an orderId) */}
+          {orderId ? (
             <p className="p2">
-              <a href={`/store/download?order_id=${encodeURIComponent(orderId)}`}>Download</a>
+              <a href={`/store/download?order_id=${encodeURIComponent(orderId)}`}>Go to download</a>
             </p>
-          ) : null}
-
-          {!orderId ? (
+          ) : (
             <p className="p2">
               Missing <span className="mono">order_id</span>. Please return from PayHere again.
             </p>
-          ) : null}
+          )}
         </div>
       </main>
 
