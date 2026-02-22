@@ -2,7 +2,6 @@
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
-  // ✅ hard no-cache (prevents 304/stale)
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   res.setHeader('Pragma', 'no-cache')
   res.setHeader('Expires', '0')
@@ -17,7 +16,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing order_id' })
     }
 
-    // 1) Try by UUID id (old flow)
+    // 1) Try by id (covers UUID + your ORD_* text ids)
     const byId = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')
@@ -32,14 +31,14 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         id: byId.data.id,
-        code: byId.data.code || null,
+        code: byId.data.code || ref, // ✅ never null
         status: byId.data.status,
         paid_at: byId.data.paid_at,
         payhere_status_code: byId.data.payhere_status_code ?? null,
       })
     }
 
-    // 2) Try by code (PayHere order ref / cart flow)
+    // 2) Try by code
     const byCode = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')
@@ -57,7 +56,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       id: byCode.data.id,
-      code: byCode.data.code || null,
+      code: byCode.data.code || ref, // ✅ never null
       status: byCode.data.status,
       paid_at: byCode.data.paid_at,
       payhere_status_code: byCode.data.payhere_status_code ?? null,
