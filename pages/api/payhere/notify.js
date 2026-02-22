@@ -28,7 +28,9 @@ function parseForm(body) {
 }
 
 function cleanBaseUrl(v) {
-  return String(v || '').trim().replace(/\/+$/, '')
+  return String(v || '')
+    .trim()
+    .replace(/\/+$/, '')
 }
 
 function getBaseUrl(req) {
@@ -105,18 +107,20 @@ function fallbackObjectKeyFromPhotoId(photoId, format) {
 }
 
 async function findOrderByPayhereOrderId(order_id) {
-  // PayHere order_id could be:
-  // - orders.id (uuid) in older flow
-  // - orders.order_id (string like ORD_...) in cart/single newer flow
-  const byId = await supabaseAdmin.from('orders').select('*').eq('id', order_id).maybeSingle()
+  const ref = String(order_id || '').trim()
+  if (!ref) return null
+
+  // - orders.id (uuid / your ORD_* ids)
+  const byId = await supabaseAdmin.from('orders').select('*').eq('id', ref).maybeSingle()
   if (byId?.data) return byId.data
 
-  const byOrderId = await supabaseAdmin
-    .from('orders')
-    .select('*')
-    .eq('order_id', order_id)
-    .maybeSingle()
+  // - orders.order_id (if you store payhere ref)
+  const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', ref).maybeSingle()
   if (byOrderId?.data) return byOrderId.data
+
+  // - orders.code (older cart flow)
+  const byCode = await supabaseAdmin.from('orders').select('*').eq('code', ref).maybeSingle()
+  if (byCode?.data) return byCode.data
 
   return null
 }
@@ -153,6 +157,36 @@ async function resolveObjectKeyForCartItem(item) {
   return fallbackObjectKeyFromPhotoId(photoId, format)
 }
 
+/**
+ * ✅ FIXED: resolve correct objectKey for SINGLE orders (folder + filename)
+ * Your R2 structure is: photos/original/<photo_id>/<filename>.jpg
+ * So we must read the correct key from photos table, NOT build it from photo_id.
+ */
+async function resolveObjectKeyForSingleOrder(o) {
+  const photoId = String(o?.photo_id || '').trim()
+  if (!photoId) return null
+
+  const fmt = normalizeFormat(o?.format)
+
+  const { data: p, error } = await supabaseAdmin
+    .from('photos')
+    .select('id, original_key, original_jpg_key, original_raw_key, raw_key, raw_object_key')
+    .eq('id', photoId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!p) return null
+
+  if (fmt === 'raw') {
+    const rk = p.original_raw_key || p.raw_object_key || p.raw_key
+    return rk ? String(rk) : null
+  }
+
+  // ✅ Prefer jpg-specific key first
+  const k = p.original_jpg_key || p.original_key
+  return k ? String(k) : null
+}
+
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
@@ -178,10 +212,10 @@ export default async function handler(req, res) {
 
     if (!order_id) return res.status(200).send('OK')
 
-    // 1) Fetch order by id OR order_id
+    // 1) Fetch order by id OR order_id OR code
     const order = await findOrderByPayhereOrderId(order_id)
     if (!order) {
-      console.error('Order not found (id/order_id):', order_id)
+      console.error('Order not found (id/order_id/code):', order_id)
       return res.status(200).send('OK')
     }
 
@@ -220,10 +254,6 @@ export default async function handler(req, res) {
 
     const statusCodeNum = Number(status_code)
 
-    /* =========================================================
-       ✅ PAYMENT SUCCESS
-    ========================================================= */
-
     if (statusCodeNum === 2) {
       const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
 
@@ -240,11 +270,7 @@ export default async function handler(req, res) {
           .eq('id', order.id)
       }
 
-      const { data: fresh } = await supabaseAdmin
-        .from('orders')
-        .select('*')
-        .eq('id', order.id)
-        .single()
+      const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).single()
 
       const o = fresh || order
       const email = normalizeEmail(o.email)
@@ -258,7 +284,6 @@ export default async function handler(req, res) {
         String(custom_1 || '').toLowerCase() === 'cart'
 
       /* ================= MEMBERSHIP ================= */
-
       if (isMembership) {
         if (!email) return res.status(200).send('OK')
 
@@ -311,9 +336,7 @@ export default async function handler(req, res) {
           status: 'active',
           start_date: startDate.toISOString(),
           end_date: endDate ? endDate.toISOString() : null,
-          created_at: existing?.created_at
-            ? new Date(existing.created_at).toISOString()
-            : now.toISOString(),
+          created_at: existing?.created_at ? new Date(existing.created_at).toISOString() : now.toISOString(),
         }
 
         await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'email' })
@@ -321,7 +344,6 @@ export default async function handler(req, res) {
       }
 
       /* ================= CART ================= */
-
       if (isCart) {
         if (!email) return res.status(200).send('OK')
 
@@ -329,8 +351,7 @@ export default async function handler(req, res) {
         if (items.length === 0) return res.status(200).send('OK')
 
         const licenses = items.map((it) => normalizeLicense(it.license))
-        const downloadLimit =
-          licenses.includes('commercial') ? 0 : licenses.includes('editorial') ? 5 : 3
+        const downloadLimit = licenses.includes('commercial') ? 0 : licenses.includes('editorial') ? 5 : 3
 
         if (o.download_limit == null || Number(o.download_limit) !== Number(downloadLimit)) {
           await supabaseAdmin.from('orders').update({ download_limit: downloadLimit }).eq('id', o.id)
@@ -351,10 +372,7 @@ export default async function handler(req, res) {
             paymentId: payment_id || null,
           })
 
-          await supabaseAdmin
-            .from('orders')
-            .update({ invoice_email_sent_at: new Date().toISOString() })
-            .eq('id', o.id)
+          await supabaseAdmin.from('orders').update({ invoice_email_sent_at: new Date().toISOString() }).eq('id', o.id)
         }
 
         if (!o.download_email_sent_at) {
@@ -377,7 +395,6 @@ export default async function handler(req, res) {
               order_id: o.id,
               expires_at: expiresAt.toISOString(),
             })
-
             if (ins.error) throw new Error(`download_tokens insert failed: ${ins.error.message}`)
 
             const ext = format === 'raw' ? 'zip' : 'jpg'
@@ -397,13 +414,7 @@ export default async function handler(req, res) {
               '1h'
             )
 
-            links.push({
-              title,
-              photoId,
-              license,
-              format,
-              url: buildDownloadUrl(token, req),
-            })
+            links.push({ title, photoId, license, format, url: buildDownloadUrl(token, req) })
           }
 
           if (links.length > 0) {
@@ -425,10 +436,7 @@ export default async function handler(req, res) {
               format: '—',
             })
 
-            await supabaseAdmin
-              .from('orders')
-              .update({ download_email_sent_at: new Date().toISOString() })
-              .eq('id', o.id)
+            await supabaseAdmin.from('orders').update({ download_email_sent_at: new Date().toISOString() }).eq('id', o.id)
           }
         }
 
@@ -437,22 +445,20 @@ export default async function handler(req, res) {
 
       /* ================= SINGLE ================= */
 
-      const objectKey =
-        o.delivery_object_key ||
-        (o.photo_id
-          ? normalizeFormat(o.format) === 'raw'
-            ? `photos/original/${o.photo_id}.zip`
-            : `photos/original/${o.photo_id}.jpg`
-          : null)
-
-      if (!objectKey) return res.status(200).send('OK')
+      // ✅ FIX: resolve correct R2 key from photos table (folder + filename)
+      const objectKey = await resolveObjectKeyForSingleOrder(o)
+      if (!objectKey) {
+        console.error('Missing objectKey for single order:', o.id, 'photo:', o.photo_id)
+        return res.status(200).send('OK')
+      }
 
       const desiredLimit = limitForLicense(normalizeLicense(o.license))
       if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
         await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
       }
 
-      if (!o.delivery_object_key) {
+      // ✅ persist correct key (even if old key existed but was wrong, overwrite it)
+      if (String(o.delivery_object_key || '') !== String(objectKey)) {
         await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
       }
 
@@ -469,7 +475,6 @@ export default async function handler(req, res) {
           order_id: o.id,
           expires_at: expiresAt.toISOString(),
         })
-
         if (ins.error) throw new Error(`download_tokens insert failed: ${ins.error.message}`)
 
         const fmt = normalizeFormat(o.format)
@@ -485,6 +490,7 @@ export default async function handler(req, res) {
             userId: o.user_id || null,
             guestEmail: email,
             filename: `${o.photo_id}.${ext}`,
+            license: normalizeLicense(o.license),
           },
           '1h'
         )
@@ -499,15 +505,12 @@ export default async function handler(req, res) {
             amount: o.amount,
             currency: o.currency,
             photoTitle: o.photo_id,
-            license: o.license,
-            format: o.format,
+            license: normalizeLicense(o.license),
+            format: normalizeFormat(o.format),
             paymentId: payment_id || null,
           })
 
-          await supabaseAdmin
-            .from('orders')
-            .update({ invoice_email_sent_at: new Date().toISOString() })
-            .eq('id', o.id)
+          await supabaseAdmin.from('orders').update({ invoice_email_sent_at: new Date().toISOString() }).eq('id', o.id)
         }
 
         if (!o.download_email_sent_at) {
@@ -516,14 +519,11 @@ export default async function handler(req, res) {
             orderId: o.id,
             photoTitle: o.photo_id,
             downloadUrl,
-            license: o.license,
-            format: o.format,
+            license: normalizeLicense(o.license),
+            format: normalizeFormat(o.format),
           })
 
-          await supabaseAdmin
-            .from('orders')
-            .update({ download_email_sent_at: new Date().toISOString() })
-            .eq('id', o.id)
+          await supabaseAdmin.from('orders').update({ download_email_sent_at: new Date().toISOString() }).eq('id', o.id)
         }
       } catch (e) {
         console.error('❌ Single photo delivery email block failed:', o.id, e)
