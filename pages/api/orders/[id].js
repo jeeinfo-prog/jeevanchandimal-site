@@ -13,49 +13,78 @@ export default async function handler(req, res) {
   res.setHeader('Surrogate-Control', 'no-store')
 
   const { id } = req.query
-  const orderId = String(id || '').trim()
+  const ref = String(id || '').trim()
 
-  if (!orderId) {
+  if (!ref) {
     return res.status(400).json({ ok: false, error: 'Missing order id' })
   }
 
   try {
-    // ✅ DO NOT select columns that may not exist (kind, items)
-    const { data, error } = await supabaseAdmin
-      .from('orders')
-      .select('id,code,status,photo_id,license,format,currency,amount,paid_at,payhere_payment_id')
-      .eq('id', orderId)
-      .maybeSingle()
+    // ✅ Use the same lookup logic as notify.js: id OR order_id OR code
+    // ✅ Keep select list safe (only columns you know exist)
+    const selectCols =
+      'id,code,order_id,status,photo_id,license,format,currency,amount,paid_at,payhere_payment_id,kind,order_kind,items'
 
-    if (error) {
-      return res.status(500).json({ ok: false, error: error.message })
+    // 1) orders.id
+    let q = await supabaseAdmin.from('orders').select(selectCols).eq('id', ref).maybeSingle()
+    let data = q?.data
+
+    // 2) orders.order_id
+    if (!data) {
+      q = await supabaseAdmin.from('orders').select(selectCols).eq('order_id', ref).maybeSingle()
+      data = q?.data
+    }
+
+    // 3) orders.code
+    if (!data) {
+      q = await supabaseAdmin.from('orders').select(selectCols).eq('code', ref).maybeSingle()
+      data = q?.data
+    }
+
+    if (q?.error) {
+      return res.status(500).json({ ok: false, error: q.error.message })
     }
     if (!data) {
       return res.status(404).json({ ok: false, error: 'Order not found' })
     }
 
-    // Your current DB schema = single-photo style
-    const kind = 'single'
+    // Determine kind safely
+    const kind =
+      String(data.kind || data.order_kind || '').toLowerCase() === 'cart' ||
+      Array.isArray(data.items) ||
+      (data.items && typeof data.items === 'object')
+        ? 'cart'
+        : String(data.kind || data.order_kind || 'single').toLowerCase() === 'membership'
+        ? 'membership'
+        : 'single'
+
+    // If cart, keep items, else null (to match your frontend expectation)
+    const items = kind === 'cart' ? (Array.isArray(data.items) ? data.items : []) : null
 
     return res.status(200).json({
-  ok: true,
-  id: data.id,
+      ok: true,
 
-  // ✅ fallback so frontend always has a usable ref
-  code: data.code || data.id || orderId,
-  order_id: data.code || data.id || orderId,
+      id: data.id,
 
-  kind,
-  status: data.status,
-  photoId: data.photo_id || null,
-  license: data.license || null,
-  format: data.format || null,
-  items: null,
-  currency: data.currency || null,
-  amount: Number(data.amount || 0),
-  paidAt: data.paid_at || null,
-  paymentId: data.payhere_payment_id || null,
-})
+      // ✅ fallback so frontend always has a usable ref
+      code: data.code || data.order_id || data.id || ref,
+      order_id: data.order_id || data.code || data.id || ref,
+
+      kind,
+      status: data.status,
+
+      photoId: data.photo_id || null,
+      license: data.license || null,
+      format: data.format || null,
+
+      items,
+
+      currency: data.currency || null,
+      amount: Number(data.amount || 0),
+
+      paidAt: data.paid_at || null,
+      paymentId: data.payhere_payment_id || null,
+    })
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
