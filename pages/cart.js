@@ -33,38 +33,63 @@ function formatMoney(currency, amount) {
   return `$${n.toFixed(2)}`
 }
 
+function readLS(key, fallback = null) {
+  if (typeof window === 'undefined') return fallback
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return fallback
+  }
+}
+
+function writeLS(key, value) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {}
+}
+
 // ---------- fallback cart impl (only used if lib/cart.js functions not found) ----------
 function fallbackReadCart() {
   if (typeof window === 'undefined') return { currency: 'LKR', items: [] }
-  const raw = localStorage.getItem(STORAGE_CART_KEY)
+  const raw = readLS(STORAGE_CART_KEY, null)
   const cart = safeJsonParse(raw, null)
   if (cart && Array.isArray(cart.items)) return cart
-  return { currency: localStorage.getItem(STORAGE_CCY_KEY) || 'LKR', items: [] }
+  return { currency: readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR', items: [] }
 }
 
 function fallbackWriteCart(cart) {
   if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_CART_KEY, JSON.stringify(cart))
-  localStorage.setItem(STORAGE_CCY_KEY, cart.currency || 'LKR')
+  writeLS(STORAGE_CART_KEY, JSON.stringify(cart))
+  writeLS(STORAGE_CCY_KEY, cart.currency || 'LKR')
 }
 
 function normalizeItem(it) {
+  const src = it || {}
+
   // Supports multiple shapes from different implementations
-  const id = it.id || it.photoId || it.photo_id
-  const title = it.title || it.name || 'Untitled'
+  const id = src.id || src.photoId || src.photo_id || src._id || null
+  const title = src.title || src.name || src._title || 'Untitled'
   const thumb =
-    it.thumb_url || it.thumbUrl || it.thumb || it.preview_url || it.previewUrl || it.image || null
+    src.thumb_url ||
+    src.thumbUrl ||
+    src.thumb ||
+    src.preview_url ||
+    src.previewUrl ||
+    src.image ||
+    src._thumb ||
+    null
 
-  const license = it.license || it.usage || it.plan || it.type || 'personal'
-  const format = it.format || it.file || it.ext || 'jpg'
+  const license = src.license || src.usage || src.plan || src.type || src._license || 'personal'
+  const format = src.format || src.file || src.ext || src._format || 'jpg'
 
-  const qty = clamp(it.qty ?? it.quantity ?? 1, 1, 99)
+  const qty = clamp(src.qty ?? src.quantity ?? src._qty ?? 1, 1, 99)
 
   // price can be item.price OR item.prices[currency][license][format]
-  const price = Number(it.price || 0)
+  const price = Number(src.price ?? src.unitPrice ?? src._price ?? 0) || 0
 
   return {
-    ...it,
+    ...src,
     _id: id,
     _title: title,
     _thumb: thumb,
@@ -83,7 +108,7 @@ function getUnitPrice(item, currency) {
     prices &&
     prices[currency] &&
     prices[currency][item._license] &&
-    prices[currency][item._license][item._format]
+    prices[currency][item._license][item._format] != null
   ) {
     return Number(prices[currency][item._license][item._format])
   }
@@ -100,24 +125,30 @@ function getCartAdapter() {
   const api = {
     read() {
       // Try common names
-      if (typeof CartLib.getCart === 'function') return CartLib.getCart()
-      if (typeof CartLib.readCart === 'function') return CartLib.readCart()
-      if (typeof CartLib.loadCart === 'function') return CartLib.loadCart()
-      if (typeof CartLib.cartGet === 'function') return CartLib.cartGet()
+      try {
+        if (typeof CartLib.getCart === 'function') return CartLib.getCart()
+        if (typeof CartLib.readCart === 'function') return CartLib.readCart()
+        if (typeof CartLib.loadCart === 'function') return CartLib.loadCart()
+        if (typeof CartLib.cartGet === 'function') return CartLib.cartGet()
+      } catch {}
       return fallbackReadCart()
     },
     write(cart) {
-      if (typeof CartLib.setCart === 'function') return CartLib.setCart(cart)
-      if (typeof CartLib.saveCart === 'function') return CartLib.saveCart(cart)
-      if (typeof CartLib.writeCart === 'function') return CartLib.writeCart(cart)
-      if (typeof CartLib.cartSet === 'function') return CartLib.cartSet(cart)
+      try {
+        if (typeof CartLib.setCart === 'function') return CartLib.setCart(cart)
+        if (typeof CartLib.saveCart === 'function') return CartLib.saveCart(cart)
+        if (typeof CartLib.writeCart === 'function') return CartLib.writeCart(cart)
+        if (typeof CartLib.cartSet === 'function') return CartLib.cartSet(cart)
+      } catch {}
       return fallbackWriteCart(cart)
     },
     clear() {
-      if (typeof CartLib.clearCart === 'function') return CartLib.clearCart()
-      if (typeof CartLib.cartClear === 'function') return CartLib.cartClear()
+      try {
+        if (typeof CartLib.clearCart === 'function') return CartLib.clearCart()
+        if (typeof CartLib.cartClear === 'function') return CartLib.cartClear()
+      } catch {}
       return fallbackWriteCart({
-        currency: localStorage.getItem(STORAGE_CCY_KEY) || 'LKR',
+        currency: readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR',
         items: [],
       })
     },
@@ -137,36 +168,56 @@ export default function CartPage() {
   const locked = items.length > 0
 
   const load = React.useCallback(() => {
-    const cart = cartApi.read() || { currency: 'LKR', items: [] }
+    const cart = cartApi.read() || {}
 
-    // Your lib/cart.js stores: { items: [...] } (no currency)
-    // So currency is stored separately here.
-    const ccy =
-      cart.currency ||
-      (typeof window !== 'undefined' ? localStorage.getItem(STORAGE_CCY_KEY) : null) ||
-      'LKR'
+    // cart could be:
+    // - { currency, items } (our wrapper)
+    // - { items } (your lib/cart.js)
+    // - just [] (older)
+    const rawItems = Array.isArray(cart) ? cart : cart.items
+    const ccy = (cart && cart.currency) || readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR'
 
     setCurrency(ccy)
-    setItems(Array.isArray(cart.items) ? cart.items.map(normalizeItem) : [])
+    setItems(Array.isArray(rawItems) ? rawItems.map(normalizeItem) : [])
   }, [cartApi])
 
   React.useEffect(() => {
     setReady(true)
     load()
 
+    if (typeof window === 'undefined') return undefined
+
     // cross-tab sync
     const onStorage = (e) => {
       if (e.key === STORAGE_CART_KEY || e.key === STORAGE_CCY_KEY) load()
     }
+
+    // same-tab updates from AddToCartButton
+    const onCustom = () => load()
+
     window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    window.addEventListener('jc_cart_updated', onCustom)
+
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('jc_cart_updated', onCustom)
+    }
   }, [load])
 
   function persist(nextItems, nextCurrency = currency) {
     const cart = { currency: nextCurrency, items: nextItems }
     cartApi.write(cart)
+
+    // keep separate currency key for legacy readers
+    writeLS(STORAGE_CCY_KEY, nextCurrency)
+
     setItems(nextItems.map(normalizeItem))
     setCurrency(nextCurrency)
+
+    // tell navbar etc (same-tab)
+    try {
+      window.dispatchEvent(new Event('jc_cart_updated'))
+    } catch {}
   }
 
   function removeItem(photoId) {
@@ -198,13 +249,11 @@ export default function CartPage() {
     if (locked) return
     const ccy = next === 'USD' ? 'USD' : 'LKR'
     persist(items, ccy)
-    if (typeof window !== 'undefined') localStorage.setItem(STORAGE_CCY_KEY, ccy)
     setNote('Currency saved.')
     setTimeout(() => setNote(''), 1200)
   }
 
   function onCheckout() {
-    // Step 2 will wire this into PayHere multi-item checkout.
     setNote('Next step: connect this button to PayHere checkout (multi-item).')
     setTimeout(() => setNote(''), 1800)
   }
@@ -266,9 +315,9 @@ export default function CartPage() {
                 <div className="cardTitle">Items</div>
 
                 <div className="list">
-                  {items.map((raw) => {
+                  {items.map((raw, idx) => {
                     const it = normalizeItem(raw)
-                    const id = it._id
+                    const id = it._id || `${idx}`
                     const unit = getUnitPrice(it, currency)
                     const line = unit * it._qty
 
@@ -302,6 +351,7 @@ export default function CartPage() {
                                 className="qtyBtn"
                                 onClick={() => setQty(id, it._qty - 1)}
                                 aria-label="Decrease quantity"
+                                type="button"
                               >
                                 −
                               </button>
@@ -309,7 +359,7 @@ export default function CartPage() {
                                 className="qtyInput"
                                 value={it._qty}
                                 onChange={(e) => {
-                                  const v = e.target.value.replace(/[^\d]/g, '')
+                                  const v = String(e.target.value || '').replace(/[^\d]/g, '')
                                   setQty(id, v ? Number(v) : 1)
                                 }}
                                 inputMode="numeric"
@@ -318,12 +368,17 @@ export default function CartPage() {
                                 className="qtyBtn"
                                 onClick={() => setQty(id, it._qty + 1)}
                                 aria-label="Increase quantity"
+                                type="button"
                               >
                                 +
                               </button>
                             </div>
 
-                            <button className="linkDanger" onClick={() => removeItem(id)}>
+                            <button
+                              className="linkDanger"
+                              onClick={() => removeItem(id)}
+                              type="button"
+                            >
                               Remove
                             </button>
 
@@ -340,9 +395,13 @@ export default function CartPage() {
                 <div className="itemsFooter">
                   <button
                     className="btnGhost"
+                    type="button"
                     onClick={() => {
                       cartApi.clear()
                       load()
+                      try {
+                        window.dispatchEvent(new Event('jc_cart_updated'))
+                      } catch {}
                     }}
                   >
                     Clear cart
@@ -369,7 +428,7 @@ export default function CartPage() {
 
                 <div className="divider" />
 
-                <button className="btnPrimary full" onClick={onCheckout}>
+                <button className="btnPrimary full" onClick={onCheckout} type="button">
                   Checkout
                 </button>
 
