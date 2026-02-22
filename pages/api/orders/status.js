@@ -2,24 +2,26 @@
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
-  // no-cache (prevents weird 304 behavior)
-  res.setHeader('Cache-Control', 'no-store, max-age=0')
+  // ✅ hard no-cache (prevents 304/stale)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
 
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
   try {
-    const orderRef = String(req.query.order_id || '').trim()
-    if (!orderRef) {
+    const ref = String(req.query.order_id || '').trim()
+    if (!ref) {
       return res.status(400).json({ ok: false, error: 'Missing order_id' })
     }
 
-    // 1) Try by id (uuid) — old flow
+    // 1) Try by UUID id (old flow)
     const byId = await supabaseAdmin
       .from('orders')
-      .select('id,order_id,status,paid_at,payhere_status_code')
-      .eq('id', orderRef)
+      .select('id,code,status,paid_at,payhere_status_code')
+      .eq('id', ref)
       .maybeSingle()
 
     if (byId.error) {
@@ -30,37 +32,35 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         id: byId.data.id,
-        order_id: byId.data.order_id || null,
-        code: byId.data.order_id || null, // backward compat
+        code: byId.data.code || null,
         status: byId.data.status,
         paid_at: byId.data.paid_at,
         payhere_status_code: byId.data.payhere_status_code ?? null,
       })
     }
 
-    // 2) Try by order_id (PayHere order ref like ORD_...)
-    const byOrderId = await supabaseAdmin
+    // 2) Try by code (PayHere order ref / cart flow)
+    const byCode = await supabaseAdmin
       .from('orders')
-      .select('id,order_id,status,paid_at,payhere_status_code')
-      .eq('order_id', orderRef)
+      .select('id,code,status,paid_at,payhere_status_code')
+      .eq('code', ref)
       .maybeSingle()
 
-    if (byOrderId.error) {
-      return res.status(500).json({ ok: false, error: byOrderId.error.message })
+    if (byCode.error) {
+      return res.status(500).json({ ok: false, error: byCode.error.message })
     }
 
-    if (!byOrderId.data) {
+    if (!byCode.data) {
       return res.status(404).json({ ok: false, error: 'Order not found' })
     }
 
     return res.status(200).json({
       ok: true,
-      id: byOrderId.data.id,
-      order_id: byOrderId.data.order_id || null,
-      code: byOrderId.data.order_id || null, // backward compat
-      status: byOrderId.data.status,
-      paid_at: byOrderId.data.paid_at,
-      payhere_status_code: byOrderId.data.payhere_status_code ?? null,
+      id: byCode.data.id,
+      code: byCode.data.code || null,
+      status: byCode.data.status,
+      paid_at: byCode.data.paid_at,
+      payhere_status_code: byCode.data.payhere_status_code ?? null,
     })
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
