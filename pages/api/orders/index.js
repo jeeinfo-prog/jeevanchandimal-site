@@ -1,70 +1,87 @@
 // pages/api/orders/index.js
-
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+
+function isUuid(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(v || '')
+  )
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
+  // no-cache (downloads should reflect latest)
+  res.setHeader('Cache-Control', 'no-store, max-age=0')
+
   try {
     const email = String(req.query.email || '').trim().toLowerCase()
+    if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
 
-    if (!email) {
-      return res.status(400).json({ ok: false, error: 'Missing email' })
-    }
-
-    const { data, error } = await supabaseAdmin
+    // 1) Load PAID orders for this email
+    const { data: orders, error } = await supabaseAdmin
       .from('orders')
-      .select(`
-        id,
-        status,
-        email,
-        photo_id,
-        license,
-        format,
-        currency,
-        amount,
-        paid_at,
-        download_count,
-        download_limit,
-        delivery_object_key,
-        photos:photo_id (
-          title,
-          preview_url,
-          thumb_url
-        )
-      `)
+      .select(
+        'id,status,photo_id,license,format,currency,amount,paid_at,download_limit,download_count,delivery_object_key,invoice_no'
+      )
       .eq('email', email)
       .eq('status', 'PAID')
       .order('paid_at', { ascending: false })
+      .limit(200)
 
-    if (error) {
-      console.error('orders fetch error:', error)
-      return res.status(500).json({ ok: false, error: error.message })
+    if (error) return res.status(500).json({ ok: false, error: error.message })
+
+    const list = orders || []
+    if (list.length === 0) return res.status(200).json({ ok: true, orders: [] })
+
+    // 2) Fetch related photos WITHOUT FK relationship
+    const photoIds = Array.from(new Set(list.map((o) => o.photo_id).filter((x) => isUuid(x))))
+
+    let photoMap = {}
+    if (photoIds.length) {
+      const { data: photos, error: pErr } = await supabaseAdmin
+        .from('photos')
+        .select('id,title,thumb_url,preview_url')
+        .in('id', photoIds)
+
+      if (pErr) return res.status(500).json({ ok: false, error: pErr.message })
+
+      photoMap = Object.fromEntries((photos || []).map((p) => [p.id, p]))
     }
 
-    const orders = (data || []).map((o) => ({
-      id: o.id,
-      status: o.status,
-      email: o.email,
-      photoId: o.photo_id,
-      title: o.photos?.title || 'Untitled',
-      preview_url: o.photos?.preview_url || null,
-      thumb_url: o.photos?.thumb_url || null,
-      license: o.license,
-      format: o.format,
-      currency: o.currency,
-      amount: Number(o.amount || 0),
-      paid_at: o.paid_at,
-      download_count: o.download_count || 0,
-      download_limit: o.download_limit || 0,
-      delivery_object_key: o.delivery_object_key || null,
-    }))
+    // 3) Merge + FLATTEN fields used by UI
+    const merged = list.map((o) => {
+      const p = photoMap[o.photo_id] || null
+      return {
+        // ✅ UI convenience
+        order_id: o.id, // your Downloads page uses item.order_id
+        title: p?.title || null,
+        thumb_url: p?.thumb_url || null,
+        preview_url: p?.preview_url || null,
 
-    return res.status(200).json({ ok: true, orders })
-  } catch (err) {
-    console.error('orders api error:', err)
-    return res.status(500).json({ ok: false, error: 'Server error' })
+        // ✅ keep original order fields
+        id: o.id,
+        status: o.status,
+        photo_id: o.photo_id,
+        license: o.license,
+        format: o.format,
+        currency: o.currency,
+        amount: o.amount,
+        paid_at: o.paid_at,
+        download_limit: o.download_limit,
+        download_count: o.download_count,
+        delivery_object_key: o.delivery_object_key,
+        invoice_no: o.invoice_no,
+
+        // optional: keep full photo object too
+        photo: p,
+      }
+    })
+
+    return res.status(200).json({ ok: true, orders: merged })
+  } catch (e) {
+    console.error(e)
+    return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
 }
