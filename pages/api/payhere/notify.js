@@ -34,7 +34,10 @@ function cleanBaseUrl(v) {
 }
 
 function getBaseUrl(req) {
-  const webhook = cleanBaseUrl(process.env.WEBHOOK_BASE_URL)
+  // ✅ Prefer server env, fallback to NEXT_PUBLIC version
+  const webhook =
+    cleanBaseUrl(process.env.WEBHOOK_BASE_URL) || cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL)
+
   if (webhook) return webhook
 
   const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
@@ -99,6 +102,7 @@ function normalizeFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
 
+// NOTE: This is ONLY a last-resort fallback. Your real R2 key includes filename.
 function fallbackObjectKeyFromPhotoId(photoId, format) {
   const pid = String(photoId || '')
   if (!pid) return null
@@ -132,35 +136,31 @@ async function ensureInvoiceNo(order) {
   return invoiceNo
 }
 
+// ✅ SAFE cart item key resolver: only uses columns that exist in your photos table
 async function resolveObjectKeyForCartItem(item) {
   const format = normalizeFormat(item.format)
   if (item.objectKey) return String(item.objectKey)
 
-  const photoId = String(item.photoId || '')
+  const photoId = String(item.photoId || '').trim()
   if (!photoId) return null
 
-  const { data: p } = await supabaseAdmin
+  const { data: p, error } = await supabaseAdmin
     .from('photos')
-    .select('id, original_object_key, original_key, object_key, r2_key, raw_object_key, raw_key')
+    .select('id,original_key,original_raw_key')
     .eq('id', photoId)
     .maybeSingle()
 
-  if (p) {
-    if (format === 'raw') {
-      const rk = p.raw_object_key || p.raw_key
-      if (rk) return String(rk)
-    }
-    const ok = p.original_object_key || p.original_key || p.object_key || p.r2_key
-    if (ok) return String(ok)
-  }
+  if (error) throw new Error(error.message)
+  if (!p) return null
 
-  return fallbackObjectKeyFromPhotoId(photoId, format)
+  if (format === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
+  return p.original_key ? String(p.original_key) : null
 }
 
 /**
- * ✅ FIXED: resolve correct objectKey for SINGLE orders (folder + filename)
- * Your R2 structure is: photos/original/<photo_id>/<filename>.jpg
- * So we must read the correct key from photos table, NOT build it from photo_id.
+ * ✅ SAFE single order key resolver:
+ * - reads photos.original_key / photos.original_raw_key (these exist)
+ * - does NOT reference raw_key/raw_object_key (do not exist)
  */
 async function resolveObjectKeyForSingleOrder(o) {
   const photoId = String(o?.photo_id || '').trim()
@@ -170,21 +170,15 @@ async function resolveObjectKeyForSingleOrder(o) {
 
   const { data: p, error } = await supabaseAdmin
     .from('photos')
-    .select('id, original_key, original_jpg_key, original_raw_key, raw_key, raw_object_key')
+    .select('id,original_key,original_raw_key')
     .eq('id', photoId)
     .maybeSingle()
 
   if (error) throw new Error(error.message)
   if (!p) return null
 
-  if (fmt === 'raw') {
-    const rk = p.original_raw_key || p.raw_object_key || p.raw_key
-    return rk ? String(rk) : null
-  }
-
-  // ✅ Prefer jpg-specific key first
-  const k = p.original_jpg_key || p.original_key
-  return k ? String(k) : null
+  if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
+  return p.original_key ? String(p.original_key) : null
 }
 
 /* ---------------- handler ---------------- */
@@ -254,6 +248,9 @@ export default async function handler(req, res) {
 
     const statusCodeNum = Number(status_code)
 
+    /* =========================================================
+       ✅ PAYMENT SUCCESS
+    ========================================================= */
     if (statusCodeNum === 2) {
       const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
 
@@ -270,9 +267,10 @@ export default async function handler(req, res) {
           .eq('id', order.id)
       }
 
+      // re-fetch latest flags
       const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).single()
-
       const o = fresh || order
+
       const email = normalizeEmail(o.email)
 
       const isMembership =
@@ -287,6 +285,7 @@ export default async function handler(req, res) {
       if (isMembership) {
         if (!email) return res.status(200).send('OK')
 
+        // prevent double-extension on webhook retries
         if (wasPaidAlready) {
           console.log('Membership webhook repeat ignored (already PAID):', o.id)
           return res.status(200).send('OK')
@@ -445,19 +444,24 @@ export default async function handler(req, res) {
 
       /* ================= SINGLE ================= */
 
-// ✅ Try to resolve from photos table first
-let objectKey = await resolveObjectKeyForSingleOrder(o)
+      // ✅ Try photos table first
+      let objectKey = await resolveObjectKeyForSingleOrder(o)
 
-// ✅ FALLBACKS: use order’s stored key, then fallback pattern
-if (!objectKey) objectKey = String(o.delivery_object_key || '').trim()
-if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
+      // ✅ FALLBACKS: use stored order key, then last-resort pattern
+      if (!objectKey) objectKey = String(o.delivery_object_key || '').trim()
+      if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
 
-if (!objectKey) {
-  console.error('Missing objectKey for single order:', o.id, 'photo:', o.photo_id)
-  return res.status(200).send('OK')
-}
+      if (!objectKey) {
+        console.error('Missing objectKey for single order:', o.id, 'photo:', o.photo_id)
+        return res.status(200).send('OK')
+      }
 
-      // ✅ persist correct key (even if old key existed but was wrong, overwrite it)
+      const desiredLimit = limitForLicense(normalizeLicense(o.license))
+      if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
+        await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
+      }
+
+      // ✅ persist correct key (overwrite if different)
       if (String(o.delivery_object_key || '') !== String(objectKey)) {
         await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
       }
@@ -535,7 +539,6 @@ if (!objectKey) {
     /* =========================================================
        ❌ PAYMENT FAILED / CANCELED
     ========================================================= */
-
     if (statusCodeNum < 0 && String(order.status || '').toUpperCase() !== 'FAILED') {
       await supabaseAdmin
         .from('orders')
