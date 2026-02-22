@@ -50,7 +50,7 @@ export default function AddToCartButton({
       qty,
     })
 
-    // Optional: notify navbar badge (if you ever want)
+    // ✅ update navbar immediately
     try {
       window.dispatchEvent(new Event('jc_cart_updated'))
     } catch {}
@@ -85,7 +85,11 @@ export default function AddToCartButton({
             className="qty"
             value={qty}
             inputMode="numeric"
-            onChange={(e) => setQty(Math.max(1, Math.min(99, Number(e.target.value || 1))))}
+            onChange={(e) => {
+              const v = String(e.target.value || '').replace(/[^\d]/g, '')
+              const n = v ? Number(v) : 1
+              setQty(Math.max(1, Math.min(99, n)))
+            }}
           />
         ) : null}
       </div>

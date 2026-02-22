@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
-import { cartCount } from '@/lib/cart'
+import { cartCount } from '../lib/cart' // ✅ FIX: remove @ alias to prevent prod crash
 
 const NAV = {
   work: [
@@ -85,18 +85,21 @@ export default function JeevanChandimalNavi(props) {
     refresh()
 
     const onStorage = (e) => {
-      // storage fires only across tabs, but we still handle it
       if (e?.key && String(e.key).includes('cart')) refresh()
       if (e?.key && String(e.key).includes('jc_cart')) refresh()
     }
 
-    window.addEventListener('storage', onStorage)
+    const onCustom = () => refresh() // ✅ instant same-tab updates from AddToCartButton
 
-    // same-tab changes won't trigger storage -> poll lightly
-    const t = setInterval(refresh, 800)
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('jc_cart_updated', onCustom)
+
+    // same-tab changes won't trigger storage -> keep a light poll as backup
+    const t = setInterval(refresh, 1200)
 
     return () => {
       window.removeEventListener('storage', onStorage)
+      window.removeEventListener('jc_cart_updated', onCustom)
       clearInterval(t)
     }
   }, [])
@@ -196,7 +199,7 @@ export default function JeevanChandimalNavi(props) {
       <header className={`navWrap ${props.rootClassName || ''}`}>
         <div className="navShell">
           {/* left */}
-          <Link href="/">
+          <Link href="/" legacyBehavior>
             <a className="brand" aria-label="Home">
               <img alt={props.logoAlt} src={props.logoSrc} className="brandLogo" />
             </a>
@@ -204,7 +207,7 @@ export default function JeevanChandimalNavi(props) {
 
           {/* center desktop */}
           <nav className="navLinks" aria-label="Primary">
-            <Link href="/">
+            <Link href="/" legacyBehavior>
               <a className={`navLink ${activeClass('/')}`}>Home</a>
             </Link>
 
@@ -230,7 +233,7 @@ export default function JeevanChandimalNavi(props) {
                 }}
                 onKeyDown={onDropdownKey('work')}
               >
-                <Link href="/work">
+                <Link href="/work" legacyBehavior>
                   <a className="dropLabel">Work</a>
                 </Link>
 
@@ -246,7 +249,7 @@ export default function JeevanChandimalNavi(props) {
                 onMouseLeave={() => scheduleClose('work')}
               >
                 {workItems.map((it) => (
-                  <Link href={it.href} key={it.href}>
+                  <Link href={it.href} key={it.href} legacyBehavior>
                     <a className={`menuItem ${activeItemClass(it.href)}`} role="menuitem">
                       {it.label}
                     </a>
@@ -277,7 +280,7 @@ export default function JeevanChandimalNavi(props) {
                 }}
                 onKeyDown={onDropdownKey('services')}
               >
-                <Link href="/services">
+                <Link href="/services" legacyBehavior>
                   <a className="dropLabel">Services</a>
                 </Link>
 
@@ -293,7 +296,7 @@ export default function JeevanChandimalNavi(props) {
                 onMouseLeave={() => scheduleClose('services')}
               >
                 {serviceItems.map((it) => (
-                  <Link href={it.href} key={it.href}>
+                  <Link href={it.href} key={it.href} legacyBehavior>
                     <a className={`menuItem ${activeItemClass(it.href)}`} role="menuitem">
                       {it.label}
                     </a>
@@ -302,16 +305,16 @@ export default function JeevanChandimalNavi(props) {
               </div>
             </div>
 
-            <Link href="/store">
+            <Link href="/store" legacyBehavior>
               <a className={`navLink ${activeClass('/store')}`}>Store</a>
             </Link>
-            <Link href="/memberships">
+            <Link href="/memberships" legacyBehavior>
               <a className={`navLink ${activeClass('/memberships')}`}>Membership</a>
             </Link>
-            <Link href="/about">
+            <Link href="/about" legacyBehavior>
               <a className={`navLink ${activeClass('/about')}`}>About</a>
             </Link>
-            <Link href="/contact">
+            <Link href="/contact" legacyBehavior>
               <a className={`navLink ${activeClass('/contact')}`}>Contact</a>
             </Link>
           </nav>
@@ -319,7 +322,7 @@ export default function JeevanChandimalNavi(props) {
           {/* right */}
           <div className="navRight">
             {/* ✅ Cart button (always visible) */}
-            <Link href="/cart">
+            <Link href="/cart" legacyBehavior>
               <a className={`cartBtn ${activeClass('/cart')}`} aria-label="Cart">
                 <span className="cartText">Cart</span>
                 <span className="cartBadge" aria-label={`Cart items: ${cartNum}`}>
@@ -341,7 +344,7 @@ export default function JeevanChandimalNavi(props) {
                 </button>
               </>
             ) : (
-              <Link href="/login">
+              <Link href="/login" legacyBehavior>
                 <a className="iconBtn" aria-label="Login">
                   <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
                     <path
@@ -384,7 +387,7 @@ export default function JeevanChandimalNavi(props) {
         <div className={`mOverlay ${mobileOpen ? 'show' : ''}`} role="dialog" aria-modal="true">
           <div className="mPanel">
             <div className="mTop">
-              <Link href="/">
+              <Link href="/" legacyBehavior>
                 <a className="mBrand" onClick={closeAll} aria-label="Home">
                   <img alt={props.logoAlt} src={props.logoSrc} className="mLogo" />
                 </a>
@@ -396,14 +399,14 @@ export default function JeevanChandimalNavi(props) {
             </div>
 
             <nav className="mLinks">
-              <Link href="/">
+              <Link href="/" legacyBehavior>
                 <a className={`mLink ${activeClass('/')}`} onClick={closeAll}>
                   Home
                 </a>
               </Link>
 
               {/* ✅ Mobile Cart */}
-              <Link href="/cart">
+              <Link href="/cart" legacyBehavior>
                 <a className={`mLink ${activeClass('/cart')}`} onClick={closeAll}>
                   <span>Cart</span>
                   <span className="mCartBadge">{cartNum}</span>
@@ -411,7 +414,7 @@ export default function JeevanChandimalNavi(props) {
               </Link>
 
               {/* Work: first tap opens, second tap navigates */}
-              <Link href="/work">
+              <Link href="/work" legacyBehavior>
                 <a
                   className={`mLink mDrop ${activeClass('/work')}`}
                   onClick={(e) => {
@@ -433,7 +436,7 @@ export default function JeevanChandimalNavi(props) {
               {mWorkOpen && (
                 <div className="mSub">
                   {workItems.map((it) => (
-                    <Link href={it.href} key={it.href}>
+                    <Link href={it.href} key={it.href} legacyBehavior>
                       <a className={`mSubLink ${activeItemClass(it.href)}`} onClick={closeAll}>
                         {it.label}
                       </a>
@@ -443,7 +446,7 @@ export default function JeevanChandimalNavi(props) {
               )}
 
               {/* Services: first tap opens, second tap navigates */}
-              <Link href="/services">
+              <Link href="/services" legacyBehavior>
                 <a
                   className={`mLink mDrop ${activeClass('/services')}`}
                   onClick={(e) => {
@@ -465,7 +468,7 @@ export default function JeevanChandimalNavi(props) {
               {mServicesOpen && (
                 <div className="mSub">
                   {serviceItems.map((it) => (
-                    <Link href={it.href} key={it.href}>
+                    <Link href={it.href} key={it.href} legacyBehavior>
                       <a className={`mSubLink ${activeItemClass(it.href)}`} onClick={closeAll}>
                         {it.label}
                       </a>
@@ -474,22 +477,22 @@ export default function JeevanChandimalNavi(props) {
                 </div>
               )}
 
-              <Link href="/store">
+              <Link href="/store" legacyBehavior>
                 <a className={`mLink ${activeClass('/store')}`} onClick={closeAll}>
                   Store
                 </a>
               </Link>
-              <Link href="/memberships">
+              <Link href="/memberships" legacyBehavior>
                 <a className={`mLink ${activeClass('/memberships')}`} onClick={closeAll}>
                   Membership
                 </a>
               </Link>
-              <Link href="/about">
+              <Link href="/about" legacyBehavior>
                 <a className={`mLink ${activeClass('/about')}`} onClick={closeAll}>
                   About
                 </a>
               </Link>
-              <Link href="/contact">
+              <Link href="/contact" legacyBehavior>
                 <a className={`mLink ${activeClass('/contact')}`} onClick={closeAll}>
                   Contact
                 </a>
@@ -503,7 +506,7 @@ export default function JeevanChandimalNavi(props) {
                   Logout
                 </button>
               ) : (
-                <Link href="/login">
+                <Link href="/login" legacyBehavior>
                   <a className="mLink" onClick={closeAll}>
                     Login
                   </a>
