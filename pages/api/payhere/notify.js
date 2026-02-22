@@ -445,17 +445,17 @@ export default async function handler(req, res) {
 
       /* ================= SINGLE ================= */
 
-      // ✅ FIX: resolve correct R2 key from photos table (folder + filename)
-      const objectKey = await resolveObjectKeyForSingleOrder(o)
-      if (!objectKey) {
-        console.error('Missing objectKey for single order:', o.id, 'photo:', o.photo_id)
-        return res.status(200).send('OK')
-      }
+// ✅ Try to resolve from photos table first
+let objectKey = await resolveObjectKeyForSingleOrder(o)
 
-      const desiredLimit = limitForLicense(normalizeLicense(o.license))
-      if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
-        await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
-      }
+// ✅ FALLBACKS: use order’s stored key, then fallback pattern
+if (!objectKey) objectKey = String(o.delivery_object_key || '').trim()
+if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
+
+if (!objectKey) {
+  console.error('Missing objectKey for single order:', o.id, 'photo:', o.photo_id)
+  return res.status(200).send('OK')
+}
 
       // ✅ persist correct key (even if old key existed but was wrong, overwrite it)
       if (String(o.delivery_object_key || '') !== String(objectKey)) {
