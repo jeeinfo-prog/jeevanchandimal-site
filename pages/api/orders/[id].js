@@ -20,13 +20,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ IMPORTANT: do NOT select "kind" (your DB doesn't have it)
-    // Also: items might not exist in older rows; we safely handle it.
+    // ✅ DO NOT select columns that may not exist (kind, items)
     const { data, error } = await supabaseAdmin
       .from('orders')
-      .select(
-        'id,code,status,items,photo_id,license,format,currency,amount,paid_at,payhere_payment_id'
-      )
+      .select('id,code,status,photo_id,license,format,currency,amount,paid_at,payhere_payment_id')
       .eq('id', orderId)
       .maybeSingle()
 
@@ -37,28 +34,26 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, error: 'Order not found' })
     }
 
-    const isCart = Array.isArray(data.items) && data.items.length > 0
-    const kind = isCart ? 'cart' : 'single'
+    // Your current DB schema = single-photo style
+    const kind = 'single'
 
     return res.status(200).json({
       ok: true,
-
       id: data.id,
 
-      // ✅ keep both for compatibility
+      // keep both for compatibility
       code: data.code || null,
       order_id: data.code || null,
 
       kind,
       status: data.status,
 
-      // Single photo fields (if applicable)
       photoId: data.photo_id || null,
       license: data.license || null,
       format: data.format || null,
 
-      // Cart fields (if applicable)
-      items: isCart ? data.items : null,
+      // cart not supported by current schema
+      items: null,
 
       currency: data.currency || null,
       amount: Number(data.amount || 0),
