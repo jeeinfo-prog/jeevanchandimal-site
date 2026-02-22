@@ -6,8 +6,9 @@ function round2(n) {
   return Math.round(x * 100) / 100
 }
 
-function makeOrderCode() {
-  return `JC-${Date.now()}-${Math.random().toString(16).slice(2, 8).toUpperCase()}`
+// ✅ PayHere order_id string AND we store it in orders.order_id
+function makeOrderRef() {
+  return `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 8).toUpperCase()}`
 }
 
 function normLicense(v) {
@@ -34,14 +35,12 @@ async function getObjectKeyForPhoto(photoId, format) {
   if (format === 'raw') {
     const raw = p.raw_object_key || p.raw_key
     if (raw) return String(raw)
-    // fallback if you store raw as zip by convention
     return `photos/original/${photoId}.zip`
   }
 
   const ok = p.original_object_key || p.original_key || p.object_key || p.r2_key
   if (ok) return String(ok)
 
-  // fallback if you store jpg by convention
   return `photos/original/${photoId}.jpg`
 }
 
@@ -94,22 +93,25 @@ export default async function handler(req, res) {
     }
 
     const amount = round2(cleanItems.reduce((sum, it) => sum + it.unitPrice * it.qty, 0))
-    const orderCode = makeOrderCode()
 
+    // ✅ order_ref is what PayHere will send back as "order_id"
+    const orderRef = makeOrderRef()
+
+    // ✅ Insert order using order_id (NOT code)
     const { data: created, error: createErr } = await supabaseAdmin
       .from('orders')
       .insert([
         {
-          code: orderCode,
+          order_id: orderRef,
           email: email || null,
           currency: ccy,
           amount,
           status: 'pending',
           kind: 'cart',
-          items: cleanItems, // ✅ jsonb includes objectKey
+          items: cleanItems,
         },
       ])
-      .select('id, code')
+      .select('id, order_id')
       .single()
 
     if (createErr) {
@@ -117,7 +119,7 @@ export default async function handler(req, res) {
     }
 
     const orderId = created?.id
-    const ref = created?.code || orderCode
+    const ref = created?.order_id || orderRef
 
     const merchant_id = process.env.PAYHERE_MERCHANT_ID
     const merchant_secret = process.env.PAYHERE_MERCHANT_SECRET
@@ -156,7 +158,7 @@ export default async function handler(req, res) {
     const query = new URLSearchParams(payload).toString()
     const redirectUrl = `https://www.payhere.lk/pay/checkout?${query}`
 
-    return res.status(200).json({ ok: true, orderId, orderCode: ref, redirectUrl })
+    return res.status(200).json({ ok: true, orderId, orderRef: ref, orderCode: ref, redirectUrl })
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }

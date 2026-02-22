@@ -1,5 +1,4 @@
 // pages/api/payhere/notify.js
-
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
@@ -99,7 +98,6 @@ function normalizeFormat(v) {
 }
 
 function fallbackObjectKeyFromPhotoId(photoId, format) {
-  // LAST RESORT ONLY — best is to store objectKey per item or fetch from photos table.
   const pid = String(photoId || '')
   if (!pid) return null
   if (format === 'raw') return `photos/original/${pid}.zip`
@@ -107,15 +105,18 @@ function fallbackObjectKeyFromPhotoId(photoId, format) {
 }
 
 async function findOrderByPayhereOrderId(order_id) {
-  // order_id could be:
+  // PayHere order_id could be:
   // - orders.id (uuid) in older flow
-  // - orders.code (string) in cart flow
-  // Try id first, then code.
+  // - orders.order_id (string like ORD_...) in cart/single newer flow
   const byId = await supabaseAdmin.from('orders').select('*').eq('id', order_id).maybeSingle()
   if (byId?.data) return byId.data
 
-  const byCode = await supabaseAdmin.from('orders').select('*').eq('code', order_id).maybeSingle()
-  if (byCode?.data) return byCode.data
+  const byOrderId = await supabaseAdmin
+    .from('orders')
+    .select('*')
+    .eq('order_id', order_id)
+    .maybeSingle()
+  if (byOrderId?.data) return byOrderId.data
 
   return null
 }
@@ -128,17 +129,12 @@ async function ensureInvoiceNo(order) {
 }
 
 async function resolveObjectKeyForCartItem(item) {
-  // Priority:
-  // 1) item.objectKey (if you add it at checkout time later)
-  // 2) photos table lookup (try common columns)
-  // 3) fallback
   const format = normalizeFormat(item.format)
   if (item.objectKey) return String(item.objectKey)
 
   const photoId = String(item.photoId || '')
   if (!photoId) return null
 
-  // Try your photos table (safe best-effort)
   const { data: p } = await supabaseAdmin
     .from('photos')
     .select('id, original_object_key, original_key, object_key, r2_key, raw_object_key, raw_key')
@@ -150,7 +146,6 @@ async function resolveObjectKeyForCartItem(item) {
       const rk = p.raw_object_key || p.raw_key
       if (rk) return String(rk)
     }
-
     const ok = p.original_object_key || p.original_key || p.object_key || p.r2_key
     if (ok) return String(ok)
   }
@@ -183,10 +178,10 @@ export default async function handler(req, res) {
 
     if (!order_id) return res.status(200).send('OK')
 
-    // 1) Fetch order by id OR code (cart flow)
+    // 1) Fetch order by id OR order_id
     const order = await findOrderByPayhereOrderId(order_id)
     if (!order) {
-      console.error('Order not found (id/code):', order_id)
+      console.error('Order not found (id/order_id):', order_id)
       return res.status(200).send('OK')
     }
 
@@ -200,7 +195,7 @@ export default async function handler(req, res) {
     const ok = payhereVerifyMd5Sig({
       merchantSecret,
       merchant_id,
-      order_id, // MUST be the PayHere order_id string (code or id) exactly
+      order_id,
       payhere_amount: normalizePayhereAmount(payhere_amount),
       payhere_currency,
       status_code,
@@ -232,7 +227,6 @@ export default async function handler(req, res) {
     if (statusCodeNum === 2) {
       const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
 
-      // mark order paid once
       if (!wasPaidAlready) {
         await supabaseAdmin
           .from('orders')
@@ -246,7 +240,6 @@ export default async function handler(req, res) {
           .eq('id', order.id)
       }
 
-      // Re-fetch latest flags/timestamps
       const { data: fresh } = await supabaseAdmin
         .from('orders')
         .select('*')
@@ -256,7 +249,6 @@ export default async function handler(req, res) {
       const o = fresh || order
       const email = normalizeEmail(o.email)
 
-      // Determine membership vs cart vs single photo
       const isMembership =
         String(o.order_kind || '').toLowerCase() === 'membership' ||
         String(custom_1 || '').toLowerCase() === 'membership'
@@ -265,17 +257,11 @@ export default async function handler(req, res) {
         String(o.kind || '').toLowerCase() === 'cart' ||
         String(custom_1 || '').toLowerCase() === 'cart'
 
-      /* =========================================================
-         🔓 MEMBERSHIP UNLOCK (tier + term)
-      ========================================================= */
+      /* ================= MEMBERSHIP ================= */
 
       if (isMembership) {
-        if (!email) {
-          console.error('Membership order has no email:', o.id)
-          return res.status(200).send('OK')
-        }
+        if (!email) return res.status(200).send('OK')
 
-        // prevent double-extension on webhook retries
         if (wasPaidAlready) {
           console.log('Membership webhook repeat ignored (already PAID):', o.id)
           return res.status(200).send('OK')
@@ -303,13 +289,11 @@ export default async function handler(req, res) {
 
         const now = new Date()
 
-        const { data: existing, error: exErr } = await supabaseAdmin
+        const { data: existing } = await supabaseAdmin
           .from('memberships')
           .select('email, plan, status, start_date, end_date, created_at')
           .eq('email', email)
           .maybeSingle()
-
-        if (exErr) console.error('Membership read failed:', exErr.message)
 
         const existingEnd = existing?.end_date ? new Date(existing.end_date) : null
         const base = existingEnd && existingEnd > now ? existingEnd : now
@@ -332,36 +316,18 @@ export default async function handler(req, res) {
             : now.toISOString(),
         }
 
-        const { error: memErr } = await supabaseAdmin
-          .from('memberships')
-          .upsert(payload, { onConflict: 'email' })
-
-        if (memErr) {
-          console.error('Membership upsert failed:', memErr.message)
-        } else {
-          console.log('✅ Membership active:', email, tier, term, 'end:', payload.end_date || 'LIFETIME')
-        }
-
+        await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'email' })
         return res.status(200).send('OK')
       }
 
-      /* =========================================================
-         🛒 CART ORDER DELIVERY (single receipt + single email with many links)
-      ========================================================= */
+      /* ================= CART ================= */
 
       if (isCart) {
         if (!email) return res.status(200).send('OK')
 
         const items = Array.isArray(o.items) ? o.items : []
-        if (items.length === 0) {
-          console.error('Cart order has no items:', o.id)
-          return res.status(200).send('OK')
-        }
+        if (items.length === 0) return res.status(200).send('OK')
 
-        // Compute a safe download_limit for the whole order:
-        // - if any commercial -> 0 unlimited
-        // - else if any editorial -> 5
-        // - else -> 3
         const licenses = items.map((it) => normalizeLicense(it.license))
         const downloadLimit =
           licenses.includes('commercial') ? 0 : licenses.includes('editorial') ? 5 : 3
@@ -370,10 +336,8 @@ export default async function handler(req, res) {
           await supabaseAdmin.from('orders').update({ download_limit: downloadLimit }).eq('id', o.id)
         }
 
-        // Ensure invoice number once
         const invoiceNo = await ensureInvoiceNo(o)
 
-        // Send receipt once
         if (!o.invoice_email_sent_at) {
           await sendReceiptEmail({
             to: email,
@@ -393,11 +357,9 @@ export default async function handler(req, res) {
             .eq('id', o.id)
         }
 
-        // Download email once (build multiple tokens + links)
         if (!o.download_email_sent_at) {
           const links = []
 
-          // Create one token per cart item (not per qty)
           for (const it of items) {
             const photoId = String(it.photoId || '')
             const title = String(it.title || photoId || 'Photo')
@@ -405,10 +367,7 @@ export default async function handler(req, res) {
             const format = normalizeFormat(it.format)
 
             const objectKey = await resolveObjectKeyForCartItem(it)
-            if (!objectKey) {
-              console.error('Cart item missing objectKey:', o.id, it)
-              continue
-            }
+            if (!objectKey) continue
 
             const jti = crypto.randomUUID()
             const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
@@ -433,67 +392,60 @@ export default async function handler(req, res) {
                 userId: o.user_id || null,
                 guestEmail: email,
                 filename: `${photoId}.${ext}`,
-                // optional: include license for auditing / future enforcement
                 license,
               },
               '1h'
             )
 
-            const url = buildDownloadUrl(token, req)
-            links.push({ title, photoId, license, format, url })
+            links.push({
+              title,
+              photoId,
+              license,
+              format,
+              url: buildDownloadUrl(token, req),
+            })
           }
 
-          if (links.length === 0) {
-            console.error('No cart download links generated:', o.id)
-            return res.status(200).send('OK')
+          if (links.length > 0) {
+            const combined = links
+              .map(
+                (x, idx) =>
+                  `${idx + 1}) ${x.title} • ${String(x.license).toUpperCase()} • ${String(
+                    x.format
+                  ).toUpperCase()}\n${x.url}`
+              )
+              .join('\n\n')
+
+            await sendDownloadEmail({
+              to: email,
+              orderId: o.id,
+              photoTitle: `Cart (${links.length} items)`,
+              downloadUrl: combined,
+              license: '—',
+              format: '—',
+            })
+
+            await supabaseAdmin
+              .from('orders')
+              .update({ download_email_sent_at: new Date().toISOString() })
+              .eq('id', o.id)
           }
-
-          // Single email: newline list (works even in plain text templates)
-          const combined = links
-            .map(
-              (x, idx) =>
-                `${idx + 1}) ${x.title} • ${String(x.license).toUpperCase()} • ${String(
-                  x.format
-                ).toUpperCase()}\n${x.url}`
-            )
-            .join('\n\n')
-
-          await sendDownloadEmail({
-            to: email,
-            orderId: o.id,
-            photoTitle: `Cart (${links.length} items)`,
-            downloadUrl: combined,
-            license: '—',
-            format: '—',
-          })
-
-          await supabaseAdmin
-            .from('orders')
-            .update({ download_email_sent_at: new Date().toISOString() })
-            .eq('id', o.id)
         }
 
-        console.log('✅ Cart receipt + downloads ensured:', o.id)
         return res.status(200).send('OK')
       }
 
-      /* =========================================================
-         🖼️ SINGLE PHOTO ORDER DELIVERY (your existing logic)
-      ========================================================= */
+      /* ================= SINGLE ================= */
 
-      // Keep your original behavior, but make sure we use o.id for updates (not order_id)
       const objectKey =
         o.delivery_object_key ||
         (o.photo_id
-          ? (normalizeFormat(o.format) === 'raw'
-              ? `photos/original/${o.photo_id}.zip`
-              : `photos/original/${o.photo_id}.jpg`)
+          ? normalizeFormat(o.format) === 'raw'
+            ? `photos/original/${o.photo_id}.zip`
+            : `photos/original/${o.photo_id}.jpg`
           : null)
 
-      if (!objectKey) {
-        console.error('Missing delivery_object_key for order:', o.id)
-        return res.status(200).send('OK')
-      }
+      if (!objectKey) return res.status(200).send('OK')
 
       const desiredLimit = limitForLicense(normalizeLicense(o.license))
       if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
@@ -509,7 +461,6 @@ export default async function handler(req, res) {
       try {
         const invoiceNo = await ensureInvoiceNo(o)
 
-        // Token first
         const jti = crypto.randomUUID()
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
@@ -540,7 +491,6 @@ export default async function handler(req, res) {
 
         const downloadUrl = buildDownloadUrl(token, req)
 
-        // Receipt once
         if (!o.invoice_email_sent_at) {
           await sendReceiptEmail({
             to: email,
@@ -560,7 +510,6 @@ export default async function handler(req, res) {
             .eq('id', o.id)
         }
 
-        // Download once
         if (!o.download_email_sent_at) {
           await sendDownloadEmail({
             to: email,
@@ -576,8 +525,6 @@ export default async function handler(req, res) {
             .update({ download_email_sent_at: new Date().toISOString() })
             .eq('id', o.id)
         }
-
-        console.log('✅ Single receipt + download ensured:', o.id)
       } catch (e) {
         console.error('❌ Single photo delivery email block failed:', o.id, e)
       }
@@ -599,8 +546,6 @@ export default async function handler(req, res) {
           payhere_status_message: status_message || null,
         })
         .eq('id', order.id)
-
-      console.log('Order FAILED:', order.id, 'payhere:', order_id)
     }
 
     return res.status(200).send('OK')

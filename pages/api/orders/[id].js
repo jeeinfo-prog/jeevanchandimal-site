@@ -1,6 +1,5 @@
 // pages/api/orders/[id].js
-
-import { supabaseAdmin } from '../../../lib/supabaseAdmin.js'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
   // ✅ GET only
@@ -21,13 +20,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing order id' })
   }
 
+  // ✅ remove code column usage; select order_id instead
   const { data, error } = await supabaseAdmin
     .from('orders')
     .select(
-      'id,code,kind,status,items,photo_id,license,format,currency,amount,paid_at,payhere_payment_id'
+      'id,order_id,kind,status,items,photo_id,license,format,currency,amount,paid_at,payhere_payment_id'
     )
     .eq('id', orderId)
-    .single()
+    .maybeSingle()
 
   if (error || !data) return res.status(404).json({ error: 'Order not found' })
 
@@ -35,7 +35,11 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     id: data.id,
-    code: data.code || null,
+
+    // ✅ keep "code" for any frontend still reading it
+    code: data.order_id || null,
+    order_id: data.order_id || null,
+
     kind, // 'cart' | 'single' | ...
     status: data.status,
 
@@ -48,7 +52,7 @@ export default async function handler(req, res) {
     items: Array.isArray(data.items) ? data.items : null,
 
     currency: data.currency,
-    amount: Number(data.amount),
+    amount: Number(data.amount || 0),
     paidAt: data.paid_at,
     paymentId: data.payhere_payment_id,
   })

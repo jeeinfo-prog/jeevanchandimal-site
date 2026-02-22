@@ -1,5 +1,5 @@
 // pages/api/orders/status.js
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -12,10 +12,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing order_id' })
     }
 
-    // 1) Try by id (old flow)
+    // 1) Try by id (uuid) — old flow
     const byId = await supabaseAdmin
       .from('orders')
-      .select('id,code,status,paid_at,payhere_status_code')
+      .select('id,order_id,status,paid_at,payhere_status_code')
       .eq('id', orderRef)
       .maybeSingle()
 
@@ -27,35 +27,37 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         id: byId.data.id,
-        code: byId.data.code || null,
+        order_id: byId.data.order_id || null,
+        code: byId.data.order_id || null, // ✅ backward compatibility
         status: byId.data.status,
         paid_at: byId.data.paid_at,
-        payhere_status_code: byId.data.payhere_status_code,
+        payhere_status_code: byId.data.payhere_status_code ?? null,
       })
     }
 
-    // 2) Try by code (cart flow)
-    const byCode = await supabaseAdmin
+    // 2) Try by order_id (PayHere order id / cart flow)
+    const byOrderId = await supabaseAdmin
       .from('orders')
-      .select('id,code,status,paid_at,payhere_status_code')
-      .eq('code', orderRef)
+      .select('id,order_id,status,paid_at,payhere_status_code')
+      .eq('order_id', orderRef)
       .maybeSingle()
 
-    if (byCode.error) {
-      return res.status(500).json({ ok: false, error: byCode.error.message })
+    if (byOrderId.error) {
+      return res.status(500).json({ ok: false, error: byOrderId.error.message })
     }
 
-    if (!byCode.data) {
+    if (!byOrderId.data) {
       return res.status(404).json({ ok: false, error: 'Order not found' })
     }
 
     return res.status(200).json({
       ok: true,
-      id: byCode.data.id,
-      code: byCode.data.code || null,
-      status: byCode.data.status,
-      paid_at: byCode.data.paid_at,
-      payhere_status_code: byCode.data.payhere_status_code,
+      id: byOrderId.data.id,
+      order_id: byOrderId.data.order_id || null,
+      code: byOrderId.data.order_id || null, // ✅ backward compatibility
+      status: byOrderId.data.status,
+      paid_at: byOrderId.data.paid_at,
+      payhere_status_code: byOrderId.data.payhere_status_code ?? null,
     })
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
