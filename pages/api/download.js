@@ -1,11 +1,13 @@
+// pages/api/download.js
 import { verifyDownloadToken } from '@/lib/secureDownload'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { getObjectStream, r2 } from '@/lib/r2'
-import { ListObjectsV2Command } from '@aws-sdk/client-s3'
-import { pipeline } from 'stream'
-import { promisify } from 'util'
+import { r2 } from '@/lib/r2'
+import { ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
-const pipe = promisify(pipeline)
+export const config = {
+  api: { responseLimit: false }, // we redirect anyway, but keep safe
+}
 
 function safeFilename(name) {
   return (
@@ -18,14 +20,6 @@ function safeFilename(name) {
 
 function removeExt(filename) {
   return String(filename || '').replace(/\.[^.]+$/, '')
-}
-
-function isNoSuchKey(err) {
-  return (
-    err?.name === 'NoSuchKey' ||
-    err?.Code === 'NoSuchKey' ||
-    err?.$metadata?.httpStatusCode === 404
-  )
 }
 
 async function findFirstFileUnderPrefix(prefix) {
@@ -49,6 +43,9 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
+    const Bucket = process.env.R2_BUCKET
+    if (!Bucket) throw new Error('Missing R2_BUCKET')
+
     const token = typeof req.query.token === 'string' ? req.query.token : ''
     if (!token) return res.status(400).json({ error: 'Missing token' })
 
@@ -60,8 +57,10 @@ export default async function handler(req, res) {
     }
 
     // ✅ Atomic: one-time token + limit + increment count
-    const { data: rpc, error: rpcErr } = await supabaseAdmin
-      .rpc('consume_download_token', { p_order_id: String(orderId), p_jti: String(jti) })
+    const { data: rpc, error: rpcErr } = await supabaseAdmin.rpc('consume_download_token', {
+      p_order_id: String(orderId),
+      p_jti: String(jti),
+    })
 
     if (rpcErr) {
       console.error('consume_download_token error:', rpcErr)
@@ -73,54 +72,52 @@ export default async function handler(req, res) {
       const code = r?.code || 'DENIED'
       const message = r?.message || 'Denied'
       const status =
-        code === 'TOKEN_USED_OR_EXPIRED' ? 401 :
-        code === 'LIMIT_REACHED' ? 403 :
-        code === 'ORDER_NOT_PAID' ? 403 :
-        code === 'ORDER_NOT_FOUND' ? 404 :
-        401
+        code === 'TOKEN_USED_OR_EXPIRED'
+          ? 401
+          : code === 'LIMIT_REACHED'
+            ? 403
+            : code === 'ORDER_NOT_PAID'
+              ? 403
+              : code === 'ORDER_NOT_FOUND'
+                ? 404
+                : 401
 
       return res.status(status).json({ error: message })
     }
 
-    // ✅ Resolve the real R2 key (your folder-based originals)
+    // ✅ Resolve the real R2 key (handles folder-based originals)
     let finalKey = objectKey
-    let r2obj
 
-    try {
-      r2obj = await getObjectStream(finalKey)
-    } catch (err) {
-      if (!isNoSuchKey(err)) throw err
+    // If objectKey points to a file that doesn't exist (older tokens / different layout),
+    // scan: photos/original/<photoId>/ and pick first file.
+    // We don't "GetObject" here (no streaming). We'll just resolve the right Key.
+    const last = objectKey.split('/').pop() || ''
+    const photoId = removeExt(last)
 
-      const last = objectKey.split('/').pop() || ''
-      const photoId = removeExt(last)
-
-      // scan actual folder
+    // If your new layout is always folder-based, you can always scan.
+    // To keep behavior safe, we only scan when objectKey looks like a "flat" jpg.
+    // (You can simplify later.)
+    if (!objectKey.includes(`/photos/original/${photoId}/`)) {
       const prefix = `photos/original/${photoId}/`
       const scannedKey = await findFirstFileUnderPrefix(prefix)
-      if (!scannedKey) return res.status(404).json({ error: 'File not found in storage' })
-
-      finalKey = scannedKey
-      r2obj = await getObjectStream(scannedKey)
+      if (scannedKey) finalKey = scannedKey
     }
-
-    const { body, contentType, contentLength } = r2obj
-    if (!body) return res.status(404).json({ error: 'File not found' })
 
     const filename = safeFilename(payload?.filename || finalKey.split('/').pop() || 'download')
 
-    res.setHeader('Content-Type', contentType || 'application/octet-stream')
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-    if (contentLength) res.setHeader('Content-Length', String(contentLength))
+    // ✅ Signed URL (download directly from R2)
+    const signedUrl = await getSignedUrl(
+      r2,
+      new GetObjectCommand({
+        Bucket,
+        Key: finalKey,
+        ResponseContentDisposition: `attachment; filename="${filename}"`,
+      }),
+      { expiresIn: 60 } // 60s is enough
+    )
+
     res.setHeader('Cache-Control', 'no-store')
-
-    if (typeof body.pipe === 'function') {
-      await pipe(body, res)
-      return
-    }
-
-    const chunks = []
-    for await (const chunk of body) chunks.push(chunk)
-    return res.status(200).send(Buffer.concat(chunks))
+    return res.redirect(302, signedUrl)
   } catch (err) {
     console.error('download error:', err?.name, err?.message)
     return res.status(401).json({ error: 'Invalid or expired token' })
