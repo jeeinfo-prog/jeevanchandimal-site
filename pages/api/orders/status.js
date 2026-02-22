@@ -2,9 +2,11 @@
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
+  // HARD no-cache (browser + CDN + Vercel)
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   res.setHeader('Pragma', 'no-cache')
   res.setHeader('Expires', '0')
+  res.setHeader('Surrogate-Control', 'no-store')
 
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
@@ -16,7 +18,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing order_id' })
     }
 
-    // 1) Try by id (covers UUID + your ORD_* text ids)
+    // helper to keep response consistent
+    const pack = (row) => {
+      const resolved = row?.code || row?.id || ref
+      return {
+        ok: true,
+        id: row.id,
+        code: resolved, // ✅ always present
+        order_id: resolved, // ✅ always present
+        status: row.status,
+        paid_at: row.paid_at || null,
+        payhere_status_code: row.payhere_status_code ?? null,
+      }
+    }
+
+    // 1) Try by id (covers UUID + ORD_* ids)
     const byId = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')
@@ -28,17 +44,10 @@ export default async function handler(req, res) {
     }
 
     if (byId.data) {
-      return res.status(200).json({
-        ok: true,
-        id: byId.data.id,
-        code: byId.data.code || ref, // ✅ never null
-        status: byId.data.status,
-        paid_at: byId.data.paid_at,
-        payhere_status_code: byId.data.payhere_status_code ?? null,
-      })
+      return res.status(200).json(pack(byId.data))
     }
 
-    // 2) Try by code
+    // 2) Try by code (if you ever store code separately)
     const byCode = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')
@@ -53,14 +62,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, error: 'Order not found' })
     }
 
-    return res.status(200).json({
-      ok: true,
-      id: byCode.data.id,
-      code: byCode.data.code || ref, // ✅ never null
-      status: byCode.data.status,
-      paid_at: byCode.data.paid_at,
-      payhere_status_code: byCode.data.payhere_status_code ?? null,
-    })
+    return res.status(200).json(pack(byCode.data))
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
