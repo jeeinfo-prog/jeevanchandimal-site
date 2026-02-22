@@ -38,28 +38,24 @@ export default async function handler(req, res) {
     const kind = 'single'
 
     return res.status(200).json({
-      ok: true,
-      id: data.id,
+  ok: true,
+  id: data.id,
 
-      // keep both for compatibility
-      code: data.code || null,
-      order_id: data.code || null,
+  // ✅ fallback so frontend always has a usable ref
+  code: data.code || data.id || orderId,
+  order_id: data.code || data.id || orderId,
 
-      kind,
-      status: data.status,
-
-      photoId: data.photo_id || null,
-      license: data.license || null,
-      format: data.format || null,
-
-      // cart not supported by current schema
-      items: null,
-
-      currency: data.currency || null,
-      amount: Number(data.amount || 0),
-      paidAt: data.paid_at || null,
-      paymentId: data.payhere_payment_id || null,
-    })
+  kind,
+  status: data.status,
+  photoId: data.photo_id || null,
+  license: data.license || null,
+  format: data.format || null,
+  items: null,
+  currency: data.currency || null,
+  amount: Number(data.amount || 0),
+  paidAt: data.paid_at || null,
+  paymentId: data.payhere_payment_id || null,
+})
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
