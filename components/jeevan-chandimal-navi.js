@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
-import { readCart, clearCart } from '../lib/cart'
+import { readCart } from '../lib/cart'
 
 const NAV = {
   work: [
@@ -22,22 +22,35 @@ const NAV = {
 
 // --- helpers ---
 function isActivePath(router, href) {
-  // Match exact or "startsWith" for sections
   const asPath = (router.asPath || '').split('?')[0]
   if (asPath === href) return true
-  // keep homepage strict
   if (href === '/') return asPath === '/'
   return asPath.startsWith(href + '/') || asPath.startsWith(href)
 }
 
 function safeEmailShort(email) {
   if (!email || typeof email !== 'string') return ''
-  // keep it compact: name@domain -> name@dom…
   const [name, domain] = email.split('@')
   if (!domain) return email
-  const dom = domain.length > 8 ? `${domain.slice(0, 7)}…` : domain
-  const n = name.length > 10 ? `${name.slice(0, 9)}…` : name
+  const dom = domain.length > 10 ? `${domain.slice(0, 9)}…` : domain
+  const n = name.length > 12 ? `${name.slice(0, 11)}…` : name
   return `${n}@${dom}`
+}
+
+function ALink({ href, className, children, ...rest }) {
+  return (
+    <Link href={href} legacyBehavior>
+      <a className={className} {...rest}>
+        {children}
+      </a>
+    </Link>
+  )
+}
+
+ALink.propTypes = {
+  href: PropTypes.string.isRequired,
+  className: PropTypes.string,
+  children: PropTypes.node,
 }
 
 export default function JeevanChandimalNavi({
@@ -53,7 +66,6 @@ export default function JeevanChandimalNavi({
   const [email, setEmail] = useState('')
   const [cartCount, setCartCount] = useState(0)
 
-  // Load email + cart count from localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -62,8 +74,9 @@ export default function JeevanChandimalNavi({
       setEmail(em)
 
       const cart = readCart()
-      const count =
-        Array.isArray(cart?.items) ? cart.items.reduce((n, it) => n + (Number(it.qty) || 1), 0) : 0
+      const count = Array.isArray(cart?.items)
+        ? cart.items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
+        : 0
       setCartCount(count)
     }
 
@@ -72,7 +85,7 @@ export default function JeevanChandimalNavi({
     const onStorage = () => load()
     window.addEventListener('storage', onStorage)
 
-    // Also listen for manual cart updates in same tab (optional custom event)
+    // Optional custom event if you dispatch it after cart changes
     const onCart = () => load()
     window.addEventListener('jc_cart_updated', onCart)
 
@@ -82,12 +95,13 @@ export default function JeevanChandimalNavi({
     }
   }, [])
 
-  // Close mobile menu on route change
   useEffect(() => {
     const handle = () => setMobileOpen(false)
-    router.events?.on('routeChangeComplete', handle)
-    return () => router.events?.off('routeChangeComplete', handle)
-  }, [router.events])
+    if (router?.events?.on) router.events.on('routeChangeComplete', handle)
+    return () => {
+      if (router?.events?.off) router.events.off('routeChangeComplete', handle)
+    }
+  }, [router])
 
   const rightEmailLabel = useMemo(() => safeEmailShort(email), [email])
 
@@ -98,16 +112,12 @@ export default function JeevanChandimalNavi({
         window.localStorage.removeItem('member_status')
         window.localStorage.removeItem('member_plan')
         window.localStorage.removeItem('member_expires_at')
-        // Keep cart or clear it? Most stores keep cart. If you want clear, keep this:
-        // clearCart()
         setEmail('')
       }
     } catch {}
-    // Go home (or login page)
     router.push('/')
   }
 
-  // Top-level left links (you can add/remove here)
   const primaryLinks = [
     { href: '/store', label: 'Store' },
     { href: '/collections', label: 'Collections' },
@@ -118,23 +128,19 @@ export default function JeevanChandimalNavi({
       <header className="navWrap">
         <div className="navShell">
           {/* Brand */}
-          <Link href={brandHref} className="brand" aria-label="Home">
+          <ALink href={brandHref} className="brand" aria-label="Home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="brandLogo" src={brandImgSrc} alt={brandAlt} />
-          </Link>
+          </ALink>
 
           {/* Desktop links */}
           <nav className="navLinks" aria-label="Primary">
             {primaryLinks.map((it) => {
               const active = isActivePath(router, it.href)
               return (
-                <Link
-                  key={it.href}
-                  href={it.href}
-                  className={`navLink ${active ? 'active' : ''}`}
-                >
+                <ALink key={it.href} href={it.href} className={`navLink ${active ? 'active' : ''}`}>
                   {it.label}
-                </Link>
+                </ALink>
               )
             })}
 
@@ -144,13 +150,13 @@ export default function JeevanChandimalNavi({
                 {NAV.work.map((it) => {
                   const active = isActivePath(router, it.href)
                   return (
-                    <Link
+                    <ALink
                       key={it.href}
                       href={it.href}
                       className={`navDropLink ${active ? 'active' : ''}`}
                     >
                       {it.label}
-                    </Link>
+                    </ALink>
                   )
                 })}
               </div>
@@ -162,30 +168,30 @@ export default function JeevanChandimalNavi({
                 {NAV.services.map((it) => {
                   const active = isActivePath(router, it.href)
                   return (
-                    <Link
+                    <ALink
                       key={it.href}
                       href={it.href}
                       className={`navDropLink ${active ? 'active' : ''}`}
                     >
                       {it.label}
-                    </Link>
+                    </ALink>
                   )
                 })}
               </div>
             </div>
           </nav>
 
-          {/* Right pills (unified) */}
+          {/* Right pills */}
           <div className="rightPills">
-            <Link href="/cart" className="pillBase pillLink" aria-label="Cart">
+            <ALink href="/cart" className="pillBase pillLink" aria-label="Cart">
               <span className="pillText">Cart</span>
               {cartCount > 0 ? <span className="pillBadge">{cartCount}</span> : null}
-            </Link>
+            </ALink>
 
             {showMembershipPill ? (
-              <Link href={membershipHref} className="pillBase pillLink pillAccent">
+              <ALink href={membershipHref} className="pillBase pillLink pillAccent">
                 <span className="pillText">MONTHLY</span>
-              </Link>
+              </ALink>
             ) : null}
 
             {email ? (
@@ -199,9 +205,9 @@ export default function JeevanChandimalNavi({
                 <span className="pillText">Logout</span>
               </button>
             ) : (
-              <Link href="/login" className="pillBase pillLink">
+              <ALink href="/login" className="pillBase pillLink">
                 <span className="pillText">Login</span>
-              </Link>
+              </ALink>
             )}
           </div>
 
@@ -227,13 +233,13 @@ export default function JeevanChandimalNavi({
                 {primaryLinks.map((it) => {
                   const active = isActivePath(router, it.href)
                   return (
-                    <Link
+                    <ALink
                       key={it.href}
                       href={it.href}
                       className={`mobileLink ${active ? 'active' : ''}`}
                     >
                       {it.label}
-                    </Link>
+                    </ALink>
                   )
                 })}
               </div>
@@ -243,13 +249,13 @@ export default function JeevanChandimalNavi({
                 {NAV.work.map((it) => {
                   const active = isActivePath(router, it.href)
                   return (
-                    <Link
+                    <ALink
                       key={it.href}
                       href={it.href}
                       className={`mobileLink ${active ? 'active' : ''}`}
                     >
                       {it.label}
-                    </Link>
+                    </ALink>
                   )
                 })}
               </div>
@@ -259,26 +265,26 @@ export default function JeevanChandimalNavi({
                 {NAV.services.map((it) => {
                   const active = isActivePath(router, it.href)
                   return (
-                    <Link
+                    <ALink
                       key={it.href}
                       href={it.href}
                       className={`mobileLink ${active ? 'active' : ''}`}
                     >
                       {it.label}
-                    </Link>
+                    </ALink>
                   )
                 })}
               </div>
 
               <div className="mobileSection">
-                <Link href="/cart" className="mobileLink">
+                <ALink href="/cart" className="mobileLink">
                   Cart {cartCount > 0 ? `(${cartCount})` : ''}
-                </Link>
+                </ALink>
 
                 {showMembershipPill ? (
-                  <Link href={membershipHref} className="mobileLink">
+                  <ALink href={membershipHref} className="mobileLink">
                     MONTHLY
-                  </Link>
+                  </ALink>
                 ) : null}
 
                 {email ? (
@@ -291,9 +297,9 @@ export default function JeevanChandimalNavi({
                     </button>
                   </>
                 ) : (
-                  <Link href="/login" className="mobileLink">
+                  <ALink href="/login" className="mobileLink">
                     Login
-                  </Link>
+                  </ALink>
                 )}
               </div>
             </div>
@@ -302,7 +308,6 @@ export default function JeevanChandimalNavi({
       </header>
 
       <style jsx>{`
-        /* ========= WRAP ========= */
         .navWrap {
           position: sticky;
           top: 0;
@@ -358,7 +363,7 @@ export default function JeevanChandimalNavi({
           background: rgba(255, 255, 255, 0.06);
         }
 
-        /* Active highlight in BLUE (your request) */
+        /* Active highlight BLUE */
         .navLink.active {
           color: #4da3ff;
           background: rgba(77, 163, 255, 0.14);
@@ -420,19 +425,18 @@ export default function JeevanChandimalNavi({
           background: rgba(77, 163, 255, 0.14);
         }
 
-        /* ========= RIGHT PILLS (UNIFIED) ========= */
+        /* ========= RIGHT PILLS ========= */
         .rightPills {
           display: inline-flex;
           align-items: center;
           gap: 10px;
           flex: 0 0 auto;
+          margin-top: 1px; /* slight optical align */
         }
 
-        /* THE IMPORTANT PART:
-           One base style for ALL pills (Link / button / static span) */
         .pillBase {
-          height: 36px; /* <- unified height */
-          border-radius: 999px; /* <- unified shape */
+          height: 32px; /* ✅ reduced height */
+          border-radius: 999px;
           padding: 0 12px;
           display: inline-flex;
           align-items: center;
@@ -452,41 +456,42 @@ export default function JeevanChandimalNavi({
         }
 
         .pillBadge {
-          min-width: 18px;
-          height: 18px;
+          min-width: 16px;
+          height: 16px;
           padding: 0 6px;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 11px;
+          font-size: 10px;
           line-height: 1;
           background: rgba(255, 255, 255, 0.14);
           border: 1px solid rgba(255, 255, 255, 0.14);
         }
 
-        /* Link and button wrappers share identical visuals */
         .pillLink {
           text-decoration: none;
           color: rgba(255, 255, 255, 0.88);
           background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.10);
-          transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: background 0.15s ease, border-color 0.15s ease,
+            transform 0.05s ease;
         }
 
         .pillBtn {
           appearance: none;
-          border: 1px solid rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           background: rgba(255, 255, 255, 0.08);
           color: rgba(255, 255, 255, 0.88);
           cursor: pointer;
-          transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+          transition: background 0.15s ease, border-color 0.15s ease,
+            transform 0.05s ease;
         }
 
         .pillStatic {
           color: rgba(255, 255, 255, 0.86);
           background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           max-width: 220px;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -522,7 +527,7 @@ export default function JeevanChandimalNavi({
           width: 40px;
           height: 36px;
           border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           background: rgba(255, 255, 255, 0.06);
           align-items: center;
           justify-content: center;
@@ -539,7 +544,7 @@ export default function JeevanChandimalNavi({
         .mobileMenu {
           display: block;
           border-top: 1px solid rgba(245, 244, 244, 0.08);
-          background: rgba(20, 20, 20, 0.90);
+          background: rgba(20, 20, 20, 0.9);
           backdrop-filter: blur(12px);
         }
 
@@ -598,9 +603,9 @@ export default function JeevanChandimalNavi({
           margin-top: 8px;
           height: 40px;
           border-radius: 14px;
-          border: 1px solid rgba(255, 255, 255, 0.10);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           background: rgba(255, 255, 255, 0.08);
-          color: rgba(255, 255, 255, 0.90);
+          color: rgba(255, 255, 255, 0.9);
           cursor: pointer;
         }
 
@@ -617,7 +622,6 @@ export default function JeevanChandimalNavi({
           }
         }
 
-        /* On small screens, keep pills compact (optional) */
         @media (max-width: 520px) {
           .pillStatic {
             max-width: 140px;
