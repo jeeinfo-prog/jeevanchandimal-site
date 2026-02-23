@@ -39,11 +39,14 @@ function normalizeStatus(data) {
 
   const s = String(raw).trim()
 
-  // If backend returns numeric status_code (like 2)
   if (s === '2') return 'PAID'
   if (s === '-1' || s === '-2' || s === '-3') return 'FAILED'
 
   return s.toUpperCase()
+}
+
+function isCartGroup(ref) {
+  return String(ref || '').toUpperCase().startsWith('CART_')
 }
 
 export default function StoreReturn() {
@@ -102,15 +105,15 @@ export default function StoreReturn() {
               window.localStorage.removeItem('jc_cart_v1')
             } catch {}
 
-            // Prefer Next router navigation
-            const target = `/store/download?order_id=${encodeURIComponent(orderId)}`
+            // ✅ If CART_* then go to download page with code=
+            const target = isCartGroup(orderId)
+              ? `/store/download?code=${encodeURIComponent(orderId)}`
+              : `/store/download?order_id=${encodeURIComponent(orderId)}`
+
             try {
               router.replace(target)
-            } catch {
-              // ignore
-            }
+            } catch {}
 
-            // Hard fallback (Safari-safe)
             setTimeout(() => {
               try {
                 window.location.href = target
@@ -123,9 +126,7 @@ export default function StoreReturn() {
           // ✅ FAILED/CANCELED
           if (FAIL_STATUSES.has(s)) {
             stopped = true
-            setMsg(
-              'Payment not completed. If you were charged, please contact support with your Order ID.'
-            )
+            setMsg('Payment not completed. If you were charged, please contact support with your Order ID.')
             return
           }
 
@@ -141,7 +142,6 @@ export default function StoreReturn() {
       }
     }
 
-    // run immediately, then interval
     tick()
     const iv = setInterval(tick, 2000)
 
@@ -152,6 +152,12 @@ export default function StoreReturn() {
   }, [router.isReady, orderId, router])
 
   const isPaid = PAID_STATUSES.has(status)
+
+  const downloadHref = orderId
+    ? isCartGroup(orderId)
+      ? `/store/download?code=${encodeURIComponent(orderId)}`
+      : `/store/download?order_id=${encodeURIComponent(orderId)}`
+    : ''
 
   return (
     <>
@@ -174,10 +180,9 @@ export default function StoreReturn() {
 
           {msg ? <p className="p2">{msg}</p> : <p className="p2">Please wait…</p>}
 
-          {/* Manual fallback (always show if we have an orderId) */}
           {orderId ? (
             <p className="p2">
-              <a href={`/store/download?order_id=${encodeURIComponent(orderId)}`}>Go to download</a>
+              <a href={downloadHref}>Go to download</a>
             </p>
           ) : (
             <p className="p2">
@@ -216,8 +221,8 @@ export default function StoreReturn() {
           line-height: 1.6;
         }
         .mono {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-            'Liberation Mono', 'Courier New', monospace;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+            'Courier New', monospace;
           font-size: 13px;
         }
         .badge {
