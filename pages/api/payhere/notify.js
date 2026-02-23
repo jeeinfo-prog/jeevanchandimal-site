@@ -11,6 +11,11 @@ export const config = {
 
 /* ---------------- helpers ---------------- */
 
+function round2(n) {
+  const x = Number(n || 0)
+  return Math.round(x * 100) / 100
+}
+
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     let data = ''
@@ -28,9 +33,7 @@ function parseForm(body) {
 }
 
 function cleanBaseUrl(v) {
-  return String(v || '')
-    .trim()
-    .replace(/\/+$/, '')
+  return String(v || '').trim().replace(/\/+$/, '')
 }
 
 function getBaseUrl(req) {
@@ -51,7 +54,7 @@ function buildDownloadUrl(token, req) {
 }
 
 function limitForLicense(license) {
-  if (license === 'commercial') return 0 // unlimited
+  if (license === 'commercial') return 0
   if (license === 'editorial') return 5
   return 3
 }
@@ -100,6 +103,10 @@ function normalizeFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
 
+function isCartGroup(ref) {
+  return String(ref || '').toUpperCase().startsWith('CART_')
+}
+
 // NOTE: last resort fallback
 function fallbackObjectKeyFromPhotoId(photoId, format) {
   const pid = String(photoId || '')
@@ -108,18 +115,25 @@ function fallbackObjectKeyFromPhotoId(photoId, format) {
   return `photos/original/${pid}.jpg`
 }
 
-async function findOrderByPayhereOrderId(order_id) {
-  const ref = String(order_id || '').trim()
-  if (!ref) return null
+/**
+ * SINGLE order lookup (safe)
+ * - by id
+ * - by order_id (only if NOT cart group; because cart has many rows)
+ * - by code (legacy)
+ */
+async function findSingleOrderByRef(ref) {
+  const v = String(ref || '').trim()
+  if (!v) return null
 
-  const byId = await supabaseAdmin.from('orders').select('*').eq('id', ref).maybeSingle()
+  const byId = await supabaseAdmin.from('orders').select('*').eq('id', v).maybeSingle()
   if (byId?.data) return byId.data
 
-  const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', ref).maybeSingle()
-  if (byOrderId?.data) return byOrderId.data
+  if (!isCartGroup(v)) {
+    const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', v).maybeSingle()
+    if (byOrderId?.data) return byOrderId.data
+  }
 
-  // IMPORTANT: code can match MANY rows; we only use maybeSingle as fallback.
-  const byCode = await supabaseAdmin.from('orders').select('*').eq('code', ref).maybeSingle()
+  const byCode = await supabaseAdmin.from('orders').select('*').eq('code', v).maybeSingle()
   if (byCode?.data) return byCode.data
 
   return null
@@ -132,7 +146,7 @@ async function ensureInvoiceNo(order) {
   return invoiceNo
 }
 
-// ✅ key resolver for single order
+// ✅ key resolver for single order (uses your existing columns)
 async function resolveObjectKeyForSingleOrder(o) {
   const photoId = String(o?.photo_id || '').trim()
   if (!photoId) return null
@@ -141,7 +155,7 @@ async function resolveObjectKeyForSingleOrder(o) {
 
   const { data: p, error } = await supabaseAdmin
     .from('photos')
-    .select('id,original_key,original_raw_key')
+    .select('id,original_key,original_raw_key,original_jpg_key')
     .eq('id', photoId)
     .maybeSingle()
 
@@ -149,7 +163,7 @@ async function resolveObjectKeyForSingleOrder(o) {
   if (!p) return null
 
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
-  return p.original_key ? String(p.original_key) : null
+  return (p.original_jpg_key || p.original_key) ? String(p.original_jpg_key || p.original_key) : null
 }
 
 /* ---------------- handler ---------------- */
@@ -194,11 +208,14 @@ export default async function handler(req, res) {
       md5sig,
     })
 
+    const kind = String(custom_1 || '').trim().toLowerCase()
+    const cartGroupRef = String(custom_2 || order_id || '').trim() // for cart: CART_...
+
     if (!ok) {
       console.error('MD5 signature mismatch for order:', order_id)
-      // try to mark something, but always 200
-      const ref = String(custom_2 || order_id || '').trim()
-      if (ref) {
+
+      // mark cart group rows OR single order row
+      if (kind === 'cart' && cartGroupRef) {
         await supabaseAdmin
           .from('orders')
           .update({
@@ -207,8 +224,22 @@ export default async function handler(req, res) {
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
-          .eq('code', ref)
+          .eq('order_id', cartGroupRef)
+      } else {
+        const single = await findSingleOrderByRef(order_id)
+        if (single) {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              status: 'INVALID_SIG',
+              payhere_payment_id: payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', single.id)
+        }
       }
+
       return res.status(200).send('OK')
     }
 
@@ -218,34 +249,30 @@ export default async function handler(req, res) {
        ✅ PAYMENT SUCCESS
     ========================================================= */
     if (statusCodeNum === 2) {
-      const kind = String(custom_1 || '').trim().toLowerCase()
-
       const isMembership = kind === 'membership'
       const isCart = kind === 'cart'
 
       /* ================= MEMBERSHIP ================= */
       if (isMembership) {
-        const order = await findOrderByPayhereOrderId(order_id)
+        const order = await findSingleOrderByRef(order_id)
         if (!order) return res.status(200).send('OK')
 
         const email = normalizeEmail(order.email)
         if (!email) return res.status(200).send('OK')
 
         const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
-        if (!wasPaidAlready) {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'PAID',
-              paid_at: new Date().toISOString(),
-              payhere_payment_id: payment_id || null,
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', order.id)
-        } else {
-          return res.status(200).send('OK')
-        }
+        if (wasPaidAlready) return res.status(200).send('OK')
+
+        await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'PAID',
+            paid_at: new Date().toISOString(),
+            payhere_payment_id: payment_id || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
+          .eq('id', order.id)
 
         const tierPlans = ['basic', 'pro', 'elite']
         const timePlans = ['monthly', 'yearly', 'lifetime']
@@ -285,29 +312,33 @@ export default async function handler(req, res) {
 
         const startDate = existing?.start_date ? new Date(existing.start_date) : now
 
-        const payload = {
-          email,
-          plan: tier,
-          status: 'active',
-          start_date: startDate.toISOString(),
-          end_date: endDate ? endDate.toISOString() : null,
-          created_at: existing?.created_at ? new Date(existing.created_at).toISOString() : now.toISOString(),
-        }
+        await supabaseAdmin.from('memberships').upsert(
+          {
+            email,
+            plan: tier,
+            status: 'active',
+            start_date: startDate.toISOString(),
+            end_date: endDate ? endDate.toISOString() : null,
+            created_at: existing?.created_at
+              ? new Date(existing.created_at).toISOString()
+              : now.toISOString(),
+          },
+          { onConflict: 'email' }
+        )
 
-        await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'email' })
         return res.status(200).send('OK')
       }
 
       /* ================= CART (GROUP PAYMENT) ================= */
       if (isCart) {
-        const groupCode = String(custom_2 || order_id || '').trim()
-        if (!groupCode) return res.status(200).send('OK')
+        const groupId = cartGroupRef
+        if (!groupId) return res.status(200).send('OK')
 
-        // Load all item orders for this cart payment
+        // ✅ IMPORTANT: cart rows are grouped by orders.order_id
         const { data: orders, error: ordErr } = await supabaseAdmin
           .from('orders')
           .select('*')
-          .eq('code', groupCode)
+          .eq('order_id', groupId)
 
         if (ordErr) {
           console.error('Cart orders fetch failed:', ordErr.message)
@@ -333,26 +364,26 @@ export default async function handler(req, res) {
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
-            .eq('code', groupCode)
+            .eq('order_id', groupId)
 
           if (up.error) console.error('Cart orders update failed:', up.error.message)
         }
 
-        // Re-fetch (latest flags)
-        const { data: freshOrders } = await supabaseAdmin.from('orders').select('*').eq('code', groupCode)
+        // Re-fetch latest
+        const { data: freshOrders } = await supabaseAdmin.from('orders').select('*').eq('order_id', groupId)
         const items = Array.isArray(freshOrders) && freshOrders.length ? freshOrders : list
 
         const totalAmount = items.reduce((sum, o) => sum + Number(o.amount || 0), 0)
         const currency = items[0].currency || payhere_currency || 'LKR'
 
-        // Choose invoiceNo (first order gets it; optional)
+        // invoice number on first row
         const invoiceNo = await ensureInvoiceNo(items[0])
 
         // Receipt email (send once)
         if (!items[0].invoice_email_sent_at) {
           await sendReceiptEmail({
             to: email,
-            orderId: groupCode,
+            orderId: groupId,
             invoiceNo,
             amount: String(round2(totalAmount)),
             currency,
@@ -362,11 +393,10 @@ export default async function handler(req, res) {
             paymentId: payment_id || null,
           })
 
-          // mark all rows as receipt sent
           await supabaseAdmin
             .from('orders')
             .update({ invoice_email_sent_at: new Date().toISOString() })
-            .eq('code', groupCode)
+            .eq('order_id', groupId)
         }
 
         // Download email (send once)
@@ -377,19 +407,15 @@ export default async function handler(req, res) {
             const photoId = String(o.photo_id || '').trim()
             const license = normalizeLicense(o.license)
             const format = normalizeFormat(o.format)
-
             if (!photoId) continue
 
             let objectKey = String(o.delivery_object_key || '').trim()
             if (!objectKey) {
-              // try photos table for safety
               try {
                 objectKey = (await resolveObjectKeyForSingleOrder(o)) || ''
               } catch {}
             }
-            if (!objectKey) {
-              objectKey = fallbackObjectKeyFromPhotoId(photoId, format)
-            }
+            if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(photoId, format)
             if (!objectKey) continue
 
             const jti = crypto.randomUUID()
@@ -397,13 +423,10 @@ export default async function handler(req, res) {
 
             const ins = await supabaseAdmin.from('download_tokens').insert({
               jti,
-              order_id: o.id, // token tied to item-order id
+              order_id: o.id, // token tied to each item-order row
               expires_at: expiresAt.toISOString(),
             })
-            if (ins.error) {
-              console.error('download_tokens insert failed:', ins.error.message)
-              continue
-            }
+            if (ins.error) continue
 
             const ext = format === 'raw' ? 'zip' : 'jpg'
             const token = createDownloadToken(
@@ -423,7 +446,6 @@ export default async function handler(req, res) {
 
             links.push({
               title: o.title || photoId,
-              photoId,
               license,
               format,
               url: buildDownloadUrl(token, req),
@@ -434,26 +456,23 @@ export default async function handler(req, res) {
             const combined = links
               .map(
                 (x, idx) =>
-                  `${idx + 1}) ${x.title} • ${String(x.license).toUpperCase()} • ${String(
-                    x.format
-                  ).toUpperCase()}\n${x.url}`
+                  `${idx + 1}) ${x.title} • ${String(x.license).toUpperCase()} • ${String(x.format).toUpperCase()}\n${x.url}`
               )
               .join('\n\n')
 
             await sendDownloadEmail({
               to: email,
-              orderId: groupCode,
+              orderId: groupId,
               photoTitle: `Cart (${links.length} items)`,
               downloadUrl: combined,
               license: '—',
               format: '—',
             })
 
-            // mark all rows as download sent
             await supabaseAdmin
               .from('orders')
               .update({ download_email_sent_at: new Date().toISOString() })
-              .eq('code', groupCode)
+              .eq('order_id', groupId)
           }
         }
 
@@ -462,7 +481,7 @@ export default async function handler(req, res) {
 
       /* ================= SINGLE PHOTO (EXISTING) ================= */
 
-      const order = await findOrderByPayhereOrderId(order_id)
+      const order = await findSingleOrderByRef(order_id)
       if (!order) return res.status(200).send('OK')
 
       const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
@@ -488,7 +507,6 @@ export default async function handler(req, res) {
       let objectKey = await resolveObjectKeyForSingleOrder(o)
       if (!objectKey) objectKey = String(o.delivery_object_key || '').trim()
       if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
-
       if (!objectKey) return res.status(200).send('OK')
 
       const desiredLimit = limitForLicense(normalizeLicense(o.license))
@@ -572,21 +590,23 @@ export default async function handler(req, res) {
        ❌ PAYMENT FAILED / CANCELED
     ========================================================= */
     if (statusCodeNum < 0) {
-      const groupCode = String(custom_2 || order_id || '').trim()
       if (String(custom_1 || '').trim().toLowerCase() === 'cart') {
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            status: 'FAILED',
-            payhere_payment_id: payment_id || null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('code', groupCode)
+        const groupId = cartGroupRef
+        if (groupId) {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              status: 'FAILED',
+              payhere_payment_id: payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('order_id', groupId)
+        }
         return res.status(200).send('OK')
       }
 
-      const order = await findOrderByPayhereOrderId(order_id)
+      const order = await findSingleOrderByRef(order_id)
       if (order && String(order.status || '').toUpperCase() !== 'FAILED') {
         await supabaseAdmin
           .from('orders')
