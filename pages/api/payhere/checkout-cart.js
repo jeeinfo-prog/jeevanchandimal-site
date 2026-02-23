@@ -1,4 +1,5 @@
 // pages/api/payhere/checkout-cart.js
+import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 function round2(n) {
@@ -14,19 +15,15 @@ function normLicense(v) {
   const x = String(v || '').trim().toLowerCase()
   return x === 'commercial' || x === 'editorial' ? x : 'personal'
 }
-
 function normFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
-
 function normCurrency(v) {
   return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
-
 function cleanBaseUrl(v) {
   return String(v || '').trim().replace(/\/+$/, '')
 }
-
 function getSiteBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
@@ -35,7 +32,6 @@ function getSiteBaseUrl(req) {
     ).toString()}`
   )
 }
-
 function getNotifyBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.WEBHOOK_BASE_URL) ||
@@ -44,100 +40,27 @@ function getNotifyBaseUrl(req) {
   )
 }
 
-// ✅ Sandbox / Live switch
-function getPayHereCheckoutBase() {
-  const env =
-    String(process.env.PAYHERE_ENV || process.env.NEXT_PUBLIC_PAYHERE_ENV || '')
-      .trim()
-      .toLowerCase()
-
-  const sandboxFlag =
-    String(process.env.PAYHERE_SANDBOX || process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
-      .trim()
-      .toLowerCase()
-
-  const isSandbox = env === 'sandbox' || sandboxFlag === 'true' || sandboxFlag === '1' || sandboxFlag === 'yes'
-
-  return isSandbox ? 'https://sandbox.payhere.lk/pay/checkout' : 'https://www.payhere.lk/pay/checkout'
-}
-
-/**
- * ✅ Safely resolve object key from photos row WITHOUT assuming column names exist.
- */
 async function getObjectKeyForPhoto(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) throw new Error('Missing photoId')
 
-  const { data: p, error } = await supabaseAdmin.from('photos').select('*').eq('id', pid).maybeSingle()
+  // ✅ only select columns you actually use (safer than select '*')
+  const { data: p, error } = await supabaseAdmin
+    .from('photos')
+    .select('id, original_key, original_jpg_key, original_raw_key')
+    .eq('id', pid)
+    .maybeSingle()
+
   if (error) throw new Error(error.message)
   if (!p) throw new Error(`Photo not found: ${pid}`)
 
-  const jpgKey =
-    p.original_jpg_key ||
-    p.original_key ||
-    p.original_object_key ||
-    p.object_key ||
-    p.r2_key ||
-    p.key ||
-    null
-
-  const rawKey =
-    p.original_raw_key ||
-    p.raw_object_key ||
-    p.raw_zip_key ||
-    p.raw_original_key ||
-    null
-
   if (format === 'raw') {
-    if (rawKey) return String(rawKey)
-    return `photos/original/${pid}.zip`
+    if (p.original_raw_key) return String(p.original_raw_key)
+    return null
   }
 
-  if (jpgKey) return String(jpgKey)
-  return `photos/original/${pid}.jpg`
-}
-
-/**
- * ✅ Insert order with safe fallbacks when some columns don't exist.
- * We'll TRY: code + order_kind + items + (required fields).
- * If some columns don't exist, we retry with less.
- */
-async function insertOrderWithFallback(row) {
-  // 1) Try full row
-  let r = await supabaseAdmin.from('orders').insert([row]).select('id, code').single()
-  if (!r.error) return r
-
-  const msg = String(r.error.message || '').toLowerCase()
-
-  // 2) If items column missing, retry without items
-  if (msg.includes('column') && msg.includes('items')) {
-    const { items, ...rest } = row
-    r = await supabaseAdmin.from('orders').insert([rest]).select('id, code').single()
-    if (!r.error) return r
-  }
-
-  // 3) If order_kind missing, retry without it
-  if (msg.includes('column') && msg.includes('order_kind')) {
-    const { order_kind, ...rest } = row
-    r = await supabaseAdmin.from('orders').insert([rest]).select('id, code').single()
-    if (!r.error) return r
-  }
-
-  // 4) Minimal safe insert (still include NOT NULL columns)
-  const minimal = {
-    status: row.status,
-    email: row.email,
-    currency: row.currency,
-    amount: row.amount,
-    photo_id: row.photo_id,
-    license: row.license,
-    format: row.format,
-    delivery_object_key: row.delivery_object_key,
-    code: row.code,
-  }
-
-  r = await supabaseAdmin.from('orders').insert([minimal]).select('id, code').single()
-  return r
+  const jpgKey = p.original_jpg_key || p.original_key
+  return jpgKey ? String(jpgKey) : null
 }
 
 export default async function handler(req, res) {
@@ -152,102 +75,103 @@ export default async function handler(req, res) {
       (Array.isArray(cart.items) && cart.items) ||
       []
 
-    const ccy = normCurrency(body.currency || cart.currency)
+    const currency = normCurrency(body.currency || cart.currency)
     const email = String(body.email || cart.email || '').trim().toLowerCase()
 
     if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
     if (!items.length) return res.status(400).json({ ok: false, error: 'Cart is empty' })
 
-    // ✅ Build clean items + compute total
-    const cleanItems = []
+    // ✅ Build normalized cart items that ALWAYS include license/format/objectKey
+    const normalizedItems = []
     let total = 0
 
     for (const it of items) {
       const photoId = String(it.photoId || it.id || it._id || '').trim()
+      const title = String(it.title || it.name || '').trim()
       const license = normLicense(it.license || it._license)
       const format = normFormat(it.format || it._format)
       const qty = Math.max(1, Math.min(99, Number(it.qty || it._qty || 1)))
       const unitPrice = Number(it.unitPrice || it.price || it._price || 0)
 
-      if (!photoId) return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
+      if (!photoId) {
+        return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
+      }
       if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-        return res.status(400).json({ ok: false, error: `Invalid cart item (missing price) photoId=${photoId}` })
+        return res.status(400).json({ ok: false, error: `Invalid price for photoId=${photoId}` })
       }
 
       const objectKey = await getObjectKeyForPhoto(photoId, format)
+      if (!objectKey) {
+        return res.status(400).json({
+          ok: false,
+          error: `Missing file key in photos table for photoId=${photoId} format=${format}`,
+        })
+      }
+
       const lineAmount = round2(unitPrice * qty)
       total += lineAmount
 
-      cleanItems.push({
+      normalizedItems.push({
         photoId,
-        title: String(it.title || ''),
-        thumbUrl: String(it.thumbUrl || it.thumb_url || ''),
+        title,
         license,
         format,
-        currency: ccy,
-        unitPrice,
         qty,
-        objectKey,
+        unitPrice: round2(unitPrice),
+        amount: lineAmount,
+        objectKey, // ✅ stored for notify + token generation
       })
     }
 
     total = round2(total)
 
-    // ✅ ONE DB ROW for the cart (code is UNIQUE, so this is required)
-    const cartCode = makeCartCode()
+    // ✅ SINGLE cart order row (avoids UNIQUE(code) collision)
+    const code = makeCartCode()
 
-    // Your orders table has NOT NULL: photo_id, license, format (based on your errors)
-    // So we must provide placeholders. Use first item.
-    const first = cleanItems[0]
-    const placeholderLicense = normLicense(first?.license) || 'personal'
-    const placeholderFormat = normFormat(first?.format) || 'jpg'
-    const placeholderPhotoId = String(first?.photoId || '').trim()
-    const placeholderKey = String(first?.objectKey || '').trim()
+    // ✅ satisfy NOT NULL columns
+    const topLicense = 'personal'
+    const topFormat = 'jpg'
+    const topPhotoId = String(normalizedItems[0]?.photoId || '').trim()
 
-    if (!placeholderPhotoId || !placeholderKey) {
-      return res.status(400).json({ ok: false, error: 'Cart item missing photoId/objectKey (cannot create order)' })
+    if (!topPhotoId) {
+      return res.status(400).json({ ok: false, error: 'Cart missing first photoId' })
     }
 
-    const toInsert = {
+    const orderRow = {
+      id: `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 14)}`, // your style id
       status: 'PENDING',
       email,
-      currency: ccy,
-      amount: total,
+      currency,
+      amount: Number(total).toFixed(2),
 
-      // ✅ required (NOT NULL) columns in your schema
-      photo_id: placeholderPhotoId,
-      license: placeholderLicense,
-      format: placeholderFormat,
-      delivery_object_key: placeholderKey,
+      // NOT NULL schema fields:
+      photo_id: topPhotoId,
+      license: topLicense,
+      format: topFormat,
 
-      // ✅ cart markers
+      // cart identity:
       order_kind: 'cart',
-      code: cartCode,
+      code, // ✅ UNIQUE
+      items: normalizedItems, // ✅ JSONB
 
-      // ✅ only if column exists
-      items: cleanItems,
+      // OPTIONAL: so you can also query by order_id if you want
+      order_id: code,
     }
 
-    const created = await insertOrderWithFallback(toInsert)
-    if (created.error || !created.data) {
-      return res.status(500).json({ ok: false, error: created.error?.message || 'Order create failed' })
+    const ins = await supabaseAdmin.from('orders').insert(orderRow).select('id, code, amount').maybeSingle()
+    if (ins.error) {
+      return res.status(500).json({ ok: false, error: ins.error.message })
     }
-
-    const orderRowId = created.data.id
+    const created = ins.data
 
     const merchant_id = process.env.PAYHERE_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
-    const merchant_secret = process.env.PAYHERE_MERCHANT_SECRET || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_SECRET
-    if (!merchant_id || !merchant_secret) {
-      return res.status(500).json({ ok: false, error: 'PayHere env missing (merchant id/secret)' })
-    }
+    if (!merchant_id) return res.status(500).json({ ok: false, error: 'Missing PAYHERE_MERCHANT_ID' })
 
     const baseUrl = getSiteBaseUrl(req)
     const notifyBase = getNotifyBaseUrl(req)
 
-    // ✅ PayHere order_id should be the CART CODE (human-friendly) OR the DB id.
-    // We'll send cartCode as order_id and also send DB id as custom_2.
-    const return_url = `${baseUrl}/store/return?order_id=${encodeURIComponent(cartCode)}`
-    const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(cartCode)}`
+    const return_url = `${baseUrl}/store/return?order_id=${encodeURIComponent(code)}`
+    const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(code)}`
     const notify_url = `${notifyBase}/api/payhere/notify`
 
     const payload = {
@@ -256,9 +180,10 @@ export default async function handler(req, res) {
       cancel_url,
       notify_url,
 
-      order_id: cartCode,
-      items: `Jeevan Chandimal Photo Cart (${cleanItems.length} items)`,
-      currency: ccy,
+      // ✅ PayHere reference
+      order_id: code,
+      items: `Jeevan Chandimal Photo Cart (${normalizedItems.length} items)`,
+      currency,
       amount: Number(total).toFixed(2),
 
       first_name: 'Customer',
@@ -269,23 +194,26 @@ export default async function handler(req, res) {
       city: '',
       country: 'Sri Lanka',
 
+      // ✅ tell notify it's a cart + give it internal row id too
       custom_1: 'cart',
-      custom_2: orderRowId, // ✅ DB id to find the cart row later
+      custom_2: created?.id || orderRow.id,
     }
 
     const query = new URLSearchParams(payload).toString()
-    const redirectUrl = `${getPayHereCheckoutBase()}?${query}`
+
+    // ✅ sandbox vs live
+    const env = String(process.env.PAYHERE_ENV || '').toLowerCase()
+    const payhereHost =
+      env === 'sandbox' ? 'https://sandbox.payhere.lk' : 'https://www.payhere.lk'
+
+    const redirectUrl = `${payhereHost}/pay/checkout?${query}`
 
     return res.status(200).json({
       ok: true,
-      cartCode,
-      orderId: orderRowId,
+      id: created?.id || orderRow.id,
+      code,
       total,
       redirectUrl,
-      payhere: {
-        mode:
-          getPayHereCheckoutBase().includes('sandbox') ? 'sandbox' : 'live',
-      },
     })
   } catch (e) {
     console.error('checkout-cart error:', e)
