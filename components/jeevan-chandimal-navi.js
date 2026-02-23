@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
-import { cartCount } from '../lib/cart' // ✅ FIX: remove @ alias to prevent prod crash
+import { readCart } from '../lib/cart' // ✅ safer than importing cartCount
 
 const NAV = {
   work: [
@@ -58,7 +58,7 @@ export default function JeevanChandimalNavi(props) {
     closeTimers.current[key] = setTimeout(() => {
       if (key === 'work') setDeskWorkOpen(false)
       if (key === 'services') setDeskServicesOpen(false)
-    }, 140) // small delay removes flicker
+    }, 140)
   }
 
   // Close menus on route change
@@ -70,29 +70,33 @@ export default function JeevanChandimalNavi(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router?.events])
 
-  // ✅ Keep cart badge updated (same-tab + other tabs) — NO INTERVAL (prevents hydration mismatch)
+  // ✅ Keep cart badge updated (same-tab + other tabs) — NO INTERVAL
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const refresh = () => {
+    const getCount = () => {
       try {
-        setCartNum(cartCount())
+        const cart = readCart()
+        const count = Array.isArray(cart?.items)
+          ? cart.items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
+          : 0
+        return count
       } catch {
-        setCartNum(0)
+        return 0
       }
     }
+
+    const refresh = () => setCartNum(getCount())
 
     refresh()
 
     const onStorage = (e) => {
-      // cross-tab updates
       if (e?.key === 'jc_cart_v1') refresh()
-      // fallback if something else writes different key names
       if (e?.key && String(e.key).includes('cart')) refresh()
       if (e?.key && String(e.key).includes('jc_cart')) refresh()
     }
 
-    const onCustom = () => refresh() // ✅ instant same-tab updates from AddToCartButton
+    const onCustom = () => refresh()
 
     window.addEventListener('storage', onStorage)
     window.addEventListener('jc_cart_updated', onCustom)
@@ -320,55 +324,38 @@ export default function JeevanChandimalNavi(props) {
 
           {/* right */}
           <div className="navRight">
-            {/* group: cart + badge + email + logout/login */}
             <div className="rightGroup">
-              {/* ✅ Cart button (always visible) */}
               <Link href="/cart" legacyBehavior>
-                <a className={`cartBtn ${activeClass('/cart')}`} aria-label="Cart">
-                  <span className="cartText">Cart</span>
-                  <span className="cartBadge" aria-label={`Cart items: ${cartNum}`}>
+                <a className={`pill pillLink ${activeClass('/cart')}`} aria-label="Cart">
+                  <span className="pillText">Cart</span>
+                  <span className="pillBadge" aria-label={`Cart items: ${cartNum}`}>
                     {cartNum}
                   </span>
                 </a>
               </Link>
 
-              {memberPlan ? <span className="badge">{String(memberPlan).toUpperCase()}</span> : null}
+              {memberPlan ? (
+                <span className="pill pillAccent">{String(memberPlan).toUpperCase()}</span>
+              ) : null}
 
-              {/* ✅ Logged-in: email + logout */}
               {userEmail ? (
                 <>
-                  <span className="userEmail" title={userEmail}>
+                  <span className="pill pillStatic" title={userEmail}>
                     {userEmail}
                   </span>
-                  <button type="button" className="logoutBtn" onClick={logout}>
+                  <button type="button" className="pill pillBtn" onClick={logout}>
                     Logout
                   </button>
                 </>
               ) : (
                 <Link href="/login" legacyBehavior>
-                  <a className="iconBtn" aria-label="Login">
-                    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M4 21v-1c0-3.313 2.687-6 6-6h4c3.313 0 6 2.687 6 6v1"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M12 11c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                  <a className="pill pillLink" aria-label="Login">
+                    Login
                   </a>
                 </Link>
               )}
             </div>
 
-            {/* burger always far right */}
             <button
               type="button"
               className="burger"
@@ -408,7 +395,6 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {/* ✅ Mobile Cart */}
               <Link href="/cart" legacyBehavior>
                 <a className={`mLink ${activeClass('/cart')}`} onClick={closeAll}>
                   <span>Cart</span>
@@ -416,7 +402,6 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {/* Work: first tap opens, second tap navigates */}
               <Link href="/work" legacyBehavior>
                 <a
                   className={`mLink mDrop ${activeClass('/work')}`}
@@ -448,7 +433,6 @@ export default function JeevanChandimalNavi(props) {
                 </div>
               )}
 
-              {/* Services: first tap opens, second tap navigates */}
               <Link href="/services" legacyBehavior>
                 <a
                   className={`mLink mDrop ${activeClass('/services')}`}
@@ -503,7 +487,6 @@ export default function JeevanChandimalNavi(props) {
 
               {memberPlan && <div className="mBadge">{String(memberPlan).toUpperCase()}</div>}
 
-              {/* ✅ Mobile logout */}
               {userEmail ? (
                 <button type="button" className="mLogout" onClick={logout}>
                   Logout
@@ -534,11 +517,13 @@ export default function JeevanChandimalNavi(props) {
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
 
+        /* ✅ GRID LAYOUT: left / center / right */
         .navShell {
           max-width: var(--dl-layout-size-maxwidth);
           margin: 0 auto;
           padding: 12px 18px;
-          display: flex;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
           align-items: center;
           gap: 14px;
           position: relative;
@@ -558,11 +543,11 @@ export default function JeevanChandimalNavi(props) {
 
         /* ========= DESKTOP LINKS ========= */
         .navLinks {
-          flex: 1;
           display: none;
           align-items: center;
-          justify-content: center;
+          justify-content: center; /* ✅ truly centered */
           gap: 18px;
+          min-width: 0;
         }
 
         .navLink,
@@ -724,133 +709,89 @@ export default function JeevanChandimalNavi(props) {
           align-items: center;
           gap: 10px;
           flex-wrap: nowrap;
-          min-width: 0; /* allow email to ellipsis */
+          min-width: 0;
         }
 
-        /* ✅ CART (unified height) */
-        .cartBtn {
-          height: 36px;
+        /* ✅ ONE pill system for ALL right items */
+        .pill {
+          height: 32px; /* ✅ reduced height */
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
           padding: 0 12px;
           border-radius: 999px;
-          text-decoration: none !important;
-          color: #f5f4f4;
-          background: rgba(255, 255, 255, 0.03);
-          opacity: 0.92;
           line-height: 1;
+          font-size: 12px;
+          letter-spacing: 0.2px;
+          box-sizing: border-box;
+          white-space: nowrap;
         }
 
-        .cartBtn:hover {
+        .pillLink {
+          text-decoration: none !important;
+          color: #f5f4f4;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(255, 255, 255, 0.03);
+          opacity: 0.92;
+          transition: opacity 0.15s, background 0.15s;
+        }
+
+        .pillLink:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.06);
         }
 
-        .cartText {
-          font-size: 12px;
-          letter-spacing: 0.2px;
+        .pillBtn {
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(255, 255, 255, 0.03);
+          color: #f5f4f4;
+          cursor: pointer;
+          opacity: 0.92;
+          transition: opacity 0.15s, background 0.15s;
         }
 
-        .cartBadge {
-          min-width: 20px;
-          height: 20px;
+        .pillBtn:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.06);
+        }
+
+        .pillStatic {
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.03);
+          color: #f5f4f4;
+          opacity: 0.88;
+          max-width: 220px;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .pillAccent {
+          border: 1px solid rgba(37, 195, 226, 0.55);
+          background: rgba(37, 195, 226, 0.12);
+          color: #25c3e2;
+          font-weight: 800;
+          letter-spacing: 1px;
+          font-size: 11px;
+        }
+
+        .pillBadge {
+          min-width: 16px;
+          height: 16px;
           padding: 0 6px;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 800;
           border: 1px solid rgba(37, 195, 226, 0.35);
           background: rgba(37, 195, 226, 0.14);
           color: #25c3e2;
         }
 
-        /* ✅ Member pill same height */
-        .badge {
-          height: 36px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 12px;
-          border: 1px solid rgba(37, 195, 226, 0.55);
-          background: rgba(37, 195, 226, 0.12);
-          border-radius: 999px;
-          letter-spacing: 1px;
-          color: #25c3e2;
-          font-weight: 800;
-          font-size: 11px;
-          line-height: 1;
-          white-space: nowrap;
-        }
-
-        /* ✅ email pill same height */
-        .userEmail {
-          height: 36px;
-          display: inline-flex;
-          align-items: center;
-          padding: 0 12px;
-          border: 1px solid rgba(245, 244, 244, 0.14);
-          background: rgba(255, 255, 255, 0.03);
-          border-radius: 999px;
-          color: #f5f4f4;
-          font-size: 12px;
-          opacity: 0.88;
-          max-width: 220px;
-          min-width: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          line-height: 1;
-        }
-
-        /* ✅ logout pill same height */
-        .logoutBtn {
-          height: 36px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 14px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: rgba(255, 255, 255, 0.03);
-          color: #f5f4f4;
-          cursor: pointer;
-          opacity: 0.92;
-          line-height: 1;
-          font-size: 12px;
-          letter-spacing: 0.2px;
-        }
-
-        .logoutBtn:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-        }
-
-        .iconBtn {
-          height: 36px;
-          color: #f5f4f4;
-          opacity: 0.85;
-          border-radius: 999px;
-          padding: 0 12px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          text-decoration: none !important;
-          transition: opacity 0.15s, background 0.15s;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: rgba(255, 255, 255, 0.03);
-        }
-
-        .iconBtn:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-        }
-
         @media (max-width: 520px) {
-          .userEmail {
+          .pillStatic {
             display: none;
           }
         }
