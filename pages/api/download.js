@@ -1,7 +1,7 @@
 // pages/api/download.js
-import { verifyDownloadToken } from '@/lib/secureDownload'
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { r2 } from '@/lib/r2'
+import { verifyDownloadToken } from '../../lib/secureDownload'
+import { supabaseAdmin } from '../../lib/supabaseAdmin'
+import { r2 } from '../../lib/r2'
 import { ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
@@ -18,8 +18,12 @@ function safeFilename(name) {
   )
 }
 
-function removeExt(filename) {
-  return String(filename || '').replace(/\.[^.]+$/, '')
+// Extract photoId from objectKey when possible:
+// photos/original/<photoId>/file.jpg  -> <photoId>
+function extractPhotoIdFromKey(key) {
+  const k = String(key || '')
+  const m = k.match(/photos\/original\/([^/]+)\//i)
+  return m?.[1] ? String(m[1]) : ''
 }
 
 async function findFirstFileUnderPrefix(prefix) {
@@ -86,18 +90,16 @@ export default async function handler(req, res) {
     }
 
     // ✅ Resolve the real R2 key (handles folder-based originals)
-    let finalKey = objectKey
+    let finalKey = String(objectKey)
 
-    // If objectKey points to a file that doesn't exist (older tokens / different layout),
-    // scan: photos/original/<photoId>/ and pick first file.
-    // We don't "GetObject" here (no streaming). We'll just resolve the right Key.
-    const last = objectKey.split('/').pop() || ''
-    const photoId = removeExt(last)
+    // Prefer photoId from token, fallback to parsing key
+    const photoId = String(payload?.photoId || extractPhotoIdFromKey(objectKey) || '').trim()
 
-    // If your new layout is always folder-based, you can always scan.
-    // To keep behavior safe, we only scan when objectKey looks like a "flat" jpg.
-    // (You can simplify later.)
-    if (!objectKey.includes(`/photos/original/${photoId}/`)) {
+    // If objectKey is NOT already in folder format, try scanning folder
+    // Folder format: photos/original/<photoId>/...
+    const isFolderKey = /photos\/original\/[^/]+\//i.test(finalKey)
+
+    if (!isFolderKey && photoId) {
       const prefix = `photos/original/${photoId}/`
       const scannedKey = await findFirstFileUnderPrefix(prefix)
       if (scannedKey) finalKey = scannedKey
