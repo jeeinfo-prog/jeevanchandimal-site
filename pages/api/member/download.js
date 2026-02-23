@@ -45,9 +45,13 @@ async function ensureMemberOrder(email) {
   const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
   if (!existing.error && existing.data) return existing.data
 
+  // ✅ Your orders.id has no default, so we must generate it
+  const id = crypto.randomUUID()
+
   const ins = await supabaseAdmin
     .from('orders')
     .insert({
+      id,
       code,
       email,
       status: 'PAID',
