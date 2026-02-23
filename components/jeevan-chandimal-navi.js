@@ -320,51 +320,55 @@ export default function JeevanChandimalNavi(props) {
 
           {/* right */}
           <div className="navRight">
-            {/* ✅ Cart button (always visible) */}
-            <Link href="/cart" legacyBehavior>
-              <a className={`cartBtn ${activeClass('/cart')}`} aria-label="Cart">
-                <span className="cartText">Cart</span>
-                <span className="cartBadge" aria-label={`Cart items: ${cartNum}`}>
-                  {cartNum}
-                </span>
-              </a>
-            </Link>
-
-            {memberPlan && <span className="badge">{String(memberPlan).toUpperCase()}</span>}
-
-            {/* ✅ Logged-in: email + logout */}
-            {userEmail ? (
-              <>
-                <span className="userEmail" title={userEmail}>
-                  {userEmail}
-                </span>
-                <button type="button" className="logoutBtn" onClick={logout}>
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link href="/login" legacyBehavior>
-                <a className="iconBtn" aria-label="Login">
-                  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M4 21v-1c0-3.313 2.687-6 6-6h4c3.313 0 6 2.687 6 6v1"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M12 11c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+            {/* group: cart + badge + email + logout/login */}
+            <div className="rightGroup">
+              {/* ✅ Cart button (always visible) */}
+              <Link href="/cart" legacyBehavior>
+                <a className={`cartBtn ${activeClass('/cart')}`} aria-label="Cart">
+                  <span className="cartText">Cart</span>
+                  <span className="cartBadge" aria-label={`Cart items: ${cartNum}`}>
+                    {cartNum}
+                  </span>
                 </a>
               </Link>
-            )}
 
+              {memberPlan ? <span className="badge">{String(memberPlan).toUpperCase()}</span> : null}
+
+              {/* ✅ Logged-in: email + logout */}
+              {userEmail ? (
+                <>
+                  <span className="userEmail" title={userEmail}>
+                    {userEmail}
+                  </span>
+                  <button type="button" className="logoutBtn" onClick={logout}>
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" legacyBehavior>
+                  <a className="iconBtn" aria-label="Login">
+                    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M4 21v-1c0-3.313 2.687-6 6-6h4c3.313 0 6 2.687 6 6v1"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M12 11c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </a>
+                </Link>
+              )}
+            </div>
+
+            {/* burger always far right */}
             <button
               type="button"
               className="burger"
@@ -713,6 +717,27 @@ export default function JeevanChandimalNavi(props) {
           display: inline-flex;
           align-items: center;
           gap: 10px;
+        }
+
+        .rightGroup {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: nowrap;
+          min-width: 0; /* allow email to ellipsis */
+        }
+
+        /* make email behave nicely when space is tight */
+        .userEmail {
+          min-width: 0;
+          max-width: 220px;
+        }
+
+        @media (max-width: 520px) {
+          /* On small screens: hide email pill (still available in mobile menu) */
+          .userEmail {
+            display: none;
+          }
         }
 
         /* ✅ CART */
