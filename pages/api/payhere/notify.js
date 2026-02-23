@@ -103,7 +103,12 @@ function genInvoiceNo(orderId) {
 async function ensureInvoiceNo(order) {
   if (order.invoice_no) return order.invoice_no
   const invoiceNo = genInvoiceNo(order.id)
-  await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', order.id)
+
+  const up = await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', order.id)
+  if (up.error) {
+    console.error('ensureInvoiceNo update failed:', up.error.message)
+    // still return generated value so email can proceed
+  }
   return invoiceNo
 }
 
@@ -132,7 +137,7 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   if (!p) return null
 
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
-  return (p.original_jpg_key || p.original_key) ? String(p.original_jpg_key || p.original_key) : null
+  return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
 }
 
 // ✅ Find the cart order row (NEW design)
@@ -143,13 +148,13 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
   // 1) Prefer custom_2 (DB id)
   if (id) {
     const byId = await supabaseAdmin.from('orders').select('*').eq('id', id).maybeSingle()
-    if (byId?.data) return byId.data
+    if (!byId.error && byId?.data) return byId.data
   }
 
   // 2) Fallback to code = CART_...
   if (code) {
     const byCode = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
-    if (byCode?.data) return byCode.data
+    if (!byCode.error && byCode?.data) return byCode.data
   }
 
   return null
@@ -166,15 +171,37 @@ async function findSingleOrderByRef(ref) {
   if (!v) return null
 
   const byId = await supabaseAdmin.from('orders').select('*').eq('id', v).maybeSingle()
-  if (byId?.data) return byId.data
+  if (!byId.error && byId?.data) return byId.data
 
   const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', v).maybeSingle()
-  if (byOrderId?.data) return byOrderId.data
+  if (!byOrderId.error && byOrderId?.data) return byOrderId.data
 
   const byCode = await supabaseAdmin.from('orders').select('*').eq('code', v).maybeSingle()
-  if (byCode?.data) return byCode.data
+  if (!byCode.error && byCode?.data) return byCode.data
 
   return null
+}
+
+/**
+ * ✅ Idempotency helper:
+ * Tries to "claim" a send flag by setting timestamp only if currently NULL.
+ * Returns true if we successfully claimed (so it's safe to send email now).
+ */
+async function claimSendOnce(orderId, column) {
+  const now = new Date().toISOString()
+  const r = await supabaseAdmin
+    .from('orders')
+    .update({ [column]: now })
+    .eq('id', orderId)
+    .is(column, null)
+    .select('id')
+    .maybeSingle()
+
+  if (r.error) {
+    console.error('claimSendOnce failed:', column, r.error.message)
+    return false
+  }
+  return !!r.data
 }
 
 /* ---------------- handler ---------------- */
@@ -279,21 +306,20 @@ export default async function handler(req, res) {
         if (!email) return res.status(200).send('OK')
 
         const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
-        if (wasPaidAlready) return res.status(200).send('OK')
+        if (!wasPaidAlready) {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              status: 'PAID',
+              paid_at: new Date().toISOString(),
+              payhere_payment_id: payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', order.id)
+        }
 
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            status: 'PAID',
-            paid_at: new Date().toISOString(),
-            payhere_payment_id: payment_id || null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('id', order.id)
-
-        // (membership upsert logic stays the same as your current file)
-        // IMPORTANT: keep your membership code exactly as you had it before if it's already working.
+        // ✅ keep your existing membership upsert logic here (unchanged)
         return res.status(200).send('OK')
       }
 
@@ -324,11 +350,21 @@ export default async function handler(req, res) {
             .eq('id', cartOrder.id)
         }
 
-        // Re-fetch latest flags
-        const { data: freshCart } = await supabaseAdmin.from('orders').select('*').eq('id', cartOrder.id).single()
-        const o = freshCart || cartOrder
+        // Re-fetch latest
+        const { data: freshCart, error: freshErr } = await supabaseAdmin
+          .from('orders')
+          .select('*')
+          .eq('id', cartOrder.id)
+          .maybeSingle()
 
+        if (freshErr) {
+          console.error('cart refetch failed:', freshErr.message)
+          return res.status(200).send('OK')
+        }
+
+        const o = freshCart || cartOrder
         const items = Array.isArray(o.items) ? o.items : []
+
         if (items.length === 0) {
           console.error('Cart order has no items array:', o.id)
           return res.status(200).send('OK')
@@ -343,28 +379,37 @@ export default async function handler(req, res) {
         // Invoice number
         const invoiceNo = await ensureInvoiceNo(o)
 
-        // Receipt email (send once)
-        if (!o.invoice_email_sent_at) {
-          const totalAmount = items.reduce((sum, it) => sum + Number(it?.unitPrice || 0) * Number(it?.qty || 1), 0)
-          const amount = round2(totalAmount || Number(o.amount || 0))
+        // ✅ Receipt email (send once) — claim first to prevent duplicates
+        const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
+        if (claimedReceipt) {
+          const amount =
+            o.amount != null
+              ? String(o.amount)
+              : String(
+                  round2(
+                    items.reduce(
+                      (sum, it) => sum + Number(it?.unitPrice || 0) * Number(it?.qty || 1),
+                      0
+                    )
+                  )
+                )
 
           await sendReceiptEmail({
             to: email,
-            orderId: o.code || o.id, // show cartCode on receipt if present
+            orderId: o.code || o.id,
             invoiceNo,
-            amount: String(amount),
+            amount,
             currency: o.currency || payhere_currency || 'LKR',
             photoTitle: `Cart (${items.length} items)`,
             license: '—',
             format: '—',
             paymentId: payment_id || null,
           })
-
-          await supabaseAdmin.from('orders').update({ invoice_email_sent_at: new Date().toISOString() }).eq('id', o.id)
         }
 
-        // Download email (send once)
-        if (!o.download_email_sent_at) {
+        // ✅ Download email (send once) — claim first to prevent duplicates + duplicate tokens
+        const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
+        if (claimedDownload) {
           const links = []
 
           for (const it of items) {
@@ -443,8 +488,8 @@ export default async function handler(req, res) {
               license: '—',
               format: '—',
             })
-
-            await supabaseAdmin.from('orders').update({ download_email_sent_at: new Date().toISOString() }).eq('id', o.id)
+          } else {
+            console.error('Cart claimed download email, but no links were generated:', o.id)
           }
         }
 
@@ -496,6 +541,13 @@ export default async function handler(req, res) {
       try {
         const invoiceNo = await ensureInvoiceNo(o)
 
+        // ✅ claim first (prevents duplicates)
+        const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
+        const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
+
+        // if neither was claimed, nothing to do
+        if (!claimedReceipt && !claimedDownload) return res.status(200).send('OK')
+
         const jti = crypto.randomUUID()
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
@@ -526,7 +578,7 @@ export default async function handler(req, res) {
 
         const downloadUrl = buildDownloadUrl(token, req)
 
-        if (!o.invoice_email_sent_at) {
+        if (claimedReceipt) {
           await sendReceiptEmail({
             to: email,
             orderId: o.id,
@@ -538,11 +590,9 @@ export default async function handler(req, res) {
             format: normalizeFormat(o.format),
             paymentId: payment_id || null,
           })
-
-          await supabaseAdmin.from('orders').update({ invoice_email_sent_at: new Date().toISOString() }).eq('id', o.id)
         }
 
-        if (!o.download_email_sent_at) {
+        if (claimedDownload) {
           await sendDownloadEmail({
             to: email,
             orderId: o.id,
@@ -551,8 +601,6 @@ export default async function handler(req, res) {
             license: normalizeLicense(o.license),
             format: normalizeFormat(o.format),
           })
-
-          await supabaseAdmin.from('orders').update({ download_email_sent_at: new Date().toISOString() }).eq('id', o.id)
         }
       } catch (e) {
         console.error('❌ Single photo delivery email block failed:', o.id, e)
