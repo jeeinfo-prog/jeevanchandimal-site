@@ -32,9 +32,7 @@ function getSiteBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
     `${(req.headers['x-forwarded-proto'] || 'https').toString()}://${(
-      req.headers['x-forwarded-host'] ||
-      req.headers.host ||
-      ''
+      req.headers['x-forwarded-host'] || req.headers.host || ''
     ).toString()}`
   )
 }
@@ -133,12 +131,16 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {}
 
-    // ✅ Your cart.js sends: { cart: { currency, items }, currency }
+    // ✅ FIX: support both payload shapes:
+    // A) cart.js sends: { email, currency, items }
+    // B) older code might send: { cart: { currency, items, email }, currency }
     const cart = body.cart || {}
-    const items = Array.isArray(cart.items) ? cart.items : []
+    const items =
+      (Array.isArray(body.items) && body.items) ||
+      (Array.isArray(cart.items) && cart.items) ||
+      []
     const ccy = normCurrency(body.currency || cart.currency)
 
-    // optional email (if you later add it)
     const email = String(body.email || cart.email || '').trim().toLowerCase() || null
 
     if (!items.length) return res.status(400).json({ ok: false, error: 'Cart is empty' })
@@ -154,9 +156,12 @@ export default async function handler(req, res) {
       // price can come as price/_price/unitPrice
       const unitPrice = Number(it.unitPrice || it.price || it._price || 0)
 
-      if (!photoId) return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
-      if (!Number.isFinite(unitPrice) || unitPrice <= 0)
+      if (!photoId) {
+        return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
+      }
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
         return res.status(400).json({ ok: false, error: 'Invalid cart item (missing price)' })
+      }
 
       const objectKey = await getObjectKeyForPhoto(photoId, format)
 
@@ -178,13 +183,13 @@ export default async function handler(req, res) {
 
     // ✅ Insert order (no orders.kind)
     const toInsert = {
-      order_id: orderRef,          // PayHere will send this back as order_id
+      order_id: orderRef, // PayHere will send this back as order_id
       email,
       currency: ccy,
       amount,
-      status: 'PENDING',           // keep consistent (your paid is "PAID")
-      order_kind: 'cart',          // if column exists
-      items: cleanItems,           // if column exists
+      status: 'PENDING', // keep consistent (your paid is "PAID")
+      order_kind: 'cart', // if column exists
+      items: cleanItems, // if column exists
     }
 
     const created = await insertOrderWithFallback(toInsert)
@@ -196,13 +201,10 @@ export default async function handler(req, res) {
     const orderId = created.data.id
     const ref = created.data.order_id || orderRef
 
-    const merchant_id =
-      process.env.PAYHERE_MERCHANT_ID ||
-      process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
+    const merchant_id = process.env.PAYHERE_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
 
     const merchant_secret =
-      process.env.PAYHERE_MERCHANT_SECRET ||
-      process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_SECRET
+      process.env.PAYHERE_MERCHANT_SECRET || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_SECRET
 
     if (!merchant_id || !merchant_secret) {
       return res.status(500).json({ ok: false, error: 'PayHere env missing (merchant id/secret)' })
