@@ -8,17 +8,26 @@ function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
 }
 
-function normalizeTier(v) {
-  const x = String(v || '').trim().toLowerCase()
-  return ['basic', 'pro', 'elite'].includes(x) ? x : 'pro'
+function resolveTierFromMembershipPlan(plan) {
+  const raw = String(plan || '').trim().toLowerCase()
+
+  // legacy mapping (your memberships.plan currently stores monthly/yearly/lifetime)
+  if (raw === 'monthly') return 'basic'
+  if (raw === 'yearly') return 'pro'
+  if (raw === 'lifetime') return 'elite'
+
+  // if already a tier
+  if (['basic', 'pro', 'elite'].includes(raw)) return raw
+
+  return null
 }
 
-function normalizeFormatForTier(tier) {
-  // basic/pro => jpg, elite => raw
+function formatForTier(tier) {
+  // BASIC/PRO => JPG, ELITE => RAW ZIP
   return tier === 'elite' ? 'raw' : 'jpg'
 }
 
-// Resolve correct R2 key from photos table
+// ✅ Resolve correct R2 key from photos table
 async function resolveObjectKeyFromPhotos(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) return null
@@ -38,33 +47,48 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
 }
 
-// Ensure a “member order” exists so /api/download can use orderId + RPC
-async function ensureMemberOrder(email) {
+/**
+ * ✅ Create/reuse a "membership order" row in orders table.
+ * IMPORTANT:
+ * - Your DB has constraint requiring photo_id for photo orders
+ * - So we MUST set order_kind='membership' to bypass that constraint.
+ * - Your orders.id has no default, so we MUST generate UUID.
+ */
+async function ensureMemberOrder(email, membershipPlan = 'monthly') {
   const code = `MEMBER_${email}`
 
   const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
   if (!existing.error && existing.data) return existing.data
 
-  // ✅ Your orders.id has no default, so we must generate it
   const id = crypto.randomUUID()
 
-  const ins = await supabaseAdmin
-    .from('orders')
-    .insert({
-      id,
-      code,
-      email,
-      status: 'PAID',
-      paid_at: new Date().toISOString(),
-      amount: 0,
-      currency: 'LKR',
-      license: 'membership',
-      format: 'membership',
-      download_limit: 0, // 0 == unlimited in your system
-    })
-    .select('*')
-    .maybeSingle()
+  // Build payload that won't trigger photo-order constraints
+  const payload = {
+    id,
+    code,
+    email,
+    status: 'PAID',
+    paid_at: new Date().toISOString(),
+    amount: 0,
+    currency: 'LKR',
 
+    // ✅ critical: prevents "photo_id required" check constraint
+    order_kind: 'membership',
+
+    // helpful fields (only if these columns exist in your orders table)
+    membership_plan: membershipPlan || null,
+    membership_term: membershipPlan || null,
+
+    // keep non-photo markers
+    license: 'membership',
+    format: 'membership',
+
+    // unlimited
+    download_limit: 0,
+    download_count: 0,
+  }
+
+  const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
   if (ins.error) throw new Error(ins.error.message)
   return ins.data
 }
@@ -82,66 +106,40 @@ export default async function handler(req, res) {
     const email = normalizeEmail(req.body?.email)
 
     if (!photoId || !email) return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      return res.status(400).json({ ok: false, error: 'Invalid email' })
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
 
-    // ✅ Prefer new membership table (from notify.js upsert)
-    let tier = null
-
-    const { data: m1, error: e1 } = await supabaseAdmin
-      .from('members')
-      .select('plan,status,expires_at,updated_at')
+    // ✅ Membership check (your table: memberships)
+    const { data: member, error: mErr } = await supabaseAdmin
+      .from('memberships')
+      .select('plan,status,end_date,created_at')
       .eq('email', email)
       .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
-    if (e1) {
-      // don’t fail yet; fallback to older table
-      console.error('members lookup error:', e1.message)
+    if (mErr) return res.status(500).json({ ok: false, error: mErr.message })
+    if (!member) return res.status(403).json({ ok: false, error: 'Not a member' })
+
+    if (member.end_date && new Date(member.end_date) < new Date()) {
+      return res.status(403).json({ ok: false, error: 'Membership expired' })
     }
 
-    if (m1) {
-      if (m1.expires_at && new Date(m1.expires_at) < new Date()) {
-        return res.status(403).json({ ok: false, error: 'Membership expired' })
-      }
-      tier = normalizeTier(m1.plan)
-    } else {
-      // ✅ Fallback: older memberships table (your previous implementation)
-      const { data: m2, error: e2 } = await supabaseAdmin
-        .from('memberships')
-        .select('plan,status,end_date,created_at')
-        .eq('email', email)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (e2) return res.status(500).json({ ok: false, error: e2.message })
-      if (!m2) return res.status(403).json({ ok: false, error: 'Not a member' })
-      if (m2.end_date && new Date(m2.end_date) < new Date()) {
-        return res.status(403).json({ ok: false, error: 'Membership expired' })
-      }
-
-      const rawPlan = String(m2.plan || '').toLowerCase()
-      // legacy mapping
-      if (rawPlan === 'monthly') tier = 'basic'
-      else if (rawPlan === 'yearly') tier = 'pro'
-      else if (rawPlan === 'lifetime') tier = 'elite'
-      else tier = normalizeTier(rawPlan)
-    }
-
+    const tier = resolveTierFromMembershipPlan(member.plan)
     if (!tier) return res.status(403).json({ ok: false, error: 'Invalid plan' })
 
-    const format = normalizeFormatForTier(tier)
+    const format = formatForTier(tier)
     const ext = format === 'raw' ? 'zip' : 'jpg'
 
+    // ✅ Resolve object key from photos table
     const objectKey = await resolveObjectKeyFromPhotos(photoId, format)
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
-    // ✅ Ensure an order row exists for this member (so /api/download RPC can work)
-    const memberOrder = await ensureMemberOrder(email)
+    // ✅ Ensure we have a membership order row that won't violate constraints
+    const membershipPlan = String(member.plan || '').trim().toLowerCase() || 'monthly'
+    const memberOrder = await ensureMemberOrder(email, membershipPlan)
 
-    // ✅ One-time token row
+    // ✅ One-time token row (required by /api/download which uses consume_download_token RPC)
     const jti = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
@@ -156,6 +154,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: 'Server error' })
     }
 
+    // ✅ Build download token payload matching pages/api/download.js requirements
     const token = createDownloadToken(
       {
         jti,
