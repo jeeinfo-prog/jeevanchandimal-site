@@ -265,14 +265,81 @@ export default function CartPage() {
   }
 
   async function onCheckout() {
-    if (busy) return
+  if (busy) return
 
-    const normItems = items.map((x) => normalizeItem(x, currency)).filter(Boolean)
-    if (normItems.length === 0) {
-      setNote('Cart is empty.')
-      setTimeout(() => setNote(''), 1400)
+  // ✅ read the latest cart at click-time (source of truth)
+  const latest = cartApi.read() || {}
+  const rawItems = Array.isArray(latest) ? latest : latest.items
+  const ccy = (latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency
+  const useCurrency = ccy === 'USD' ? 'USD' : 'LKR'
+
+  const normItems = Array.isArray(rawItems)
+    ? rawItems.map((x) => normalizeItem(x, useCurrency)).filter(Boolean)
+    : []
+
+  if (normItems.length === 0) {
+    setNote('Cart is empty.')
+    setTimeout(() => setNote(''), 1600)
+    return
+  }
+
+  // ✅ email (same place your navbar uses)
+  const emailRaw =
+    (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
+  const email = String(emailRaw || '').trim().toLowerCase()
+
+  if (!email) {
+    setNote('Please login / enter email first (user_email missing).')
+    setTimeout(() => setNote(''), 2200)
+    return
+  }
+
+  setBusy(true)
+  setNote('Redirecting to PayHere...')
+
+  try {
+    // ✅ build payload exactly what checkout-cart.js expects
+    const payloadItems = normItems.map((it) => {
+      const unitPrice = Number(it.unitPrice || it._price || getUnitPrice(it, useCurrency) || 0)
+
+      return {
+        photoId: String(it.photoId || it._id || ''),
+        title: String(it.title || it._title || ''),
+        thumbUrl: String(it.thumbUrl || it._thumb || ''),
+        license: String(it.license || it._license || 'personal').toLowerCase(),
+        format: String(it.format || it._format || 'jpg').toLowerCase() === 'raw' ? 'raw' : 'jpg',
+        currency: useCurrency,
+        qty: clamp(it.qty || it._qty || 1, 1, 99),
+        unitPrice,
+      }
+    })
+
+    const r = await fetch('/api/payhere/checkout-cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        currency: useCurrency,
+        items: payloadItems,
+      }),
+    })
+
+    const data = await r.json().catch(() => ({}))
+
+    if (!r.ok || !data?.ok || !data?.redirectUrl) {
+      setNote(data?.error || 'Checkout failed')
+      setTimeout(() => setNote(''), 2600)
+      setBusy(false)
       return
     }
+
+    window.location.href = data.redirectUrl
+  } catch (e) {
+    setNote(e?.message || 'Checkout error')
+    setTimeout(() => setNote(''), 2600)
+    setBusy(false)
+  }
+}
 
     // ✅ email used same style as single checkout / membership
     const emailRaw =
