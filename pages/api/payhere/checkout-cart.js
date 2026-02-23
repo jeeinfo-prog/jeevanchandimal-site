@@ -1,5 +1,4 @@
 // pages/api/payhere/checkout-cart.js
-import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 function round2(n) {
@@ -21,6 +20,7 @@ function normFormat(v) {
 function normCurrency(v) {
   return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
+
 function cleanBaseUrl(v) {
   return String(v || '').trim().replace(/\/+$/, '')
 }
@@ -40,13 +40,24 @@ function getNotifyBaseUrl(req) {
   )
 }
 
-/**
- * ✅ Source of truth = Supabase app_settings.payhere_mode
- * - Accepts: 'sandbox' | 'live' (anything else -> sandbox)
- * - Fallback is ALWAYS sandbox (never accidentally go live)
- */
+// ✅ Reads PayHere mode from Supabase app_settings, with env fallbacks.
+// Supports your existing PAYHERE_SANDBOX=true too.
 async function getPayhereMode() {
-  const fallbackMode = 'sandbox'
+  // ENV fallbacks (your project uses PAYHERE_SANDBOX)
+  const sandboxFlag =
+    String(process.env.PAYHERE_SANDBOX || process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
+      .trim()
+      .toLowerCase() === 'true'
+
+  const envModeRaw = String(process.env.PAYHERE_ENV || process.env.PAYHERE_MODE || '')
+    .trim()
+    .toLowerCase()
+
+  // Default if nothing set:
+  let fallbackMode = 'sandbox'
+  if (sandboxFlag) fallbackMode = 'sandbox'
+  else if (envModeRaw === 'live') fallbackMode = 'live'
+  else if (envModeRaw === 'sandbox') fallbackMode = 'sandbox'
 
   try {
     const { data, error } = await supabaseAdmin
@@ -58,7 +69,8 @@ async function getPayhereMode() {
     if (error) return fallbackMode
 
     const v = String(data?.value || '').trim().toLowerCase()
-    return v === 'live' ? 'live' : 'sandbox'
+    if (v === 'live') return 'live'
+    return 'sandbox'
   } catch {
     return fallbackMode
   }
@@ -68,7 +80,7 @@ async function getObjectKeyForPhoto(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) throw new Error('Missing photoId')
 
-  // ✅ only select columns you actually use (safer than select '*')
+  // ✅ only select columns you actually use
   const { data: p, error } = await supabaseAdmin
     .from('photos')
     .select('id, original_key, original_jpg_key, original_raw_key')
@@ -87,8 +99,49 @@ async function getObjectKeyForPhoto(photoId, format) {
   return jpgKey ? String(jpgKey) : null
 }
 
+async function insertOrderWithFallback(orderRow) {
+  // Try insert with items + payhere_mode (if columns exist),
+  // then retry dropping fields if DB doesn’t have those columns.
+  const tryInsert = async (row) =>
+    supabaseAdmin.from('orders').insert(row).select('id, code, amount').maybeSingle()
+
+  // 1) first attempt
+  let ins = await tryInsert(orderRow)
+  if (!ins.error) return ins
+
+  const msg = String(ins.error.message || '')
+
+  // 2) if column doesn't exist, retry removing payhere_mode
+  if (msg.includes('payhere_mode') && msg.includes('column')) {
+    const { payhere_mode, ...rest } = orderRow
+    ins = await tryInsert(rest)
+    if (!ins.error) return ins
+  }
+
+  // 3) if items column doesn't exist, retry removing items
+  if (msg.includes('items') && msg.includes('column')) {
+    const { items, ...rest } = orderRow
+    ins = await tryInsert(rest)
+    if (!ins.error) return ins
+  }
+
+  // 4) retry removing both (in case both missing)
+  if (
+    (msg.includes('payhere_mode') && msg.includes('column')) ||
+    (msg.includes('items') && msg.includes('column'))
+  ) {
+    const { items, payhere_mode, ...rest } = orderRow
+    ins = await tryInsert(rest)
+    if (!ins.error) return ins
+  }
+
+  return ins
+}
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  }
 
   try {
     const body = req.body || {}
@@ -105,7 +158,7 @@ export default async function handler(req, res) {
     if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
     if (!items.length) return res.status(400).json({ ok: false, error: 'Cart is empty' })
 
-    // ✅ Build normalized cart items that ALWAYS include license/format/objectKey
+    // ✅ normalize cart items
     const normalizedItems = []
     let total = 0
 
@@ -143,29 +196,23 @@ export default async function handler(req, res) {
         qty,
         unitPrice: round2(unitPrice),
         amount: lineAmount,
-        objectKey, // ✅ stored for notify + token generation
+        objectKey,
       })
     }
 
     total = round2(total)
 
-    // ✅ SINGLE cart order row (avoids UNIQUE(code) collision)
     const code = makeCartCode()
 
-    // ✅ satisfy NOT NULL columns
-    const topLicense = 'personal'
-    const topFormat = 'jpg'
+    // satisfy NOT NULL columns in your orders table
     const topPhotoId = String(normalizedItems[0]?.photoId || '').trim()
+    if (!topPhotoId) return res.status(400).json({ ok: false, error: 'Cart missing first photoId' })
 
-    if (!topPhotoId) {
-      return res.status(400).json({ ok: false, error: 'Cart missing first photoId' })
-    }
-
-    // ✅ determine PayHere mode from Supabase setting
     const payhereMode = await getPayhereMode()
 
+    // ✅ order row
     const orderRow = {
-      id: `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 14)}`, // your style id
+      id: `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 14)}`,
       status: 'PENDING',
       email,
       currency,
@@ -173,28 +220,26 @@ export default async function handler(req, res) {
 
       // NOT NULL schema fields:
       photo_id: topPhotoId,
-      license: topLicense,
-      format: topFormat,
+      license: 'personal',
+      format: 'jpg',
 
       // cart identity:
       order_kind: 'cart',
-      code, // ✅ UNIQUE
-      items: normalizedItems, // ✅ JSONB (ensure orders.items exists)
-
-      // OPTIONAL: so you can also query by order_id if you want
+      code,
+      items: normalizedItems, // JSONB (fallback will remove if column missing)
       order_id: code,
 
-      // OPTIONAL: store mode (requires orders.payhere_mode column)
+      // Optional (fallback removes if column missing)
       payhere_mode: payhereMode,
     }
 
-    const ins = await supabaseAdmin.from('orders').insert(orderRow).select('id, code, amount').maybeSingle()
+    const ins = await insertOrderWithFallback(orderRow)
     if (ins.error) {
       return res.status(500).json({ ok: false, error: ins.error.message })
     }
+
     const created = ins.data
 
-    // ✅ merchant_id (keep your current env)
     const merchant_id = process.env.PAYHERE_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
     if (!merchant_id) return res.status(500).json({ ok: false, error: 'Missing PAYHERE_MERCHANT_ID' })
 
@@ -211,7 +256,6 @@ export default async function handler(req, res) {
       cancel_url,
       notify_url,
 
-      // ✅ PayHere reference
       order_id: code,
       items: `Jeevan Chandimal Photo Cart (${normalizedItems.length} items)`,
       currency,
@@ -225,14 +269,12 @@ export default async function handler(req, res) {
       city: '',
       country: 'Sri Lanka',
 
-      // ✅ tell notify it's a cart + give it internal row id too
       custom_1: 'cart',
       custom_2: created?.id || orderRow.id,
     }
 
     const query = new URLSearchParams(payload).toString()
 
-    // ✅ sandbox vs live (from Supabase)
     const payhereHost = payhereMode === 'live' ? 'https://www.payhere.lk' : 'https://sandbox.payhere.lk'
     const redirectUrl = `${payhereHost}/pay/checkout?${query}`
 
