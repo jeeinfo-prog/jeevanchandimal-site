@@ -1,4 +1,5 @@
 // pages/api/payhere/checkout-cart.js
+import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 function round2(n) {
@@ -8,6 +9,13 @@ function round2(n) {
 
 function makeOrderRef() {
   return `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 10).toUpperCase()}`
+}
+
+function makeUuid() {
+  // Node 18+ supports randomUUID()
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  // fallback (very rare)
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
 function normLicense(v) {
@@ -78,24 +86,29 @@ async function getObjectKeyForPhoto(photoId, format) {
 }
 
 async function insertOrderWithFallback(row) {
+  // 1) Try full row
   let r = await supabaseAdmin.from('orders').insert([row]).select('id, order_id').single()
   if (!r.error) return r
 
   const msg = String(r.error.message || '').toLowerCase()
 
+  // 2) If "items" column missing, retry without it
   if (msg.includes('column') && msg.includes('items')) {
     const { items, ...rest } = row
     r = await supabaseAdmin.from('orders').insert([rest]).select('id, order_id').single()
     if (!r.error) return r
   }
 
+  // 3) If "order_kind" missing, retry without it
   if (msg.includes('column') && msg.includes('order_kind')) {
     const { order_kind, ...rest } = row
     r = await supabaseAdmin.from('orders').insert([rest]).select('id, order_id').single()
     if (!r.error) return r
   }
 
+  // 4) Minimum safe columns (BUT keep id!)
   const minimal = {
+    id: row.id, // ✅ keep id to avoid null id error
     order_id: row.order_id,
     email: row.email,
     currency: row.currency,
@@ -113,7 +126,9 @@ export default async function handler(req, res) {
     const body = req.body || {}
     const cart = body.cart || {}
 
-    // ✅ Accept BOTH shapes
+    // ✅ Support BOTH payload shapes:
+    // A) { email, currency, items }
+    // B) { cart: { email, currency, items }, currency }
     const items =
       (Array.isArray(body.items) && body.items) ||
       (Array.isArray(cart.items) && cart.items) ||
@@ -138,17 +153,17 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
       }
       if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-        return res.status(400).json({ ok: false, error: `Invalid cart item (missing price) photoId=${photoId}` })
+        return res.status(400).json({
+          ok: false,
+          error: `Invalid cart item (missing price) photoId=${photoId}`,
+        })
       }
 
-      // ✅ Do NOT crash the whole request if DB lookup fails
       let objectKey = null
       try {
         objectKey = await getObjectKeyForPhoto(photoId, format)
       } catch (e) {
-        // make this a clean 400 (real reason shown)
-        const msg = String(e?.message || 'Photo lookup failed')
-        return res.status(400).json({ ok: false, error: msg })
+        return res.status(400).json({ ok: false, error: String(e?.message || 'Photo lookup failed') })
       }
 
       cleanItems.push({
@@ -166,8 +181,10 @@ export default async function handler(req, res) {
 
     const amount = round2(cleanItems.reduce((sum, it) => sum + it.unitPrice * it.qty, 0))
     const orderRef = makeOrderRef()
+    const orderUuid = makeUuid() // ✅ FIX: generate id
 
     const toInsert = {
+      id: orderUuid, // ✅ required by your DB
       order_id: orderRef,
       email,
       currency: ccy,
@@ -178,6 +195,7 @@ export default async function handler(req, res) {
     }
 
     const created = await insertOrderWithFallback(toInsert)
+
     if (created.error || !created.data) {
       return res.status(500).json({
         ok: false,
@@ -189,7 +207,8 @@ export default async function handler(req, res) {
     const ref = created.data.order_id || orderRef
 
     const merchant_id = process.env.PAYHERE_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
-    const merchant_secret = process.env.PAYHERE_MERCHANT_SECRET || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_SECRET
+    const merchant_secret =
+      process.env.PAYHERE_MERCHANT_SECRET || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_SECRET
 
     if (!merchant_id || !merchant_secret) {
       return res.status(500).json({ ok: false, error: 'PayHere env missing (merchant id/secret)' })
@@ -237,9 +256,6 @@ export default async function handler(req, res) {
     })
   } catch (e) {
     console.error('checkout-cart error:', e)
-    return res.status(500).json({
-      ok: false,
-      error: e?.message || 'Server error',
-    })
+    return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
 }
