@@ -10,8 +10,8 @@ import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-foot
 
 const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED', 'CONFIRMED', '2'])
 
-function readQueryOrderId(q) {
-  const v = q?.order_id
+function readQueryStr(q, key) {
+  const v = q?.[key]
   if (typeof v === 'string') return v.trim()
   if (Array.isArray(v) && typeof v[0] === 'string') return v[0].trim()
   return ''
@@ -67,30 +67,42 @@ function normStatus(s) {
   return v.toUpperCase()
 }
 
+function isCartGroup(ref) {
+  return String(ref || '').toUpperCase().startsWith('CART_')
+}
+
 export default function StoreDownload() {
   const router = useRouter()
 
-  // can be ORD_* (your DB id) OR old UUID OR code
-  const orderRef = readQueryOrderId(router.query)
+  // ✅ support both:
+  // - /store/download?order_id=...  (single)
+  // - /store/download?code=CART_... (cart group)
+  const orderIdRef = readQueryStr(router.query, 'order_id')
+  const codeRef = readQueryStr(router.query, 'code')
+
+  const mode = codeRef ? 'cart' : 'single'
+  const ref = codeRef || orderIdRef // what we show + what we pass to status
+  const isCart = mode === 'cart' || isCartGroup(ref)
 
   const [status, setStatus] = React.useState('PENDING')
   const [msg, setMsg] = React.useState('')
   const [downloadLinks, setDownloadLinks] = React.useState([])
-  const [resolvedId, setResolvedId] = React.useState('')
+  const [resolvedId, setResolvedId] = React.useState('') // for single
   const [loading, setLoading] = React.useState(false)
 
   async function load() {
-    if (!orderRef) return
+    if (!ref) return
     if (loading) return
 
     setLoading(true)
     setMsg('')
     setDownloadLinks([])
+    setResolvedId('')
 
     try {
-      // 1) Resolve + verify paid
+      // 1) Resolve + verify paid (works for both single + cart if your status API supports it)
       const sr = await fetch(
-        `/api/orders/status?order_id=${encodeURIComponent(orderRef)}&t=${Date.now()}`,
+        `/api/orders/status?order_id=${encodeURIComponent(ref)}&t=${Date.now()}`,
         { headers: { 'Cache-Control': 'no-store' } }
       )
 
@@ -102,10 +114,7 @@ export default function StoreDownload() {
         return
       }
 
-      const oid = String(sdata?.id || '').trim() // IMPORTANT: this is the real orders.id in your DB
       const st = normStatus(sdata?.status)
-
-      setResolvedId(oid)
       setStatus(st)
 
       if (!PAID_STATUSES.has(st)) {
@@ -113,16 +122,29 @@ export default function StoreDownload() {
         return
       }
 
-      if (!oid) {
-        setMsg('Missing internal order id. Please contact support.')
-        return
+      // 2) Generate secure link(s)
+      // ✅ single expects internal orders.id
+      // ✅ cart expects group code (server will return multiple tokens)
+      let payload = null
+
+      if (isCart) {
+        payload = { code: ref } // ✅ cart group
+      } else {
+        const oid = String(sdata?.id || '').trim()
+        setResolvedId(oid)
+
+        if (!oid) {
+          setMsg('Missing internal order id. Please contact support.')
+          return
+        }
+
+        payload = { orderId: oid } // ✅ single
       }
 
-      // 2) Create secure token(s) using the REAL orders.id
       const tr = await fetch('/api/download/create-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: oid }),
+        body: JSON.stringify(payload),
       })
 
       const tdata = await tr.json().catch(() => ({}))
@@ -152,9 +174,11 @@ export default function StoreDownload() {
     if (!router.isReady) return
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, orderRef])
+  }, [router.isReady, ref])
 
   const paid = PAID_STATUSES.has(status)
+
+  const backHref = ref ? `/store/return?order_id=${encodeURIComponent(ref)}` : '/store'
 
   return (
     <>
@@ -169,7 +193,7 @@ export default function StoreDownload() {
         <div className="card">
           <h1 className="title">Download</h1>
 
-          {!orderRef ? (
+          {!ref ? (
             <p className="p">
               Missing order id. Go back to the{' '}
               <Link href="/store" className="link">
@@ -180,10 +204,10 @@ export default function StoreDownload() {
           ) : (
             <>
               <p className="p">
-                Order: <span className="mono">{orderRef}</span>
+                {isCart ? 'Cart Code' : 'Order'}: <span className="mono">{ref}</span>
               </p>
 
-              {resolvedId && resolvedId !== orderRef ? (
+              {!isCart && resolvedId && resolvedId !== ref ? (
                 <p className="p2">
                   Internal ID: <span className="mono">{resolvedId}</span>
                 </p>
@@ -194,10 +218,7 @@ export default function StoreDownload() {
                   <div className="badge pending">Status: {status}</div>
                   <p className="p2">{msg || 'Waiting for payment confirmation.'}</p>
                   <p className="p2">
-                    <Link
-                      href={`/store/return?order_id=${encodeURIComponent(orderRef)}`}
-                      className="link"
-                    >
+                    <Link href={backHref} className="link">
                       Back to payment status
                     </Link>
                   </p>
@@ -210,12 +231,7 @@ export default function StoreDownload() {
                   {downloadLinks.length > 0 ? (
                     <div className="btnList">
                       {downloadLinks.map((x, idx) => (
-                        <a
-                          key={idx}
-                          className="btn"
-                          href={x.url}
-                          rel="noreferrer"
-                        >
+                        <a key={idx} className="btn" href={x.url} rel="noreferrer">
                           {x.label || `Download item ${idx + 1}`}
                         </a>
                       ))}
@@ -263,8 +279,8 @@ export default function StoreDownload() {
           line-height: 1.6;
         }
         .mono {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-            'Liberation Mono', 'Courier New', monospace;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+            'Courier New', monospace;
           font-size: 13px;
           opacity: 0.95;
         }
