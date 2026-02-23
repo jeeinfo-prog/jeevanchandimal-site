@@ -1,4 +1,5 @@
 // pages/api/payhere/notify.js
+
 import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
@@ -33,12 +34,15 @@ function parseForm(body) {
 }
 
 function cleanBaseUrl(v) {
-  return String(v || '').trim().replace(/\/+$/, '')
+  return String(v || '')
+    .trim()
+    .replace(/\/+$/, '')
 }
 
 function getBaseUrl(req) {
   const webhook =
-    cleanBaseUrl(process.env.WEBHOOK_BASE_URL) || cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL)
+    cleanBaseUrl(process.env.WEBHOOK_BASE_URL) ||
+    cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL)
   if (webhook) return webhook
 
   const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
@@ -71,6 +75,35 @@ function normalizeLicense(v) {
 function normalizeFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
+
+/* ===== MEMBERSHIP HELPERS ===== */
+
+function normalizeMembershipTier(v) {
+  const x = String(v || '').trim().toLowerCase()
+  return ['basic', 'pro', 'elite'].includes(x) ? x : 'pro'
+}
+
+function normalizeMembershipTerm(v) {
+  const x = String(v || '').trim().toLowerCase()
+  return ['monthly', 'yearly', 'lifetime'].includes(x) ? x : 'monthly'
+}
+
+function addMonths(date, months) {
+  const d = new Date(date)
+  const day = d.getUTCDate()
+  d.setUTCMonth(d.getUTCMonth() + months)
+  // handle month-end rollover (e.g. Jan 31 + 1 month)
+  if (d.getUTCDate() < day) d.setUTCDate(0)
+  return d
+}
+
+function addYears(date, years) {
+  const d = new Date(date)
+  d.setUTCFullYear(d.getUTCFullYear() + years)
+  return d
+}
+
+/* ===== DOWNLOAD LIMIT HELPERS ===== */
 
 function limitForLicense(license) {
   const x = normalizeLicense(license)
@@ -306,6 +339,8 @@ export default async function handler(req, res) {
         if (!email) return res.status(200).send('OK')
 
         const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
+
+        // ✅ Mark paid (idempotent)
         if (!wasPaidAlready) {
           await supabaseAdmin
             .from('orders')
@@ -319,7 +354,65 @@ export default async function handler(req, res) {
             .eq('id', order.id)
         }
 
-        // ✅ keep your existing membership upsert logic here (unchanged)
+        // ✅ Re-fetch latest row
+        const freshRes = await supabaseAdmin.from('orders').select('*').eq('id', order.id).maybeSingle()
+        if (freshRes.error) {
+          console.error('membership refetch failed:', freshRes.error.message)
+          return res.status(200).send('OK')
+        }
+        const o = freshRes.data || order
+
+        // ✅ Membership tier/term stored in existing columns:
+        // - license = tier (basic/pro/elite)
+        // - format  = term (monthly/yearly/lifetime)
+        const tier = normalizeMembershipTier(o.license)
+        const term = normalizeMembershipTerm(o.format)
+
+        // ✅ Compute expiry
+        const now = new Date()
+        let expiresAt = null
+        if (term === 'monthly') expiresAt = addMonths(now, 1).toISOString()
+        if (term === 'yearly') expiresAt = addYears(now, 1).toISOString()
+        if (term === 'lifetime') expiresAt = addYears(now, 100).toISOString()
+
+        // ✅ Activate membership
+        try {
+          const upsertPayload = {
+            email,
+            plan: tier,
+            status: 'active',
+            expires_at: expiresAt,
+            updated_at: new Date().toISOString(),
+          }
+
+          const up = await supabaseAdmin.from('members').upsert(upsertPayload, { onConflict: 'email' })
+          if (up.error) console.error('members upsert error:', up.error.message)
+        } catch (e) {
+          console.error('members activate error:', e?.message || e)
+        }
+
+        // ✅ Send receipt email ONCE (idempotent)
+        try {
+          const invoiceNo = await ensureInvoiceNo(o)
+
+          const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
+          if (claimedReceipt) {
+            await sendReceiptEmail({
+              to: email,
+              orderId: o.id,
+              invoiceNo,
+              amount: o.amount,
+              currency: o.currency || payhere_currency || 'LKR',
+              photoTitle: `Membership (${tier} • ${term})`,
+              license: tier,
+              format: term,
+              paymentId: payment_id || null,
+            })
+          }
+        } catch (e) {
+          console.error('membership receipt email failed:', o?.id, e?.message || e)
+        }
+
         return res.status(200).send('OK')
       }
 
