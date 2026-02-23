@@ -49,80 +49,105 @@ function writeLS(key, value) {
   } catch {}
 }
 
+function normCurrency(v) {
+  return v === 'USD' ? 'USD' : 'LKR'
+}
+function normLicense(v) {
+  const x = String(v || '').toLowerCase()
+  return ['personal', 'commercial', 'editorial'].includes(x) ? x : 'personal'
+}
+function normFormat(v) {
+  const x = String(v || '').toLowerCase()
+  return x === 'raw' ? 'raw' : 'jpg'
+}
+
+// stable key (must match lib/cart.js logic)
+function cartKeyOf(x) {
+  const photoId = String(x?.photoId || x?.photo_id || x?.id || x?._id || '')
+  const license = normLicense(x?.license || x?._license)
+  const format = normFormat(x?.format || x?._format)
+  const currency = normCurrency(x?.currency || x?._currency)
+  return `${photoId}__${license}__${format}__${currency}`
+}
+
 // ---------- fallback cart impl (only used if lib/cart.js functions not found) ----------
 function fallbackReadCart() {
   if (typeof window === 'undefined') return { currency: 'LKR', items: [] }
   const raw = readLS(STORAGE_CART_KEY, null)
   const cart = safeJsonParse(raw, null)
-  if (cart && Array.isArray(cart.items)) {
-    const ccy = cart.currency === 'USD' ? 'USD' : 'LKR'
-    return { currency: ccy, items: cart.items }
-  }
+  if (cart && Array.isArray(cart.items)) return cart
   return { currency: readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR', items: [] }
 }
 
 function fallbackWriteCart(cart) {
   if (typeof window === 'undefined') return
-  const ccy = cart?.currency === 'USD' ? 'USD' : 'LKR'
-  const items = Array.isArray(cart?.items) ? cart.items : []
-  writeLS(STORAGE_CART_KEY, JSON.stringify({ currency: ccy, items }))
-  writeLS(STORAGE_CCY_KEY, ccy)
+  writeLS(STORAGE_CART_KEY, JSON.stringify(cart))
+  writeLS(STORAGE_CCY_KEY, cart.currency || 'LKR')
 }
 
-function normalizeItem(it, fallbackCurrency = 'LKR') {
+// normalize item for UI display (keeps original fields, adds _*)
+function normalizeItem(it, forcedCurrency) {
   const src = it || {}
 
-  // Supports multiple shapes from different implementations
-  const id = src.photoId || src.photo_id || src.id || src._id || null
+  const photoId = String(src.photoId || src.photo_id || src.id || src._id || '')
+  if (!photoId) return null
+
   const title = src.title || src.name || src._title || 'Untitled'
   const thumb =
-    src.thumbUrl ||
     src.thumb_url ||
+    src.thumbUrl ||
     src.thumb ||
-    src.previewUrl ||
     src.preview_url ||
+    src.previewUrl ||
     src.image ||
     src._thumb ||
     null
 
-  const license = src.license || src.usage || src.plan || src.type || src._license || 'personal'
-  const format = src.format || src.file || src.ext || src._format || 'jpg'
+  const license = normLicense(src.license || src.usage || src.plan || src.type || src._license)
+  const format = normFormat(src.format || src.file || src.ext || src._format)
+  const currency = normCurrency(forcedCurrency || src.currency || src._currency)
 
   const qty = clamp(src.qty ?? src.quantity ?? src._qty ?? 1, 1, 99)
 
-  // price can be item.price OR item.prices[currency][license][format]
-  const price = Number(src.unitPrice ?? src.price ?? src._price ?? 0) || 0
+  // unit price can be item.unitPrice OR item.price OR price maps
+  const unitPrice = Number(src.unitPrice ?? src.price ?? src._price ?? 0) || 0
 
-  // ✅ normalize currency per item (important for checkout payload)
-  const currency = src.currency === 'USD' ? 'USD' : fallbackCurrency === 'USD' ? 'USD' : 'LKR'
+  const key = `${photoId}__${license}__${format}__${currency}`
 
   return {
     ...src,
-    _id: id ? String(id) : null,
-    _title: String(title || 'Untitled'),
-    _thumb: thumb ? String(thumb) : null,
-    _license: String(license || 'personal').toLowerCase(),
-    _format: String(format || 'jpg').toLowerCase() === 'raw' ? 'raw' : 'jpg',
-    _qty: qty,
-    _price: price,
+    photoId,
+    title,
+    thumbUrl: thumb,
+    license,
+    format,
+    currency,
+    unitPrice,
+    qty,
+
+    _key: key,
+    _photoId: photoId,
+    _title: String(title || ''),
+    _thumb: thumb,
+    _license: license,
+    _format: format,
     _currency: currency,
+    _qty: qty,
+    _price: unitPrice,
   }
 }
 
 function getUnitPrice(item, currency) {
-  if (Number(item._price) > 0) return Number(item._price)
+  if (Number(item.unitPrice || item._price) > 0) return Number(item.unitPrice || item._price)
 
   const prices = item.prices || item.PRICES || item.priceMap
-  if (
-    prices &&
-    prices[currency] &&
-    prices[currency][item._license] &&
-    prices[currency][item._license][item._format] != null
-  ) {
-    return Number(prices[currency][item._license][item._format])
+  const lic = item.license || item._license
+  const fmt = item.format || item._format
+
+  if (prices && prices[currency] && prices[currency][lic] && prices[currency][lic][fmt] != null) {
+    return Number(prices[currency][lic][fmt])
   }
 
-  // last resort: if item has { lkr, usd } etc
   if (currency === 'LKR' && item.lkr) return Number(item.lkr)
   if (currency === 'USD' && item.usd) return Number(item.usd)
 
@@ -178,13 +203,11 @@ export default function CartPage() {
 
   const load = React.useCallback(() => {
     const cart = cartApi.read() || {}
-
     const rawItems = Array.isArray(cart) ? cart : cart.items
-    const ccy = (cart && cart.currency) || readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR'
-    const normalizedCcy = ccy === 'USD' ? 'USD' : 'LKR'
+    const ccy = normCurrency((cart && cart.currency) || readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR')
 
-    setCurrency(normalizedCcy)
-    setItems(Array.isArray(rawItems) ? rawItems.map((x) => normalizeItem(x, normalizedCcy)).filter(Boolean) : [])
+    setCurrency(ccy)
+    setItems(Array.isArray(rawItems) ? rawItems.map((x) => normalizeItem(x, ccy)).filter(Boolean) : [])
   }, [cartApi])
 
   React.useEffect(() => {
@@ -193,12 +216,9 @@ export default function CartPage() {
 
     if (typeof window === 'undefined') return undefined
 
-    // cross-tab sync
     const onStorage = (e) => {
       if (e.key === STORAGE_CART_KEY || e.key === STORAGE_CCY_KEY) load()
     }
-
-    // same-tab updates from AddToCartButton
     const onCustom = () => load()
 
     window.addEventListener('storage', onStorage)
@@ -210,138 +230,84 @@ export default function CartPage() {
     }
   }, [load])
 
-  function persist(nextItems, nextCurrency = currency) {
-    const ccy = nextCurrency === 'USD' ? 'USD' : 'LKR'
-    const cleaned = Array.isArray(nextItems)
-      ? nextItems.map((x) => normalizeItem(x, ccy)).filter(Boolean)
-      : []
-
-    const cart = { currency: ccy, items: cleaned }
+  function persist(nextItemsRaw, nextCurrency = currency) {
+    const ccy = normCurrency(nextCurrency)
+    const cart = { currency: ccy, items: nextItemsRaw }
     cartApi.write(cart)
 
-    // keep separate currency key for legacy readers
     writeLS(STORAGE_CCY_KEY, ccy)
 
-    setItems(cleaned)
     setCurrency(ccy)
+    setItems(nextItemsRaw.map((x) => normalizeItem(x, ccy)).filter(Boolean))
 
-    // tell navbar etc (same-tab)
     try {
       window.dispatchEvent(new Event('jc_cart_updated'))
     } catch {}
   }
 
-  function removeItem(photoId) {
-    const next = items.filter((x) => (x._id || x.id || x.photoId) !== photoId)
-    persist(next)
+  function removeItemByKey(key) {
+    const latest = cartApi.read() || {}
+    const rawItems = Array.isArray(latest) ? latest : latest.items
+    const ccy = normCurrency((latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency)
+    const arr = Array.isArray(rawItems) ? rawItems : []
+
+    const next = arr.filter((x) => cartKeyOf({ ...x, currency: ccy }) !== key)
+    persist(next, ccy)
   }
 
-  function setQty(photoId, qty) {
+  function setQtyByKey(key, qty) {
+    const latest = cartApi.read() || {}
+    const rawItems = Array.isArray(latest) ? latest : latest.items
+    const ccy = normCurrency((latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency)
+    const arr = Array.isArray(rawItems) ? rawItems : []
+
     const nextQty = clamp(qty, 1, 99)
-    const next = items.map((x) => {
-      const id = x._id || x.id || x.photoId
-      if (id !== photoId) return x
-      return { ...x, qty: nextQty, _qty: nextQty }
+    const next = arr.map((x) => {
+      const k = cartKeyOf({ ...x, currency: ccy })
+      if (k !== key) return x
+      return { ...x, qty: nextQty }
     })
-    persist(next)
+
+    persist(next, ccy)
   }
 
   const computed = React.useMemo(() => {
-    const norm = items.map((x) => normalizeItem(x, currency)).filter(Boolean)
+    const ccy = normCurrency(currency)
     let subtotal = 0
-    for (const it of norm) {
-      const unit = getUnitPrice(it, currency)
-      subtotal += unit * it._qty
+    for (const it of items) {
+      const unit = Number(it.unitPrice || it._price || 0) || getUnitPrice(it, ccy)
+      subtotal += Number(unit || 0) * Number(it._qty || it.qty || 1)
     }
     return { subtotal, total: subtotal }
   }, [items, currency])
 
   function onCurrencyChange(next) {
     if (locked) return
-    const ccy = next === 'USD' ? 'USD' : 'LKR'
-    persist(items, ccy)
+    const ccy = normCurrency(next)
+    const latest = cartApi.read() || {}
+    const rawItems = Array.isArray(latest) ? latest : latest.items
+    persist(Array.isArray(rawItems) ? rawItems : [], ccy)
     setNote('Currency saved.')
     setTimeout(() => setNote(''), 1200)
   }
 
   async function onCheckout() {
-  if (busy) return
+    if (busy) return
 
-  // ✅ read the latest cart at click-time (source of truth)
-  const latest = cartApi.read() || {}
-  const rawItems = Array.isArray(latest) ? latest : latest.items
-  const ccy = (latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency
-  const useCurrency = ccy === 'USD' ? 'USD' : 'LKR'
+    const latest = cartApi.read() || {}
+    const rawItems = Array.isArray(latest) ? latest : latest.items
+    const ccy = normCurrency((latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency)
 
-  const normItems = Array.isArray(rawItems)
-    ? rawItems.map((x) => normalizeItem(x, useCurrency)).filter(Boolean)
-    : []
+    const normItems = Array.isArray(rawItems)
+      ? rawItems.map((x) => normalizeItem(x, ccy)).filter(Boolean)
+      : []
 
-  if (normItems.length === 0) {
-    setNote('Cart is empty.')
-    setTimeout(() => setNote(''), 1600)
-    return
-  }
-
-  // ✅ email (same place your navbar uses)
-  const emailRaw =
-    (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
-  const email = String(emailRaw || '').trim().toLowerCase()
-
-  if (!email) {
-    setNote('Please login / enter email first (user_email missing).')
-    setTimeout(() => setNote(''), 2200)
-    return
-  }
-
-  setBusy(true)
-  setNote('Redirecting to PayHere...')
-
-  try {
-    // ✅ build payload exactly what checkout-cart.js expects
-    const payloadItems = normItems.map((it) => {
-      const unitPrice = Number(it.unitPrice || it._price || getUnitPrice(it, useCurrency) || 0)
-
-      return {
-        photoId: String(it.photoId || it._id || ''),
-        title: String(it.title || it._title || ''),
-        thumbUrl: String(it.thumbUrl || it._thumb || ''),
-        license: String(it.license || it._license || 'personal').toLowerCase(),
-        format: String(it.format || it._format || 'jpg').toLowerCase() === 'raw' ? 'raw' : 'jpg',
-        currency: useCurrency,
-        qty: clamp(it.qty || it._qty || 1, 1, 99),
-        unitPrice,
-      }
-    })
-
-    const r = await fetch('/api/payhere/checkout-cart', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        currency: useCurrency,
-        items: payloadItems,
-      }),
-    })
-
-    const data = await r.json().catch(() => ({}))
-
-    if (!r.ok || !data?.ok || !data?.redirectUrl) {
-      setNote(data?.error || 'Checkout failed')
-      setTimeout(() => setNote(''), 2600)
-      setBusy(false)
+    if (normItems.length === 0) {
+      setNote('Cart is empty.')
+      setTimeout(() => setNote(''), 1600)
       return
     }
 
-    window.location.href = data.redirectUrl
-  } catch (e) {
-    setNote(e?.message || 'Checkout error')
-    setTimeout(() => setNote(''), 2600)
-    setBusy(false)
-  }
-}
-
-    // ✅ email used same style as single checkout / membership
     const emailRaw =
       (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
     const email = String(emailRaw || '').trim().toLowerCase()
@@ -357,22 +323,16 @@ export default function CartPage() {
 
     try {
       const payloadItems = normItems.map((it) => {
-        const photoId = it._id
-        const title = it._title
-        const thumbUrl = it._thumb
-        const license = (it._license || 'personal').toLowerCase()
-        const format = it._format === 'raw' ? 'raw' : 'jpg'
-        const qty = clamp(it._qty, 1, 99)
-        const unitPrice = Number(getUnitPrice(it, currency) || 0)
+        const unitPrice = Number(it.unitPrice || it._price || getUnitPrice(it, ccy) || 0)
 
         return {
-          photoId,
-          title,
-          thumbUrl,
-          license,
-          format,
-          currency,
-          qty,
+          photoId: String(it._photoId || it.photoId || ''),
+          title: String(it._title || it.title || ''),
+          thumbUrl: String(it.thumbUrl || it._thumb || ''),
+          license: normLicense(it._license || it.license),
+          format: normFormat(it._format || it.format),
+          currency: ccy,
+          qty: clamp(it._qty || it.qty || 1, 1, 99),
           unitPrice,
         }
       })
@@ -382,26 +342,25 @@ export default function CartPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          currency,
+          currency: ccy,
           items: payloadItems,
         }),
       })
 
       const data = await r.json().catch(() => ({}))
+
       if (!r.ok || !data?.ok || !data?.redirectUrl) {
-        const msg = data?.error || 'Checkout failed'
-        setNote(msg)
-        setTimeout(() => setNote(''), 2400)
         setBusy(false)
+        setNote(data?.error || 'Checkout failed')
+        setTimeout(() => setNote(''), 2600)
         return
       }
 
-      // ✅ Go to PayHere checkout
       window.location.href = data.redirectUrl
     } catch (e) {
-      setNote(e?.message || 'Checkout error')
-      setTimeout(() => setNote(''), 2400)
       setBusy(false)
+      setNote(e?.message || 'Checkout error')
+      setTimeout(() => setNote(''), 2600)
     }
   }
 
@@ -409,10 +368,7 @@ export default function CartPage() {
     <>
       <Head>
         <title>Cart — Jeevan Chandimal</title>
-        <meta
-          name="description"
-          content="Your cart — review items, adjust quantity and proceed to checkout."
-        />
+        <meta name="description" content="Your cart — review items, adjust quantity and proceed to checkout." />
         <meta name="robots" content="noindex,nofollow" />
       </Head>
 
@@ -462,16 +418,14 @@ export default function CartPage() {
                 <div className="cardTitle">Items</div>
 
                 <div className="list">
-                  {items.map((raw, idx) => {
-                    const it = normalizeItem(raw, currency)
-                    if (!it) return null
-
-                    const id = it._id || `${idx}`
-                    const unit = getUnitPrice(it, currency)
-                    const line = unit * it._qty
+                  {items.map((it, idx) => {
+                    const key = it._key || cartKeyOf(it) || String(idx)
+                    const unit = Number(it.unitPrice || it._price || 0) || getUnitPrice(it, currency)
+                    const line = unit * Number(it._qty || it.qty || 1)
+                    const photoId = it._photoId || it.photoId
 
                     return (
-                      <div key={id} className="row">
+                      <div key={key} className="row">
                         <div className="thumb">
                           {it._thumb ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -498,7 +452,7 @@ export default function CartPage() {
                             <div className="qty">
                               <button
                                 className="qtyBtn"
-                                onClick={() => setQty(id, it._qty - 1)}
+                                onClick={() => setQtyByKey(key, (it._qty || 1) - 1)}
                                 aria-label="Decrease quantity"
                                 type="button"
                                 disabled={busy}
@@ -510,14 +464,14 @@ export default function CartPage() {
                                 value={it._qty}
                                 onChange={(e) => {
                                   const v = String(e.target.value || '').replace(/[^\d]/g, '')
-                                  setQty(id, v ? Number(v) : 1)
+                                  setQtyByKey(key, v ? Number(v) : 1)
                                 }}
                                 inputMode="numeric"
                                 disabled={busy}
                               />
                               <button
                                 className="qtyBtn"
-                                onClick={() => setQty(id, it._qty + 1)}
+                                onClick={() => setQtyByKey(key, (it._qty || 1) + 1)}
                                 aria-label="Increase quantity"
                                 type="button"
                                 disabled={busy}
@@ -528,15 +482,14 @@ export default function CartPage() {
 
                             <button
                               className="linkDanger"
-                              onClick={() => removeItem(id)}
+                              onClick={() => removeItemByKey(key)}
                               type="button"
                               disabled={busy}
                             >
                               Remove
                             </button>
 
-                            {/* IMPORTANT: store page expects /store/<photoId> not per-item key */}
-                            <Link href={`/store/${encodeURIComponent(String(it._id))}`} legacyBehavior>
+                            <Link href={`/store/${photoId}`} legacyBehavior>
                               <a className="link">View</a>
                             </Link>
                           </div>
@@ -584,7 +537,7 @@ export default function CartPage() {
                 <div className="divider" />
 
                 <button className="btnPrimary full" onClick={onCheckout} type="button" disabled={busy}>
-                  {busy ? 'Redirecting…' : 'Checkout'}
+                  {busy ? 'Please wait…' : 'Checkout'}
                 </button>
 
                 <div className="smallNote">
@@ -812,7 +765,7 @@ export default function CartPage() {
           background: rgba(255, 255, 255, 0.06);
         }
         .qtyBtn:disabled {
-          opacity: 0.55;
+          opacity: 0.6;
           cursor: not-allowed;
         }
         .qtyInput {
@@ -824,10 +777,6 @@ export default function CartPage() {
           background: transparent;
           color: #fff;
           font-size: 13px;
-        }
-        .qtyInput:disabled {
-          opacity: 0.55;
-          cursor: not-allowed;
         }
 
         .link,
@@ -844,8 +793,9 @@ export default function CartPage() {
         .linkDanger:hover {
           opacity: 1;
         }
-        .linkDanger:disabled {
-          opacity: 0.55;
+        .linkDanger:disabled,
+        .link:disabled {
+          opacity: 0.6;
           cursor: not-allowed;
         }
 
