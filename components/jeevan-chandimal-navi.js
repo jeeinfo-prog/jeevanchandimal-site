@@ -727,30 +727,18 @@ export default function JeevanChandimalNavi(props) {
           min-width: 0; /* allow email to ellipsis */
         }
 
-        /* make email behave nicely when space is tight */
-        .userEmail {
-          min-width: 0;
-          max-width: 220px;
-        }
-
-        @media (max-width: 520px) {
-          /* On small screens: hide email pill (still available in mobile menu) */
-          .userEmail {
-            display: none;
-          }
-        }
-
-        /* ✅ CART */
+        /* ✅ CART (unified height) */
         .cartBtn {
+          height: 36px;
           display: inline-flex;
           align-items: center;
           gap: 8px;
           border: 1px solid rgba(245, 244, 244, 0.16);
-          padding: 8px 12px;
+          padding: 0 12px;
           border-radius: 999px;
           text-decoration: none !important;
           color: #f5f4f4;
-          background: rgba(255, 255, 255, 0.02);
+          background: rgba(255, 255, 255, 0.03);
           opacity: 0.92;
           line-height: 1;
         }
@@ -762,6 +750,7 @@ export default function JeevanChandimalNavi(props) {
 
         .cartText {
           font-size: 12px;
+          letter-spacing: 0.2px;
         }
 
         .cartBadge {
@@ -779,39 +768,60 @@ export default function JeevanChandimalNavi(props) {
           color: #25c3e2;
         }
 
+        /* ✅ Member pill same height */
         .badge {
-          font-size: 11px;
-          padding: 4px 10px;
-          border: 1px solid #25c3e2;
+          height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 12px;
+          border: 1px solid rgba(37, 195, 226, 0.55);
+          background: rgba(37, 195, 226, 0.12);
           border-radius: 999px;
           letter-spacing: 1px;
           color: #25c3e2;
-          font-weight: 700;
+          font-weight: 800;
+          font-size: 11px;
           line-height: 1;
           white-space: nowrap;
         }
 
+        /* ✅ email pill same height */
         .userEmail {
-          font-size: 12px;
-          opacity: 0.85;
-          padding: 6px 10px;
+          height: 36px;
+          display: inline-flex;
+          align-items: center;
+          padding: 0 12px;
           border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.03);
           border-radius: 999px;
+          color: #f5f4f4;
+          font-size: 12px;
+          opacity: 0.88;
           max-width: 220px;
+          min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          line-height: 1;
         }
 
+        /* ✅ logout pill same height */
         .logoutBtn {
-          font-size: 12px;
-          padding: 8px 12px;
-          border-radius: 12px;
+          height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 14px;
+          border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.16);
           background: rgba(255, 255, 255, 0.03);
           color: #f5f4f4;
           cursor: pointer;
-          opacity: 0.9;
+          opacity: 0.92;
+          line-height: 1;
+          font-size: 12px;
+          letter-spacing: 0.2px;
         }
 
         .logoutBtn:hover {
@@ -820,20 +830,29 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .iconBtn {
+          height: 36px;
           color: #f5f4f4;
           opacity: 0.85;
-          border-radius: 12px;
-          padding: 8px;
+          border-radius: 999px;
+          padding: 0 12px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           text-decoration: none !important;
           transition: opacity 0.15s, background 0.15s;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(255, 255, 255, 0.03);
         }
 
         .iconBtn:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.06);
+        }
+
+        @media (max-width: 520px) {
+          .userEmail {
+            display: none;
+          }
         }
 
         .burger {
