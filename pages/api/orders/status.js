@@ -14,13 +14,17 @@ function groupStatus(rows) {
   if (list.length === 0) return 'NOT_FOUND'
 
   const statuses = list.map((r) => normStatus(r.status))
+
+  // fail wins
   if (statuses.some((s) => s === 'FAILED' || s === 'CANCELED' || s === 'CANCELLED')) return 'FAILED'
-  if (statuses.every((s) => s === 'PAID')) return 'PAID'
+
+  // ✅ IMPORTANT: for carts, return PAID if ANY row is PAID (webhook may update rows one-by-one)
+  if (statuses.some((s) => s === 'PAID')) return 'PAID'
+
   return 'PENDING'
 }
 
 export default async function handler(req, res) {
-  // HARD no-cache (browser + CDN + Vercel)
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   res.setHeader('Pragma', 'no-cache')
   res.setHeader('Expires', '0')
@@ -32,16 +36,17 @@ export default async function handler(req, res) {
 
   try {
     const ref = String(req.query.order_id || '').trim()
-    if (!ref) {
-      return res.status(400).json({ ok: false, error: 'Missing order_id' })
-    }
+    if (!ref) return res.status(400).json({ ok: false, error: 'Missing order_id' })
 
-    // ✅ CART GROUP: CART_...
+    /* =========================
+       ✅ CART GROUP: CART_...
+       group stored in orders.order_id
+    ========================= */
     if (isCartGroup(ref)) {
       const r = await supabaseAdmin
         .from('orders')
-        .select('id,code,status,paid_at,payhere_status_code')
-        .eq('code', ref)
+        .select('id,status,paid_at,payhere_status_code,order_id')
+        .eq('order_id', ref)
 
       if (r.error) return res.status(500).json({ ok: false, error: r.error.message })
 
@@ -50,13 +55,13 @@ export default async function handler(req, res) {
 
       const st = groupStatus(rows)
 
-      // choose a representative row for paid_at / status_code
+      // representative PAID row (for paid_at / status_code)
       const paidRow = rows.find((x) => normStatus(x.status) === 'PAID') || rows[0]
 
       return res.status(200).json({
         ok: true,
-        id: rows[0].id, // compatibility (not used for cart downloads)
-        code: ref,
+        id: paidRow?.id || rows[0].id, // used by download page
+        code: ref, // keep response compatible
         order_id: ref,
         status: st,
         count: rows.length,
@@ -65,7 +70,9 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ SINGLE ORDER: try by id
+    /* =========================
+       ✅ SINGLE ORDER: try by id
+    ========================= */
     const byId = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')
@@ -86,7 +93,9 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ SINGLE ORDER: try by code (non-cart legacy)
+    /* =========================
+       ✅ SINGLE ORDER: try by code
+    ========================= */
     const byCode = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')

@@ -5,9 +5,9 @@ import { createDownloadToken } from '@/lib/secureDownload'
 
 function limitForLicense(license) {
   const x = String(license || '').trim().toLowerCase()
-  if (x === 'commercial') return 0 // unlimited
+  if (x === 'commercial') return 0
   if (x === 'editorial') return 5
-  return 3 // personal
+  return 3
 }
 
 function getBaseUrl(req) {
@@ -34,15 +34,11 @@ function isUuid(v) {
   )
 }
 
-/**
- * ✅ Resolve correct R2 key for single orders:
- * photos/original/<photo_id>/<filename>.jpg  (from photos table)
- */
 async function resolveObjectKeyForSingleOrder(order) {
   const fmt = normalizeFormat(order?.format)
   const photoId = String(order?.photo_id || '').trim()
   if (!photoId) return null
-  if (!isUuid(photoId)) return null // legacy slug orders can't be resolved here
+  if (!isUuid(photoId)) return null
 
   const { data: p, error } = await supabaseAdmin
     .from('photos')
@@ -54,7 +50,6 @@ async function resolveObjectKeyForSingleOrder(order) {
   if (!p) return null
 
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
-
   const k = p.original_jpg_key || p.original_key
   return k ? String(k) : null
 }
@@ -95,32 +90,31 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {}
     const orderId = String(body.orderId || '').trim()
-    const code = String(body.code || '').trim()
+    const code = String(body.code || '').trim() // CART_... comes here
 
     if (!orderId && !code) {
       return res.status(400).json({ ok: false, error: 'Missing orderId or code' })
     }
 
-    // Token validity window (also stored in DB for one-time enforcement)
     const expiresMinutes = 60
     const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
     const base = getBaseUrl(req)
 
     /* =========================================================
        ✅ CART GROUP: body.code = CART_...
+       group stored in orders.order_id
     ========================================================= */
     if (code) {
       const { data: orders, error } = await supabaseAdmin
         .from('orders')
-        .select('id,status,delivery_object_key,photo_id,format,email,license,download_limit,title,code')
-        .eq('code', code)
+        .select('id,status,delivery_object_key,photo_id,format,email,license,download_limit,title,order_id')
+        .eq('order_id', code)
 
       if (error) return res.status(500).json({ ok: false, error: error.message })
 
       const list = Array.isArray(orders) ? orders : []
       if (list.length === 0) return res.status(404).json({ ok: false, error: 'Cart orders not found' })
 
-      // require all PAID (or at least one paid)
       const anyPaid = list.some((o) => String(o.status || '').toUpperCase() === 'PAID')
       if (!anyPaid) return res.status(400).json({ ok: false, error: 'Order not paid' })
 
@@ -130,14 +124,10 @@ export default async function handler(req, res) {
         const o = list[i]
         if (String(o.status || '').toUpperCase() !== 'PAID') continue
 
-        // ensure limit set (only if empty/null)
         if (o.download_limit == null) {
           const desiredLimit = limitForLicense(o.license)
           const u = await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
-          if (u.error) {
-            console.error('download_limit update failed:', u.error.message)
-            // do not hard fail; continue
-          }
+          if (u.error) console.error('download_limit update failed:', u.error.message)
         }
 
         const objectKey = await ensureObjectKey(o)
@@ -183,70 +173,61 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: 'No downloadable items found for this cart' })
       }
 
-      // ✅ Return items with token+url (frontend supports both)
       return res.status(200).json({ ok: true, items, expiresAt: expiresAt.toISOString() })
     }
 
     /* =========================================================
        ✅ SINGLE ORDER: body.orderId
     ========================================================= */
-    {
-      const ref = orderId
-      const { data: order, error } = await supabaseAdmin
-        .from('orders')
-        .select('id,status,delivery_object_key,photo_id,format,email,license,download_limit')
-        .eq('id', ref)
-        .maybeSingle()
+    const { data: order, error } = await supabaseAdmin
+      .from('orders')
+      .select('id,status,delivery_object_key,photo_id,format,email,license,download_limit')
+      .eq('id', orderId)
+      .maybeSingle()
 
-      if (error) return res.status(500).json({ ok: false, error: error.message })
-      if (!order) return res.status(404).json({ ok: false, error: 'Order not found' })
-      if (String(order.status || '').toUpperCase() !== 'PAID') {
-        return res.status(400).json({ ok: false, error: 'Order not paid' })
-      }
-
-      const objectKey = await ensureObjectKey(order)
-      if (!objectKey) {
-        return res.status(400).json({ ok: false, error: 'Missing delivery_object_key (cannot resolve)' })
-      }
-
-      if (order.download_limit == null) {
-        const desiredLimit = limitForLicense(order.license)
-        const u = await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', order.id)
-        if (u.error) {
-          console.error('download_limit update failed:', u.error.message)
-          return res.status(500).json({ ok: false, error: 'Failed to set download limit' })
-        }
-      }
-
-      const jti = crypto.randomUUID()
-
-      const ins = await supabaseAdmin.from('download_tokens').insert({
-        jti,
-        order_id: order.id,
-        expires_at: expiresAt.toISOString(),
-      })
-      if (ins.error) return res.status(500).json({ ok: false, error: ins.error.message })
-
-      const fmt = normalizeFormat(order.format)
-      const ext = fmt === 'raw' ? 'zip' : 'jpg'
-
-      const token = createDownloadToken(
-        {
-          jti,
-          orderId: order.id,
-          photoId: order.photo_id,
-          format: fmt,
-          objectKey,
-          guestEmail: order.email || null,
-          filename: `${order.photo_id}.${ext}`,
-          license: normalizeLicense(order.license),
-        },
-        '1h'
-      )
-
-      const url = `${base}/api/download?token=${encodeURIComponent(token)}`
-      return res.status(200).json({ ok: true, url, token, expiresAt: expiresAt.toISOString() })
+    if (error) return res.status(500).json({ ok: false, error: error.message })
+    if (!order) return res.status(404).json({ ok: false, error: 'Order not found' })
+    if (String(order.status || '').toUpperCase() !== 'PAID') {
+      return res.status(400).json({ ok: false, error: 'Order not paid' })
     }
+
+    const objectKey = await ensureObjectKey(order)
+    if (!objectKey) return res.status(400).json({ ok: false, error: 'Missing delivery_object_key (cannot resolve)' })
+
+    if (order.download_limit == null) {
+      const desiredLimit = limitForLicense(order.license)
+      const u = await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', order.id)
+      if (u.error) return res.status(500).json({ ok: false, error: 'Failed to set download limit' })
+    }
+
+    const jti = crypto.randomUUID()
+
+    const ins = await supabaseAdmin.from('download_tokens').insert({
+      jti,
+      order_id: order.id,
+      expires_at: expiresAt.toISOString(),
+    })
+    if (ins.error) return res.status(500).json({ ok: false, error: ins.error.message })
+
+    const fmt = normalizeFormat(order.format)
+    const ext = fmt === 'raw' ? 'zip' : 'jpg'
+
+    const token = createDownloadToken(
+      {
+        jti,
+        orderId: order.id,
+        photoId: order.photo_id,
+        format: fmt,
+        objectKey,
+        guestEmail: order.email || null,
+        filename: `${order.photo_id}.${ext}`,
+        license: normalizeLicense(order.license),
+      },
+      '1h'
+    )
+
+    const url = `${base}/api/download?token=${encodeURIComponent(token)}`
+    return res.status(200).json({ ok: true, url, token, expiresAt: expiresAt.toISOString() })
   } catch (e) {
     console.error('create-token error:', e)
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
