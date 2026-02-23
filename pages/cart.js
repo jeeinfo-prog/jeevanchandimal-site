@@ -54,28 +54,33 @@ function fallbackReadCart() {
   if (typeof window === 'undefined') return { currency: 'LKR', items: [] }
   const raw = readLS(STORAGE_CART_KEY, null)
   const cart = safeJsonParse(raw, null)
-  if (cart && Array.isArray(cart.items)) return cart
+  if (cart && Array.isArray(cart.items)) {
+    const ccy = cart.currency === 'USD' ? 'USD' : 'LKR'
+    return { currency: ccy, items: cart.items }
+  }
   return { currency: readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR', items: [] }
 }
 
 function fallbackWriteCart(cart) {
   if (typeof window === 'undefined') return
-  writeLS(STORAGE_CART_KEY, JSON.stringify(cart))
-  writeLS(STORAGE_CCY_KEY, cart.currency || 'LKR')
+  const ccy = cart?.currency === 'USD' ? 'USD' : 'LKR'
+  const items = Array.isArray(cart?.items) ? cart.items : []
+  writeLS(STORAGE_CART_KEY, JSON.stringify({ currency: ccy, items }))
+  writeLS(STORAGE_CCY_KEY, ccy)
 }
 
-function normalizeItem(it) {
+function normalizeItem(it, fallbackCurrency = 'LKR') {
   const src = it || {}
 
   // Supports multiple shapes from different implementations
-  const id = src.id || src.photoId || src.photo_id || src._id || null
+  const id = src.photoId || src.photo_id || src.id || src._id || null
   const title = src.title || src.name || src._title || 'Untitled'
   const thumb =
-    src.thumb_url ||
     src.thumbUrl ||
+    src.thumb_url ||
     src.thumb ||
-    src.preview_url ||
     src.previewUrl ||
+    src.preview_url ||
     src.image ||
     src._thumb ||
     null
@@ -86,17 +91,21 @@ function normalizeItem(it) {
   const qty = clamp(src.qty ?? src.quantity ?? src._qty ?? 1, 1, 99)
 
   // price can be item.price OR item.prices[currency][license][format]
-  const price = Number(src.price ?? src.unitPrice ?? src._price ?? 0) || 0
+  const price = Number(src.unitPrice ?? src.price ?? src._price ?? 0) || 0
+
+  // ✅ normalize currency per item (important for checkout payload)
+  const currency = src.currency === 'USD' ? 'USD' : fallbackCurrency === 'USD' ? 'USD' : 'LKR'
 
   return {
     ...src,
-    _id: id,
-    _title: title,
-    _thumb: thumb,
-    _license: license,
-    _format: format,
+    _id: id ? String(id) : null,
+    _title: String(title || 'Untitled'),
+    _thumb: thumb ? String(thumb) : null,
+    _license: String(license || 'personal').toLowerCase(),
+    _format: String(format || 'jpg').toLowerCase() === 'raw' ? 'raw' : 'jpg',
     _qty: qty,
     _price: price,
+    _currency: currency,
   }
 }
 
@@ -124,7 +133,6 @@ function getUnitPrice(item, currency) {
 function getCartAdapter() {
   const api = {
     read() {
-      // Try common names
       try {
         if (typeof CartLib.getCart === 'function') return CartLib.getCart()
         if (typeof CartLib.readCart === 'function') return CartLib.readCart()
@@ -164,21 +172,19 @@ export default function CartPage() {
   const [currency, setCurrency] = React.useState('LKR')
   const [items, setItems] = React.useState([])
   const [note, setNote] = React.useState('')
+  const [busy, setBusy] = React.useState(false)
 
   const locked = items.length > 0
 
   const load = React.useCallback(() => {
     const cart = cartApi.read() || {}
 
-    // cart could be:
-    // - { currency, items } (our wrapper)
-    // - { items } (your lib/cart.js)
-    // - just [] (older)
     const rawItems = Array.isArray(cart) ? cart : cart.items
     const ccy = (cart && cart.currency) || readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR'
+    const normalizedCcy = ccy === 'USD' ? 'USD' : 'LKR'
 
-    setCurrency(ccy)
-    setItems(Array.isArray(rawItems) ? rawItems.map(normalizeItem) : [])
+    setCurrency(normalizedCcy)
+    setItems(Array.isArray(rawItems) ? rawItems.map((x) => normalizeItem(x, normalizedCcy)).filter(Boolean) : [])
   }, [cartApi])
 
   React.useEffect(() => {
@@ -205,14 +211,19 @@ export default function CartPage() {
   }, [load])
 
   function persist(nextItems, nextCurrency = currency) {
-    const cart = { currency: nextCurrency, items: nextItems }
+    const ccy = nextCurrency === 'USD' ? 'USD' : 'LKR'
+    const cleaned = Array.isArray(nextItems)
+      ? nextItems.map((x) => normalizeItem(x, ccy)).filter(Boolean)
+      : []
+
+    const cart = { currency: ccy, items: cleaned }
     cartApi.write(cart)
 
     // keep separate currency key for legacy readers
-    writeLS(STORAGE_CCY_KEY, nextCurrency)
+    writeLS(STORAGE_CCY_KEY, ccy)
 
-    setItems(nextItems.map(normalizeItem))
-    setCurrency(nextCurrency)
+    setItems(cleaned)
+    setCurrency(ccy)
 
     // tell navbar etc (same-tab)
     try {
@@ -236,7 +247,7 @@ export default function CartPage() {
   }
 
   const computed = React.useMemo(() => {
-    const norm = items.map(normalizeItem)
+    const norm = items.map((x) => normalizeItem(x, currency)).filter(Boolean)
     let subtotal = 0
     for (const it of norm) {
       const unit = getUnitPrice(it, currency)
@@ -253,9 +264,78 @@ export default function CartPage() {
     setTimeout(() => setNote(''), 1200)
   }
 
-  function onCheckout() {
-    setNote('Next step: connect this button to PayHere checkout (multi-item).')
-    setTimeout(() => setNote(''), 1800)
+  async function onCheckout() {
+    if (busy) return
+
+    const normItems = items.map((x) => normalizeItem(x, currency)).filter(Boolean)
+    if (normItems.length === 0) {
+      setNote('Cart is empty.')
+      setTimeout(() => setNote(''), 1400)
+      return
+    }
+
+    // ✅ email used same style as single checkout / membership
+    const emailRaw =
+      (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
+    const email = String(emailRaw || '').trim().toLowerCase()
+
+    if (!email) {
+      setNote('Please login / enter email first (user_email missing).')
+      setTimeout(() => setNote(''), 2200)
+      return
+    }
+
+    setBusy(true)
+    setNote('Redirecting to PayHere...')
+
+    try {
+      const payloadItems = normItems.map((it) => {
+        const photoId = it._id
+        const title = it._title
+        const thumbUrl = it._thumb
+        const license = (it._license || 'personal').toLowerCase()
+        const format = it._format === 'raw' ? 'raw' : 'jpg'
+        const qty = clamp(it._qty, 1, 99)
+        const unitPrice = Number(getUnitPrice(it, currency) || 0)
+
+        return {
+          photoId,
+          title,
+          thumbUrl,
+          license,
+          format,
+          currency,
+          qty,
+          unitPrice,
+        }
+      })
+
+      const r = await fetch('/api/payhere/checkout-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          currency,
+          items: payloadItems,
+        }),
+      })
+
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok || !data?.ok || !data?.redirectUrl) {
+        const msg = data?.error || 'Checkout failed'
+        setNote(msg)
+        setTimeout(() => setNote(''), 2400)
+        setBusy(false)
+        return
+      }
+
+      // ✅ Go to PayHere checkout
+      window.location.href = data.redirectUrl
+    } catch (e) {
+      setNote(e?.message || 'Checkout error')
+      setTimeout(() => setNote(''), 2400)
+      setBusy(false)
+    }
   }
 
   return (
@@ -287,7 +367,7 @@ export default function CartPage() {
                 className="ccySelect"
                 value={currency}
                 onChange={(e) => onCurrencyChange(e.target.value)}
-                disabled={locked}
+                disabled={locked || busy}
                 title={locked ? 'Currency is locked once items are in cart.' : 'Choose currency'}
               >
                 <option value="LKR">LKR</option>
@@ -316,7 +396,9 @@ export default function CartPage() {
 
                 <div className="list">
                   {items.map((raw, idx) => {
-                    const it = normalizeItem(raw)
+                    const it = normalizeItem(raw, currency)
+                    if (!it) return null
+
                     const id = it._id || `${idx}`
                     const unit = getUnitPrice(it, currency)
                     const line = unit * it._qty
@@ -352,6 +434,7 @@ export default function CartPage() {
                                 onClick={() => setQty(id, it._qty - 1)}
                                 aria-label="Decrease quantity"
                                 type="button"
+                                disabled={busy}
                               >
                                 −
                               </button>
@@ -363,12 +446,14 @@ export default function CartPage() {
                                   setQty(id, v ? Number(v) : 1)
                                 }}
                                 inputMode="numeric"
+                                disabled={busy}
                               />
                               <button
                                 className="qtyBtn"
                                 onClick={() => setQty(id, it._qty + 1)}
                                 aria-label="Increase quantity"
                                 type="button"
+                                disabled={busy}
                               >
                                 +
                               </button>
@@ -378,11 +463,13 @@ export default function CartPage() {
                               className="linkDanger"
                               onClick={() => removeItem(id)}
                               type="button"
+                              disabled={busy}
                             >
                               Remove
                             </button>
 
-                            <Link href={`/store/${id}`} legacyBehavior>
+                            {/* IMPORTANT: store page expects /store/<photoId> not per-item key */}
+                            <Link href={`/store/${encodeURIComponent(String(it._id))}`} legacyBehavior>
                               <a className="link">View</a>
                             </Link>
                           </div>
@@ -396,6 +483,7 @@ export default function CartPage() {
                   <button
                     className="btnGhost"
                     type="button"
+                    disabled={busy}
                     onClick={() => {
                       cartApi.clear()
                       load()
@@ -428,12 +516,12 @@ export default function CartPage() {
 
                 <div className="divider" />
 
-                <button className="btnPrimary full" onClick={onCheckout} type="button">
-                  Checkout
+                <button className="btnPrimary full" onClick={onCheckout} type="button" disabled={busy}>
+                  {busy ? 'Redirecting…' : 'Checkout'}
                 </button>
 
                 <div className="smallNote">
-                  Checkout will create a single order for multiple items (next step).
+                  Checkout will create a single order for multiple items.
                 </div>
               </aside>
             </div>
@@ -656,6 +744,10 @@ export default function CartPage() {
         .qtyBtn:hover {
           background: rgba(255, 255, 255, 0.06);
         }
+        .qtyBtn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
         .qtyInput {
           width: 44px;
           height: 34px;
@@ -665,6 +757,10 @@ export default function CartPage() {
           background: transparent;
           color: #fff;
           font-size: 13px;
+        }
+        .qtyInput:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
         }
 
         .link,
@@ -680,6 +776,10 @@ export default function CartPage() {
         }
         .linkDanger:hover {
           opacity: 1;
+        }
+        .linkDanger:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
         }
 
         .itemsFooter {
@@ -710,11 +810,19 @@ export default function CartPage() {
         .btnPrimary:hover {
           background: rgba(0, 120, 255, 0.28);
         }
+        .btnPrimary:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
         .btnGhost {
           background: rgba(0, 0, 0, 0.2);
         }
         .btnGhost:hover {
           background: rgba(255, 255, 255, 0.06);
+        }
+        .btnGhost:disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
         }
         .full {
           width: 100%;
