@@ -1,9 +1,9 @@
 // components/jeevan-chandimal-navi.js
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
-import { cartCount } from '../lib/cart' // ✅ FIX: remove @ alias to prevent prod crash
+import { readCart, clearCart } from '../lib/cart'
 
 const NAV = {
   work: [
@@ -20,510 +20,289 @@ const NAV = {
   ],
 }
 
-export default function JeevanChandimalNavi(props) {
+// --- helpers ---
+function isActivePath(router, href) {
+  // Match exact or "startsWith" for sections
+  const asPath = (router.asPath || '').split('?')[0]
+  if (asPath === href) return true
+  // keep homepage strict
+  if (href === '/') return asPath === '/'
+  return asPath.startsWith(href + '/') || asPath.startsWith(href)
+}
+
+function safeEmailShort(email) {
+  if (!email || typeof email !== 'string') return ''
+  // keep it compact: name@domain -> name@dom…
+  const [name, domain] = email.split('@')
+  if (!domain) return email
+  const dom = domain.length > 8 ? `${domain.slice(0, 7)}…` : domain
+  const n = name.length > 10 ? `${name.slice(0, 9)}…` : name
+  return `${n}@${dom}`
+}
+
+export default function JeevanChandimalNavi({
+  showMembershipPill = true,
+  membershipHref = '/membership',
+  brandHref = '/',
+  brandImgSrc = '/logo.png',
+  brandAlt = 'Jeevan Chandimal',
+}) {
   const router = useRouter()
 
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [cartCount, setCartCount] = useState(0)
 
-  const [deskWorkOpen, setDeskWorkOpen] = useState(false)
-  const [deskServicesOpen, setDeskServicesOpen] = useState(false)
-
-  const [mWorkOpen, setMWorkOpen] = useState(false)
-  const [mServicesOpen, setMServicesOpen] = useState(false)
-
-  const [memberPlan, setMemberPlan] = useState(null)
-  const [userEmail, setUserEmail] = useState('')
-
-  // ✅ Cart count
-  const [cartNum, setCartNum] = useState(0)
-
-  const closeTimers = useRef({ work: null, services: null })
-
-  const closeAll = () => {
-    setMobileOpen(false)
-    setDeskWorkOpen(false)
-    setDeskServicesOpen(false)
-    setMWorkOpen(false)
-    setMServicesOpen(false)
-  }
-
-  const cancelCloseTimer = (key) => {
-    const t = closeTimers.current?.[key]
-    if (t) clearTimeout(t)
-    closeTimers.current[key] = null
-  }
-
-  const scheduleClose = (key) => {
-    cancelCloseTimer(key)
-    closeTimers.current[key] = setTimeout(() => {
-      if (key === 'work') setDeskWorkOpen(false)
-      if (key === 'services') setDeskServicesOpen(false)
-    }, 140) // small delay removes flicker
-  }
-
-  // Close menus on route change
-  useEffect(() => {
-    if (!router?.events) return
-    const onRoute = () => closeAll()
-    router.events.on('routeChangeStart', onRoute)
-    return () => router.events.off('routeChangeStart', onRoute)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router?.events])
-
-  // ✅ Keep cart badge updated (same-tab + other tabs) — NO INTERVAL (prevents hydration mismatch)
+  // Load email + cart count from localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const refresh = () => {
-      try {
-        setCartNum(cartCount())
-      } catch {
-        setCartNum(0)
-      }
+    const load = () => {
+      const em = window.localStorage.getItem('user_email') || ''
+      setEmail(em)
+
+      const cart = readCart()
+      const count =
+        Array.isArray(cart?.items) ? cart.items.reduce((n, it) => n + (Number(it.qty) || 1), 0) : 0
+      setCartCount(count)
     }
 
-    refresh()
+    load()
 
-    const onStorage = (e) => {
-      // cross-tab updates
-      if (e?.key === 'jc_cart_v1') refresh()
-      // fallback if something else writes different key names
-      if (e?.key && String(e.key).includes('cart')) refresh()
-      if (e?.key && String(e.key).includes('jc_cart')) refresh()
-    }
-
-    const onCustom = () => refresh() // ✅ instant same-tab updates from AddToCartButton
-
+    const onStorage = () => load()
     window.addEventListener('storage', onStorage)
-    window.addEventListener('jc_cart_updated', onCustom)
+
+    // Also listen for manual cart updates in same tab (optional custom event)
+    const onCart = () => load()
+    window.addEventListener('jc_cart_updated', onCart)
 
     return () => {
       window.removeEventListener('storage', onStorage)
-      window.removeEventListener('jc_cart_updated', onCustom)
+      window.removeEventListener('jc_cart_updated', onCart)
     }
   }, [])
 
-  // Read local user + member plan
+  // Close mobile menu on route change
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    const handle = () => setMobileOpen(false)
+    router.events?.on('routeChangeComplete', handle)
+    return () => router.events?.off('routeChangeComplete', handle)
+  }, [router.events])
 
-    const email = window.localStorage.getItem('user_email') || ''
-    setUserEmail(email)
+  const rightEmailLabel = useMemo(() => safeEmailShort(email), [email])
 
-    const cachedPlan = window.localStorage.getItem('member_plan')
-    if (cachedPlan) setMemberPlan(cachedPlan)
-
-    if (!email) return
-
-    fetch(`/api/member/status?email=${encodeURIComponent(email)}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.member) {
-          const plan = d?.plan || cachedPlan || 'member'
-          setMemberPlan(plan)
-          window.localStorage.setItem('member_plan', plan)
-        } else {
-          window.localStorage.removeItem('member_plan')
-          setMemberPlan(null)
-        }
-      })
-      .catch(() => {})
-  }, [router.asPath])
-
-  const logout = () => {
+  const handleLogout = () => {
     try {
-      window.localStorage.removeItem('user_email')
-      window.localStorage.removeItem('member_plan')
-    } catch (e) {}
-    setUserEmail('')
-    setMemberPlan(null)
-    closeAll()
-    router.push('/login')
-  }
-
-  // Parent + child active highlight
-  const isActive = (href) => {
-    if (!href) return false
-    if (href === '/work') return router.pathname.startsWith('/work')
-    if (href === '/services') return router.pathname.startsWith('/services')
-    if (href === '/store') return router.pathname.startsWith('/store')
-    if (href === '/cart') return router.pathname.startsWith('/cart')
-    return router.pathname === href
-  }
-
-  const activeClass = (href) => (isActive(href) ? 'isActive' : '')
-  const activeItemClass = (href) => (isActive(href) ? 'isActiveItem' : '')
-
-  const onDropdownKey = (which) => (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      if (which === 'work') {
-        setDeskWorkOpen((v) => {
-          const next = !v
-          if (next) setDeskServicesOpen(false)
-          return next
-        })
-      } else {
-        setDeskServicesOpen((v) => {
-          const next = !v
-          if (next) setDeskWorkOpen(false)
-          return next
-        })
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('user_email')
+        window.localStorage.removeItem('member_status')
+        window.localStorage.removeItem('member_plan')
+        window.localStorage.removeItem('member_expires_at')
+        // Keep cart or clear it? Most stores keep cart. If you want clear, keep this:
+        // clearCart()
+        setEmail('')
       }
-    }
-    if (e.key === 'Escape') {
-      setDeskWorkOpen(false)
-      setDeskServicesOpen(false)
-    }
+    } catch {}
+    // Go home (or login page)
+    router.push('/')
   }
 
-  // Close desktop dropdowns if click outside
-  useEffect(() => {
-    const onDoc = (e) => {
-      const el = e.target
-      if (!(el instanceof Element)) return
-      if (el.closest?.('.navShell')) return
-      setDeskWorkOpen(false)
-      setDeskServicesOpen(false)
-    }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
-  }, [])
-
-  const workItems = useMemo(() => NAV.work, [])
-  const serviceItems = useMemo(() => NAV.services, [])
+  // Top-level left links (you can add/remove here)
+  const primaryLinks = [
+    { href: '/store', label: 'Store' },
+    { href: '/collections', label: 'Collections' },
+  ]
 
   return (
     <>
-      <header className={`navWrap ${props.rootClassName || ''}`}>
+      <header className="navWrap">
         <div className="navShell">
-          {/* left */}
-          <Link href="/" legacyBehavior>
-            <a className="brand" aria-label="Home">
-              <img alt={props.logoAlt} src={props.logoSrc} className="brandLogo" />
-            </a>
+          {/* Brand */}
+          <Link href={brandHref} className="brand" aria-label="Home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="brandLogo" src={brandImgSrc} alt={brandAlt} />
           </Link>
 
-          {/* center desktop */}
+          {/* Desktop links */}
           <nav className="navLinks" aria-label="Primary">
-            <Link href="/" legacyBehavior>
-              <a className={`navLink ${activeClass('/')}`}>Home</a>
-            </Link>
-
-            {/* Work dropdown */}
-            <div
-              className="drop"
-              onMouseEnter={() => {
-                cancelCloseTimer('work')
-                setDeskWorkOpen(true)
-                setDeskServicesOpen(false)
-              }}
-              onMouseLeave={() => scheduleClose('work')}
-            >
-              <div
-                className={`dropToggle ${activeClass('/work')}`}
-                role="button"
-                tabIndex={0}
-                aria-haspopup="menu"
-                aria-expanded={deskWorkOpen ? 'true' : 'false'}
-                onClick={() => {
-                  setDeskWorkOpen((v) => !v)
-                  setDeskServicesOpen(false)
-                }}
-                onKeyDown={onDropdownKey('work')}
-              >
-                <Link href="/work" legacyBehavior>
-                  <a className="dropLabel">Work</a>
+            {primaryLinks.map((it) => {
+              const active = isActivePath(router, it.href)
+              return (
+                <Link
+                  key={it.href}
+                  href={it.href}
+                  className={`navLink ${active ? 'active' : ''}`}
+                >
+                  {it.label}
                 </Link>
+              )
+            })}
 
-                <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
-                  ▾
-                </span>
-              </div>
-
-              <div
-                className={`menu ${deskWorkOpen ? 'show' : ''}`}
-                role="menu"
-                onMouseEnter={() => cancelCloseTimer('work')}
-                onMouseLeave={() => scheduleClose('work')}
-              >
-                {workItems.map((it) => (
-                  <Link href={it.href} key={it.href} legacyBehavior>
-                    <a className={`menuItem ${activeItemClass(it.href)}`} role="menuitem">
+            <div className="navGroup">
+              <span className="navGroupLabel">Work</span>
+              <div className="navGroupMenu">
+                {NAV.work.map((it) => {
+                  const active = isActivePath(router, it.href)
+                  return (
+                    <Link
+                      key={it.href}
+                      href={it.href}
+                      className={`navDropLink ${active ? 'active' : ''}`}
+                    >
                       {it.label}
-                    </a>
-                  </Link>
-                ))}
+                    </Link>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Services dropdown */}
-            <div
-              className="drop"
-              onMouseEnter={() => {
-                cancelCloseTimer('services')
-                setDeskServicesOpen(true)
-                setDeskWorkOpen(false)
-              }}
-              onMouseLeave={() => scheduleClose('services')}
-            >
-              <div
-                className={`dropToggle ${activeClass('/services')}`}
-                role="button"
-                tabIndex={0}
-                aria-haspopup="menu"
-                aria-expanded={deskServicesOpen ? 'true' : 'false'}
-                onClick={() => {
-                  setDeskServicesOpen((v) => !v)
-                  setDeskWorkOpen(false)
-                }}
-                onKeyDown={onDropdownKey('services')}
-              >
-                <Link href="/services" legacyBehavior>
-                  <a className="dropLabel">Services</a>
-                </Link>
-
-                <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
-                  ▾
-                </span>
-              </div>
-
-              <div
-                className={`menu ${deskServicesOpen ? 'show' : ''}`}
-                role="menu"
-                onMouseEnter={() => cancelCloseTimer('services')}
-                onMouseLeave={() => scheduleClose('services')}
-              >
-                {serviceItems.map((it) => (
-                  <Link href={it.href} key={it.href} legacyBehavior>
-                    <a className={`menuItem ${activeItemClass(it.href)}`} role="menuitem">
+            <div className="navGroup">
+              <span className="navGroupLabel">Services</span>
+              <div className="navGroupMenu">
+                {NAV.services.map((it) => {
+                  const active = isActivePath(router, it.href)
+                  return (
+                    <Link
+                      key={it.href}
+                      href={it.href}
+                      className={`navDropLink ${active ? 'active' : ''}`}
+                    >
                       {it.label}
-                    </a>
-                  </Link>
-                ))}
+                    </Link>
+                  )
+                })}
               </div>
             </div>
-
-            <Link href="/store" legacyBehavior>
-              <a className={`navLink ${activeClass('/store')}`}>Store</a>
-            </Link>
-            <Link href="/memberships" legacyBehavior>
-              <a className={`navLink ${activeClass('/memberships')}`}>Membership</a>
-            </Link>
-            <Link href="/about" legacyBehavior>
-              <a className={`navLink ${activeClass('/about')}`}>About</a>
-            </Link>
-            <Link href="/contact" legacyBehavior>
-              <a className={`navLink ${activeClass('/contact')}`}>Contact</a>
-            </Link>
           </nav>
 
-          {/* right */}
-          <div className="navRight">
-            {/* group: cart + badge + email + logout/login */}
-            <div className="rightGroup">
-              {/* ✅ Cart button (always visible) */}
-              <Link href="/cart" legacyBehavior>
-                <a className={`cartBtn ${activeClass('/cart')}`} aria-label="Cart">
-                  <span className="cartText">Cart</span>
-                  <span className="cartBadge" aria-label={`Cart items: ${cartNum}`}>
-                    {cartNum}
-                  </span>
-                </a>
+          {/* Right pills (unified) */}
+          <div className="rightPills">
+            <Link href="/cart" className="pillBase pillLink" aria-label="Cart">
+              <span className="pillText">Cart</span>
+              {cartCount > 0 ? <span className="pillBadge">{cartCount}</span> : null}
+            </Link>
+
+            {showMembershipPill ? (
+              <Link href={membershipHref} className="pillBase pillLink pillAccent">
+                <span className="pillText">MONTHLY</span>
               </Link>
+            ) : null}
 
-              {memberPlan ? <span className="badge">{String(memberPlan).toUpperCase()}</span> : null}
+            {email ? (
+              <span className="pillBase pillStatic" title={email}>
+                <span className="pillText">{rightEmailLabel}</span>
+              </span>
+            ) : null}
 
-              {/* ✅ Logged-in: email + logout */}
-              {userEmail ? (
-                <>
-                  <span className="userEmail" title={userEmail}>
-                    {userEmail}
-                  </span>
-                  <button type="button" className="logoutBtn" onClick={logout}>
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <Link href="/login" legacyBehavior>
-                  <a className="iconBtn" aria-label="Login">
-                    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M4 21v-1c0-3.313 2.687-6 6-6h4c3.313 0 6 2.687 6 6v1"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M12 11c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </a>
-                </Link>
-              )}
-            </div>
-
-            {/* burger always far right */}
-            <button
-              type="button"
-              className="burger"
-              aria-label="Open menu"
-              onClick={() => {
-                setMobileOpen(true)
-                setMWorkOpen(false)
-                setMServicesOpen(false)
-              }}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-          </div>
-        </div>
-
-        {/* MOBILE OVERLAY */}
-        <div className={`mOverlay ${mobileOpen ? 'show' : ''}`} role="dialog" aria-modal="true">
-          <div className="mPanel">
-            <div className="mTop">
-              <Link href="/" legacyBehavior>
-                <a className="mBrand" onClick={closeAll} aria-label="Home">
-                  <img alt={props.logoAlt} src={props.logoSrc} className="mLogo" />
-                </a>
-              </Link>
-
-              <button type="button" className="mClose" onClick={closeAll} aria-label="Close menu">
-                ✕
+            {email ? (
+              <button type="button" className="pillBase pillBtn" onClick={handleLogout}>
+                <span className="pillText">Logout</span>
               </button>
-            </div>
-
-            <nav className="mLinks">
-              <Link href="/" legacyBehavior>
-                <a className={`mLink ${activeClass('/')}`} onClick={closeAll}>
-                  Home
-                </a>
+            ) : (
+              <Link href="/login" className="pillBase pillLink">
+                <span className="pillText">Login</span>
               </Link>
-
-              {/* ✅ Mobile Cart */}
-              <Link href="/cart" legacyBehavior>
-                <a className={`mLink ${activeClass('/cart')}`} onClick={closeAll}>
-                  <span>Cart</span>
-                  <span className="mCartBadge">{cartNum}</span>
-                </a>
-              </Link>
-
-              {/* Work: first tap opens, second tap navigates */}
-              <Link href="/work" legacyBehavior>
-                <a
-                  className={`mLink mDrop ${activeClass('/work')}`}
-                  onClick={(e) => {
-                    if (!mWorkOpen) {
-                      e.preventDefault()
-                      setMWorkOpen(true)
-                      setMServicesOpen(false)
-                      return
-                    }
-                    closeAll()
-                  }}
-                >
-                  <span>Work</span>
-                  <span className={`mChev ${mWorkOpen ? 'open' : ''}`} aria-hidden="true">
-                    ▾
-                  </span>
-                </a>
-              </Link>
-              {mWorkOpen && (
-                <div className="mSub">
-                  {workItems.map((it) => (
-                    <Link href={it.href} key={it.href} legacyBehavior>
-                      <a className={`mSubLink ${activeItemClass(it.href)}`} onClick={closeAll}>
-                        {it.label}
-                      </a>
-                    </Link>
-                  ))}
-                </div>
-              )}
-
-              {/* Services: first tap opens, second tap navigates */}
-              <Link href="/services" legacyBehavior>
-                <a
-                  className={`mLink mDrop ${activeClass('/services')}`}
-                  onClick={(e) => {
-                    if (!mServicesOpen) {
-                      e.preventDefault()
-                      setMServicesOpen(true)
-                      setMWorkOpen(false)
-                      return
-                    }
-                    closeAll()
-                  }}
-                >
-                  <span>Services</span>
-                  <span className={`mChev ${mServicesOpen ? 'open' : ''}`} aria-hidden="true">
-                    ▾
-                  </span>
-                </a>
-              </Link>
-              {mServicesOpen && (
-                <div className="mSub">
-                  {serviceItems.map((it) => (
-                    <Link href={it.href} key={it.href} legacyBehavior>
-                      <a className={`mSubLink ${activeItemClass(it.href)}`} onClick={closeAll}>
-                        {it.label}
-                      </a>
-                    </Link>
-                  ))}
-                </div>
-              )}
-
-              <Link href="/store" legacyBehavior>
-                <a className={`mLink ${activeClass('/store')}`} onClick={closeAll}>
-                  Store
-                </a>
-              </Link>
-              <Link href="/memberships" legacyBehavior>
-                <a className={`mLink ${activeClass('/memberships')}`} onClick={closeAll}>
-                  Membership
-                </a>
-              </Link>
-              <Link href="/about" legacyBehavior>
-                <a className={`mLink ${activeClass('/about')}`} onClick={closeAll}>
-                  About
-                </a>
-              </Link>
-              <Link href="/contact" legacyBehavior>
-                <a className={`mLink ${activeClass('/contact')}`} onClick={closeAll}>
-                  Contact
-                </a>
-              </Link>
-
-              {memberPlan && <div className="mBadge">{String(memberPlan).toUpperCase()}</div>}
-
-              {/* ✅ Mobile logout */}
-              {userEmail ? (
-                <button type="button" className="mLogout" onClick={logout}>
-                  Logout
-                </button>
-              ) : (
-                <Link href="/login" legacyBehavior>
-                  <a className="mLink" onClick={closeAll}>
-                    Login
-                  </a>
-                </Link>
-              )}
-            </nav>
+            )}
           </div>
 
-          <button type="button" className="mBackdrop" aria-label="Close menu" onClick={closeAll} />
+          {/* Mobile toggle */}
+          <button
+            type="button"
+            className="burger"
+            aria-label="Menu"
+            aria-expanded={mobileOpen ? 'true' : 'false'}
+            onClick={() => setMobileOpen((v) => !v)}
+          >
+            <span className="burgerLine" />
+            <span className="burgerLine" />
+            <span className="burgerLine" />
+          </button>
         </div>
+
+        {/* Mobile drawer */}
+        {mobileOpen ? (
+          <div className="mobileMenu" role="dialog" aria-label="Mobile menu">
+            <div className="mobileInner">
+              <div className="mobileSection">
+                {primaryLinks.map((it) => {
+                  const active = isActivePath(router, it.href)
+                  return (
+                    <Link
+                      key={it.href}
+                      href={it.href}
+                      className={`mobileLink ${active ? 'active' : ''}`}
+                    >
+                      {it.label}
+                    </Link>
+                  )
+                })}
+              </div>
+
+              <div className="mobileSection">
+                <div className="mobileTitle">Work</div>
+                {NAV.work.map((it) => {
+                  const active = isActivePath(router, it.href)
+                  return (
+                    <Link
+                      key={it.href}
+                      href={it.href}
+                      className={`mobileLink ${active ? 'active' : ''}`}
+                    >
+                      {it.label}
+                    </Link>
+                  )
+                })}
+              </div>
+
+              <div className="mobileSection">
+                <div className="mobileTitle">Services</div>
+                {NAV.services.map((it) => {
+                  const active = isActivePath(router, it.href)
+                  return (
+                    <Link
+                      key={it.href}
+                      href={it.href}
+                      className={`mobileLink ${active ? 'active' : ''}`}
+                    >
+                      {it.label}
+                    </Link>
+                  )
+                })}
+              </div>
+
+              <div className="mobileSection">
+                <Link href="/cart" className="mobileLink">
+                  Cart {cartCount > 0 ? `(${cartCount})` : ''}
+                </Link>
+
+                {showMembershipPill ? (
+                  <Link href={membershipHref} className="mobileLink">
+                    MONTHLY
+                  </Link>
+                ) : null}
+
+                {email ? (
+                  <>
+                    <div className="mobileMeta" title={email}>
+                      {email}
+                    </div>
+                    <button type="button" className="mobileBtn" onClick={handleLogout}>
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <Link href="/login" className="mobileLink">
+                    Login
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </header>
 
       <style jsx>{`
-        /* ========= THEME ========= */
+        /* ========= WRAP ========= */
         .navWrap {
           position: sticky;
           top: 0;
@@ -535,7 +314,7 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .navShell {
-          max-width: var(--dl-layout-size-maxwidth);
+          max-width: var(--dl-layout-size-maxwidth, 1200px);
           margin: 0 auto;
           padding: 12px 18px;
           display: flex;
@@ -561,515 +340,287 @@ export default function JeevanChandimalNavi(props) {
           flex: 1;
           display: none;
           align-items: center;
-          justify-content: center;
-          gap: 18px;
+          gap: 14px;
+          min-width: 0;
         }
 
-        .navLink,
-        .dropLabel {
-          color: #f5f4f4;
-          text-decoration: none !important;
+        .navLink {
+          color: rgba(255, 255, 255, 0.86);
+          text-decoration: none;
           font-size: 14px;
-          letter-spacing: 0.2px;
-          opacity: 0.92;
-          padding: 10px 8px;
+          padding: 8px 10px;
           border-radius: 10px;
-          transition: opacity 0.15s, background 0.15s;
-          display: inline-flex;
-          align-items: center;
+          transition: background 0.15s ease, color 0.15s ease;
+          white-space: nowrap;
         }
 
-        .navLink:hover,
-        .dropLabel:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
+        .navLink:hover {
+          background: rgba(255, 255, 255, 0.06);
         }
 
-        /* keep highlighted text BLUE */
-        .isActive {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
-          border: 1px solid rgba(37, 195, 226, 0.22);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 700;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
+        /* Active highlight in BLUE (your request) */
+        .navLink.active {
+          color: #4da3ff;
+          background: rgba(77, 163, 255, 0.14);
         }
 
-        /* ========= DROPDOWN ========= */
-        .drop {
+        .navGroup {
           position: relative;
           display: inline-flex;
           align-items: center;
         }
 
-        .drop::after {
-          content: '';
+        .navGroupLabel {
+          color: rgba(255, 255, 255, 0.86);
+          font-size: 14px;
+          padding: 8px 10px;
+          border-radius: 10px;
+          cursor: default;
+          user-select: none;
+        }
+
+        .navGroup:hover .navGroupLabel {
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        .navGroupMenu {
           position: absolute;
-          left: 0;
-          top: 100%;
-          height: 14px;
-          width: 100%;
-        }
-
-        .dropToggle {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 0;
-          border-radius: 12px;
-          outline: none;
-        }
-
-        .dropToggle:focus-visible {
-          box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
-        }
-
-        .chev {
-          width: 14px;
-          height: 14px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          color: rgba(245, 244, 244, 0.75);
-          font-size: 12px;
-          transform: rotate(-90deg);
-          transition: transform 0.16s ease;
-          margin-left: 4px;
-        }
-
-        .chev.open {
-          transform: rotate(0deg);
-        }
-
-        .mChev {
-          width: 14px;
-          height: 14px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 0.8;
-          transform: rotate(-90deg);
-          transition: transform 0.16s ease;
-        }
-
-        .mChev.open {
-          transform: rotate(0deg);
-        }
-
-        .menu {
-          position: absolute;
-          top: calc(100% + 10px);
+          top: 42px;
           left: 0;
           min-width: 220px;
-          background: rgba(18, 18, 18, 0.92);
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          border-radius: 14px;
           padding: 8px;
-          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+          border-radius: 14px;
+          background: rgba(18, 18, 18, 0.92);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(10px);
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
           display: none;
-          flex-direction: column;
-          gap: 2px;
-          animation: dropIn 160ms ease forwards;
-          z-index: 99999;
-          pointer-events: auto;
         }
 
-        .menu.show {
-          display: flex;
+        .navGroup:hover .navGroupMenu {
+          display: block;
         }
 
-        @keyframes dropIn {
-          from {
-            opacity: 0;
-            transform: translateY(-6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .menuItem {
-          color: #f5f4f4;
-          text-decoration: none !important;
-          font-size: 14px;
+        .navDropLink {
+          display: block;
           padding: 10px 10px;
-          border-radius: 10px;
-          opacity: 0.92;
-          transition: background 0.15s, opacity 0.15s;
+          border-radius: 12px;
+          color: rgba(255, 255, 255, 0.86);
+          text-decoration: none;
+          font-size: 14px;
+          transition: background 0.15s ease, color 0.15s ease;
         }
 
-        .menuItem:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.08);
+        .navDropLink:hover {
+          background: rgba(255, 255, 255, 0.08);
         }
 
-        .menuItem.isActiveItem {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
-          border: 1px solid rgba(37, 195, 226, 0.18);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 700;
+        .navDropLink.active {
+          color: #4da3ff;
+          background: rgba(77, 163, 255, 0.14);
         }
 
-        /* ========= RIGHT ========= */
-        .navRight {
+        /* ========= RIGHT PILLS (UNIFIED) ========= */
+        .rightPills {
           display: inline-flex;
           align-items: center;
           gap: 10px;
+          flex: 0 0 auto;
         }
 
-        .rightGroup {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: nowrap;
-          min-width: 0; /* allow email to ellipsis */
-        }
-
-        /* ✅ CART (unified height) */
-        .cartBtn {
-          height: 36px;
+        /* THE IMPORTANT PART:
+           One base style for ALL pills (Link / button / static span) */
+        .pillBase {
+          height: 36px; /* <- unified height */
+          border-radius: 999px; /* <- unified shape */
+          padding: 0 12px;
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          padding: 0 12px;
-          border-radius: 999px;
-          text-decoration: none !important;
-          color: #f5f4f4;
-          background: rgba(255, 255, 255, 0.03);
-          opacity: 0.92;
+          font-size: 12.5px;
+          line-height: 1;
+          letter-spacing: 0.2px;
+          white-space: nowrap;
+          user-select: none;
+          box-sizing: border-box;
+        }
+
+        .pillText {
+          display: inline-flex;
+          align-items: center;
           line-height: 1;
         }
 
-        .cartBtn:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-        }
-
-        .cartText {
-          font-size: 12px;
-          letter-spacing: 0.2px;
-        }
-
-        .cartBadge {
-          min-width: 20px;
-          height: 20px;
+        .pillBadge {
+          min-width: 18px;
+          height: 18px;
           padding: 0 6px;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           font-size: 11px;
-          font-weight: 800;
-          border: 1px solid rgba(37, 195, 226, 0.35);
-          background: rgba(37, 195, 226, 0.14);
-          color: #25c3e2;
-        }
-
-        /* ✅ Member pill same height */
-        .badge {
-          height: 36px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 12px;
-          border: 1px solid rgba(37, 195, 226, 0.55);
-          background: rgba(37, 195, 226, 0.12);
-          border-radius: 999px;
-          letter-spacing: 1px;
-          color: #25c3e2;
-          font-weight: 800;
-          font-size: 11px;
           line-height: 1;
-          white-space: nowrap;
+          background: rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(255, 255, 255, 0.14);
         }
 
-        /* ✅ email pill same height */
-        .userEmail {
-          height: 36px;
-          display: inline-flex;
-          align-items: center;
-          padding: 0 12px;
-          border: 1px solid rgba(245, 244, 244, 0.14);
-          background: rgba(255, 255, 255, 0.03);
-          border-radius: 999px;
-          color: #f5f4f4;
-          font-size: 12px;
-          opacity: 0.88;
+        /* Link and button wrappers share identical visuals */
+        .pillLink {
+          text-decoration: none;
+          color: rgba(255, 255, 255, 0.88);
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.10);
+          transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+        }
+
+        .pillBtn {
+          appearance: none;
+          border: 1px solid rgba(255, 255, 255, 0.10);
+          background: rgba(255, 255, 255, 0.08);
+          color: rgba(255, 255, 255, 0.88);
+          cursor: pointer;
+          transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+        }
+
+        .pillStatic {
+          color: rgba(255, 255, 255, 0.86);
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.10);
           max-width: 220px;
-          min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
-          line-height: 1;
         }
 
-        /* ✅ logout pill same height */
-        .logoutBtn {
-          height: 36px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0 14px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: rgba(255, 255, 255, 0.03);
-          color: #f5f4f4;
-          cursor: pointer;
-          opacity: 0.92;
-          line-height: 1;
-          font-size: 12px;
-          letter-spacing: 0.2px;
+        .pillLink:hover,
+        .pillBtn:hover {
+          background: rgba(255, 255, 255, 0.12);
+          border-color: rgba(255, 255, 255, 0.16);
         }
 
-        .logoutBtn:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
+        .pillLink:active,
+        .pillBtn:active {
+          transform: translateY(1px);
         }
 
-        .iconBtn {
-          height: 36px;
-          color: #f5f4f4;
-          opacity: 0.85;
-          border-radius: 999px;
-          padding: 0 12px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          text-decoration: none !important;
-          transition: opacity 0.15s, background 0.15s;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: rgba(255, 255, 255, 0.03);
+        .pillAccent {
+          background: rgba(77, 163, 255, 0.16);
+          border-color: rgba(77, 163, 255, 0.22);
+          color: #d8ecff;
         }
 
-        .iconBtn:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-        }
-
-        @media (max-width: 520px) {
-          .userEmail {
-            display: none;
-          }
-        }
-
-        .burger {
-          width: 44px;
-          height: 42px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          background: rgba(0, 0, 0, 0.18);
-          border-radius: 14px;
-          display: inline-flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          cursor: pointer;
-        }
-
-        .burger span {
-          width: 18px;
-          height: 2px;
-          background: rgba(245, 244, 244, 0.9);
-          border-radius: 2px;
+        .pillAccent:hover {
+          background: rgba(77, 163, 255, 0.22);
+          border-color: rgba(77, 163, 255, 0.28);
         }
 
         /* ========= MOBILE ========= */
-        .mOverlay {
-          display: none;
-        }
-
-        .mOverlay.show {
-          display: block;
-          position: fixed;
-          inset: 0;
-          z-index: 10000;
-        }
-
-        .mBackdrop {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.62);
-          border: 0;
-          padding: 0;
-          margin: 0;
-          cursor: pointer;
-          z-index: 0;
-        }
-
-        .mPanel {
-          position: fixed;
-          top: 0;
-          right: 0;
-          height: 100vh;
-          width: min(420px, 92vw);
-          background: #151515;
-          border-left: 1px solid rgba(245, 244, 244, 0.1);
-          box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
-          padding: 18px;
-          display: flex;
+        .burger {
+          display: inline-flex;
           flex-direction: column;
-          animation: slideIn 180ms ease forwards;
-          z-index: 1;
-        }
-
-        @keyframes slideIn {
-          from {
-            transform: translateX(12px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-
-        .mTop {
-          display: flex;
+          gap: 5px;
+          width: 40px;
+          height: 36px;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.10);
+          background: rgba(255, 255, 255, 0.06);
           align-items: center;
-          justify-content: space-between;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .burgerLine {
+          width: 18px;
+          height: 2px;
+          background: rgba(255, 255, 255, 0.82);
+          border-radius: 2px;
+        }
+
+        .mobileMenu {
+          display: block;
+          border-top: 1px solid rgba(245, 244, 244, 0.08);
+          background: rgba(20, 20, 20, 0.90);
+          backdrop-filter: blur(12px);
+        }
+
+        .mobileInner {
+          max-width: var(--dl-layout-size-maxwidth, 1200px);
+          margin: 0 auto;
+          padding: 12px 18px 18px;
+          display: grid;
           gap: 12px;
         }
 
-        .mBrand {
-          display: inline-flex;
-          align-items: center;
-          text-decoration: none !important;
-        }
-
-        .mLogo {
-          height: 40px;
-        }
-
-        .mClose {
-          border: 1px solid rgba(245, 244, 244, 0.14);
+        .mobileSection {
+          padding: 10px;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
           background: rgba(255, 255, 255, 0.04);
-          color: #f5f4f4;
-          width: 44px;
-          height: 42px;
-          border-radius: 14px;
-          cursor: pointer;
-          font-size: 18px;
         }
 
-        .mLinks {
-          margin-top: 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
+        .mobileTitle {
+          font-size: 12px;
+          opacity: 0.75;
+          margin-bottom: 6px;
+          letter-spacing: 0.2px;
         }
 
-        .mLink {
-          color: #f5f4f4;
-          text-decoration: none !important;
-          padding: 12px 12px;
-          border-radius: 14px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(245, 244, 244, 0.08);
-          opacity: 0.92;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .mCartBadge {
-          min-width: 22px;
-          height: 22px;
-          padding: 0 7px;
-          border-radius: 999px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          font-weight: 800;
-          border: 1px solid rgba(37, 195, 226, 0.35);
-          background: rgba(37, 195, 226, 0.14);
-          color: #25c3e2;
-        }
-
-        .mLink:hover {
-          opacity: 1;
-          background: rgba(255, 255, 255, 0.06);
-        }
-
-        .mLink.isActive {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.22), rgba(37, 195, 226, 0.1));
-          border-color: rgba(37, 195, 226, 0.22);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 700;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
-        }
-
-        .mSub {
-          margin-top: -4px;
-          margin-left: 10px;
-          padding-left: 10px;
-          border-left: 2px solid rgba(245, 244, 244, 0.12);
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .mSubLink {
-          color: rgba(245, 244, 244, 0.92);
-          text-decoration: none !important;
-          padding: 10px 12px;
+        .mobileLink {
+          display: block;
+          padding: 10px 10px;
           border-radius: 12px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(245, 244, 244, 0.06);
+          text-decoration: none;
+          color: rgba(255, 255, 255, 0.88);
+          font-size: 14px;
         }
 
-        .mSubLink:hover {
-          background: rgba(255, 255, 255, 0.06);
+        .mobileLink:hover {
+          background: rgba(255, 255, 255, 0.08);
         }
 
-        .mSubLink.isActiveItem {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
-          border-color: rgba(37, 195, 226, 0.18);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 800;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.06);
+        .mobileLink.active {
+          color: #4da3ff;
+          background: rgba(77, 163, 255, 0.14);
         }
 
-        .mBadge {
-          margin-top: 12px;
-          align-self: flex-start;
-          font-size: 11px;
-          padding: 6px 12px;
-          border: 1px solid rgba(37, 195, 226, 0.55);
-          border-radius: 999px;
-          letter-spacing: 1px;
-          color: #25c3e2;
-          font-weight: 800;
+        .mobileMeta {
+          padding: 10px 10px;
+          border-radius: 12px;
+          color: rgba(255, 255, 255, 0.78);
+          font-size: 13px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
-        .mLogout {
+        .mobileBtn {
+          width: 100%;
           margin-top: 8px;
-          border: 1px solid rgba(245, 244, 244, 0.14);
-          background: rgba(255, 255, 255, 0.04);
-          color: #f5f4f4;
+          height: 40px;
           border-radius: 14px;
-          padding: 12px 12px;
+          border: 1px solid rgba(255, 255, 255, 0.10);
+          background: rgba(255, 255, 255, 0.08);
+          color: rgba(255, 255, 255, 0.90);
           cursor: pointer;
-          text-align: left;
-          opacity: 0.92;
         }
 
-        .mLogout:hover {
-          opacity: 1;
-          background: rgba(255, 255, 255, 0.07);
-        }
-
-        @media (min-width: 900px) {
+        /* ========= RESPONSIVE ========= */
+        @media (min-width: 980px) {
           .navLinks {
             display: flex;
           }
           .burger {
             display: none;
+          }
+          .mobileMenu {
+            display: none;
+          }
+        }
+
+        /* On small screens, keep pills compact (optional) */
+        @media (max-width: 520px) {
+          .pillStatic {
+            max-width: 140px;
           }
         }
       `}</style>
@@ -1077,14 +628,10 @@ export default function JeevanChandimalNavi(props) {
   )
 }
 
-JeevanChandimalNavi.defaultProps = {
-  rootClassName: '',
-  logoAlt: 'Business Logo',
-  logoSrc: '/JC/jc%20logo%20web%2004-1500h.png',
-}
-
 JeevanChandimalNavi.propTypes = {
-  rootClassName: PropTypes.string,
-  logoAlt: PropTypes.string,
-  logoSrc: PropTypes.string,
+  showMembershipPill: PropTypes.bool,
+  membershipHref: PropTypes.string,
+  brandHref: PropTypes.string,
+  brandImgSrc: PropTypes.string,
+  brandAlt: PropTypes.string,
 }
