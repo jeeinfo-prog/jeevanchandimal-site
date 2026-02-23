@@ -93,7 +93,9 @@ export default async function handler(req, res) {
     const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
     const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
     const siteUrl = String(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim()
-    const webhookBase = String(process.env.WEBHOOK_BASE_URL || siteUrl || '').trim().replace(/\/+$/, '')
+    const webhookBase = String(process.env.WEBHOOK_BASE_URL || siteUrl || '')
+      .trim()
+      .replace(/\/+$/, '')
 
     if (!merchantId || !merchantSecret) {
       return res.status(500).json({
@@ -104,30 +106,28 @@ export default async function handler(req, res) {
 
     const orderId = crypto.randomUUID()
 
-    // ✅ IMPORTANT:
-    // Save tier + term into orders so notify.js can activate membership correctly.
-    // Keep your "placeholders" if your orders schema has NOT NULL photo fields.
+    /**
+     * ✅ IMPORTANT:
+     * Your orders table does NOT have membership_term/membership_tier.
+     * So we store membership details using existing columns:
+     * - license = tier (basic/pro/elite)
+     * - format  = term (monthly/yearly/lifetime)
+     */
     const payload = {
       id: orderId,
       email,
-
       order_kind: 'membership',
 
-      // tier & term (notify.js will use these)
-      membership_tier: tier,
-      membership_term: term,
-
-      // keep for older code paths if you use it anywhere
-      membership_plan: tier,
+      // store membership metadata in existing fields
+      license: tier,
+      format: term,
 
       currency,
       amount,
       status: 'PENDING',
 
-      // placeholders for NOT NULL fields in orders schema
+      // placeholders for NOT NULL / legacy fields
       photo_id: 'membership',
-      license: 'membership',
-      format: 'membership',
       delivery_object_key: 'membership',
     }
 
@@ -145,7 +145,6 @@ export default async function handler(req, res) {
       currency,
     })
 
-    // Return info required by your client to post to PayHere
     return res.status(200).json({
       ok: true,
       orderId,
@@ -154,9 +153,6 @@ export default async function handler(req, res) {
       tier,
       term,
       hash,
-
-      // ✅ optional: send URLs so client can build PayHere fields consistently
-      // (if you build fields client-side)
       notifyUrl: webhookBase ? `${webhookBase}/api/payhere/notify` : undefined,
     })
   } catch (e) {
