@@ -40,8 +40,11 @@ function getNotifyBaseUrl(req) {
   )
 }
 
-// ✅ Read PayHere mode from Supabase (source of truth)
-// - fallback is ALWAYS sandbox (never accidentally go live)
+/**
+ * ✅ Source of truth = Supabase app_settings.payhere_mode
+ * - Accepts: 'sandbox' | 'live' (anything else -> sandbox)
+ * - Fallback is ALWAYS sandbox (never accidentally go live)
+ */
 async function getPayhereMode() {
   const fallbackMode = 'sandbox'
 
@@ -176,12 +179,12 @@ export default async function handler(req, res) {
       // cart identity:
       order_kind: 'cart',
       code, // ✅ UNIQUE
-      items: normalizedItems, // ✅ JSONB
+      items: normalizedItems, // ✅ JSONB (ensure orders.items exists)
 
       // OPTIONAL: so you can also query by order_id if you want
       order_id: code,
 
-      // OPTIONAL: store mode (requires column). Remove if you don't want it.
+      // OPTIONAL: store mode (requires orders.payhere_mode column)
       payhere_mode: payhereMode,
     }
 
@@ -191,6 +194,7 @@ export default async function handler(req, res) {
     }
     const created = ins.data
 
+    // ✅ merchant_id (keep your current env)
     const merchant_id = process.env.PAYHERE_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
     if (!merchant_id) return res.status(500).json({ ok: false, error: 'Missing PAYHERE_MERCHANT_ID' })
 
