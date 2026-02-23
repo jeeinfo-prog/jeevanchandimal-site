@@ -6,35 +6,26 @@ function round2(n) {
   const x = Number(n || 0)
   return Math.round(x * 100) / 100
 }
-
-function makeOrderRef() {
-  return `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 10).toUpperCase()}`
-}
-
 function makeUuid() {
-  // Node 18+ supports randomUUID()
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-  // fallback (very rare)
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
-
+function makeGroupCode() {
+  return `CART_${Date.now()}_${Math.random().toString(16).slice(2, 10).toUpperCase()}`
+}
 function normLicense(v) {
   const x = String(v || '').trim().toLowerCase()
   return x === 'commercial' || x === 'editorial' ? x : 'personal'
 }
-
 function normFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
-
 function normCurrency(v) {
   return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
-
 function cleanBaseUrl(v) {
   return String(v || '').trim().replace(/\/+$/, '')
 }
-
 function getSiteBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
@@ -43,7 +34,6 @@ function getSiteBaseUrl(req) {
     ).toString()}`
   )
 }
-
 function getNotifyBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.WEBHOOK_BASE_URL) ||
@@ -85,40 +75,6 @@ async function getObjectKeyForPhoto(photoId, format) {
   return `photos/original/${pid}.jpg`
 }
 
-async function insertOrderWithFallback(row) {
-  // 1) Try full row
-  let r = await supabaseAdmin.from('orders').insert([row]).select('id, order_id').single()
-  if (!r.error) return r
-
-  const msg = String(r.error.message || '').toLowerCase()
-
-  // 2) If "items" column missing, retry without it
-  if (msg.includes('column') && msg.includes('items')) {
-    const { items, ...rest } = row
-    r = await supabaseAdmin.from('orders').insert([rest]).select('id, order_id').single()
-    if (!r.error) return r
-  }
-
-  // 3) If "order_kind" missing, retry without it
-  if (msg.includes('column') && msg.includes('order_kind')) {
-    const { order_kind, ...rest } = row
-    r = await supabaseAdmin.from('orders').insert([rest]).select('id, order_id').single()
-    if (!r.error) return r
-  }
-
-  // 4) Minimum safe columns (BUT keep id!)
-  const minimal = {
-    id: row.id, // ✅ keep id to avoid null id error
-    order_id: row.order_id,
-    email: row.email,
-    currency: row.currency,
-    amount: row.amount,
-    status: row.status,
-  }
-  r = await supabaseAdmin.from('orders').insert([minimal]).select('id, order_id').single()
-  return r
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
@@ -126,22 +82,24 @@ export default async function handler(req, res) {
     const body = req.body || {}
     const cart = body.cart || {}
 
-    // ✅ Support BOTH payload shapes:
-    // A) { email, currency, items }
-    // B) { cart: { email, currency, items }, currency }
     const items =
       (Array.isArray(body.items) && body.items) ||
       (Array.isArray(cart.items) && cart.items) ||
       []
 
     const ccy = normCurrency(body.currency || cart.currency)
-    const email = String(body.email || cart.email || '').trim().toLowerCase() || null
+    const email = String(body.email || cart.email || '').trim().toLowerCase()
 
-    if (!items.length) {
-      return res.status(400).json({ ok: false, error: 'Cart is empty (no items received)' })
-    }
+    if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
+    if (!items.length) return res.status(400).json({ ok: false, error: 'Cart is empty' })
 
-    const cleanItems = []
+    // Group code ties all item-orders together
+    const groupCode = makeGroupCode()
+
+    // Build item rows (1 DB row per item => matches your NOT NULL schema)
+    const rows = []
+    let total = 0
+
     for (const it of items) {
       const photoId = String(it.photoId || it.id || it._id || '').trim()
       const license = normLicense(it.license || it._license)
@@ -149,67 +107,48 @@ export default async function handler(req, res) {
       const qty = Math.max(1, Math.min(99, Number(it.qty || it._qty || 1)))
       const unitPrice = Number(it.unitPrice || it.price || it._price || 0)
 
-      if (!photoId) {
-        return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
-      }
+      if (!photoId) return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
       if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-        return res.status(400).json({
-          ok: false,
-          error: `Invalid cart item (missing price) photoId=${photoId}`,
-        })
+        return res
+          .status(400)
+          .json({ ok: false, error: `Invalid cart item (missing price) photoId=${photoId}` })
       }
 
-      let objectKey = null
-      try {
-        objectKey = await getObjectKeyForPhoto(photoId, format)
-      } catch (e) {
-        return res.status(400).json({ ok: false, error: String(e?.message || 'Photo lookup failed') })
-      }
+      const objectKey = await getObjectKeyForPhoto(photoId, format)
 
-      cleanItems.push({
-        photoId,
-        title: String(it.title || it._title || ''),
-        thumbUrl: String(it.thumbUrl || it.thumb_url || it._thumb || ''),
+      // qty support: we insert multiple rows OR store qty in amount.
+      // simplest: multiply amount, store qty in download_limit logic later if needed
+      const lineAmount = round2(unitPrice * qty)
+      total += lineAmount
+
+      rows.push({
+        id: makeUuid(),
+        status: 'PENDING',
+        email,
+        currency: ccy,
+        amount: lineAmount,
+
+        photo_id: photoId,
         license,
         format,
-        currency: ccy,
-        unitPrice,
-        qty,
-        objectKey,
+
+        delivery_object_key: objectKey,
+
+        order_kind: 'photo', // keep existing flow
+        code: groupCode, // ✅ group all rows under one cart payment
       })
     }
 
-    const amount = round2(cleanItems.reduce((sum, it) => sum + it.unitPrice * it.qty, 0))
-    const orderRef = makeOrderRef()
-    const orderUuid = makeUuid() // ✅ FIX: generate id
+    total = round2(total)
 
-    const toInsert = {
-      id: orderUuid, // ✅ required by your DB
-      order_id: orderRef,
-      email,
-      currency: ccy,
-      amount,
-      status: 'PENDING',
-      order_kind: 'cart',
-      items: cleanItems,
+    // Insert all item orders
+    const ins = await supabaseAdmin.from('orders').insert(rows).select('id, photo_id, amount, code')
+    if (ins.error) {
+      return res.status(500).json({ ok: false, error: ins.error.message })
     }
-
-    const created = await insertOrderWithFallback(toInsert)
-
-    if (created.error || !created.data) {
-      return res.status(500).json({
-        ok: false,
-        error: created.error?.message || 'Order create failed',
-      })
-    }
-
-    const orderId = created.data.id
-    const ref = created.data.order_id || orderRef
 
     const merchant_id = process.env.PAYHERE_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
-    const merchant_secret =
-      process.env.PAYHERE_MERCHANT_SECRET || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_SECRET
-
+    const merchant_secret = process.env.PAYHERE_MERCHANT_SECRET || process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_SECRET
     if (!merchant_id || !merchant_secret) {
       return res.status(500).json({ ok: false, error: 'PayHere env missing (merchant id/secret)' })
     }
@@ -217,8 +156,9 @@ export default async function handler(req, res) {
     const baseUrl = getSiteBaseUrl(req)
     const notifyBase = getNotifyBaseUrl(req)
 
-    const return_url = `${baseUrl}/store/return?order_id=${encodeURIComponent(ref)}`
-    const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(ref)}`
+    // PayHere reference = groupCode (NOT a single order row)
+    const return_url = `${baseUrl}/store/return?order_id=${encodeURIComponent(groupCode)}`
+    const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(groupCode)}`
     const notify_url = `${notifyBase}/api/payhere/notify`
 
     const payload = {
@@ -227,21 +167,21 @@ export default async function handler(req, res) {
       cancel_url,
       notify_url,
 
-      order_id: ref,
-      items: `Jeevan Chandimal Photo Cart (${cleanItems.length} items)`,
+      order_id: groupCode,
+      items: `Jeevan Chandimal Photo Cart (${rows.length} items)`,
       currency: ccy,
-      amount: Number(amount).toFixed(2),
+      amount: Number(total).toFixed(2),
 
       first_name: 'Customer',
       last_name: '',
-      email: email || '',
+      email,
       phone: '',
       address: '',
       city: '',
       country: 'Sri Lanka',
 
       custom_1: 'cart',
-      custom_2: orderId || '',
+      custom_2: groupCode,
     }
 
     const query = new URLSearchParams(payload).toString()
@@ -249,9 +189,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      orderId,
-      orderRef: ref,
-      orderCode: ref,
+      groupCode,
+      count: rows.length,
+      total,
       redirectUrl,
     })
   } catch (e) {
