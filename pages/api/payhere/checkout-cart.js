@@ -6,26 +6,39 @@ function round2(n) {
   const x = Number(n || 0)
   return Math.round(x * 100) / 100
 }
+
 function makeUuid() {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
-function makeGroupCode() {
+
+function makeGroupId() {
   return `CART_${Date.now()}_${Math.random().toString(16).slice(2, 10).toUpperCase()}`
 }
+
+// IMPORTANT: your DB has unique constraint on orders.code
+// So every row MUST have its own unique code.
+function makeRowCode() {
+  return `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 10).toUpperCase()}`
+}
+
 function normLicense(v) {
   const x = String(v || '').trim().toLowerCase()
   return x === 'commercial' || x === 'editorial' ? x : 'personal'
 }
+
 function normFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
+
 function normCurrency(v) {
   return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
+
 function cleanBaseUrl(v) {
   return String(v || '').trim().replace(/\/+$/, '')
 }
+
 function getSiteBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
@@ -34,6 +47,7 @@ function getSiteBaseUrl(req) {
     ).toString()}`
   )
 }
+
 function getNotifyBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.WEBHOOK_BASE_URL) ||
@@ -46,25 +60,18 @@ async function getObjectKeyForPhoto(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) throw new Error('Missing photoId')
 
-  const { data: p, error } = await supabaseAdmin.from('photos').select('*').eq('id', pid).maybeSingle()
+  const { data: p, error } = await supabaseAdmin
+    .from('photos')
+    .select('*')
+    .eq('id', pid)
+    .maybeSingle()
+
   if (error) throw new Error(error.message)
   if (!p) throw new Error(`Photo not found: ${pid}`)
 
-  const jpgKey =
-    p.original_jpg_key ||
-    p.original_key ||
-    p.original_object_key ||
-    p.object_key ||
-    p.r2_key ||
-    p.key ||
-    null
-
-  const rawKey =
-    p.original_raw_key ||
-    p.raw_object_key ||
-    p.raw_zip_key ||
-    p.raw_original_key ||
-    null
+  // prefer stable columns
+  const jpgKey = p.original_jpg_key || p.original_key || p.original_object_key || p.object_key || p.r2_key || p.key || null
+  const rawKey = p.original_raw_key || p.raw_zip_key || p.raw_original_key || p.raw_object_key || null
 
   if (format === 'raw') {
     if (rawKey) return String(rawKey)
@@ -93,10 +100,9 @@ export default async function handler(req, res) {
     if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
     if (!items.length) return res.status(400).json({ ok: false, error: 'Cart is empty' })
 
-    // Group code ties all item-orders together
-    const groupCode = makeGroupCode()
+    // ✅ Group id used as PayHere order_id AND stored in orders.order_id for ALL rows
+    const groupId = makeGroupId()
 
-    // Build item rows (1 DB row per item => matches your NOT NULL schema)
     const rows = []
     let total = 0
 
@@ -107,20 +113,20 @@ export default async function handler(req, res) {
       const qty = Math.max(1, Math.min(99, Number(it.qty || it._qty || 1)))
       const unitPrice = Number(it.unitPrice || it.price || it._price || 0)
 
-      if (!photoId) return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
+      if (!photoId) {
+        return res.status(400).json({ ok: false, error: 'Invalid cart item (missing photoId)' })
+      }
       if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-        return res
-          .status(400)
-          .json({ ok: false, error: `Invalid cart item (missing price) photoId=${photoId}` })
+        return res.status(400).json({ ok: false, error: `Invalid cart item (missing price) photoId=${photoId}` })
       }
 
       const objectKey = await getObjectKeyForPhoto(photoId, format)
 
-      // qty support: we insert multiple rows OR store qty in amount.
-      // simplest: multiply amount, store qty in download_limit logic later if needed
       const lineAmount = round2(unitPrice * qty)
       total += lineAmount
 
+      // ✅ If qty > 1: simplest is 1 row with amount=unit*qty
+      // Download still 1 file; qty is only for pricing.
       rows.push({
         id: makeUuid(),
         status: 'PENDING',
@@ -134,15 +140,19 @@ export default async function handler(req, res) {
 
         delivery_object_key: objectKey,
 
-        order_kind: 'photo', // keep existing flow
-        code: groupCode, // ✅ group all rows under one cart payment
+        order_kind: 'photo', // keep compatible with existing schema
+
+        // ✅ IMPORTANT:
+        // - order_id = shared groupId (for cart)
+        // - code must be unique per row (because orders_code_unique)
+        order_id: groupId,
+        code: makeRowCode(),
       })
     }
 
     total = round2(total)
 
-    // Insert all item orders
-    const ins = await supabaseAdmin.from('orders').insert(rows).select('id, photo_id, amount, code')
+    const ins = await supabaseAdmin.from('orders').insert(rows).select('id, photo_id, amount, order_id, code')
     if (ins.error) {
       return res.status(500).json({ ok: false, error: ins.error.message })
     }
@@ -156,9 +166,9 @@ export default async function handler(req, res) {
     const baseUrl = getSiteBaseUrl(req)
     const notifyBase = getNotifyBaseUrl(req)
 
-    // PayHere reference = groupCode (NOT a single order row)
-    const return_url = `${baseUrl}/store/return?order_id=${encodeURIComponent(groupCode)}`
-    const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(groupCode)}`
+    // ✅ PayHere order_id = groupId (cart group)
+    const return_url = `${baseUrl}/store/return?order_id=${encodeURIComponent(groupId)}`
+    const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(groupId)}`
     const notify_url = `${notifyBase}/api/payhere/notify`
 
     const payload = {
@@ -167,7 +177,7 @@ export default async function handler(req, res) {
       cancel_url,
       notify_url,
 
-      order_id: groupCode,
+      order_id: groupId,
       items: `Jeevan Chandimal Photo Cart (${rows.length} items)`,
       currency: ccy,
       amount: Number(total).toFixed(2),
@@ -180,8 +190,9 @@ export default async function handler(req, res) {
       city: '',
       country: 'Sri Lanka',
 
+      // ✅ make notify.js treat as cart
       custom_1: 'cart',
-      custom_2: groupCode,
+      custom_2: groupId,
     }
 
     const query = new URLSearchParams(payload).toString()
@@ -189,7 +200,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      groupCode,
+      groupId,
       count: rows.length,
       total,
       redirectUrl,
