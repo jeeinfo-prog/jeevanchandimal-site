@@ -1,6 +1,24 @@
 // pages/api/orders/status.js
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
+function isCartGroup(ref) {
+  return String(ref || '').toUpperCase().startsWith('CART_')
+}
+
+function normStatus(s) {
+  return String(s || 'PENDING').trim().toUpperCase()
+}
+
+function groupStatus(rows) {
+  const list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return 'NOT_FOUND'
+
+  const statuses = list.map((r) => normStatus(r.status))
+  if (statuses.some((s) => s === 'FAILED' || s === 'CANCELED' || s === 'CANCELLED')) return 'FAILED'
+  if (statuses.every((s) => s === 'PAID')) return 'PAID'
+  return 'PENDING'
+}
+
 export default async function handler(req, res) {
   // HARD no-cache (browser + CDN + Vercel)
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -18,51 +36,76 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing order_id' })
     }
 
-    // helper to keep response consistent
-    const pack = (row) => {
-      const resolved = row?.code || row?.id || ref
-      return {
+    // ✅ CART GROUP: CART_...
+    if (isCartGroup(ref)) {
+      const r = await supabaseAdmin
+        .from('orders')
+        .select('id,code,status,paid_at,payhere_status_code')
+        .eq('code', ref)
+
+      if (r.error) return res.status(500).json({ ok: false, error: r.error.message })
+
+      const rows = Array.isArray(r.data) ? r.data : []
+      if (rows.length === 0) return res.status(404).json({ ok: false, error: 'Order not found' })
+
+      const st = groupStatus(rows)
+
+      // choose a representative row for paid_at / status_code
+      const paidRow = rows.find((x) => normStatus(x.status) === 'PAID') || rows[0]
+
+      return res.status(200).json({
         ok: true,
-        id: row.id,
-        code: resolved, // ✅ always present
-        order_id: resolved, // ✅ always present
-        status: row.status,
-        paid_at: row.paid_at || null,
-        payhere_status_code: row.payhere_status_code ?? null,
-      }
+        id: rows[0].id, // compatibility (not used for cart downloads)
+        code: ref,
+        order_id: ref,
+        status: st,
+        count: rows.length,
+        paid_at: paidRow?.paid_at || null,
+        payhere_status_code: paidRow?.payhere_status_code ?? null,
+      })
     }
 
-    // 1) Try by id (covers UUID + ORD_* ids)
+    // ✅ SINGLE ORDER: try by id
     const byId = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')
       .eq('id', ref)
       .maybeSingle()
 
-    if (byId.error) {
-      return res.status(500).json({ ok: false, error: byId.error.message })
-    }
-
+    if (byId.error) return res.status(500).json({ ok: false, error: byId.error.message })
     if (byId.data) {
-      return res.status(200).json(pack(byId.data))
+      const resolved = byId.data?.code || byId.data?.id || ref
+      return res.status(200).json({
+        ok: true,
+        id: byId.data.id,
+        code: resolved,
+        order_id: resolved,
+        status: byId.data.status,
+        paid_at: byId.data.paid_at || null,
+        payhere_status_code: byId.data.payhere_status_code ?? null,
+      })
     }
 
-    // 2) Try by code (if you ever store code separately)
+    // ✅ SINGLE ORDER: try by code (non-cart legacy)
     const byCode = await supabaseAdmin
       .from('orders')
       .select('id,code,status,paid_at,payhere_status_code')
       .eq('code', ref)
       .maybeSingle()
 
-    if (byCode.error) {
-      return res.status(500).json({ ok: false, error: byCode.error.message })
-    }
+    if (byCode.error) return res.status(500).json({ ok: false, error: byCode.error.message })
+    if (!byCode.data) return res.status(404).json({ ok: false, error: 'Order not found' })
 
-    if (!byCode.data) {
-      return res.status(404).json({ ok: false, error: 'Order not found' })
-    }
-
-    return res.status(200).json(pack(byCode.data))
+    const resolved = byCode.data?.code || byCode.data?.id || ref
+    return res.status(200).json({
+      ok: true,
+      id: byCode.data.id,
+      code: resolved,
+      order_id: resolved,
+      status: byCode.data.status,
+      paid_at: byCode.data.paid_at || null,
+      payhere_status_code: byCode.data.payhere_status_code ?? null,
+    })
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
