@@ -232,13 +232,23 @@ export default function CartPage() {
 
   function persist(nextItemsRaw, nextCurrency = currency) {
     const ccy = normCurrency(nextCurrency)
-    const cart = { currency: ccy, items: nextItemsRaw }
+
+    // ✅ IMPORTANT FIX:
+    // Always persist items *with* currency on each item.
+    // Your lib/cart.js key includes currency; if items don't store currency,
+    // other parts of the app can re-key them differently and "cart becomes empty".
+    const withCurrency = (Array.isArray(nextItemsRaw) ? nextItemsRaw : []).map((x) => ({
+      ...x,
+      currency: ccy,
+    }))
+
+    const cart = { currency: ccy, items: withCurrency }
     cartApi.write(cart)
 
     writeLS(STORAGE_CCY_KEY, ccy)
 
     setCurrency(ccy)
-    setItems(nextItemsRaw.map((x) => normalizeItem(x, ccy)).filter(Boolean))
+    setItems(withCurrency.map((x) => normalizeItem(x, ccy)).filter(Boolean))
 
     try {
       window.dispatchEvent(new Event('jc_cart_updated'))
@@ -294,13 +304,11 @@ export default function CartPage() {
   async function onCheckout() {
     if (busy) return
 
-    const latest = cartApi.read() || {}
-    const rawItems = Array.isArray(latest) ? latest : latest.items
-    const ccy = normCurrency((latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency)
-
-    const normItems = Array.isArray(rawItems)
-      ? rawItems.map((x) => normalizeItem(x, ccy)).filter(Boolean)
-      : []
+    // ✅ IMPORTANT FIX:
+    // Use the current *state* items you are rendering.
+    // Reading again from cartApi can race with other writes / storage events and come back empty.
+    const ccy = normCurrency(currency)
+    const normItems = Array.isArray(items) ? items.map((x) => normalizeItem(x, ccy)).filter(Boolean) : []
 
     if (normItems.length === 0) {
       setNote('Cart is empty.')
@@ -356,6 +364,8 @@ export default function CartPage() {
         return
       }
 
+      // ✅ Do NOT clear the cart here.
+      // Clear only after payment success (notify/return flow), otherwise return page may show empty.
       window.location.href = data.redirectUrl
     } catch (e) {
       setBusy(false)
@@ -540,9 +550,7 @@ export default function CartPage() {
                   {busy ? 'Please wait…' : 'Checkout'}
                 </button>
 
-                <div className="smallNote">
-                  Checkout will create a single order for multiple items.
-                </div>
+                <div className="smallNote">Checkout will create a single order for multiple items.</div>
               </aside>
             </div>
           )}
