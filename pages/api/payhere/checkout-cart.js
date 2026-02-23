@@ -40,6 +40,27 @@ function getNotifyBaseUrl(req) {
   )
 }
 
+// ✅ Read PayHere mode from Supabase (source of truth)
+// - fallback is ALWAYS sandbox (never accidentally go live)
+async function getPayhereMode() {
+  const fallbackMode = 'sandbox'
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'payhere_mode')
+      .maybeSingle()
+
+    if (error) return fallbackMode
+
+    const v = String(data?.value || '').trim().toLowerCase()
+    return v === 'live' ? 'live' : 'sandbox'
+  } catch {
+    return fallbackMode
+  }
+}
+
 async function getObjectKeyForPhoto(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) throw new Error('Missing photoId')
@@ -137,6 +158,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Cart missing first photoId' })
     }
 
+    // ✅ determine PayHere mode from Supabase setting
+    const payhereMode = await getPayhereMode()
+
     const orderRow = {
       id: `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 14)}`, // your style id
       status: 'PENDING',
@@ -156,6 +180,9 @@ export default async function handler(req, res) {
 
       // OPTIONAL: so you can also query by order_id if you want
       order_id: code,
+
+      // OPTIONAL: store mode (requires column). Remove if you don't want it.
+      payhere_mode: payhereMode,
     }
 
     const ins = await supabaseAdmin.from('orders').insert(orderRow).select('id, code, amount').maybeSingle()
@@ -201,11 +228,8 @@ export default async function handler(req, res) {
 
     const query = new URLSearchParams(payload).toString()
 
-    // ✅ sandbox vs live
-    const env = String(process.env.PAYHERE_ENV || '').toLowerCase()
-    const payhereHost =
-      env === 'sandbox' ? 'https://sandbox.payhere.lk' : 'https://www.payhere.lk'
-
+    // ✅ sandbox vs live (from Supabase)
+    const payhereHost = payhereMode === 'live' ? 'https://www.payhere.lk' : 'https://sandbox.payhere.lk'
     const redirectUrl = `${payhereHost}/pay/checkout?${query}`
 
     return res.status(200).json({
@@ -214,6 +238,7 @@ export default async function handler(req, res) {
       code,
       total,
       redirectUrl,
+      payhereMode,
     })
   } catch (e) {
     console.error('checkout-cart error:', e)
