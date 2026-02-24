@@ -153,38 +153,38 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const panOrigin = React.useRef({ x: 0, y: 0 })
 
   // ✅ Pointer-based pan (mouse + touch)
-const activePointerId = React.useRef(null)
+  const activePointerId = React.useRef(null)
 
-function onPointerDownPan(e) {
-  if (e.pointerType === 'mouse' && e.button !== 0) return
+  function onPointerDownPan(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
 
-  e.preventDefault()
-  setIsPanning(true)
-  activePointerId.current = e.pointerId
+    e.preventDefault()
+    setIsPanning(true)
+    activePointerId.current = e.pointerId
 
-  try {
-    e.currentTarget.setPointerCapture(e.pointerId)
-  } catch {}
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {}
 
-  panStart.current = { x: e.clientX, y: e.clientY }
-  panOrigin.current = { x: pan.x, y: pan.y }
-}
+    panStart.current = { x: e.clientX, y: e.clientY }
+    panOrigin.current = { x: pan.x, y: pan.y }
+  }
 
-function onPointerMovePan(e) {
-  if (!isPanning) return
-  if (activePointerId.current != null && e.pointerId !== activePointerId.current) return
+  function onPointerMovePan(e) {
+    if (!isPanning) return
+    if (activePointerId.current != null && e.pointerId !== activePointerId.current) return
 
-  e.preventDefault()
-  const dx = e.clientX - panStart.current.x
-  const dy = e.clientY - panStart.current.y
-  setPan({ x: panOrigin.current.x + dx, y: panOrigin.current.y + dy })
-}
+    e.preventDefault()
+    const dx = e.clientX - panStart.current.x
+    const dy = e.clientY - panStart.current.y
+    setPan({ x: panOrigin.current.x + dx, y: panOrigin.current.y + dy })
+  }
 
-function endPointerPan(e) {
-  if (activePointerId.current != null && e.pointerId !== activePointerId.current) return
-  setIsPanning(false)
-  activePointerId.current = null
-}
+  function endPointerPan(e) {
+    if (activePointerId.current != null && e.pointerId !== activePointerId.current) return
+    setIsPanning(false)
+    activePointerId.current = null
+  }
 
   // checkout fields
   const [email, setEmail] = React.useState('')
@@ -211,7 +211,6 @@ function endPointerPan(e) {
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${encodeURIComponent(variant)}`
     : ''
-
 
   const displaySrc = previewSrc || photo?.previewUrl || photo?.thumbUrl || ''
   const firstTag = (photo?.tags || []).find(Boolean) || ''
@@ -252,8 +251,6 @@ function endPointerPan(e) {
     const delta = e.deltaY > 0 ? -0.08 : 0.08
     setZoom((z) => clamp(Number((z + delta).toFixed(2)), 1, 3))
   }
-
-  
 
   React.useEffect(() => {
     function onKey(e) {
@@ -825,6 +822,13 @@ function endPointerPan(e) {
                       }
                       if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
                     }}
+                    style={{
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      WebkitTouchCallout: 'none',
+                      WebkitUserDrag: 'none',
+                      touchAction: 'manipulation',
+                    }}
                   />
 
                   {wmOn && <div className="wmTile" style={{ opacity: wmOpacity }} />}
@@ -1319,69 +1323,69 @@ function endPointerPan(e) {
         )}
 
         {/* ZOOM OVERLAY */}
-{zoomOpen && (
-  <div className="zoomOverlay" onContextMenu={preventSave}>
-    <div className="zoomTop">
-      <div className="zoomTitle">{photo?.title || 'Preview'}</div>
-      <div className="zoomActions">
-        <span className="zoomPct">{Math.round(zoom * 100)}%</span>
+        {zoomOpen && (
+          <div className="zoomOverlay" onContextMenu={preventSave}>
+            <div className="zoomTop">
+              <div className="zoomTitle">{photo?.title || 'Preview'}</div>
+              <div className="zoomActions">
+                <span className="zoomPct">{Math.round(zoom * 100)}%</span>
 
-        <button
-          type="button"
-          className="miniBtn"
-          onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}
-        >
-          −
-        </button>
+                <button
+                  type="button"
+                  className="miniBtn"
+                  onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}
+                >
+                  −
+                </button>
 
-        <button
-          type="button"
-          className="miniBtn"
-          onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}
-        >
-          +
-        </button>
+                <button
+                  type="button"
+                  className="miniBtn"
+                  onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}
+                >
+                  +
+                </button>
 
-        <button type="button" className="miniBtn" onClick={closeZoom}>
-          Close
-        </button>
-      </div>
-    </div>
+                <button type="button" className="miniBtn" onClick={closeZoom}>
+                  Close
+                </button>
+              </div>
+            </div>
 
-    <div
-      className="zoomBody"
-      onWheel={onWheelZoom}
-      onPointerDown={onPointerDownPan}
-      onPointerMove={onPointerMovePan}
-      onPointerUp={endPointerPan}
-      onPointerCancel={endPointerPan}
-      onPointerLeave={endPointerPan}
-      onContextMenu={preventSave}
-    >
-      <img
-        src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
-        alt={photo?.title || 'Preview'}
-        draggable={false}
-        onDragStart={preventSave}
-        onContextMenu={preventSave}
-        style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          cursor: isPanning ? 'grabbing' : 'grab',
+            <div
+              className="zoomBody"
+              onWheel={onWheelZoom}
+              onPointerDown={onPointerDownPan}
+              onPointerMove={onPointerMovePan}
+              onPointerUp={endPointerPan}
+              onPointerCancel={endPointerPan}
+              onPointerLeave={endPointerPan}
+              onContextMenu={preventSave}
+            >
+              <img
+                src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
+                alt={photo?.title || 'Preview'}
+                draggable={false}
+                onDragStart={preventSave}
+                onContextMenu={preventSave}
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  cursor: isPanning ? 'grabbing' : 'grab',
 
-          // ✅ important: blocks iOS long-press "Save Image"
-          // and still allows pan because pointer events are on the container
-          pointerEvents: 'none',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-          WebkitTouchCallout: 'none',
-          WebkitUserDrag: 'none',
-        }}
-      />
+                  // ✅ important: blocks iOS long-press "Save Image"
+                  // and still allows pan because pointer events are on the container
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                  WebkitUserDrag: 'none',
+                }}
+              />
 
-      {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
-    </div>
-  </div>
-)}
+              {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
+            </div>
+          </div>
+        )}
       </main>
 
       <JeevanChandimalNewFooter />
@@ -1465,6 +1469,15 @@ function endPointerPan(e) {
           user-select: none;
           -webkit-user-select: none;
           -webkit-touch-callout: none;
+        }
+
+        /* ✅ Explicit desktop behavior */
+        .mainImg {
+          display: block;
+          -webkit-touch-callout: none;
+          -webkit-user-drag: none;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .zoomBtn {
@@ -1973,27 +1986,27 @@ function endPointerPan(e) {
         }
 
         .zoomBody {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
+          position: relative;
+          overflow: hidden;
+          display: grid;
+          place-items: center;
 
-  touch-action: none;              /* ✅ REQUIRED for mobile drag */
-  -webkit-user-select: none;       /* block text/image selection */
-  user-select: none;
-}
+          touch-action: none; /* ✅ REQUIRED for mobile drag */
+          -webkit-user-select: none; /* block text/image selection */
+          user-select: none;
+        }
 
         .zoomBody img {
-  max-width: none;
-  max-height: none;
-  width: auto;
-  height: auto;
+          max-width: none;
+          max-height: none;
+          width: auto;
+          height: auto;
 
-  pointer-events: none;            /* ✅ image can't be long-pressed */
-  -webkit-user-drag: none;
-  -webkit-touch-callout: none;     /* iOS: no save image popup */
-  user-select: none;
-}
+          pointer-events: none; /* ✅ image can't be long-pressed */
+          -webkit-user-drag: none;
+          -webkit-touch-callout: none; /* iOS: no save image popup */
+          user-select: none;
+        }
 
         .imageFrame:hover .wmTile {
           opacity: 0;
@@ -2012,12 +2025,13 @@ function endPointerPan(e) {
           inset: 0;
         }
 
+        /* ✅ Mobile: FORCE hide the real <img> so only background preview shows */
         @media (max-width: 991px) {
-          .mainImg {
-            display: none;
+          .imageFrame img.mainImg {
+            display: none !important;
           }
-          .imgBg {
-            display: block;
+          .imageFrame .imgBg {
+            display: block !important;
           }
           .layout {
             grid-template-columns: 1fr;
