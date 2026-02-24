@@ -76,6 +76,10 @@ function normalizeFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
 
+function normalizeCurrency(v) {
+  return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
+}
+
 /* ===== MEMBERSHIP HELPERS ===== */
 
 function normalizeMembershipTier(v) {
@@ -92,7 +96,6 @@ function addMonths(date, months) {
   const d = new Date(date)
   const day = d.getUTCDate()
   d.setUTCMonth(d.getUTCMonth() + months)
-  // handle month-end rollover (e.g. Jan 31 + 1 month)
   if (d.getUTCDate() < day) d.setUTCDate(0)
   return d
 }
@@ -140,7 +143,6 @@ async function ensureInvoiceNo(order) {
   const up = await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', order.id)
   if (up.error) {
     console.error('ensureInvoiceNo update failed:', up.error.message)
-    // still return generated value so email can proceed
   }
   return invoiceNo
 }
@@ -178,13 +180,11 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
   const id = String(cartOrderDbId || '').trim()
   const code = String(cartCode || '').trim()
 
-  // 1) Prefer custom_2 (DB id)
   if (id) {
     const byId = await supabaseAdmin.from('orders').select('*').eq('id', id).maybeSingle()
     if (!byId.error && byId?.data) return byId.data
   }
 
-  // 2) Fallback to code = CART_...
   if (code) {
     const byCode = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
     if (!byCode.error && byCode?.data) return byCode.data
@@ -195,9 +195,6 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
 
 /**
  * SINGLE order lookup (safe)
- * - by id
- * - by order_id (if you use it)
- * - by code (legacy)
  */
 async function findSingleOrderByRef(ref) {
   const v = String(ref || '').trim()
@@ -216,9 +213,7 @@ async function findSingleOrderByRef(ref) {
 }
 
 /**
- * ✅ Idempotency helper:
- * Tries to "claim" a send flag by setting timestamp only if currently NULL.
- * Returns true if we successfully claimed (so it's safe to send email now).
+ * ✅ Idempotency helper
  */
 async function claimSendOnce(orderId, column) {
   const now = new Date().toISOString()
@@ -237,10 +232,76 @@ async function claimSendOnce(orderId, column) {
   return !!r.data
 }
 
+/* ===== PAYHERE SECRET RESOLVER =====
+   Option B + sandbox/live:
+   - Try multiple secrets (sandbox/live/default) safely.
+*/
+function getCandidateMerchantSecrets() {
+  const list = [
+    process.env.PAYHERE_MERCHANT_SECRET_SANDBOX,
+    process.env.PAYHERE_MERCHANT_SECRET_LIVE,
+    process.env.PAYHERE_MERCHANT_SECRET,
+  ]
+    .map((x) => String(x || '').trim())
+    .filter(Boolean)
+
+  // remove duplicates
+  return Array.from(new Set(list))
+}
+
+function verifyMd5WithAnySecret(payload) {
+  const secrets = getCandidateMerchantSecrets()
+  for (const merchantSecret of secrets) {
+    try {
+      const ok = payhereVerifyMd5Sig({ ...payload, merchantSecret })
+      if (ok) return true
+    } catch {}
+  }
+  return false
+}
+
+function orderLooksLikeCart(order_id, custom_1, dbOrder) {
+  const kindRaw = String(custom_1 || '').trim().toLowerCase()
+  const isCartByCustom = kindRaw === 'cart'
+  const isCartByPrefix = String(order_id || '').startsWith('CART_')
+  const isCartByDb = String(dbOrder?.order_kind || '').toLowerCase() === 'cart'
+  return isCartByCustom || isCartByPrefix || isCartByDb
+}
+
+function orderLooksLikeMembership(custom_1, dbOrder) {
+  const kindRaw = String(custom_1 || '').trim().toLowerCase()
+  const isMemByCustom = kindRaw === 'membership'
+  const isMemByDb = String(dbOrder?.order_kind || '').toLowerCase() === 'membership'
+  return isMemByCustom || isMemByDb
+}
+
+function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency }) {
+  if (!dbOrder) return true
+  const dbAmount = normalizePayhereAmount(dbOrder.amount)
+  const dbCurrency = normalizeCurrency(dbOrder.currency)
+  const phAmount = normalizePayhereAmount(payhere_amount)
+  const phCurrency = normalizeCurrency(payhere_currency)
+
+  // If your DB has no amount/currency, skip.
+  if (!dbOrder.amount || !dbOrder.currency) return true
+
+  if (dbAmount !== phAmount || dbCurrency !== phCurrency) {
+    console.error('Amount/currency mismatch:', {
+      orderId: dbOrder.id,
+      code: dbOrder.code,
+      dbAmount,
+      dbCurrency,
+      phAmount,
+      phCurrency,
+    })
+    return false
+  }
+  return true
+}
+
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
-  // PayHere expects 200 always
   if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
@@ -262,15 +323,24 @@ export default async function handler(req, res) {
 
     if (!order_id) return res.status(200).send('OK')
 
-    // Verify signature
-    const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
-    if (!merchantSecret) {
-      console.error('Missing PAYHERE_MERCHANT_SECRET; cannot verify signature.')
-      return res.status(200).send('OK')
-    }
+    // We can still process without knowing kind yet.
+    const cartCode = String(order_id || '').trim()
+    const cartDbId = String(custom_2 || '').trim()
 
-    const ok = payhereVerifyMd5Sig({
-      merchantSecret,
+    // Try to find DB row early (helps kind detection + amount validation)
+    // - If cart: custom_2 is DB id; code is CART_...
+    // - If single/membership: order_id is ref
+    let dbOrder = null
+    try {
+      if (String(order_id || '').startsWith('CART_') || String(custom_1 || '').trim().toLowerCase() === 'cart') {
+        dbOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
+      } else {
+        dbOrder = await findSingleOrderByRef(order_id)
+      }
+    } catch {}
+
+    // Verify signature (try sandbox/live/default secrets)
+    const ok = verifyMd5WithAnySecret({
       merchant_id,
       order_id,
       payhere_amount: normalizePayhereAmount(payhere_amount),
@@ -279,19 +349,12 @@ export default async function handler(req, res) {
       md5sig,
     })
 
-    const kind = String(custom_1 || '').trim().toLowerCase()
-
-    // NEW cart flow:
-    // - order_id = cartCode (CART_...)
-    // - custom_2 = cart order DB id
-    const cartCode = String(order_id || '').trim()
-    const cartDbId = String(custom_2 || '').trim()
-
     if (!ok) {
       console.error('MD5 signature mismatch for order:', order_id)
 
-      if (kind === 'cart') {
-        const cartOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
+      const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
+      if (isCart) {
+        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
           await supabaseAdmin
             .from('orders')
@@ -304,7 +367,7 @@ export default async function handler(req, res) {
             .eq('id', cartOrder.id)
         }
       } else {
-        const single = await findSingleOrderByRef(order_id)
+        const single = dbOrder || (await findSingleOrderByRef(order_id))
         if (single) {
           await supabaseAdmin
             .from('orders')
@@ -327,20 +390,33 @@ export default async function handler(req, res) {
        ✅ PAYMENT SUCCESS
     ========================================================= */
     if (statusCodeNum === 2) {
-      const isMembership = kind === 'membership'
-      const isCart = kind === 'cart'
+      const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
+      const isMembership = orderLooksLikeMembership(custom_1, dbOrder)
 
       /* ================= MEMBERSHIP ================= */
       if (isMembership) {
-        const order = await findSingleOrderByRef(order_id)
+        const order = dbOrder || (await findSingleOrderByRef(order_id))
         if (!order) return res.status(200).send('OK')
+
+        // ✅ Amount/currency safety (Option B)
+        if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              status: 'AMOUNT_MISMATCH',
+              payhere_payment_id: payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', order.id)
+          return res.status(200).send('OK')
+        }
 
         const email = normalizeEmail(order.email)
         if (!email) return res.status(200).send('OK')
 
         const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
 
-        // ✅ Mark paid (idempotent)
         if (!wasPaidAlready) {
           await supabaseAdmin
             .from('orders')
@@ -354,7 +430,6 @@ export default async function handler(req, res) {
             .eq('id', order.id)
         }
 
-        // ✅ Re-fetch latest row
         const freshRes = await supabaseAdmin.from('orders').select('*').eq('id', order.id).maybeSingle()
         if (freshRes.error) {
           console.error('membership refetch failed:', freshRes.error.message)
@@ -362,20 +437,15 @@ export default async function handler(req, res) {
         }
         const o = freshRes.data || order
 
-        // ✅ Membership tier/term stored in existing columns:
-        // - license = tier (basic/pro/elite)
-        // - format  = term (monthly/yearly/lifetime)
         const tier = normalizeMembershipTier(o.license)
         const term = normalizeMembershipTerm(o.format)
 
-        // ✅ Compute expiry
         const now = new Date()
         let expiresAt = null
         if (term === 'monthly') expiresAt = addMonths(now, 1).toISOString()
         if (term === 'yearly') expiresAt = addYears(now, 1).toISOString()
         if (term === 'lifetime') expiresAt = addYears(now, 100).toISOString()
 
-        // ✅ Activate membership
         try {
           const upsertPayload = {
             email,
@@ -391,10 +461,8 @@ export default async function handler(req, res) {
           console.error('members activate error:', e?.message || e)
         }
 
-        // ✅ Send receipt email ONCE (idempotent)
         try {
           const invoiceNo = await ensureInvoiceNo(o)
-
           const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
           if (claimedReceipt) {
             await sendReceiptEmail({
@@ -418,9 +486,23 @@ export default async function handler(req, res) {
 
       /* ================= CART (NEW: SINGLE ROW) ================= */
       if (isCart) {
-        const cartOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
+        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (!cartOrder) {
           console.error('Cart order not found:', { cartDbId, cartCode })
+          return res.status(200).send('OK')
+        }
+
+        // ✅ Amount/currency safety (Option B)
+        if (!amountCurrencyMatchOrLog({ dbOrder: cartOrder, payhere_amount, payhere_currency })) {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              status: 'AMOUNT_MISMATCH',
+              payhere_payment_id: payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', cartOrder.id)
           return res.status(200).send('OK')
         }
 
@@ -429,7 +511,6 @@ export default async function handler(req, res) {
 
         const wasPaidAlready = String(cartOrder.status || '').toUpperCase() === 'PAID'
 
-        // Mark cart order as PAID (idempotent)
         if (!wasPaidAlready) {
           await supabaseAdmin
             .from('orders')
@@ -443,7 +524,6 @@ export default async function handler(req, res) {
             .eq('id', cartOrder.id)
         }
 
-        // Re-fetch latest
         const { data: freshCart, error: freshErr } = await supabaseAdmin
           .from('orders')
           .select('*')
@@ -463,16 +543,13 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
-        // Ensure download_limit on cart order
         const desiredLimit = cartLimitFromItems(items)
         if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
           await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
         }
 
-        // Invoice number
         const invoiceNo = await ensureInvoiceNo(o)
 
-        // ✅ Receipt email (send once) — claim first to prevent duplicates
         const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
         if (claimedReceipt) {
           const amount =
@@ -500,7 +577,6 @@ export default async function handler(req, res) {
           })
         }
 
-        // ✅ Download email (send once) — claim first to prevent duplicates + duplicate tokens
         const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
         if (claimedDownload) {
           const links = []
@@ -531,7 +607,7 @@ export default async function handler(req, res) {
 
             const ins = await supabaseAdmin.from('download_tokens').insert({
               jti,
-              order_id: o.id, // ✅ cart is one order row; all tokens tie to this order
+              order_id: o.id,
               expires_at: expiresAt.toISOString(),
             })
             if (ins.error) {
@@ -591,8 +667,22 @@ export default async function handler(req, res) {
 
       /* ================= SINGLE PHOTO (EXISTING) ================= */
 
-      const order = await findSingleOrderByRef(order_id)
+      const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (!order) return res.status(200).send('OK')
+
+      // ✅ Amount/currency safety (Option B)
+      if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
+        await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'AMOUNT_MISMATCH',
+            payhere_payment_id: payment_id || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
+          .eq('id', order.id)
+        return res.status(200).send('OK')
+      }
 
       const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
       if (!wasPaidAlready) {
@@ -634,11 +724,9 @@ export default async function handler(req, res) {
       try {
         const invoiceNo = await ensureInvoiceNo(o)
 
-        // ✅ claim first (prevents duplicates)
         const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
         const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
 
-        // if neither was claimed, nothing to do
         if (!claimedReceipt && !claimedDownload) return res.status(200).send('OK')
 
         const jti = crypto.randomUUID()
@@ -706,8 +794,10 @@ export default async function handler(req, res) {
        ❌ PAYMENT FAILED / CANCELED
     ========================================================= */
     if (statusCodeNum < 0) {
-      if (String(custom_1 || '').trim().toLowerCase() === 'cart') {
-        const cartOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
+      const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
+
+      if (isCart) {
+        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
           await supabaseAdmin
             .from('orders')
@@ -722,7 +812,7 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
-      const order = await findSingleOrderByRef(order_id)
+      const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (order && String(order.status || '').toUpperCase() !== 'FAILED') {
         await supabaseAdmin
           .from('orders')

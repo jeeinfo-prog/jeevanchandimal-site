@@ -13,8 +13,11 @@ import * as CartLib from '../lib/cart'
 const STORAGE_CART_KEY = 'jc_cart_v1'
 const STORAGE_CCY_KEY = 'jc_currency_v1'
 
-// ✅ FX lock (Option A: live rate + lock at checkout)
+// ✅ FX lock (live rate + lock at checkout)
 const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
+
+// ✅ Default display/checkout currency (you requested USD)
+const DEFAULT_CURRENCY = 'USD'
 
 function clamp(n, min, max) {
   const x = Number(n)
@@ -59,7 +62,7 @@ function writeLS(key, value) {
 }
 
 function normCurrency(v) {
-  return v === 'USD' ? 'USD' : 'LKR'
+  return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
 function normLicense(v) {
   const x = String(v || '').toLowerCase()
@@ -101,17 +104,17 @@ function cartKeyOf(x) {
 
 // ---------- fallback cart impl (only used if lib/cart.js functions not found) ----------
 function fallbackReadCart() {
-  if (typeof window === 'undefined') return { currency: 'LKR', items: [] }
+  if (typeof window === 'undefined') return { currency: DEFAULT_CURRENCY, items: [] }
   const raw = readLS(STORAGE_CART_KEY, null)
   const cart = safeJsonParse(raw, null)
   if (cart && Array.isArray(cart.items)) return cart
-  return { currency: readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR', items: [] }
+  return { currency: readLS(STORAGE_CCY_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY, items: [] }
 }
 
 function fallbackWriteCart(cart) {
   if (typeof window === 'undefined') return
   writeLS(STORAGE_CART_KEY, JSON.stringify(cart))
-  writeLS(STORAGE_CCY_KEY, cart.currency || 'LKR')
+  writeLS(STORAGE_CCY_KEY, cart.currency || DEFAULT_CURRENCY)
 }
 
 // normalize item for UI display (keeps original fields, adds _*)
@@ -212,7 +215,7 @@ function getCartAdapter() {
         if (typeof CartLib.cartClear === 'function') return CartLib.cartClear()
       } catch {}
       return fallbackWriteCart({
-        currency: readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR',
+        currency: readLS(STORAGE_CCY_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY,
         items: [],
       })
     },
@@ -225,24 +228,24 @@ export default function CartPage() {
   const cartApi = React.useMemo(() => getCartAdapter(), [])
   const [ready, setReady] = React.useState(false)
 
-  // ✅ "Display / Checkout currency" (totals will be converted into this)
-  const [currency, setCurrency] = React.useState('LKR')
+  // ✅ Display / checkout currency (Option B)
+  const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
   const [items, setItems] = React.useState([])
   const [note, setNote] = React.useState('')
   const [busy, setBusy] = React.useState(false)
 
-  // ✅ FX state (Option A: live + lock)
+  // ✅ FX state (live + lock at checkout)
   const [fxLiveUsdLkr, setFxLiveUsdLkr] = React.useState(320)
   const [fxLockedUsdLkr, setFxLockedUsdLkr] = React.useState(null)
   const fxRateUsdLkr = fxLockedUsdLkr || fxLiveUsdLkr
 
-  // ✅ Keep selector enabled (now it is display/checkout currency, not forcing item currency)
+  // Selector enabled (display/checkout currency)
   const locked = false
 
   const load = React.useCallback(() => {
     const cart = cartApi.read() || {}
     const rawItems = Array.isArray(cart) ? cart : cart.items
-    const ccy = normCurrency((cart && cart.currency) || readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR')
+    const ccy = normCurrency((cart && cart.currency) || readLS(STORAGE_CCY_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY)
 
     setCurrency(ccy)
     setItems(
@@ -287,7 +290,6 @@ export default function CartPage() {
 
     async function run() {
       try {
-        // expects: { ok: true, usdLkr: 3xx.xx } OR compatible
         const r = await fetch('/api/fx', { headers: { 'Cache-Control': 'no-store' } })
         const data = await r.json().catch(() => null)
         if (!alive) return
@@ -306,7 +308,7 @@ export default function CartPage() {
   function persist(nextItemsRaw, nextCurrency = currency) {
     const ccy = normCurrency(nextCurrency)
 
-    // ✅ Preserve each item's currency if it already exists.
+    // ✅ Preserve each item's own currency
     const withCurrency = (Array.isArray(nextItemsRaw) ? nextItemsRaw : []).map((x) => ({
       ...x,
       currency: normCurrency(x?.currency || x?._currency || ccy),
@@ -314,7 +316,6 @@ export default function CartPage() {
 
     const cart = { currency: ccy, items: withCurrency }
     cartApi.write(cart)
-
     writeLS(STORAGE_CCY_KEY, ccy)
 
     setCurrency(ccy)
@@ -349,7 +350,6 @@ export default function CartPage() {
     persist(next, currency)
   }
 
-  // ✅ Mixed currency detection (still useful for display)
   const currencySet = React.useMemo(() => {
     const set = new Set()
     for (const it of items) set.add(normCurrency(it?._currency || it?.currency || currency))
@@ -358,9 +358,6 @@ export default function CartPage() {
 
   const isMixedCurrency = currencySet.length > 1
 
-  // ✅ compute totals:
-  // - totalsByCurrency: raw totals without conversion
-  // - subtotalConverted: converted total into selected currency
   const computed = React.useMemo(() => {
     const totalsByCurrency = {}
     let subtotalConverted = 0
@@ -373,7 +370,6 @@ export default function CartPage() {
 
       totalsByCurrency[itemCcy] = (totalsByCurrency[itemCcy] || 0) + line
 
-      // convert to selected currency
       const convertedLine = convertAmount(line, itemCcy, currency, fxRateUsdLkr)
       subtotalConverted += convertedLine
     }
@@ -396,7 +392,6 @@ export default function CartPage() {
 
   function clearFxLock() {
     try {
-      writeLS(STORAGE_FX_LOCK_KEY, '')
       if (typeof window !== 'undefined') {
         try {
           window.localStorage.removeItem(STORAGE_FX_LOCK_KEY)
@@ -413,7 +408,6 @@ export default function CartPage() {
 
     const ccy = normCurrency(currency)
 
-    // Use the current *state* items you are rendering.
     const normItems = Array.isArray(items) ? items.map((x) => normalizeItem(x, ccy)).filter(Boolean) : []
 
     if (normItems.length === 0) {
@@ -422,8 +416,7 @@ export default function CartPage() {
       return
     }
 
-    const emailRaw =
-      (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
+    const emailRaw = (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
     const email = String(emailRaw || '').trim().toLowerCase()
 
     if (!email) {
@@ -432,8 +425,7 @@ export default function CartPage() {
       return
     }
 
-    // ✅ LOCK FX RATE at checkout time (Option A)
-    // If already locked, keep it.
+    // ✅ Lock FX at checkout time (so totals match server-side)
     let lockRate = fxLockedUsdLkr
     if (!lockRate) {
       lockRate = normalizeRate(fxLiveUsdLkr, 320)
@@ -451,8 +443,7 @@ export default function CartPage() {
         const rawUnit = Number(it.unitPrice || it._price || getUnitPrice(it, itemCcy) || 0)
         const qty = clamp(it._qty || it.qty || 1, 1, 99)
 
-        // ✅ Convert unitPrice into checkout currency
-        // (so backend/payhere can create ONE currency order)
+        // convert to checkout currency
         const unitPrice = convertAmount(rawUnit, itemCcy, ccy, lockRate)
 
         return {
@@ -462,12 +453,10 @@ export default function CartPage() {
           license: normLicense(it._license || it.license),
           format: normFormat(it._format || it.format),
 
-          // checkout currency
           currency: ccy,
           qty,
           unitPrice,
 
-          // keep original info (harmless extra fields)
           originalCurrency: itemCcy,
           originalUnitPrice: rawUnit,
         }
@@ -480,8 +469,6 @@ export default function CartPage() {
           email,
           currency: ccy,
           items: payloadItems,
-
-          // ✅ pass the locked rate to backend so totals match exactly
           usdLkr: lockRate,
           fxLockedAt: Date.now(),
         }),
@@ -489,15 +476,29 @@ export default function CartPage() {
 
       const data = await r.json().catch(() => ({}))
 
-      if (!r.ok || !data?.ok || !data?.redirectUrl) {
+      // ✅ NEW: Expect action+fields (POST submit), not redirectUrl
+      if (!r.ok || !data?.ok || !data?.action || !data?.fields) {
         setBusy(false)
         setNote(data?.error || 'Checkout failed')
         setTimeout(() => setNote(''), 2600)
         return
       }
 
-      // ✅ Do NOT clear the cart here.
-      window.location.href = data.redirectUrl
+      // ✅ Submit a POST form to PayHere (sandbox/live)
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = data.action
+
+      for (const [k, v] of Object.entries(data.fields)) {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = k
+        input.value = String(v ?? '')
+        form.appendChild(input)
+      }
+
+      document.body.appendChild(form)
+      form.submit()
     } catch (e) {
       setBusy(false)
       setNote(e?.message || 'Checkout error')
@@ -520,9 +521,7 @@ export default function CartPage() {
           <div className="topBar">
             <div>
               <h1 className="thq-heading-2">Cart</h1>
-              <p className="thq-body-small sub">
-                Review your items, adjust quantities, and proceed to checkout.
-              </p>
+              <p className="thq-body-small sub">Review your items, adjust quantities, and proceed to checkout.</p>
             </div>
 
             <div className="ccyBox">
@@ -532,13 +531,12 @@ export default function CartPage() {
                 value={currency}
                 onChange={(e) => onCurrencyChange(e.target.value)}
                 disabled={locked || busy}
-                title={'Choose display/checkout currency (totals will convert)'}
+                title="Choose display/checkout currency (totals will convert)"
               >
-                <option value="LKR">LKR</option>
                 <option value="USD">USD</option>
+                <option value="LKR">LKR</option>
               </select>
 
-              {/* ✅ FX info + lock state */}
               <div className="fxHint">
                 {fxLockedUsdLkr ? (
                   <>
@@ -579,12 +577,10 @@ export default function CartPage() {
                   {items.map((it, idx) => {
                     const key = it._key || cartKeyOf(it) || String(idx)
                     const itemCcy = normCurrency(it._currency || it.currency || currency)
-                    const unit =
-                      Number(it.unitPrice || it._price || 0) || getUnitPrice(it, itemCcy)
+                    const unit = Number(it.unitPrice || it._price || 0) || getUnitPrice(it, itemCcy)
                     const line = unit * Number(it._qty || it.qty || 1)
                     const photoId = it._photoId || it.photoId
 
-                    // ✅ show converted line total into selected currency
                     const convertedLine = convertAmount(line, itemCcy, currency, fxRateUsdLkr)
 
                     return (
@@ -652,12 +648,7 @@ export default function CartPage() {
                               </button>
                             </div>
 
-                            <button
-                              className="linkDanger"
-                              onClick={() => removeItemByKey(key)}
-                              type="button"
-                              disabled={busy}
-                            >
+                            <button className="linkDanger" onClick={() => removeItemByKey(key)} type="button" disabled={busy}>
                               Remove
                             </button>
 
@@ -696,28 +687,23 @@ export default function CartPage() {
               <aside className="summaryCard">
                 <div className="cardTitle">Summary</div>
 
-                {/* ✅ Raw totals by currency (for transparency) */}
                 {isMixedCurrency ? (
                   <div className="mixWarn">
                     <div className="mixTitle">Mixed currencies</div>
                     <div className="mixText">
-                      Totals below are converted into <strong>{currency}</strong> using{' '}
-                      {fxLockedUsdLkr ? 'locked' : 'live'} rate.
+                      Totals below are converted into <strong>{currency}</strong> using {fxLockedUsdLkr ? 'locked' : 'live'} rate.
                     </div>
                     <div className="mixList">
                       {Object.keys(computed.totalsByCurrency).map((cur) => (
                         <div key={cur} className="mixLine">
                           <span className="muted">{cur}</span>
-                          <span className="strong">
-                            {formatMoneySimple(cur, computed.totalsByCurrency[cur])}
-                          </span>
+                          <span className="strong">{formatMoneySimple(cur, computed.totalsByCurrency[cur])}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : null}
 
-                {/* ✅ Converted totals into selected currency */}
                 <div className="sumRow">
                   <span className="muted">Subtotal</span>
                   <span className="strong">{formatMoney(currency, computed.subtotalConverted)}</span>
