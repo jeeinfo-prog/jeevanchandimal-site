@@ -1343,24 +1343,42 @@ function endPointerPan(e) {
       onPointerLeave={endPointerPan}
       onContextMenu={preventSave}
     >
-      <img
-        src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
-        alt={photo?.title || 'Preview'}
-        draggable={false}
-        onDragStart={preventSave}
-        onContextMenu={preventSave}
-        style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          cursor: isPanning ? 'grabbing' : 'grab',
+      {/* ✅ Desktop image (kept for SEO/accessibility + natural size) */}
+<img
+  className="previewImg"
+  src={previewSrc || photo.previewUrl || photo.thumbUrl}
+  alt={photo.title}
+  draggable={false}
+  onClick={openZoom}
+  onContextMenu={preventSave}
+  onDragStart={preventSave}
+  loading="eager"
+  onLoad={(e) => {
+    const w = e.currentTarget.naturalWidth
+    const h = e.currentTarget.naturalHeight
+    if (w && h) setNaturalDims({ w, h })
+  }}
+  onError={(e) => {
+    if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+      e.currentTarget.src = photo.previewUrl
+      return
+    }
+    if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
+  }}
+/>
 
-          // ✅ critical: stops iOS long-press save menu, keeps pan working via container
-          pointerEvents: 'none',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-          WebkitTouchCallout: 'none',
-          WebkitUserDrag: 'none',
-        }}
-      />
+{/* ✅ Mobile preview (background-image blocks long-press save) */}
+<div
+  className="previewBg"
+  role="img"
+  aria-label={photo.title}
+  onClick={openZoom}
+  onContextMenu={preventSave}
+  onTouchStart={(e) => e.preventDefault()}
+  style={{
+    backgroundImage: `url("${previewSrc || photo.previewUrl || photo.thumbUrl}")`,
+  }}
+/>
 
       {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
     </div>
@@ -1439,6 +1457,38 @@ function endPointerPan(e) {
           display: block;
           user-select: none;
         }
+
+        .previewImg {
+  width: 100%;
+  height: auto;
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.previewBg {
+  display: none;           /* default: desktop off */
+  width: 100%;
+  aspect-ratio: 4 / 3;     /* keeps a nice shape */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ✅ Mobile: hide real <img>, use background-image instead */
+@media (max-width: 991px) {
+  .previewImg {
+    display: none;
+  }
+  .previewBg {
+    display: block;
+  }
+}
 
         .zoomBtn {
           position: absolute;
