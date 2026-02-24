@@ -1301,46 +1301,69 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         )}
 
         {/* ZOOM OVERLAY */}
-        {zoomOpen && (
-          <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
-            <div className="zoomTop">
-              <div className="zoomTitle">{photo?.title || 'Preview'}</div>
-              <div className="zoomActions">
-                <span className="zoomPct">{Math.round(zoom * 100)}%</span>
-                <button
-                  type="button"
-                  className="miniBtn"
-                  onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}
-                >
-                  −
-                </button>
-                <button
-                  type="button"
-                  className="miniBtn"
-                  onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}
-                >
-                  +
-                </button>
-                <button type="button" className="miniBtn" onClick={closeZoom}>
-                  Close
-                </button>
-              </div>
-            </div>
+{zoomOpen && (
+  <div className="zoomOverlay" onContextMenu={preventSave}>
+    <div className="zoomTop">
+      <div className="zoomTitle">{photo?.title || 'Preview'}</div>
+      <div className="zoomActions">
+        <span className="zoomPct">{Math.round(zoom * 100)}%</span>
 
-            <div className="zoomBody" onWheel={onWheelZoom} onMouseDown={onMouseDownPan}>
-              <img
-                src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
-                alt={photo?.title || 'Preview'}
-                draggable={false}
-                style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                  cursor: isPanning ? 'grabbing' : 'grab',
-                }}
-              />
-              {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          className="miniBtn"
+          onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}
+        >
+          −
+        </button>
+
+        <button
+          type="button"
+          className="miniBtn"
+          onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}
+        >
+          +
+        </button>
+
+        <button type="button" className="miniBtn" onClick={closeZoom}>
+          Close
+        </button>
+      </div>
+    </div>
+
+    <div
+      className="zoomBody"
+      onWheel={onWheelZoom}
+      onPointerDown={onPointerDownPan}
+      onPointerMove={onPointerMovePan}
+      onPointerUp={endPointerPan}
+      onPointerCancel={endPointerPan}
+      onPointerLeave={endPointerPan}
+      onContextMenu={preventSave}
+    >
+      <img
+        src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
+        alt={photo?.title || 'Preview'}
+        draggable={false}
+        onDragStart={preventSave}
+        onContextMenu={preventSave}
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          cursor: isPanning ? 'grabbing' : 'grab',
+
+          // ✅ important: blocks iOS long-press "Save Image"
+          // and still allows pan because pointer events are on the container
+          pointerEvents: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitUserDrag: 'none',
+        }}
+      />
+
+      {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
+    </div>
+  </div>
+)}
       </main>
 
       <JeevanChandimalNewFooter />
@@ -1932,19 +1955,27 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         }
 
         .zoomBody {
-          position: relative;
-          overflow: hidden;
-          display: grid;
-          place-items: center;
-        }
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+
+  touch-action: none;              /* ✅ REQUIRED for mobile drag */
+  -webkit-user-select: none;       /* block text/image selection */
+  user-select: none;
+}
 
         .zoomBody img {
-          max-width: none;
-          max-height: none;
-          width: auto;
-          height: auto;
-          user-select: none;
-        }
+  max-width: none;
+  max-height: none;
+  width: auto;
+  height: auto;
+
+  pointer-events: none;            /* ✅ image can't be long-pressed */
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;     /* iOS: no save image popup */
+  user-select: none;
+}
 
         .imageFrame:hover .wmTile {
           opacity: 0;
