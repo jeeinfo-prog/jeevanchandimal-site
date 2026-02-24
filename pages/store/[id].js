@@ -967,6 +967,17 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               {/* BUY CARD */}
               <aside className="buyCard">
                 <h1 className="title">{photo.title}</h1>
+                <div className="badgeRow">
+  {photo?.location ? <span className="badge">📍 {photo.location}</span> : null}
+
+  {photo?.exif?.make || photo?.exif?.model ? (
+    <span className="badge">
+      📷 {[photo.exif?.make, photo.exif?.model].filter(Boolean).join(' ')}
+    </span>
+  ) : null}
+
+  {resolution ? <span className="badge">🖼️ {resolution}</span> : null}
+</div>
                 {isMember ? (
                   <div className="memberBadge">{String(memberPlan || 'member').toUpperCase()}</div>
                 ) : null}
@@ -1274,9 +1285,13 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                         </div>
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
-                          <div className="relTag">
-                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
-                          </div>
+                          <div className="relCaption">
+  {String(p.description || '').trim()
+    ? String(p.description).trim()
+    : Array.isArray(p.tags) && p.tags[0]
+    ? `#${p.tags[0]}`
+    : 'Sri Lanka photography'}
+</div>
                         </div>
                       </a>
                     </Link>
@@ -1945,6 +1960,36 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         .relCard:hover .relThumb img {
           transform: scale(1.03);
         }
+
+        .badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(245, 244, 244, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  opacity: 0.92;
+}
+
+.relCaption {
+  font-size: 12px;
+  opacity: 0.82;
+  line-height: 1.35;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
         /* Zoom modal */
         .zoomOverlay {
