@@ -1,6 +1,8 @@
 // pages/api/photo/[id]/preview.js
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
+import fs from 'fs'
+import path from 'path'
 
 export const config = {
   api: { responseLimit: false },
@@ -55,6 +57,87 @@ async function getObjectOrNull(key) {
   }
 }
 
+/* ---------------- watermark helpers ---------------- */
+
+const WM_PATH = path.join(process.cwd(), 'public', 'JC', 'jclogo05.png')
+let WM_BUF = null
+
+function getWatermarkBuffer() {
+  if (WM_BUF) return WM_BUF
+  WM_BUF = fs.readFileSync(WM_PATH)
+  return WM_BUF
+}
+
+function pickDimsFromSharpMeta(meta) {
+  const w = Number(meta?.width) || null
+  const h = Number(meta?.height) || null
+  return { w, h }
+}
+
+async function generateWatermarkedJpg(inputJpg, variant) {
+  const sharp = (await import('sharp')).default
+
+  // decode once to get dimensions
+  const base = sharp(inputJpg, { failOn: 'none' }).rotate()
+  const meta = await base.metadata()
+  const { w, h } = pickDimsFromSharpMeta(meta)
+
+  // fallback if missing meta
+  const outW = w || 2000
+  const outH = h || 1400
+
+  const wmBuf = getWatermarkBuffer()
+
+  // watermark sizing
+  const baseSize = Math.round(Math.min(outW, outH) * (variant === 'corner' ? 0.22 : 0.26))
+  const strongSize = Math.round(Math.min(outW, outH) * 0.28)
+
+  const cornerMark = await sharp(wmBuf).resize(baseSize, baseSize, { fit: 'inside' }).png().toBuffer()
+  const strongMark = await sharp(wmBuf)
+    .resize(strongSize, strongSize, { fit: 'inside' })
+    .png()
+    .toBuffer()
+
+  // Compose strategy:
+  // - corner: one mark bottom-right (and tiny top-left)
+  // - strong: center + 4 corners + mid edges (harder to crop)
+  let composites = []
+
+  if (variant === 'corner') {
+    composites = [
+      { input: cornerMark, gravity: 'southeast', blend: 'over', opacity: 0.22 },
+      { input: cornerMark, gravity: 'northwest', blend: 'over', opacity: 0.08 },
+    ]
+  } else if (variant === 'strong') {
+    composites = [
+      { input: strongMark, gravity: 'center', blend: 'over', opacity: 0.22 },
+
+      { input: cornerMark, gravity: 'northwest', blend: 'over', opacity: 0.12 },
+      { input: cornerMark, gravity: 'northeast', blend: 'over', opacity: 0.12 },
+      { input: cornerMark, gravity: 'southwest', blend: 'over', opacity: 0.12 },
+      { input: cornerMark, gravity: 'southeast', blend: 'over', opacity: 0.12 },
+
+      { input: cornerMark, gravity: 'north', blend: 'over', opacity: 0.09 },
+      { input: cornerMark, gravity: 'south', blend: 'over', opacity: 0.09 },
+      { input: cornerMark, gravity: 'east', blend: 'over', opacity: 0.09 },
+      { input: cornerMark, gravity: 'west', blend: 'over', opacity: 0.09 },
+    ]
+  } else {
+    // standard preview has no baked watermark (kept as-is)
+    return inputJpg
+  }
+
+  const out = await sharp(inputJpg, { failOn: 'none' })
+    .rotate()
+    .composite(composites)
+    .jpeg({ quality: 82 })
+    .toBuffer()
+
+  return out
+}
+
+/* ---------------- preview generation ---------------- */
+
 async function ensureStandardPreviewExists(photoId) {
   const previewKey = `photos/preview/${photoId}.jpg`
 
@@ -107,6 +190,43 @@ async function ensureStandardPreviewExists(photoId) {
   }
 }
 
+async function ensureWatermarkedPreviewExists(photoId, variant) {
+  if (variant !== 'strong' && variant !== 'corner') return null
+
+  const wmKey = keyFor(photoId, variant)
+
+  // 1) Already exists?
+  const existing = await getObjectOrNull(wmKey)
+  if (existing?.Body) return { key: wmKey, obj: existing }
+
+  // 2) Ensure standard exists (source)
+  const ensuredStd = await ensureStandardPreviewExists(photoId)
+  const stdObj = ensuredStd?.obj
+  if (!stdObj?.Body) return null
+
+  const stdBuf = Buffer.isBuffer(stdObj.Body) ? stdObj.Body : await streamToBuffer(stdObj.Body)
+
+  // 3) Create watermarked preview
+  const out = await generateWatermarkedJpg(stdBuf, variant)
+  if (!out || !Buffer.isBuffer(out) || out.length === 0) return null
+
+  // 4) Save to R2
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: wmKey,
+      Body: out,
+      ContentType: 'image/jpeg',
+      CacheControl: 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800',
+    })
+  )
+
+  return {
+    key: wmKey,
+    obj: { Body: out, ContentType: 'image/jpeg', ContentLength: out.length },
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -134,10 +254,15 @@ export default async function handler(req, res) {
     // 1) Try requested key
     let obj = await getObjectOrNull(wantedKey)
 
-    // 2) If watermark variant missing, fallback to standard (and generate if needed)
+    // 2) If watermark variant missing, generate + save, fallback to standard if generation fails
     if (!obj?.Body && (variant === 'strong' || variant === 'corner')) {
-      const ensured = await ensureStandardPreviewExists(id)
-      obj = ensured?.obj || null
+      const ensuredWm = await ensureWatermarkedPreviewExists(id, variant)
+      obj = ensuredWm?.obj || null
+
+      if (!obj?.Body) {
+        const ensuredStd = await ensureStandardPreviewExists(id)
+        obj = ensuredStd?.obj || null
+      }
     }
 
     // 3) Standard missing -> generate
