@@ -1319,16 +1319,26 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
             <div className="zoomBody" onWheel={onWheelZoom} onMouseDown={onMouseDownPan}>
               <img
-  src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
-  alt={photo?.title || 'Preview'}
+  src={previewSrc || photo.previewUrl || photo.thumbUrl}
+  alt={photo.title}
   draggable={false}
+  onClick={openZoom}
   onContextMenu={preventSave}
   onDragStart={preventSave}
   onTouchStart={(e) => e.preventDefault()}
-  style={{
-    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-    cursor: isPanning ? 'grabbing' : 'grab',
-    touchAction: 'none',
+  style={{ touchAction: 'none' }}
+  loading="eager"
+  onLoad={(e) => {
+    const w = e.currentTarget.naturalWidth
+    const h = e.currentTarget.naturalHeight
+    if (w && h) setNaturalDims({ w, h })
+  }}
+  onError={(e) => {
+    if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
+      e.currentTarget.src = photo.previewUrl
+      return
+    }
+    if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
   }}
 />
               {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
@@ -1936,6 +1946,13 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         .imageFrame:hover .wmTile {
           opacity: 0;
         }
+
+        .imageFrame img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  touch-action: none;
+}
 
         .relThumb:hover .relWm {
           opacity: 0;
