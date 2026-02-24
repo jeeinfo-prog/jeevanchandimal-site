@@ -33,6 +33,12 @@ function formatMoney(currency, amount) {
   return `$${n.toFixed(2)}`
 }
 
+function formatMoneySimple(currency, amount) {
+  const n = Number(amount || 0)
+  if (currency === 'LKR') return `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  return `$${n.toFixed(2)}`
+}
+
 function readLS(key, fallback = null) {
   if (typeof window === 'undefined') return fallback
   try {
@@ -105,7 +111,10 @@ function normalizeItem(it, forcedCurrency) {
 
   const license = normLicense(src.license || src.usage || src.plan || src.type || src._license)
   const format = normFormat(src.format || src.file || src.ext || src._format)
-  const currency = normCurrency(forcedCurrency || src.currency || src._currency)
+
+  // ✅ IMPORTANT: DO NOT force item currency anymore.
+  // Item-level currency must be preserved to avoid mixed totals being wrong.
+  const currency = normCurrency(src.currency || src._currency || forcedCurrency)
 
   const qty = clamp(src.qty ?? src.quantity ?? src._qty ?? 1, 1, 99)
 
@@ -199,6 +208,7 @@ export default function CartPage() {
   const [note, setNote] = React.useState('')
   const [busy, setBusy] = React.useState(false)
 
+  // ✅ lock currency selector only when cart has items (same as before)
   const locked = items.length > 0
 
   const load = React.useCallback(() => {
@@ -206,8 +216,16 @@ export default function CartPage() {
     const rawItems = Array.isArray(cart) ? cart : cart.items
     const ccy = normCurrency((cart && cart.currency) || readLS(STORAGE_CCY_KEY, 'LKR') || 'LKR')
 
+    // ✅ DO NOT force all items to this currency.
+    // Keep item.currency if present; fallback to cart currency only if item currency missing.
     setCurrency(ccy)
-    setItems(Array.isArray(rawItems) ? rawItems.map((x) => normalizeItem(x, ccy)).filter(Boolean) : [])
+    setItems(
+      Array.isArray(rawItems)
+        ? rawItems
+            .map((x) => normalizeItem(x, ccy))
+            .filter(Boolean)
+        : []
+    )
   }, [cartApi])
 
   React.useEffect(() => {
@@ -233,13 +251,12 @@ export default function CartPage() {
   function persist(nextItemsRaw, nextCurrency = currency) {
     const ccy = normCurrency(nextCurrency)
 
-    // ✅ IMPORTANT FIX:
-    // Always persist items *with* currency on each item.
-    // Your lib/cart.js key includes currency; if items don't store currency,
-    // other parts of the app can re-key them differently and "cart becomes empty".
+    // ✅ IMPORTANT:
+    // Preserve each item's currency if it already exists.
+    // Only fill missing currency with the cart currency.
     const withCurrency = (Array.isArray(nextItemsRaw) ? nextItemsRaw : []).map((x) => ({
       ...x,
-      currency: ccy,
+      currency: normCurrency(x?.currency || x?._currency || ccy),
     }))
 
     const cart = { currency: ccy, items: withCurrency }
@@ -258,37 +275,53 @@ export default function CartPage() {
   function removeItemByKey(key) {
     const latest = cartApi.read() || {}
     const rawItems = Array.isArray(latest) ? latest : latest.items
-    const ccy = normCurrency((latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency)
     const arr = Array.isArray(rawItems) ? rawItems : []
 
-    const next = arr.filter((x) => cartKeyOf({ ...x, currency: ccy }) !== key)
-    persist(next, ccy)
+    // ✅ key already includes currency, so compare using each item's own currency
+    const next = arr.filter((x) => cartKeyOf(x) !== key)
+    persist(next, currency)
   }
 
   function setQtyByKey(key, qty) {
     const latest = cartApi.read() || {}
     const rawItems = Array.isArray(latest) ? latest : latest.items
-    const ccy = normCurrency((latest && latest.currency) || readLS(STORAGE_CCY_KEY, currency) || currency)
     const arr = Array.isArray(rawItems) ? rawItems : []
 
     const nextQty = clamp(qty, 1, 99)
     const next = arr.map((x) => {
-      const k = cartKeyOf({ ...x, currency: ccy })
+      const k = cartKeyOf(x)
       if (k !== key) return x
       return { ...x, qty: nextQty }
     })
 
-    persist(next, ccy)
+    persist(next, currency)
   }
 
+  // ✅ Mixed currency detection
+  const currencySet = React.useMemo(() => {
+    const set = new Set()
+    for (const it of items) set.add(normCurrency(it?._currency || it?.currency || currency))
+    return Array.from(set)
+  }, [items, currency])
+
+  const isMixedCurrency = currencySet.length > 1
+
+  // ✅ compute totals by currency (never combine)
   const computed = React.useMemo(() => {
-    const ccy = normCurrency(currency)
-    let subtotal = 0
+    const totalsByCurrency = {}
+
     for (const it of items) {
-      const unit = Number(it.unitPrice || it._price || 0) || getUnitPrice(it, ccy)
-      subtotal += Number(unit || 0) * Number(it._qty || it.qty || 1)
+      const itemCcy = normCurrency(it?._currency || it?.currency || currency)
+      const unit = Number(it.unitPrice || it._price || 0) || getUnitPrice(it, itemCcy)
+      const qty = Number(it._qty || it.qty || 1)
+      const line = Number(unit || 0) * Number(qty || 1)
+
+      totalsByCurrency[itemCcy] = (totalsByCurrency[itemCcy] || 0) + line
     }
-    return { subtotal, total: subtotal }
+
+    return {
+      totalsByCurrency,
+    }
   }, [items, currency])
 
   function onCurrencyChange(next) {
@@ -301,13 +334,32 @@ export default function CartPage() {
     setTimeout(() => setNote(''), 1200)
   }
 
+  function keepOnlyCurrency(cur) {
+    const keep = normCurrency(cur)
+    const latest = cartApi.read() || {}
+    const rawItems = Array.isArray(latest) ? latest : latest.items
+    const arr = Array.isArray(rawItems) ? rawItems : []
+
+    const filtered = arr.filter((x) => normCurrency(x?.currency || x?._currency) === keep)
+    persist(filtered, keep)
+
+    setNote(`Kept only ${keep} items.`)
+    setTimeout(() => setNote(''), 1400)
+  }
+
   async function onCheckout() {
     if (busy) return
 
-    // ✅ IMPORTANT FIX:
+    // ✅ block checkout if mixed currencies
+    if (isMixedCurrency) {
+      setNote('Your cart has multiple currencies. Keep only one currency to checkout.')
+      setTimeout(() => setNote(''), 2600)
+      return
+    }
+
+    const ccy = normCurrency(currencySet[0] || currency)
+
     // Use the current *state* items you are rendering.
-    // Reading again from cartApi can race with other writes / storage events and come back empty.
-    const ccy = normCurrency(currency)
     const normItems = Array.isArray(items) ? items.map((x) => normalizeItem(x, ccy)).filter(Boolean) : []
 
     if (normItems.length === 0) {
@@ -331,7 +383,8 @@ export default function CartPage() {
 
     try {
       const payloadItems = normItems.map((it) => {
-        const unitPrice = Number(it.unitPrice || it._price || getUnitPrice(it, ccy) || 0)
+        const itemCcy = normCurrency(it._currency || it.currency || ccy)
+        const unitPrice = Number(it.unitPrice || it._price || getUnitPrice(it, itemCcy) || 0)
 
         return {
           photoId: String(it._photoId || it.photoId || ''),
@@ -339,7 +392,7 @@ export default function CartPage() {
           thumbUrl: String(it.thumbUrl || it._thumb || ''),
           license: normLicense(it._license || it.license),
           format: normFormat(it._format || it.format),
-          currency: ccy,
+          currency: itemCcy,
           qty: clamp(it._qty || it.qty || 1, 1, 99),
           unitPrice,
         }
@@ -365,7 +418,6 @@ export default function CartPage() {
       }
 
       // ✅ Do NOT clear the cart here.
-      // Clear only after payment success (notify/return flow), otherwise return page may show empty.
       window.location.href = data.redirectUrl
     } catch (e) {
       setBusy(false)
@@ -430,7 +482,9 @@ export default function CartPage() {
                 <div className="list">
                   {items.map((it, idx) => {
                     const key = it._key || cartKeyOf(it) || String(idx)
-                    const unit = Number(it.unitPrice || it._price || 0) || getUnitPrice(it, currency)
+                    const itemCcy = normCurrency(it._currency || it.currency || currency)
+                    const unit =
+                      Number(it.unitPrice || it._price || 0) || getUnitPrice(it, itemCcy)
                     const line = unit * Number(it._qty || it.qty || 1)
                     const photoId = it._photoId || it.photoId
 
@@ -450,12 +504,13 @@ export default function CartPage() {
                           <div className="tags">
                             <span className="pill">{String(it._license).toUpperCase()}</span>
                             <span className="pill">{String(it._format).toUpperCase()}</span>
+                            <span className="pill">{String(itemCcy).toUpperCase()}</span>
                           </div>
 
                           <div className="priceLine">
-                            <span className="muted">{formatMoney(currency, unit)} each</span>
+                            <span className="muted">{formatMoney(itemCcy, unit)} each</span>
                             <span className="dot">•</span>
-                            <span className="strong">{formatMoney(currency, line)}</span>
+                            <span className="strong">{formatMoney(itemCcy, line)}</span>
                           </div>
 
                           <div className="actions">
@@ -534,20 +589,62 @@ export default function CartPage() {
               <aside className="summaryCard">
                 <div className="cardTitle">Summary</div>
 
+                {/* ✅ Totals by currency (never combine) */}
                 <div className="sumRow">
                   <span className="muted">Subtotal</span>
-                  <span className="strong">{formatMoney(currency, computed.subtotal)}</span>
+                  <span className="strong">
+                    {Object.keys(computed.totalsByCurrency).map((cur) => (
+                      <span key={cur} className="sumLine">
+                        {formatMoneySimple(cur, computed.totalsByCurrency[cur])}
+                      </span>
+                    ))}
+                  </span>
                 </div>
 
                 <div className="sumRow">
                   <span className="muted">Total</span>
-                  <span className="strong">{formatMoney(currency, computed.total)}</span>
+                  <span className="strong">
+                    {Object.keys(computed.totalsByCurrency).map((cur) => (
+                      <span key={cur} className="sumLine">
+                        {formatMoneySimple(cur, computed.totalsByCurrency[cur])}
+                      </span>
+                    ))}
+                  </span>
                 </div>
+
+                {isMixedCurrency ? (
+                  <div className="mixWarn">
+                    <div className="mixTitle">⚠️ Mixed currencies in cart</div>
+                    <div className="mixText">
+                      Please keep only one currency to checkout.
+                    </div>
+
+                    <div className="mixActions">
+                      {currencySet.map((cur) => (
+                        <button
+                          key={cur}
+                          className="btnGhost mini"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => keepOnlyCurrency(cur)}
+                        >
+                          Keep {cur} only
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="divider" />
 
-                <button className="btnPrimary full" onClick={onCheckout} type="button" disabled={busy}>
-                  {busy ? 'Please wait…' : 'Checkout'}
+                <button
+                  className="btnPrimary full"
+                  onClick={onCheckout}
+                  type="button"
+                  disabled={busy || isMixedCurrency}
+                  title={isMixedCurrency ? 'Keep only one currency to checkout' : 'Checkout'}
+                >
+                  {busy ? 'Please wait…' : isMixedCurrency ? 'Checkout (choose one currency)' : 'Checkout'}
                 </button>
 
                 <div className="smallNote">Checkout will create a single order for multiple items.</div>
@@ -855,10 +952,44 @@ export default function CartPage() {
 
         .sumRow {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: space-between;
           padding: 10px 0;
+          gap: 10px;
         }
+        .sumLine {
+          display: block;
+          text-align: right;
+        }
+
+        .mixWarn {
+          margin-top: 10px;
+          padding: 10px 12px;
+          border-radius: 14px;
+          border: 1px solid rgba(255, 180, 0, 0.28);
+          background: rgba(255, 180, 0, 0.06);
+        }
+        .mixTitle {
+          font-weight: 800;
+          font-size: 13px;
+          margin-bottom: 4px;
+        }
+        .mixText {
+          font-size: 12px;
+          opacity: 0.85;
+        }
+        .mixActions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .mini {
+          padding: 8px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+        }
+
         .divider {
           height: 1px;
           background: rgba(245, 244, 244, 0.12);
