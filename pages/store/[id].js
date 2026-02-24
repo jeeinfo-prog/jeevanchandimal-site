@@ -152,40 +152,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const panStart = React.useRef({ x: 0, y: 0 })
   const panOrigin = React.useRef({ x: 0, y: 0 })
 
-  // ✅ Pointer-based pan (mouse + touch)
-const activePointerId = React.useRef(null)
-
-function onPointerDownPan(e) {
-  if (e.pointerType === 'mouse' && e.button !== 0) return
-
-  e.preventDefault()
-  setIsPanning(true)
-  activePointerId.current = e.pointerId
-
-  try {
-    e.currentTarget.setPointerCapture(e.pointerId)
-  } catch {}
-
-  panStart.current = { x: e.clientX, y: e.clientY }
-  panOrigin.current = { x: pan.x, y: pan.y }
-}
-
-function onPointerMovePan(e) {
-  if (!isPanning) return
-  if (activePointerId.current != null && e.pointerId !== activePointerId.current) return
-
-  e.preventDefault()
-  const dx = e.clientX - panStart.current.x
-  const dy = e.clientY - panStart.current.y
-  setPan({ x: panOrigin.current.x + dx, y: panOrigin.current.y + dy })
-}
-
-function endPointerPan(e) {
-  if (activePointerId.current != null && e.pointerId !== activePointerId.current) return
-  setIsPanning(false)
-  activePointerId.current = null
-}
-  
   // checkout fields
   const [email, setEmail] = React.useState('')
   const [firstName, setFirstName] = React.useState('')
@@ -212,6 +178,8 @@ function endPointerPan(e) {
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${encodeURIComponent(variant)}`
     : ''
 
+
+  const displaySrc = previewSrc || photo?.previewUrl || photo?.thumbUrl || ''
   const firstTag = (photo?.tags || []).find(Boolean) || ''
   const rawAvailable = photo?.rawAvailable !== false
 
@@ -251,7 +219,23 @@ function endPointerPan(e) {
     setZoom((z) => clamp(Number((z + delta).toFixed(2)), 1, 3))
   }
 
-  
+  function onMouseDownPan(e) {
+    e.preventDefault()
+    setIsPanning(true)
+    panStart.current = { x: e.clientX, y: e.clientY }
+    panOrigin.current = { x: pan.x, y: pan.y }
+  }
+
+  function onMouseMovePan(e) {
+    if (!isPanning) return
+    const dx = e.clientX - panStart.current.x
+    const dy = e.clientY - panStart.current.y
+    setPan({ x: panOrigin.current.x + dx, y: panOrigin.current.y + dy })
+  }
+
+  function onMouseUpPan() {
+    setIsPanning(false)
+  }
 
   React.useEffect(() => {
     function onKey(e) {
@@ -790,8 +774,21 @@ function endPointerPan(e) {
                     Zoom
                   </button>
 
+                  <div
+                    className="imgBg"
+                    role="img"
+                    aria-label={photo.title}
+                    onClick={openZoom}
+                    onContextMenu={preventSave}
+                    style={{
+                      backgroundImage: displaySrc ? `url('${displaySrc}')` : 'none',
+                      aspectRatio: finalW && finalH ? `${finalW} / ${finalH}` : '4 / 3',
+                    }}
+                  />
+
                   <img
-                    src={previewSrc || photo.previewUrl || photo.thumbUrl}
+                    className="mainImg"
+                    src={displaySrc}
                     alt={photo.title}
                     draggable={false}
                     onClick={openZoom}
@@ -1304,86 +1301,46 @@ function endPointerPan(e) {
         )}
 
         {/* ZOOM OVERLAY */}
-{zoomOpen && (
-  <div className="zoomOverlay" onContextMenu={preventSave}>
-    <div className="zoomTop">
-      <div className="zoomTitle">{photo?.title || 'Preview'}</div>
-      <div className="zoomActions">
-        <span className="zoomPct">{Math.round(zoom * 100)}%</span>
+        {zoomOpen && (
+          <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+            <div className="zoomTop">
+              <div className="zoomTitle">{photo?.title || 'Preview'}</div>
+              <div className="zoomActions">
+                <span className="zoomPct">{Math.round(zoom * 100)}%</span>
+                <button
+                  type="button"
+                  className="miniBtn"
+                  onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="miniBtn"
+                  onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}
+                >
+                  +
+                </button>
+                <button type="button" className="miniBtn" onClick={closeZoom}>
+                  Close
+                </button>
+              </div>
+            </div>
 
-        <button
-          type="button"
-          className="miniBtn"
-          onClick={() => setZoom((z) => clamp(z - 0.1, 1, 3))}
-        >
-          −
-        </button>
-
-        <button
-          type="button"
-          className="miniBtn"
-          onClick={() => setZoom((z) => clamp(z + 0.1, 1, 3))}
-        >
-          +
-        </button>
-
-        <button type="button" className="miniBtn" onClick={closeZoom}>
-          Close
-        </button>
-      </div>
-    </div>
-
-    <div
-      className="zoomBody"
-      onWheel={onWheelZoom}
-      onPointerDown={onPointerDownPan}
-      onPointerMove={onPointerMovePan}
-      onPointerUp={endPointerPan}
-      onPointerCancel={endPointerPan}
-      onPointerLeave={endPointerPan}
-      onContextMenu={preventSave}
-    >
-      {/* ✅ Desktop image (kept for SEO/accessibility + natural size) */}
-<img
-  className="previewImg"
-  src={previewSrc || photo.previewUrl || photo.thumbUrl}
-  alt={photo.title}
-  draggable={false}
-  onClick={openZoom}
-  onContextMenu={preventSave}
-  onDragStart={preventSave}
-  loading="eager"
-  onLoad={(e) => {
-    const w = e.currentTarget.naturalWidth
-    const h = e.currentTarget.naturalHeight
-    if (w && h) setNaturalDims({ w, h })
-  }}
-  onError={(e) => {
-    if (photo.previewUrl && e.currentTarget.src !== photo.previewUrl) {
-      e.currentTarget.src = photo.previewUrl
-      return
-    }
-    if (photo.thumbUrl) e.currentTarget.src = photo.thumbUrl
-  }}
-/>
-
-{/* ✅ Mobile preview (background-image blocks long-press save) */}
-<div
-  className="previewBg"
-  role="img"
-  aria-label={photo.title}
-  onClick={openZoom}
-  onContextMenu={preventSave}
-  onTouchStart={(e) => e.preventDefault()}
-  style={{
-    backgroundImage: `url("${previewSrc || photo.previewUrl || photo.thumbUrl}")`,
-  }}
-/>
-
-      {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
-    </div>
-  </div>
-)}
+            <div className="zoomBody" onWheel={onWheelZoom} onMouseDown={onMouseDownPan}>
+              <img
+                src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
+                alt={photo?.title || 'Preview'}
+                draggable={false}
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  cursor: isPanning ? 'grabbing' : 'grab',
+                }}
+              />
+              {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
+            </div>
+          </div>
+        )}
       </main>
 
       <JeevanChandimalNewFooter />
@@ -1458,37 +1415,16 @@ function endPointerPan(e) {
           user-select: none;
         }
 
-        .previewImg {
-  width: 100%;
-  height: auto;
-  display: block;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  -webkit-user-drag: none;
-}
-
-.previewBg {
-  display: none;           /* default: desktop off */
-  width: 100%;
-  aspect-ratio: 4 / 3;     /* keeps a nice shape */
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-}
-
-/* ✅ Mobile: hide real <img>, use background-image instead */
-@media (max-width: 991px) {
-  .previewImg {
-    display: none;
-  }
-  .previewBg {
-    display: block;
-  }
-}
+        .imgBg {
+          display: none;
+          width: 100%;
+          background-position: center;
+          background-repeat: no-repeat;
+          background-size: contain;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-touch-callout: none;
+        }
 
         .zoomBtn {
           position: absolute;
@@ -1996,22 +1932,19 @@ function endPointerPan(e) {
         }
 
         .zoomBody {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  touch-action: none; /* ✅ required for mobile pan */
-}
+          position: relative;
+          overflow: hidden;
+          display: grid;
+          place-items: center;
+        }
 
-.zoomBody img {
-  max-width: none;
-  max-height: none;
-  width: auto;
-  height: auto;
-  -webkit-user-drag: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
+        .zoomBody img {
+          max-width: none;
+          max-height: none;
+          width: auto;
+          height: auto;
+          user-select: none;
+        }
 
         .imageFrame:hover .wmTile {
           opacity: 0;
@@ -2031,6 +1964,12 @@ function endPointerPan(e) {
         }
 
         @media (max-width: 991px) {
+          .mainImg {
+            display: none;
+          }
+          .imgBg {
+            display: block;
+          }
           .layout {
             grid-template-columns: 1fr;
           }
