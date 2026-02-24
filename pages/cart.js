@@ -108,7 +108,10 @@ function fallbackReadCart() {
   const raw = readLS(STORAGE_CART_KEY, null)
   const cart = safeJsonParse(raw, null)
   if (cart && Array.isArray(cart.items)) return cart
-  return { currency: readLS(STORAGE_CCY_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY, items: [] }
+  return {
+    currency: readLS(STORAGE_CCY_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY,
+    items: [],
+  }
 }
 
 function fallbackWriteCart(cart) {
@@ -223,6 +226,32 @@ function getCartAdapter() {
   return api
 }
 
+// ✅ helper: submit PayHere POST
+function submitPayHereForm(action, fields) {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = String(action || '')
+  form.style.display = 'none'
+
+  for (const [k, v] of Object.entries(fields || {})) {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = k
+    input.value = String(v ?? '')
+    form.appendChild(input)
+  }
+
+  document.body.appendChild(form)
+  try {
+    form.submit()
+  } finally {
+    // best-effort cleanup (submit causes navigation anyway)
+    try {
+      document.body.removeChild(form)
+    } catch {}
+  }
+}
+
 export default function CartPage() {
   const router = useRouter()
   const cartApi = React.useMemo(() => getCartAdapter(), [])
@@ -245,14 +274,14 @@ export default function CartPage() {
   const load = React.useCallback(() => {
     const cart = cartApi.read() || {}
     const rawItems = Array.isArray(cart) ? cart : cart.items
-    const ccy = normCurrency((cart && cart.currency) || readLS(STORAGE_CCY_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY)
+    const ccy = normCurrency(
+      (cart && cart.currency) || readLS(STORAGE_CCY_KEY, DEFAULT_CURRENCY) || DEFAULT_CURRENCY
+    )
 
     setCurrency(ccy)
     setItems(
       Array.isArray(rawItems)
-        ? rawItems
-            .map((x) => normalizeItem(x, ccy))
-            .filter(Boolean)
+        ? rawItems.map((x) => normalizeItem(x, ccy)).filter(Boolean)
         : []
     )
   }, [cartApi])
@@ -408,7 +437,9 @@ export default function CartPage() {
 
     const ccy = normCurrency(currency)
 
-    const normItems = Array.isArray(items) ? items.map((x) => normalizeItem(x, ccy)).filter(Boolean) : []
+    const normItems = Array.isArray(items)
+      ? items.map((x) => normalizeItem(x, ccy)).filter(Boolean)
+      : []
 
     if (normItems.length === 0) {
       setNote('Cart is empty.')
@@ -416,7 +447,8 @@ export default function CartPage() {
       return
     }
 
-    const emailRaw = (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
+    const emailRaw =
+      (typeof window !== 'undefined' && window.localStorage.getItem('user_email')) || ''
     const email = String(emailRaw || '').trim().toLowerCase()
 
     if (!email) {
@@ -476,29 +508,27 @@ export default function CartPage() {
 
       const data = await r.json().catch(() => ({}))
 
-      // ✅ NEW: Expect action+fields (POST submit), not redirectUrl
-      if (!r.ok || !data?.ok || !data?.action || !data?.fields) {
+      // ✅ Backward compatible: redirectUrl (old) OR action+fields (new)
+      if (!r.ok || !data?.ok) {
         setBusy(false)
         setNote(data?.error || 'Checkout failed')
         setTimeout(() => setNote(''), 2600)
         return
       }
 
-      // ✅ Submit a POST form to PayHere (sandbox/live)
-      const form = document.createElement('form')
-      form.method = 'POST'
-      form.action = data.action
-
-      for (const [k, v] of Object.entries(data.fields)) {
-        const input = document.createElement('input')
-        input.type = 'hidden'
-        input.name = k
-        input.value = String(v ?? '')
-        form.appendChild(input)
+      if (data?.redirectUrl) {
+        window.location.href = String(data.redirectUrl)
+        return
       }
 
-      document.body.appendChild(form)
-      form.submit()
+      if (!data?.action || !data?.fields) {
+        setBusy(false)
+        setNote('Checkout response missing PayHere fields')
+        setTimeout(() => setNote(''), 2600)
+        return
+      }
+
+      submitPayHereForm(data.action, data.fields)
     } catch (e) {
       setBusy(false)
       setNote(e?.message || 'Checkout error')
@@ -510,7 +540,10 @@ export default function CartPage() {
     <>
       <Head>
         <title>Cart — Jeevan Chandimal</title>
-        <meta name="description" content="Your cart — review items, adjust quantity and proceed to checkout." />
+        <meta
+          name="description"
+          content="Your cart — review items, adjust quantity and proceed to checkout."
+        />
         <meta name="robots" content="noindex,nofollow" />
       </Head>
 
@@ -521,7 +554,9 @@ export default function CartPage() {
           <div className="topBar">
             <div>
               <h1 className="thq-heading-2">Cart</h1>
-              <p className="thq-body-small sub">Review your items, adjust quantities, and proceed to checkout.</p>
+              <p className="thq-body-small sub">
+                Review your items, adjust quantities, and proceed to checkout.
+              </p>
             </div>
 
             <div className="ccyBox">
@@ -648,7 +683,12 @@ export default function CartPage() {
                               </button>
                             </div>
 
-                            <button className="linkDanger" onClick={() => removeItemByKey(key)} type="button" disabled={busy}>
+                            <button
+                              className="linkDanger"
+                              onClick={() => removeItemByKey(key)}
+                              type="button"
+                              disabled={busy}
+                            >
                               Remove
                             </button>
 
@@ -691,13 +731,16 @@ export default function CartPage() {
                   <div className="mixWarn">
                     <div className="mixTitle">Mixed currencies</div>
                     <div className="mixText">
-                      Totals below are converted into <strong>{currency}</strong> using {fxLockedUsdLkr ? 'locked' : 'live'} rate.
+                      Totals below are converted into <strong>{currency}</strong> using{' '}
+                      {fxLockedUsdLkr ? 'locked' : 'live'} rate.
                     </div>
                     <div className="mixList">
                       {Object.keys(computed.totalsByCurrency).map((cur) => (
                         <div key={cur} className="mixLine">
                           <span className="muted">{cur}</span>
-                          <span className="strong">{formatMoneySimple(cur, computed.totalsByCurrency[cur])}</span>
+                          <span className="strong">
+                            {formatMoneySimple(cur, computed.totalsByCurrency[cur])}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -716,11 +759,18 @@ export default function CartPage() {
 
                 <div className="divider" />
 
-                <button className="btnPrimary full" onClick={onCheckout} type="button" disabled={busy}>
+                <button
+                  className="btnPrimary full"
+                  onClick={onCheckout}
+                  type="button"
+                  disabled={busy}
+                >
                   {busy ? 'Please wait…' : fxLockedUsdLkr ? 'Checkout (rate locked)' : 'Checkout'}
                 </button>
 
-                <div className="smallNote">Checkout will create a single order for multiple items.</div>
+                <div className="smallNote">
+                  Checkout will create a single order for multiple items.
+                </div>
               </aside>
             </div>
           )}

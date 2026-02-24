@@ -3,18 +3,13 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createDownloadToken } from '@/lib/secureDownload'
 
+/* ---------------- helpers ---------------- */
+
 function limitForLicense(license) {
   const x = String(license || '').trim().toLowerCase()
   if (x === 'commercial') return 0
   if (x === 'editorial') return 5
   return 3
-}
-
-function getBaseUrl(req) {
-  const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
-  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
-  if (host) return `${proto}://${host}`
-  return process.env.NEXT_PUBLIC_SITE_URL || ''
 }
 
 function normalizeFormat(v) {
@@ -28,22 +23,40 @@ function normalizeLicense(v) {
   return 'personal'
 }
 
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
+}
+
+function getBaseUrl(req) {
+  // Prefer explicit base if you set it (recommended for Vercel)
+  const explicit =
+    String(process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || '').trim() ||
+    String(process.env.NEXT_PUBLIC_SITE_URL || '').trim()
+
+  if (explicit) return explicit.replace(/\/+$/, '')
+
+  const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
+  return host ? `${proto}://${host}` : ''
+}
+
 function isUuid(v) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     String(v || '').trim()
   )
 }
 
-async function resolveObjectKeyForSingleOrder(order) {
-  const fmt = normalizeFormat(order?.format)
-  const photoId = String(order?.photo_id || '').trim()
-  if (!photoId) return null
-  if (!isUuid(photoId)) return null
+// Resolve correct R2 key from photos table (single-photo orders + fallback for cart items)
+async function resolveObjectKeyFromPhotos(photoId, format) {
+  const pid = String(photoId || '').trim()
+  if (!pid || !isUuid(pid)) return null
+
+  const fmt = normalizeFormat(format)
 
   const { data: p, error } = await supabaseAdmin
     .from('photos')
     .select('id, original_key, original_jpg_key, original_raw_key')
-    .eq('id', photoId)
+    .eq('id', pid)
     .maybeSingle()
 
   if (error) throw new Error(error.message)
@@ -54,35 +67,48 @@ async function resolveObjectKeyForSingleOrder(order) {
   return k ? String(k) : null
 }
 
-async function ensureObjectKey(order) {
-  const fallbackJpg = `photos/original/${order.photo_id}.jpg`
-  const fallbackZip = `photos/original/${order.photo_id}.zip`
+// last-resort fallback (only if you still store files like this)
+function fallbackObjectKeyFromPhotoId(photoId, format) {
+  const pid = String(photoId || '').trim()
+  if (!pid) return null
+  return format === 'raw' ? `photos/original/${pid}.zip` : `photos/original/${pid}.jpg`
+}
 
-  let objectKey = order.delivery_object_key ? String(order.delivery_object_key) : ''
-  const looksWrong =
-    !objectKey ||
-    objectKey === fallbackJpg ||
-    objectKey === fallbackZip ||
-    objectKey === `photos/original/${order.photo_id}`
+// For single-photo order row: ensure delivery_object_key is correct
+async function ensureObjectKeyForSingleOrder(order) {
+  const photoId = String(order?.photo_id || '').trim()
+  if (!photoId) return ''
 
-  if (looksWrong) {
-    const resolved = await resolveObjectKeyForSingleOrder(order)
+  let objectKey = order?.delivery_object_key ? String(order.delivery_object_key).trim() : ''
+
+  // If missing, try resolve from photos
+  if (!objectKey) {
+    const resolved = await resolveObjectKeyFromPhotos(photoId, order?.format)
     if (resolved) {
       objectKey = resolved
-      const u = await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', order.id)
+      const u = await supabaseAdmin
+        .from('orders')
+        .update({ delivery_object_key: objectKey })
+        .eq('id', order.id)
+
       if (u.error) console.error('delivery_object_key update failed:', u.error.message)
+    } else {
+      // final fallback
+      objectKey = fallbackObjectKeyFromPhotoId(photoId, normalizeFormat(order?.format)) || ''
     }
   }
 
   return objectKey || ''
 }
 
-function makeItemLabel(o, idx) {
-  const lic = normalizeLicense(o.license)
-  const fmt = normalizeFormat(o.format)
-  const base = o.title || o.photo_id || `Item ${idx + 1}`
+function makeCartItemLabel(item, idx) {
+  const lic = normalizeLicense(item?.license)
+  const fmt = normalizeFormat(item?.format)
+  const base = String(item?.title || item?.photoId || item?.photo_id || `Item ${idx + 1}`).trim()
   return `${base} • ${lic.toUpperCase()} • ${fmt.toUpperCase()}`
 }
+
+/* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
@@ -90,113 +116,141 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {}
     const orderId = String(body.orderId || '').trim()
-    const code = String(body.code || '').trim() // CART_... comes here
+    const code = String(body.code || '').trim() // CART_...
 
     if (!orderId && !code) {
       return res.status(400).json({ ok: false, error: 'Missing orderId or code' })
     }
 
+    const base = getBaseUrl(req)
     const expiresMinutes = 60
     const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
-    const base = getBaseUrl(req)
 
     /* =========================================================
-       ✅ CART GROUP: body.code = CART_...
-       group stored in orders.order_id
+       ✅ CART (NEW DESIGN): one order row where orders.code = CART_...
+          items are in orders.items (JSONB)
     ========================================================= */
     if (code) {
-      const { data: orders, error } = await supabaseAdmin
+      const { data: cartOrder, error } = await supabaseAdmin
         .from('orders')
-        .select('id,status,delivery_object_key,photo_id,format,email,license,download_limit,title,order_id')
-        .eq('order_id', code)
+        .select('id,status,code,order_kind,items,email,currency,amount,download_limit')
+        .eq('code', code)
+        .maybeSingle()
 
       if (error) return res.status(500).json({ ok: false, error: error.message })
+      if (!cartOrder) return res.status(404).json({ ok: false, error: 'Cart order not found' })
 
-      const list = Array.isArray(orders) ? orders : []
-      if (list.length === 0) return res.status(404).json({ ok: false, error: 'Cart orders not found' })
+      if (String(cartOrder.status || '').toUpperCase() !== 'PAID') {
+        return res.status(400).json({ ok: false, error: 'Order not paid' })
+      }
 
-      const anyPaid = list.some((o) => String(o.status || '').toUpperCase() === 'PAID')
-      if (!anyPaid) return res.status(400).json({ ok: false, error: 'Order not paid' })
+      const itemsArr = Array.isArray(cartOrder.items) ? cartOrder.items : []
+      if (itemsArr.length === 0) {
+        return res.status(400).json({ ok: false, error: 'Cart has no items' })
+      }
 
-      const items = []
+      // Ensure download_limit exists on the cart order
+      // (0 unlimited if any commercial, 5 if any editorial, else 3)
+      const licenses = itemsArr.map((it) => normalizeLicense(it?.license))
+      const desiredLimit = licenses.includes('commercial') ? 0 : licenses.includes('editorial') ? 5 : 3
 
-      for (let i = 0; i < list.length; i++) {
-        const o = list[i]
-        if (String(o.status || '').toUpperCase() !== 'PAID') continue
+      if (cartOrder.download_limit == null || Number(cartOrder.download_limit) !== Number(desiredLimit)) {
+        const u = await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', cartOrder.id)
+        if (u.error) console.error('cart download_limit update failed:', u.error.message)
+      }
 
-        if (o.download_limit == null) {
-          const desiredLimit = limitForLicense(o.license)
-          const u = await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
-          if (u.error) console.error('download_limit update failed:', u.error.message)
+      const guestEmail = normalizeEmail(cartOrder.email)
+
+      const outItems = []
+
+      for (let i = 0; i < itemsArr.length; i++) {
+        const it = itemsArr[i] || {}
+        const photoId = String(it.photoId || it.photo_id || '').trim()
+        if (!photoId) continue
+
+        const fmt = normalizeFormat(it.format)
+        const lic = normalizeLicense(it.license)
+
+        // Prefer objectKey stored in item from checkout-cart.js
+        let objectKey = String(it.objectKey || it.object_key || '').trim()
+
+        // If missing, resolve from photos table, then fallback
+        if (!objectKey) {
+          try {
+            objectKey = (await resolveObjectKeyFromPhotos(photoId, fmt)) || ''
+          } catch (e) {
+            console.error('cart resolveObjectKeyFromPhotos failed:', e?.message || e)
+          }
         }
-
-        const objectKey = await ensureObjectKey(o)
+        if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(photoId, fmt) || ''
         if (!objectKey) continue
 
         const jti = crypto.randomUUID()
 
         const ins = await supabaseAdmin.from('download_tokens').insert({
           jti,
-          order_id: o.id,
+          order_id: cartOrder.id, // ✅ all tokens tie to the ONE cart order row
           expires_at: expiresAt.toISOString(),
         })
+
         if (ins.error) {
           console.error('download_tokens insert failed:', ins.error.message)
           continue
         }
 
-        const fmt = normalizeFormat(o.format)
         const ext = fmt === 'raw' ? 'zip' : 'jpg'
 
         const token = createDownloadToken(
           {
             jti,
-            orderId: o.id,
-            photoId: o.photo_id,
+            orderId: cartOrder.id,
+            photoId,
             format: fmt,
             objectKey,
-            guestEmail: o.email || null,
-            filename: `${o.photo_id}.${ext}`,
-            license: normalizeLicense(o.license),
+            guestEmail: guestEmail || null,
+            filename: `${photoId}.${ext}`,
+            license: lic,
           },
           '1h'
         )
 
-        items.push({
-          title: makeItemLabel(o, i),
+        outItems.push({
+          title: makeCartItemLabel(it, i),
           token,
           url: `${base}/api/download?token=${encodeURIComponent(token)}`,
         })
       }
 
-      if (items.length === 0) {
+      if (outItems.length === 0) {
         return res.status(400).json({ ok: false, error: 'No downloadable items found for this cart' })
       }
 
-      return res.status(200).json({ ok: true, items, expiresAt: expiresAt.toISOString() })
+      return res.status(200).json({ ok: true, items: outItems, expiresAt: expiresAt.toISOString() })
     }
 
     /* =========================================================
-       ✅ SINGLE ORDER: body.orderId
+       ✅ SINGLE ORDER: body.orderId = orders.id
     ========================================================= */
     const { data: order, error } = await supabaseAdmin
       .from('orders')
-      .select('id,status,delivery_object_key,photo_id,format,email,license,download_limit')
+      .select('id,status,photo_id,format,email,license,download_limit,delivery_object_key')
       .eq('id', orderId)
       .maybeSingle()
 
     if (error) return res.status(500).json({ ok: false, error: error.message })
     if (!order) return res.status(404).json({ ok: false, error: 'Order not found' })
+
     if (String(order.status || '').toUpperCase() !== 'PAID') {
       return res.status(400).json({ ok: false, error: 'Order not paid' })
     }
 
-    const objectKey = await ensureObjectKey(order)
+    const objectKey = await ensureObjectKeyForSingleOrder(order)
     if (!objectKey) return res.status(400).json({ ok: false, error: 'Missing delivery_object_key (cannot resolve)' })
 
+    // Ensure download_limit exists
     if (order.download_limit == null) {
-      const desiredLimit = limitForLicense(order.license)
-      const u = await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', order.id)
+      const desired = limitForLicense(order.license)
+      const u = await supabaseAdmin.from('orders').update({ download_limit: desired }).eq('id', order.id)
       if (u.error) return res.status(500).json({ ok: false, error: 'Failed to set download limit' })
     }
 
@@ -219,7 +273,7 @@ export default async function handler(req, res) {
         photoId: order.photo_id,
         format: fmt,
         objectKey,
-        guestEmail: order.email || null,
+        guestEmail: normalizeEmail(order.email) || null,
         filename: `${order.photo_id}.${ext}`,
         license: normalizeLicense(order.license),
       },
