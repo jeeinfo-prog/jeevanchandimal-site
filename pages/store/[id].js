@@ -1325,18 +1325,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   onClick={openZoom}
   onContextMenu={preventSave}
   onDragStart={preventSave}
-  onTouchStart={(e) => {
-    // allow tap (zoom) but block long-press save
-    const touch = e.touches?.[0]
-    if (!touch) return
-    const timeout = setTimeout(() => {
-      e.preventDefault()
-    }, 350)
-
-    const clear = () => clearTimeout(timeout)
-    e.target.addEventListener('touchend', clear, { once: true })
-    e.target.addEventListener('touchmove', clear, { once: true })
-  }}
   loading="eager"
   onLoad={(e) => {
     const w = e.currentTarget.naturalWidth
