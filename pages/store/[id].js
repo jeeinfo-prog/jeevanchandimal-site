@@ -1189,21 +1189,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                       {cartMsg ? <span className="cartMsg">{cartMsg}</span> : null}
                     </div>
 
-                    <div className="fileInfo">
-  {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
-    <div>
-      <strong>JPG size:</strong>{' '}
-      {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
-    </div>
-  )}
-
-  {format === 'raw' && rawSizeMB && rawAvailable && (
-    <div>
-      <strong>RAW size:</strong> ~{rawSizeMB} MB
-    </div>
-  )}
-</div>
-
                     <p className="digitalNotice">
                       This is a digital product. No physical item will be shipped. Files are delivered
                       instantly after successful payment.
