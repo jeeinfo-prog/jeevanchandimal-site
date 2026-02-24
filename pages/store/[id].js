@@ -893,12 +893,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                         </div>
                       ) : null}
 
-                      {photo.exif?.make || photo.exif?.model ? (
-                        <div>
-                          <strong>Camera:</strong>{' '}
-                          {[photo.exif?.make, photo.exif?.model].filter(Boolean).join(' ')}
-                        </div>
-                      ) : null}
+                      
 
                       {photo.exif?.lensModel ? (
                         <div>
@@ -977,6 +972,16 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   ) : null}
 
   {resolution ? <span className="badge">🖼️ {resolution}</span> : null}
+
+  {format === 'jpg' && (exactJpgMB || jpgSizeMB) ? (
+  <span className="badge">
+    💾 {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
+  </span>
+) : null}
+
+{format === 'raw' && rawAvailable && rawSizeMB ? (
+  <span className="badge">💾 ~{rawSizeMB} MB</span>
+) : null}
 </div>
                 {isMember ? (
                   <div className="memberBadge">{String(memberPlan || 'member').toUpperCase()}</div>
@@ -1185,25 +1190,19 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     </div>
 
                     <div className="fileInfo">
-                      {resolution && (
-                        <div>
-                          <strong>Resolution:</strong> {resolution}
-                        </div>
-                      )}
+  {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
+    <div>
+      <strong>JPG size:</strong>{' '}
+      {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
+    </div>
+  )}
 
-                      {format === 'jpg' && (exactJpgMB || jpgSizeMB) && (
-                        <div>
-                          <strong>JPG size:</strong>{' '}
-                          {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
-                        </div>
-                      )}
-
-                      {format === 'raw' && rawSizeMB && rawAvailable && (
-                        <div>
-                          <strong>RAW size:</strong> ~{rawSizeMB} MB
-                        </div>
-                      )}
-                    </div>
+  {format === 'raw' && rawSizeMB && rawAvailable && (
+    <div>
+      <strong>RAW size:</strong> ~{rawSizeMB} MB
+    </div>
+  )}
+</div>
 
                     <p className="digitalNotice">
                       This is a digital product. No physical item will be shipped. Files are delivered
