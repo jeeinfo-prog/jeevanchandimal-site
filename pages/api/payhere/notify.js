@@ -96,6 +96,7 @@ function addMonths(date, months) {
   const d = new Date(date)
   const day = d.getUTCDate()
   d.setUTCMonth(d.getUTCMonth() + months)
+  // handle month-end rollover (e.g. Jan 31 + 1 month)
   if (d.getUTCDate() < day) d.setUTCDate(0)
   return d
 }
@@ -123,6 +124,8 @@ function cartLimitFromItems(items) {
   return 3
 }
 
+/* ===== INVOICE ===== */
+
 function genInvoiceNo(orderId) {
   const d = new Date()
   const yyyy = d.getUTCFullYear()
@@ -146,6 +149,8 @@ async function ensureInvoiceNo(order) {
   }
   return invoiceNo
 }
+
+/* ===== OBJECT KEY RESOLVE ===== */
 
 // NOTE: last resort fallback
 function fallbackObjectKeyFromPhotoId(photoId, format) {
@@ -175,16 +180,19 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
 }
 
-// ✅ Find the cart order row (NEW design)
+/* ===== ORDER LOOKUPS ===== */
+
 async function findCartOrder({ cartOrderDbId, cartCode }) {
   const id = String(cartOrderDbId || '').trim()
   const code = String(cartCode || '').trim()
 
+  // 1) Prefer custom_2 (DB id)
   if (id) {
     const byId = await supabaseAdmin.from('orders').select('*').eq('id', id).maybeSingle()
     if (!byId.error && byId?.data) return byId.data
   }
 
+  // 2) Fallback to code = CART_...
   if (code) {
     const byCode = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
     if (!byCode.error && byCode?.data) return byCode.data
@@ -193,9 +201,6 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
   return null
 }
 
-/**
- * SINGLE order lookup (safe)
- */
 async function findSingleOrderByRef(ref) {
   const v = String(ref || '').trim()
   if (!v) return null
@@ -213,7 +218,8 @@ async function findSingleOrderByRef(ref) {
 }
 
 /**
- * ✅ Idempotency helper
+ * ✅ Idempotency helper:
+ * Set timestamp only if currently NULL.
  */
 async function claimSendOnce(orderId, column) {
   const now = new Date().toISOString()
@@ -232,21 +238,19 @@ async function claimSendOnce(orderId, column) {
   return !!r.data
 }
 
-/* ===== PAYHERE SECRET RESOLVER =====
-   Option B + sandbox/live:
-   - Try multiple secrets (sandbox/live/default) safely.
-*/
-function getCandidateMerchantSecrets() {
-  const list = [
-    process.env.PAYHERE_MERCHANT_SECRET_SANDBOX,
-    process.env.PAYHERE_MERCHANT_SECRET_LIVE,
-    process.env.PAYHERE_MERCHANT_SECRET,
-  ]
-    .map((x) => String(x || '').trim())
-    .filter(Boolean)
+/* ===== PAYHERE SECRET RESOLVER (your required version) ===== */
 
-  // remove duplicates
-  return Array.from(new Set(list))
+function getCandidateMerchantSecrets() {
+  const sandboxFlag =
+    String(process.env.PAYHERE_SANDBOX || process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
+      .trim()
+      .toLowerCase() === 'true'
+
+  const list = sandboxFlag
+    ? [process.env.PAYHERE_MERCHANT_SECRET_SANDBOX, process.env.PAYHERE_MERCHANT_SECRET]
+    : [process.env.PAYHERE_MERCHANT_SECRET_LIVE, process.env.PAYHERE_MERCHANT_SECRET]
+
+  return Array.from(new Set(list.map((x) => String(x || '').trim()).filter(Boolean)))
 }
 
 function verifyMd5WithAnySecret(payload) {
@@ -260,9 +264,11 @@ function verifyMd5WithAnySecret(payload) {
   return false
 }
 
+/* ===== KIND DETECTION + AMOUNT SAFETY ===== */
+
 function orderLooksLikeCart(order_id, custom_1, dbOrder) {
   const kindRaw = String(custom_1 || '').trim().toLowerCase()
-  const isCartByCustom = kindRaw === 'cart'
+  const isCartByCustom = kindRaw === 'cart' // correct for cart flow
   const isCartByPrefix = String(order_id || '').startsWith('CART_')
   const isCartByDb = String(dbOrder?.order_kind || '').toLowerCase() === 'cart'
   return isCartByCustom || isCartByPrefix || isCartByDb
@@ -277,13 +283,14 @@ function orderLooksLikeMembership(custom_1, dbOrder) {
 
 function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency }) {
   if (!dbOrder) return true
+
+  // If DB has no amount/currency, skip.
+  if (!dbOrder.amount || !dbOrder.currency) return true
+
   const dbAmount = normalizePayhereAmount(dbOrder.amount)
   const dbCurrency = normalizeCurrency(dbOrder.currency)
   const phAmount = normalizePayhereAmount(payhere_amount)
   const phCurrency = normalizeCurrency(payhere_currency)
-
-  // If your DB has no amount/currency, skip.
-  if (!dbOrder.amount || !dbOrder.currency) return true
 
   if (dbAmount !== phAmount || dbCurrency !== phCurrency) {
     console.error('Amount/currency mismatch:', {
@@ -302,6 +309,7 @@ function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency })
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
+  // PayHere expects 200 always
   if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
@@ -323,13 +331,10 @@ export default async function handler(req, res) {
 
     if (!order_id) return res.status(200).send('OK')
 
-    // We can still process without knowing kind yet.
     const cartCode = String(order_id || '').trim()
     const cartDbId = String(custom_2 || '').trim()
 
     // Try to find DB row early (helps kind detection + amount validation)
-    // - If cart: custom_2 is DB id; code is CART_...
-    // - If single/membership: order_id is ref
     let dbOrder = null
     try {
       if (String(order_id || '').startsWith('CART_') || String(custom_1 || '').trim().toLowerCase() === 'cart') {
@@ -339,7 +344,7 @@ export default async function handler(req, res) {
       }
     } catch {}
 
-    // Verify signature (try sandbox/live/default secrets)
+    // Verify signature (try sandbox or live secrets based on flag)
     const ok = verifyMd5WithAnySecret({
       merchant_id,
       order_id,
@@ -398,7 +403,6 @@ export default async function handler(req, res) {
         const order = dbOrder || (await findSingleOrderByRef(order_id))
         if (!order) return res.status(200).send('OK')
 
-        // ✅ Amount/currency safety (Option B)
         if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
           await supabaseAdmin
             .from('orders')
@@ -430,11 +434,17 @@ export default async function handler(req, res) {
             .eq('id', order.id)
         }
 
-        const freshRes = await supabaseAdmin.from('orders').select('*').eq('id', order.id).maybeSingle()
+        const freshRes = await supabaseAdmin
+          .from('orders')
+          .select('*')
+          .eq('id', order.id)
+          .maybeSingle()
+
         if (freshRes.error) {
           console.error('membership refetch failed:', freshRes.error.message)
           return res.status(200).send('OK')
         }
+
         const o = freshRes.data || order
 
         const tier = normalizeMembershipTier(o.license)
@@ -446,6 +456,7 @@ export default async function handler(req, res) {
         if (term === 'yearly') expiresAt = addYears(now, 1).toISOString()
         if (term === 'lifetime') expiresAt = addYears(now, 100).toISOString()
 
+        // Activate membership
         try {
           const upsertPayload = {
             email,
@@ -455,12 +466,16 @@ export default async function handler(req, res) {
             updated_at: new Date().toISOString(),
           }
 
-          const up = await supabaseAdmin.from('members').upsert(upsertPayload, { onConflict: 'email' })
+          const up = await supabaseAdmin
+            .from('members')
+            .upsert(upsertPayload, { onConflict: 'email' })
+
           if (up.error) console.error('members upsert error:', up.error.message)
         } catch (e) {
           console.error('members activate error:', e?.message || e)
         }
 
+        // Receipt email (send once)
         try {
           const invoiceNo = await ensureInvoiceNo(o)
           const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
@@ -492,7 +507,6 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
-        // ✅ Amount/currency safety (Option B)
         if (!amountCurrencyMatchOrLog({ dbOrder: cartOrder, payhere_amount, payhere_currency })) {
           await supabaseAdmin
             .from('orders')
@@ -524,6 +538,7 @@ export default async function handler(req, res) {
             .eq('id', cartOrder.id)
         }
 
+        // Re-fetch latest
         const { data: freshCart, error: freshErr } = await supabaseAdmin
           .from('orders')
           .select('*')
@@ -543,13 +558,16 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
+        // Ensure download_limit on cart order
         const desiredLimit = cartLimitFromItems(items)
         if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
           await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
         }
 
+        // Invoice number
         const invoiceNo = await ensureInvoiceNo(o)
 
+        // Receipt email (send once)
         const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
         if (claimedReceipt) {
           const amount =
@@ -577,6 +595,7 @@ export default async function handler(req, res) {
           })
         }
 
+        // Download email (send once)
         const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
         if (claimedDownload) {
           const links = []
@@ -670,7 +689,6 @@ export default async function handler(req, res) {
       const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (!order) return res.status(200).send('OK')
 
-      // ✅ Amount/currency safety (Option B)
       if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
         await supabaseAdmin
           .from('orders')
@@ -698,7 +716,12 @@ export default async function handler(req, res) {
           .eq('id', order.id)
       }
 
-      const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).single()
+      const { data: fresh } = await supabaseAdmin
+        .from('orders')
+        .select('*')
+        .eq('id', order.id)
+        .single()
+
       const o = fresh || order
 
       const email = normalizeEmail(o.email)
@@ -709,7 +732,8 @@ export default async function handler(req, res) {
         objectKey = await resolveObjectKeyFromPhotos(o.photo_id, o.format)
       } catch {}
       if (!objectKey) objectKey = String(o.delivery_object_key || '').trim()
-      if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
+      if (!objectKey)
+        objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
       if (!objectKey) return res.status(200).send('OK')
 
       const desiredLimit = limitForLicense(o.license)
