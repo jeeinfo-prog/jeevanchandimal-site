@@ -1287,7 +1287,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
         {/* ZOOM OVERLAY */}
         {zoomOpen && (
-          <div className="zoomOverlay" onMouseMove={onMouseMovePan} onMouseUp={onMouseUpPan}>
+          <div
+  className="zoomOverlay"
+  onMouseMove={onMouseMovePan}
+  onMouseUp={onMouseUpPan}
+  onContextMenu={preventSave}
+>
             <div className="zoomTop">
               <div className="zoomTitle">{photo?.title || 'Preview'}</div>
               <div className="zoomActions">
@@ -1314,14 +1319,18 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
             <div className="zoomBody" onWheel={onWheelZoom} onMouseDown={onMouseDownPan}>
               <img
-                src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
-                alt={photo?.title || 'Preview'}
-                draggable={false}
-                style={{
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                  cursor: isPanning ? 'grabbing' : 'grab',
-                }}
-              />
+  src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
+  alt={photo?.title || 'Preview'}
+  draggable={false}
+  onContextMenu={preventSave}
+  onDragStart={preventSave}
+  onTouchStart={(e) => e.preventDefault()}
+  style={{
+    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+    cursor: isPanning ? 'grabbing' : 'grab',
+    touchAction: 'none',
+  }}
+/>
               {wmOn && <div className="zoomWm" style={{ opacity: wmOpacity }} />}
             </div>
           </div>
@@ -1913,12 +1922,16 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         }
 
         .zoomBody img {
-          max-width: none;
-          max-height: none;
-          width: auto;
-          height: auto;
-          user-select: none;
-        }
+  max-width: none;
+  max-height: none;
+  width: auto;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  pointer-events: auto;
+}
 
         .imageFrame:hover .wmTile {
           opacity: 0;
