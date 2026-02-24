@@ -157,11 +157,9 @@ export default function StoreIndex() {
                 const val = e.target.value
                 setQuery(val)
 
-                router.replace(
-                  { pathname: '/store', query: val ? { q: val } : {} },
-                  undefined,
-                  { shallow: true }
-                )
+                router.replace({ pathname: '/store', query: val ? { q: val } : {} }, undefined, {
+                  shallow: true,
+                })
               }}
               placeholder="Search (e.g. Sigiriya, night, portrait)…"
               aria-label="Search photos"
@@ -252,6 +250,9 @@ export default function StoreIndex() {
                             </button>
                           ))}
                         </div>
+
+                        {/* ✅ Price hidden on store grid (premium feel) */}
+                        <div className="hint">Licensing available • View details →</div>
 
                         {/* ✅ Add to Cart (compact) */}
                         <div
@@ -490,6 +491,13 @@ export default function StoreIndex() {
           background: rgba(245, 244, 244, 0.08);
         }
 
+        .hint {
+          margin-top: 10px;
+          font-size: 12px;
+          opacity: 0.78;
+          line-height: 1.4;
+        }
+
         .cartBox {
           margin-top: 12px;
           border-top: 1px solid rgba(245, 244, 244, 0.1);
@@ -587,8 +595,9 @@ function CartMini({ photo }) {
       </div>
 
       <div className="row2">
-        <button className="btn" type="button" onClick={onAdd}>
-          Add to cart • {money(currency, unitPrice)}
+        {/* ✅ No price on store grid */}
+        <button className="btn" type="button" onClick={onAdd} title={`Add to cart • ${money(currency, unitPrice)}`}>
+          Add to cart
         </button>
         {msg ? <span className="msg">{msg}</span> : null}
       </div>
