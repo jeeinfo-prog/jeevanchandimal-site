@@ -1325,8 +1325,18 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   onClick={openZoom}
   onContextMenu={preventSave}
   onDragStart={preventSave}
-  onTouchStart={(e) => e.preventDefault()}
-  style={{ touchAction: 'none' }}
+  onTouchStart={(e) => {
+    // allow tap (zoom) but block long-press save
+    const touch = e.touches?.[0]
+    if (!touch) return
+    const timeout = setTimeout(() => {
+      e.preventDefault()
+    }, 350)
+
+    const clear = () => clearTimeout(timeout)
+    e.target.addEventListener('touchend', clear, { once: true })
+    e.target.addEventListener('touchmove', clear, { once: true })
+  }}
   loading="eager"
   onLoad={(e) => {
     const w = e.currentTarget.naturalWidth
@@ -1948,10 +1958,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         }
 
         .imageFrame img {
-  -webkit-touch-callout: none;
-  -webkit-user-drag: none;
+  width: 100%;
+  height: auto;
+  display: block;
   user-select: none;
-  touch-action: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 
         .relThumb:hover .relWm {
