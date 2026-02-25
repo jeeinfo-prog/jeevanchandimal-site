@@ -135,14 +135,14 @@ const TheWork = (props) => {
   display: grid;
   gap: var(--dl-layout-space-fiveunits);
   grid-template-columns: 1fr 1fr;
-  align-items: center; /* ✅ center text & image vertically */
+  align-items: center; /* ✅ center */
 }
 
         .the-work-thq-tabs-menu-elm {
   display: flex;
   flex-direction: column;
   gap: var(--dl-layout-space-twounits);
-  justify-content: center; /* ✅ vertical center */
+  justify-content: center; /* ✅ center text */
 }
 
         /* TAB CARD */

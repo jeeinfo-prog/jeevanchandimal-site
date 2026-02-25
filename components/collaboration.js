@@ -139,20 +139,19 @@ const Collaboration = (props) => {
 
       <style jsx>{`
         .collaboration-container2 {
-          width: 100%;
-          display: grid;
-          gap: var(--dl-layout-space-fiveunits);
-          grid-template-columns: 1fr 1fr;
-          align-items: stretch; /* ✅ align bottom with image */
-        }
+  width: 100%;
+  display: grid;
+  gap: var(--dl-layout-space-fiveunits);
+  grid-template-columns: 1fr 1fr;
+  align-items: center; /* ✅ center */
+}
 
         .collaboration-thq-tabs-menu-elm {
-          display: flex;
-          flex-direction: column;
-          gap: var(--dl-layout-space-twounits);
-          justify-content: flex-end; /* ✅ bottom aligned */
-          height: 100%;
-        }
+  display: flex;
+  flex-direction: column;
+  gap: var(--dl-layout-space-twounits);
+  justify-content: center; /* ✅ center text */
+}
 
         /* ✅ Tab cards (same cinematic effects) */
         .collabTab {
