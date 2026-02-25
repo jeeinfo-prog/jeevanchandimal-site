@@ -35,9 +35,7 @@ const Availability = (props) => {
               <span className="thq-heading-3">
                 {props.heading11 ?? (
                   <Fragment>
-                    <span className="availability-text15">
-                      Available for select projects.
-                    </span>
+                    <span className="availability-text15">Available for select projects.</span>
                   </Fragment>
                 )}
               </span>
@@ -53,19 +51,21 @@ const Availability = (props) => {
               </p>
             </div>
 
-            {/* ✅ Single CTA */}
+            {/* ✅ Single CTA (Next 12 safe Link) */}
             <div className="availability-thq-actions-elm">
-              <Link href="/contact" className="availability-cta">
-                <span className="ctaLabel">
-                  {props.action2 ?? (
-                    <Fragment>
-                      <span className="availability-text18">Contact Me</span>
-                    </Fragment>
-                  )}
-                </span>
-                <span className="ctaArrow" aria-hidden="true">
-                  →
-                </span>
+              <Link href="/contact" passHref legacyBehavior>
+                <a className="availability-cta">
+                  <span className="ctaLabel">
+                    {props.action2 ?? (
+                      <Fragment>
+                        <span className="availability-text18">Contact Me</span>
+                      </Fragment>
+                    )}
+                  </span>
+                  <span className="ctaArrow" aria-hidden="true">
+                    →
+                  </span>
+                </a>
               </Link>
             </div>
           </div>
@@ -78,7 +78,6 @@ const Availability = (props) => {
           position: relative;
         }
 
-        /* cinematic divider */
         .cineDivider {
           width: 100%;
           height: 1px;
@@ -113,7 +112,6 @@ const Availability = (props) => {
           align-items: center;
         }
 
-        /* badge row */
         .badgeRow {
           display: flex;
           width: 100%;
@@ -142,13 +140,8 @@ const Availability = (props) => {
           box-shadow: 0 0 0 4px rgba(245, 244, 244, 0.08);
         }
 
-        /* tones */
         .toneCyan {
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.18),
-            rgba(37, 195, 226, 0.06)
-          );
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.18), rgba(37, 195, 226, 0.06));
           border-color: rgba(37, 195, 226, 0.22);
           color: #25c3e2;
         }
@@ -177,17 +170,12 @@ const Availability = (props) => {
           box-shadow: 0 0 0 4px rgba(255, 120, 120, 0.12);
         }
 
-        /* CTA (your .mLink cinematic cyan style + polish) */
         .availability-cta {
           color: #25c3e2 !important;
           text-decoration: none !important;
           padding: 14px 18px;
           border-radius: 14px;
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.22),
-            rgba(37, 195, 226, 0.1)
-          );
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.22), rgba(37, 195, 226, 0.1));
           border: 1px solid rgba(37, 195, 226, 0.22);
           opacity: 1;
           font-weight: 700;
@@ -205,13 +193,8 @@ const Availability = (props) => {
         }
 
         .availability-cta:hover {
-          opacity: 1;
           transform: translateY(-1px);
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.28),
-            rgba(37, 195, 226, 0.12)
-          );
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.28), rgba(37, 195, 226, 0.12));
           box-shadow: 0 14px 26px rgba(37, 195, 226, 0.12);
         }
 
@@ -222,11 +205,6 @@ const Availability = (props) => {
         .availability-cta:focus-visible {
           outline: 2px solid rgba(37, 195, 226, 0.6);
           outline-offset: 2px;
-        }
-
-        .ctaLabel {
-          display: inline-flex;
-          align-items: center;
         }
 
         .ctaArrow {
@@ -248,7 +226,6 @@ const Availability = (props) => {
             align-items: flex-start;
             gap: var(--dl-layout-space-oneandhalfunits);
           }
-
           .availability-thq-actions-elm {
             width: 100%;
             justify-content: flex-start;
@@ -264,8 +241,6 @@ Availability.defaultProps = {
   action2: undefined,
   heading1: undefined,
   content1: undefined,
-
-  // ✅ new
   statusText: undefined,
   statusTone: 'toneCyan', // toneCyan | toneAmber | toneRed
 }
@@ -275,8 +250,6 @@ Availability.propTypes = {
   action2: PropTypes.element,
   heading1: PropTypes.element,
   content1: PropTypes.element,
-
-  // ✅ new
   statusText: PropTypes.element,
   statusTone: PropTypes.oneOf(['toneCyan', 'toneAmber', 'toneRed']),
 }
