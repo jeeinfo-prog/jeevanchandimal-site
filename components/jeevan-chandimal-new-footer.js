@@ -308,7 +308,7 @@ const JeevanChandimalNewFooter = (props) => {
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: 16px;
-    padding-bottom: 64px; /* ✅ reserve dropdown space */
+    padding-bottom: 64px;
   }
 
   .jcBrand {
@@ -331,7 +331,6 @@ const JeevanChandimalNewFooter = (props) => {
     flex-wrap: wrap;
   }
 
-  /* ✅ middle links pill shape + hover blue text */
   .jcLink {
     height: 32px;
     padding: 0 12px;
@@ -351,10 +350,9 @@ const JeevanChandimalNewFooter = (props) => {
   .jcLink:hover {
     opacity: 1;
     background: rgba(245, 244, 244, 0.06);
-    color: #25c3e2 !important; /* ✅ hover = blue */
+    color: #25c3e2 !important;
   }
 
-  /* ✅ active pill highlight like navbar */
   .isActive {
     height: 32px;
     border-radius: 999px;
@@ -372,7 +370,6 @@ const JeevanChandimalNewFooter = (props) => {
     align-items: center;
   }
 
-  /* ✅ make dropdown toggle pill to match links */
   .jcDropToggle {
     height: 32px;
     padding: 0 12px;
@@ -382,26 +379,25 @@ const JeevanChandimalNewFooter = (props) => {
     gap: 6px;
   }
 
-  /* ✅ hovering anywhere on the toggle makes the text blue */
   .jcDropToggle:hover .jcLink {
     color: #25c3e2 !important;
   }
 
+  /* ✅ Arrow border removed + background matched */
   .jcArrow {
     width: 26px;
     height: 26px;
-    border-radius: 10px;
+    border-radius: 999px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(245, 244, 244, 0.12);
-    background: rgba(0, 0, 0, 0.18);
+    border: none; /* removed border */
+    background: transparent; /* match footer background */
     transition: background 0.15s, border-color 0.15s;
   }
 
   .jcArrow:hover {
     background: rgba(245, 244, 244, 0.06);
-    border-color: rgba(245, 244, 244, 0.18);
   }
 
   .jcArrowSvg {
@@ -434,7 +430,6 @@ const JeevanChandimalNewFooter = (props) => {
     z-index: 999999;
   }
 
-  /* ✅ hover bridge (paste THIS right after .jcMenu) */
   .jcMenu::before {
     content: '';
     position: absolute;
@@ -460,14 +455,12 @@ const JeevanChandimalNewFooter = (props) => {
     border: 1px solid transparent;
   }
 
-  /* ✅ dropdown hover = blue text */
   .jcMenuItem:hover {
     opacity: 1;
     background: rgba(245, 244, 244, 0.08);
     color: #25c3e2 !important;
   }
 
-  /* ✅ Active dropdown child highlight */
   .isActiveItem {
     background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
     border: 1px solid rgba(37, 195, 226, 0.18);
@@ -495,6 +488,7 @@ const JeevanChandimalNewFooter = (props) => {
     flex-wrap: wrap;
   }
 
+  /* ✅ social hover text = blue highlight */
   .jcSocialBtn {
     width: 40px;
     height: 40px;
@@ -514,7 +508,7 @@ const JeevanChandimalNewFooter = (props) => {
     transform: translateY(-1px);
     background: rgba(37, 195, 226, 0.1);
     border-color: rgba(37, 195, 226, 0.35);
-    color: #25c3e2;
+    color: #25c3e2; /* ✅ blue text/icon on hover */
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   }
 
