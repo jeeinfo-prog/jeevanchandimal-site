@@ -131,20 +131,19 @@ const TheWork = (props) => {
 
       <style jsx>{`
         .the-work-container2 {
-          width: 100%;
-          display: grid;
-          gap: var(--dl-layout-space-fiveunits);
-          grid-template-columns: 1fr 1fr;
-          align-items: stretch;
-        }
+  width: 100%;
+  display: grid;
+  gap: var(--dl-layout-space-fiveunits);
+  grid-template-columns: 1fr 1fr;
+  align-items: center; /* ✅ center text & image vertically */
+}
 
         .the-work-thq-tabs-menu-elm {
-          display: flex;
-          flex-direction: column;
-          gap: var(--dl-layout-space-twounits);
-          justify-content: flex-end;
-          height: 100%;
-        }
+  display: flex;
+  flex-direction: column;
+  gap: var(--dl-layout-space-twounits);
+  justify-content: center; /* ✅ vertical center */
+}
 
         /* TAB CARD */
         .workTab {
