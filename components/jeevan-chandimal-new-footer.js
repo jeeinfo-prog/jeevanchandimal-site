@@ -502,45 +502,37 @@ const JeevanChandimalNewFooter = (props) => {
   background: transparent;
   border: 1px solid rgba(245, 244, 244, 0.08);
 
+  color: rgba(245, 244, 244, 0.88);
   text-decoration: none !important;
 
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
-/* base icon color */
+/* ✅ FORCE svg to follow text color (fixes “no hover highlight”) */
 .jcSocialSvg {
   width: 16px;
   height: 16px;
   display: block;
+  fill: currentColor;
 }
 
-/* ✅ force base fill color (works regardless of SVG attributes) */
-.jcSocialBtn .jcSocialSvg,
-.jcSocialBtn .jcSocialSvg * {
-  fill: rgba(245, 244, 244, 0.88) !important;
+.jcSocialSvg * {
+  fill: currentColor;
 }
 
-/* ✅ hover = blue highlight (direct fill override) */
+/* ✅ hover = blue highlight */
 .jcSocialBtn:hover {
   transform: translateY(-1px);
+  color: #25c3e2 !important;
   background: rgba(37, 195, 226, 0.08);
   border-color: rgba(37, 195, 226, 0.28);
-}
-
-.jcSocialBtn:hover .jcSocialSvg,
-.jcSocialBtn:hover .jcSocialSvg * {
-  fill: #25c3e2 !important;
 }
 
 /* optional: keyboard focus also blue */
 .jcSocialBtn:focus-visible {
   outline: none;
+  color: #25c3e2 !important;
   box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.25);
-}
-
-.jcSocialBtn:focus-visible .jcSocialSvg,
-.jcSocialBtn:focus-visible .jcSocialSvg * {
-  fill: #25c3e2 !important;
 }
 
         .jcDivider {
