@@ -47,7 +47,6 @@ function getNotifyBaseUrl(req) {
 }
 
 // ✅ Reads PayHere mode from Supabase app_settings, with env fallbacks.
-// Supports your existing PAYHERE_SANDBOX=true too.
 async function getPayhereMode() {
   const sandboxFlag =
     String(process.env.PAYHERE_SANDBOX || process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
@@ -102,31 +101,38 @@ async function getObjectKeyForPhoto(photoId, format) {
   return jpgKey ? String(jpgKey) : null
 }
 
-async function insertOrderWithFallback(orderRow) {
+/**
+ * ✅ STRICT INSERT:
+ * - NEVER drops `items`
+ * - If DB missing orders.items, FAIL FAST with clear error
+ * - Still allows dropping optional columns like payhere_mode / fx fields
+ */
+async function insertOrderStrict(orderRow) {
   const tryInsert = async (row) =>
     supabaseAdmin.from('orders').insert(row).select('id, code, amount').maybeSingle()
 
-  // 1) first attempt
   let ins = await tryInsert(orderRow)
   if (!ins.error) return ins
 
   const msg = String(ins.error.message || '')
 
-  // retry helpers (drop one or more possible-missing columns)
+  if (msg.includes('items') && msg.includes('column')) {
+    return {
+      data: null,
+      error: new Error(
+        'DB missing orders.items column. Run: alter table orders add column if not exists items jsonb;'
+      ),
+    }
+  }
+
   async function retry(dropKeys) {
     const next = { ...orderRow }
     for (const k of dropKeys) delete next[k]
     return tryInsert(next)
   }
 
-  // 2) retry dropping known optional columns if schema doesn't have them
   if (msg.includes('payhere_mode') && msg.includes('column')) {
     ins = await retry(['payhere_mode'])
-    if (!ins.error) return ins
-  }
-
-  if (msg.includes('items') && msg.includes('column')) {
-    ins = await retry(['items'])
     if (!ins.error) return ins
   }
 
@@ -140,8 +146,7 @@ async function insertOrderWithFallback(orderRow) {
     if (!ins.error) return ins
   }
 
-  // 3) final retry dropping all optional columns (covers mixed missing columns)
-  ins = await retry(['items', 'payhere_mode', 'fx_usd_lkr', 'fx_locked_at'])
+  ins = await retry(['payhere_mode', 'fx_usd_lkr', 'fx_locked_at'])
   if (!ins.error) return ins
 
   return ins
@@ -153,12 +158,10 @@ function md5(s) {
 }
 
 function computePayHereHash({ merchant_id, order_id, amount, currency, merchant_secret }) {
-  // hash = UPPER(MD5(merchant_id + order_id + amount + currency + UPPER(MD5(merchant_secret))))
   const secretHash = md5(merchant_secret).toUpperCase()
   return md5(`${merchant_id}${order_id}${amount}${currency}${secretHash}`).toUpperCase()
 }
 
-// Choose merchant creds based on mode, with backward-compatible fallbacks
 function getMerchantCreds(payhereMode) {
   const isLive = payhereMode === 'live'
 
@@ -192,18 +195,15 @@ export default async function handler(req, res) {
       (Array.isArray(cart.items) && cart.items) ||
       []
 
-    // ✅ Option B: user-selected checkout currency (USD/LKR)
     const currency = normCurrency(body.currency || cart.currency)
     const email = String(body.email || cart.email || '').trim().toLowerCase()
 
-    // optional FX metadata (from your cart page)
     const usdLkr = body.usdLkr != null ? Number(body.usdLkr) : null
     const fxLockedAt = body.fxLockedAt != null ? Number(body.fxLockedAt) : null
 
     if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
     if (!items.length) return res.status(400).json({ ok: false, error: 'Cart is empty' })
 
-    // ✅ normalize cart items (server-trusted)
     const normalizedItems = []
     let total = 0
 
@@ -253,7 +253,6 @@ export default async function handler(req, res) {
 
     const payhereMode = await getPayhereMode()
 
-    // ✅ order row
     const orderRow = {
       id: `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 14)}`,
       status: 'PENDING',
@@ -261,11 +260,9 @@ export default async function handler(req, res) {
       currency,
       amount: money2(total),
 
-      // Optional FX metadata (add columns if you want; fallback removes if missing)
       fx_usd_lkr: usdLkr != null ? round2(usdLkr) : null,
       fx_locked_at: fxLockedAt ? new Date(Number(fxLockedAt)).toISOString() : null,
 
-      // NOT NULL schema fields (keep your existing requirements)
       photo_id: topPhotoId,
       license: 'personal',
       format: 'jpg',
@@ -278,7 +275,7 @@ export default async function handler(req, res) {
       payhere_mode: payhereMode,
     }
 
-    const ins = await insertOrderWithFallback(orderRow)
+    const ins = await insertOrderStrict(orderRow)
     if (ins.error) {
       return res.status(500).json({ ok: false, error: ins.error.message })
     }
@@ -297,7 +294,6 @@ export default async function handler(req, res) {
     const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(code)}`
     const notify_url = `${notifyBase}/api/payhere/notify`
 
-    // ✅ PayHere action endpoint (sandbox/live)
     const action =
       payhereMode === 'live'
         ? 'https://www.payhere.lk/pay/checkout'
@@ -324,11 +320,9 @@ export default async function handler(req, res) {
       city: '',
       country: 'Sri Lanka',
 
-      // ✅ IMPORTANT: ALWAYS 'cart' so notify routing is stable
       custom_1: 'cart',
       custom_2: created?.id || orderRow.id,
 
-      // ✅ recommended: hash
       hash: computePayHereHash({
         merchant_id,
         order_id: code,

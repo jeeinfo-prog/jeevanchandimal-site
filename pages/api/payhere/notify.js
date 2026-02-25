@@ -553,10 +553,22 @@ export default async function handler(req, res) {
         const o = freshCart || cartOrder
         const items = Array.isArray(o.items) ? o.items : []
 
+        // ✅ IMPORTANT: if paid cart has no items, mark it clearly in DB
         if (items.length === 0) {
-          console.error('Cart order has no items array:', o.id)
-          return res.status(200).send('OK')
-        }
+  console.error('Cart order has no items array:', o.id)
+
+  await supabaseAdmin
+    .from('orders')
+    .update({
+      status: 'PAID_NO_ITEMS',
+      payhere_payment_id: payment_id || null,
+      payhere_status_code: status_code || null,
+      payhere_status_message: status_message || null,
+    })
+    .eq('id', o.id)
+
+  return res.status(200).send('OK')
+}
 
         // Ensure download_limit on cart order
         const desiredLimit = cartLimitFromItems(items)
