@@ -488,34 +488,34 @@ const JeevanChandimalNewFooter = (props) => {
     flex-wrap: wrap;
   }
 
-  /* ✅ social hover text = blue highlight */
-  .jcSocialBtn {
-    width: 40px;
-    height: 40px;
-    border-radius: 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.55);
-    border: 1px solid rgba(245, 244, 244, 0.1);
-    color: rgba(245, 244, 244, 0.92);
-    text-decoration: none !important;
-    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
-      box-shadow 0.15s ease;
-  }
+  /* ✅ thinner + clean social buttons */
+.jcSocialBtn {
+  width: 34px;              /* smaller */
+  height: 34px;             /* smaller */
+  border-radius: 10px;      /* slightly tighter */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;  /* remove dark box */
+  border: none;             /* remove border */
+  color: rgba(245, 244, 244, 0.85);
+  text-decoration: none !important;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
 
-  .jcSocialBtn:hover {
-    transform: translateY(-1px);
-    background: rgba(37, 195, 226, 0.1);
-    border-color: rgba(37, 195, 226, 0.35);
-    color: #25c3e2; /* ✅ blue text/icon on hover */
-    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
-  }
+/* ✅ hover = blue icon/text */
+.jcSocialBtn:hover {
+  transform: translateY(-1px);
+  color: #25c3e2 !important;     /* this drives SVG color */
+  background: rgba(37, 195, 226, 0.08); /* subtle hover */
+}
 
-  .jcSocialSvg {
-    width: 18px;
-    height: 18px;
-  }
+/* ensure svg follows text color */
+.jcSocialSvg {
+  width: 16px;   /* slightly smaller */
+  height: 16px;
+  display: block;
+}
 
   .jcDivider {
     width: 100%;
