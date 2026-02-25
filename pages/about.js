@@ -1,4 +1,3 @@
-// pages/about.js
 import React from 'react'
 import Head from 'next/head'
 
@@ -31,10 +30,7 @@ const About = () => {
         <link rel="canonical" href="https://jeevanchandimal.com/about" />
 
         {/* Open Graph */}
-        <meta
-          property="og:title"
-          content="About | Jeevan Chandimal – Filmmaker & Visual Storyteller"
-        />
+        <meta property="og:title" content="About | Jeevan Chandimal – Filmmaker & Visual Storyteller" />
         <meta
           property="og:description"
           content="Filmmaker and visual storyteller crafting cinematic work across film, photography, sound, and motion."
@@ -103,16 +99,14 @@ const About = () => {
 
           <SkillsOverview />
 
-          {/* ✅ BTS CINEMATIC (public/about/bts-1.jpg ... bts-7.jpg) */}
+          {/* ✅ BTS CINEMATIC: put images in public/about/bts-1.jpg ... bts-7.jpg */}
           <BehindTheScenes01
             items={[
               { id: 'b1', src: '/about/bts-1.jpg', alt: 'Behind the Scenes 1', ratio: '1-1' },
               { id: 'b2', src: '/about/bts-2.jpg', alt: 'Behind the Scenes 2', ratio: '1-1' },
-
               { id: 'b3', src: '/about/bts-3.jpg', alt: 'Behind the Scenes 3', ratio: '4-3' },
               { id: 'b4', src: '/about/bts-4.jpg', alt: 'Behind the Scenes 4', ratio: '1-1' },
               { id: 'b5', src: '/about/bts-5.jpg', alt: 'Behind the Scenes 5', ratio: '4-3' },
-
               { id: 'b6', src: '/about/bts-6.jpg', alt: 'Behind the Scenes 6', ratio: '1-1' },
               { id: 'b7', src: '/about/bts-7.jpg', alt: 'Behind the Scenes 7', ratio: '1-1' },
             ]}

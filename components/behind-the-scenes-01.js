@@ -16,25 +16,18 @@ const BehindTheScenes01 = (props) => {
     ]
   }, [props.items])
 
-  // ✅ Keep your original layout feel: 2 / 3 / 2 (cinematic masonry)
-  const col1 = items.slice(0, 2)
-  const col2 = items.slice(2, 5)
-  const col3 = items.slice(5, 7)
-
+  /* -------------------- Lightbox -------------------- */
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
 
-  const flat = useMemo(() => [...col1, ...col2, ...col3], [col1, col2, col3])
-
   const openAt = useCallback(
     (idx) => {
-      const safe = Math.max(0, Math.min(idx, flat.length - 1))
+      const safe = Math.max(0, Math.min(idx, items.length - 1))
       setActiveIndex(safe)
       setLightboxOpen(true)
-      // lock scroll
       if (typeof document !== 'undefined') document.body.style.overflow = 'hidden'
     },
-    [flat.length]
+    [items.length]
   )
 
   const close = useCallback(() => {
@@ -43,12 +36,12 @@ const BehindTheScenes01 = (props) => {
   }, [])
 
   const prev = useCallback(() => {
-    setActiveIndex((i) => (i - 1 + flat.length) % flat.length)
-  }, [flat.length])
+    setActiveIndex((i) => (i - 1 + items.length) % items.length)
+  }, [items.length])
 
   const next = useCallback(() => {
-    setActiveIndex((i) => (i + 1) % flat.length)
-  }, [flat.length])
+    setActiveIndex((i) => (i + 1) % items.length)
+  }, [items.length])
 
   useEffect(() => {
     if (!lightboxOpen) return
@@ -61,33 +54,66 @@ const BehindTheScenes01 = (props) => {
     return () => window.removeEventListener('keydown', onKey)
   }, [lightboxOpen, close, prev, next])
 
-  const getImgClass = (ratio) => {
-    if (ratio === '4-3') return 'img img43'
-    return 'img img11'
-  }
+  /* -------------------- Auto-pick best landscape hero -------------------- */
+  const [heroIndex, setHeroIndex] = useState(0)
 
-  const renderCol = (arr, offset) =>
-    arr.map((it, i) => {
-      const idx = offset + i
-      return (
-        <button
-          key={it.id}
-          type="button"
-          className="cardBtn"
-          onClick={() => openAt(idx)}
-          aria-label={`Open ${it.alt || 'Behind the Scenes image'} preview`}
-        >
-          <div className="card">
-            <img alt={it.alt || ''} src={it.src} className={getImgClass(it.ratio)} loading="lazy" />
-            <div className="overlay" />
-            <div className="meta">
-              <span className="tag">BTS</span>
-              <span className="hint">Click to preview</span>
-            </div>
-          </div>
-        </button>
+  useEffect(() => {
+    let cancelled = false
+    if (!items?.length) return
+
+    // pick best landscape: ratio > 1.18, score favors wide + large
+    const measure = (src) =>
+      new Promise((resolve) => {
+        const img = new window.Image()
+        img.decoding = 'async'
+        img.loading = 'eager'
+        img.onload = () => resolve({ w: img.naturalWidth || 0, h: img.naturalHeight || 0, ok: true })
+        img.onerror = () => resolve({ w: 0, h: 0, ok: false })
+        img.src = src
+      })
+
+    ;(async () => {
+      // only in browser
+      if (typeof window === 'undefined') return
+
+      const results = await Promise.all(
+        items.map(async (it, idx) => {
+          const m = await measure(it.src)
+          const w = m.w || 0
+          const h = m.h || 0
+          const ar = h > 0 ? w / h : 0
+          const area = w * h
+
+          // Landscape preference: wide + decent resolution
+          const isLandscape = ar >= 1.18
+          // Score: width factor + area factor (gentle)
+          const score = isLandscape ? ar * Math.log10(Math.max(area, 10)) : 0
+
+          return { idx, ar, area, score, ok: m.ok }
+        })
       )
-    })
+
+      if (cancelled) return
+
+      // Choose max score; fallback to 0 if nothing qualifies
+      let best = results[0] || { idx: 0, score: 0 }
+      for (const r of results) {
+        if (r.score > best.score) best = r
+      }
+
+      setHeroIndex(best?.score > 0 ? best.idx : 0)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [items])
+
+  const heroItem = items[heroIndex]
+  const masonryItems = useMemo(
+    () => items.map((it, originalIndex) => ({ ...it, originalIndex })).filter((it) => it.originalIndex !== heroIndex),
+    [items, heroIndex]
+  )
 
   return (
     <>
@@ -106,19 +132,57 @@ const BehindTheScenes01 = (props) => {
               {props.content1 ?? (
                 <Fragment>
                   <span>
-                    Most of the magic happens where the camera isn’t pointed — shaping light,
-                    building sound layers, refining motion frame by frame. The process is hands-on,
-                    detail-driven, and focused on turning ideas into crafted visual experiences.
+                    Most of the magic happens where the camera isn’t pointed — shaping light, building sound layers,
+                    refining motion frame by frame. The process is hands-on, detail-driven, and focused on turning ideas
+                    into crafted visual experiences.
                   </span>
                 </Fragment>
               )}
             </p>
           </header>
 
-          <div className="grid3">
-            <div className="col">{renderCol(col1, 0)}</div>
-            <div className="col">{renderCol(col2, 2)}</div>
-            <div className="col">{renderCol(col3, 5)}</div>
+          {/* HERO + MASONRY */}
+          <div className="btsLayout">
+            {/* HERO (auto-picked best landscape) */}
+            {heroItem && (
+              <button
+                type="button"
+                className="heroBtn"
+                onClick={() => openAt(heroIndex)}
+                aria-label="Open BTS hero preview"
+              >
+                <div className="heroCard">
+                  <img src={heroItem.src} alt={heroItem.alt || ''} className="heroImg" loading="eager" />
+                  <div className="heroOverlay" />
+                  <div className="heroMeta">
+                    <span className="heroTag">BEHIND THE SCENES</span>
+                    <span className="heroHint">Click to preview</span>
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* MASONRY (rest) */}
+            <div className="masonry">
+              {masonryItems.map((it) => (
+                <button
+                  key={it.id}
+                  type="button"
+                  className="masonryItem"
+                  onClick={() => openAt(it.originalIndex)}
+                  aria-label={`Open ${it.alt || 'BTS image'} preview`}
+                >
+                  <div className="card">
+                    <img src={it.src} alt={it.alt || ''} className="imgAuto" loading="lazy" />
+                    <div className="overlay" />
+                    <div className="meta">
+                      <span className="tag">BTS</span>
+                      <span className="hint">Preview</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -133,7 +197,7 @@ const BehindTheScenes01 = (props) => {
               <div className="lbTitle">
                 <span className="lbKicker">Behind the Scenes</span>
                 <span className="lbCount">
-                  {activeIndex + 1}/{flat.length}
+                  {activeIndex + 1}/{items.length}
                 </span>
               </div>
 
@@ -149,8 +213,8 @@ const BehindTheScenes01 = (props) => {
 
               <div className="lbFrame">
                 <img
-                  src={flat[activeIndex]?.src}
-                  alt={flat[activeIndex]?.alt || ''}
+                  src={items[activeIndex]?.src}
+                  alt={items[activeIndex]?.alt || ''}
                   className="lbImg"
                   draggable="false"
                 />
@@ -164,7 +228,7 @@ const BehindTheScenes01 = (props) => {
             </div>
 
             <div className="lbFooter">
-              <span className="lbAlt">{flat[activeIndex]?.alt || '—'}</span>
+              <span className="lbAlt">{items[activeIndex]?.alt || '—'}</span>
               <div className="lbTips">Esc to close • ← → to navigate</div>
             </div>
           </div>
@@ -204,23 +268,107 @@ const BehindTheScenes01 = (props) => {
           margin: 0;
         }
 
-        /* ====== CINEMATIC GRID ====== */
-        .grid3 {
+        /* ===== HERO + MASONRY LAYOUT ===== */
+        .btsLayout {
           width: 100%;
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: var(--dl-layout-space-oneandhalfunits);
-          align-items: start;
-        }
-
-        .col {
           display: flex;
           flex-direction: column;
-          gap: var(--dl-layout-space-oneandhalfunits);
-          min-width: 0;
+          gap: var(--dl-layout-space-twoandhalfunits);
         }
 
-        .cardBtn {
+        /* ===== HERO ===== */
+        .heroBtn {
+          border: 0;
+          padding: 0;
+          background: transparent;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .heroCard {
+          position: relative;
+          width: 100%;
+          border-radius: 18px;
+          overflow: hidden;
+          box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+          outline: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(0, 0, 0, 0.25);
+        }
+
+        .heroImg {
+          width: 100%;
+          height: clamp(360px, 46vw, 560px);
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          filter: saturate(1.08) contrast(1.06);
+          transition: transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
+            filter 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .heroOverlay {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(70% 70% at 50% 25%, rgba(255, 255, 255, 0.08), transparent 60%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.75));
+          opacity: 0.95;
+        }
+
+        .heroMeta {
+          position: absolute;
+          left: 18px;
+          right: 18px;
+          bottom: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          color: rgba(245, 244, 244, 0.95);
+        }
+
+        .heroTag {
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          padding: 10px 12px;
+          border-radius: 999px;
+          background: rgba(34, 34, 34, 0.55);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(245, 244, 244, 0.14);
+        }
+
+        .heroHint {
+          font-size: 12px;
+          opacity: 0.85;
+          padding: 10px 12px;
+          border-radius: 999px;
+          background: rgba(34, 34, 34, 0.35);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(245, 244, 244, 0.12);
+        }
+
+        .heroBtn:hover .heroImg {
+          transform: scale(1.06);
+          filter: saturate(1.14) contrast(1.1);
+        }
+
+        .heroBtn:focus-visible .heroCard {
+          outline: 2px solid rgba(0, 153, 255, 0.7);
+          outline-offset: 2px;
+        }
+
+        /* ===== MASONRY ===== */
+        .masonry {
+          column-count: 3;
+          column-gap: var(--dl-layout-space-oneandhalfunits);
+          width: 100%;
+        }
+
+        .masonryItem {
+          break-inside: avoid;
+          margin-bottom: var(--dl-layout-space-oneandhalfunits);
+          width: 100%;
           border: 0;
           padding: 0;
           background: transparent;
@@ -232,31 +380,22 @@ const BehindTheScenes01 = (props) => {
           position: relative;
           border-radius: 16px;
           overflow: hidden;
-          transform: translateZ(0);
           box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
           outline: 1px solid rgba(245, 244, 244, 0.08);
           background: rgba(0, 0, 0, 0.2);
         }
 
-        .img {
+        .imgAuto {
           width: 100%;
-          object-fit: cover;
+          height: auto;
           display: block;
+          object-fit: cover;
           transform: scale(1.02);
           filter: saturate(1.05) contrast(1.02);
           transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
             filter 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        /* keep your heights */
-        .img11 {
-          height: 440px;
-        }
-        .img43 {
-          height: 240px;
-        }
-
-        /* filmic overlay + vignette */
         .overlay {
           pointer-events: none;
           position: absolute;
@@ -298,17 +437,16 @@ const BehindTheScenes01 = (props) => {
           border: 1px solid rgba(245, 244, 244, 0.1);
         }
 
-        /* hover cinematic */
-        .cardBtn:hover .img {
-          transform: scale(1.08);
+        .masonryItem:hover .imgAuto {
+          transform: scale(1.06);
           filter: saturate(1.12) contrast(1.06);
         }
 
-        .cardBtn:hover .overlay {
+        .masonryItem:hover .overlay {
           opacity: 0.95;
         }
 
-        .cardBtn:focus-visible .card {
+        .masonryItem:focus-visible .card {
           outline: 2px solid rgba(0, 153, 255, 0.65);
           outline-offset: 2px;
         }
@@ -412,7 +550,7 @@ const BehindTheScenes01 = (props) => {
           transform: scale(1.01);
         }
 
-        /* subtle film grain + vignette */
+        /* optional grain file: public/about/grain.png */
         .lbGrain {
           pointer-events: none;
           position: absolute;
@@ -481,12 +619,11 @@ const BehindTheScenes01 = (props) => {
 
         /* ====== RESPONSIVE ====== */
         @media (max-width: 991px) {
-          .grid3 {
-            grid-template-columns: 1fr;
+          .masonry {
+            column-count: 2;
           }
-          .img11,
-          .img43 {
-            height: 420px;
+          .heroImg {
+            height: clamp(300px, 58vw, 420px);
           }
           .lbBody {
             grid-template-columns: 44px 1fr 44px;
@@ -499,8 +636,14 @@ const BehindTheScenes01 = (props) => {
         }
 
         @media (max-width: 767px) {
-          .img11,
-          .img43 {
+          .masonry {
+            column-count: 1;
+          }
+          .heroMeta {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .heroImg {
             height: 320px;
           }
           .lbBody {
