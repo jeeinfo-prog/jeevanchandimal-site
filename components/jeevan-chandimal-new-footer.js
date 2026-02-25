@@ -285,47 +285,45 @@ const JeevanChandimalNewFooter = (props) => {
       </footer>
 
       <style jsx>{`
-.jcFooter {
-  width: 100%;
-  padding: 34px 18px 26px;
-  background: rgba(34, 34, 34, 0.92);
-  border-top: 1px solid rgba(245, 244, 244, 0.08);
-  backdrop-filter: blur(10px);
-  position: relative;
-  z-index: 30;
-}
+        .jcFooter {
+          width: 100%;
+          padding: 34px 18px 26px;
+          background: rgba(34, 34, 34, 0.92);
+          border-top: 1px solid rgba(245, 244, 244, 0.08);
+          backdrop-filter: blur(10px);
+          position: relative;
+          z-index: 30;
+        }
 
-.jcInner {
-  max-width: var(--dl-layout-size-maxwidth);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+        .jcInner {
+          max-width: var(--dl-layout-size-maxwidth);
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
 
-.jcTop {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 16px;
-  padding-bottom: 64px;
-  position: relative; /* ✅ needed for dropdown stacking */
-  z-index: 2;
-}
+        .jcTop {
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+          gap: 16px;
+          padding-bottom: 64px; /* ✅ reserve dropdown space */
+        }
 
-.jcBrand {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none !important;
-}
+        .jcBrand {
+          display: inline-flex;
+          align-items: center;
+          text-decoration: none !important;
+        }
 
-.jcLogo {
-  height: 44px;
-  width: auto;
-  display: block;
-}
+        .jcLogo {
+          height: 44px;
+          width: auto;
+          display: block;
+        }
 
-.jcNav {
+        .jcNav {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,7 +331,7 @@ const JeevanChandimalNewFooter = (props) => {
   flex-wrap: wrap;
 }
 
-/* LINKS */
+/* ✅ footer middle links = pill like navbar/login buttons */
 .jcLink {
   height: 32px;
   padding: 0 12px;
@@ -346,16 +344,20 @@ const JeevanChandimalNewFooter = (props) => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  box-sizing: border-box;
   transition: background 0.18s ease, color 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
 }
 
 .jcLink:hover {
   opacity: 1;
   background: rgba(245, 244, 244, 0.06);
-  color: #25c3e2 !important;
+  color: #25c3e2 !important; /* ✅ hover = blue text */
 }
 
+/* ✅ footer active pill highlight (same style as navbar) */
 .isActive {
+  height: 32px;
+  border-radius: 999px;
   background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
   border: 1px solid rgba(37, 195, 226, 0.22);
   color: #25c3e2 !important;
@@ -364,13 +366,7 @@ const JeevanChandimalNewFooter = (props) => {
   box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
 }
 
-/* DROPDOWN */
-.jcDrop {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
+/* ✅ Work/Services toggle wrapper pill */
 .jcDropToggle {
   height: 32px;
   padding: 0 12px;
@@ -380,33 +376,41 @@ const JeevanChandimalNewFooter = (props) => {
   gap: 6px;
 }
 
+/* ✅ hovering anywhere on the toggle makes Work/Services text blue */
 .jcDropToggle:hover .jcLink {
   color: #25c3e2 !important;
 }
 
-.jcArrow {
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-}
+        /* ✅ Arrow border removed + background matched */
+  .jcArrow {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none; /* removed border */
+    background: transparent; /* match footer background */
+    transition: background 0.15s, border-color 0.15s;
+  }
 
-.jcArrowSvg {
-  width: 16px;
-  height: 16px;
-  fill: rgba(245, 244, 244, 0.85);
-  transition: transform 0.18s ease;
-}
+  .jcArrow:hover {
+    background: rgba(245, 244, 244, 0.06);
+  }
 
-.teleport-rotate .jcArrowSvg {
-  transform: rotate(90deg);
-}
+  .jcArrowSvg {
+    width: 16px;
+    height: 16px;
+    fill: rgba(245, 244, 244, 0.85);
+    transform: rotate(0deg);
+    transition: transform 0.18s ease;
+  }
 
-.jcMenu {
+        .teleport-rotate .jcArrowSvg {
+          transform: rotate(90deg);
+        }
+
+        .jcMenu {
   position: absolute;
   top: calc(100% + 10px);
   left: 0;
@@ -422,9 +426,9 @@ const JeevanChandimalNewFooter = (props) => {
   border-radius: 14px;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55);
   z-index: 999999;
-  pointer-events: auto; /* ✅ fix click issue */
 }
 
+/* ✅ hover bridge (paste THIS right after .jcMenu) */
 .jcMenu::before {
   content: "";
   position: absolute;
@@ -434,31 +438,35 @@ const JeevanChandimalNewFooter = (props) => {
   height: 12px;
 }
 
-.teleport-show {
-  display: flex !important;
-}
+        .teleport-show {
+          display: flex !important;
+        }
 
-.jcMenuItem {
+        .jcMenuItem {
   color: #f5f4f4;
   text-decoration: none !important;
   font-size: 14px;
   padding: 10px 10px;
   border-radius: 10px;
   opacity: 0.92;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, opacity 0.15s, color 0.15s, border-color 0.15s;
+  display: block;
   border: 1px solid transparent;
 }
 
+/* ✅ hover = blue text */
 .jcMenuItem:hover {
   opacity: 1;
   background: rgba(245, 244, 244, 0.08);
   color: #25c3e2 !important;
 }
 
+/* ✅ active = same blue + highlight */
 .isActiveItem {
   background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
   border: 1px solid rgba(37, 195, 226, 0.18);
   color: #25c3e2 !important;
+  opacity: 1;
   font-weight: 700;
 }
 
@@ -467,9 +475,13 @@ const JeevanChandimalNewFooter = (props) => {
   .jcDrop .jcMenu:hover {
     display: flex;
   }
+
+  .jcDrop:hover .jcArrowSvg {
+    transform: rotate(90deg);
+  }
 }
 
-/* SOCIAL ICONS — stroke version (hover always works) */
+        /* SOCIAL ICONS */
 .jcSocial {
   display: inline-flex;
   align-items: center;
@@ -478,6 +490,7 @@ const JeevanChandimalNewFooter = (props) => {
   flex-wrap: wrap;
 }
 
+/* ✅ thinner, minimal buttons */
 .jcSocialBtn {
   width: 32px;
   height: 32px;
@@ -485,93 +498,120 @@ const JeevanChandimalNewFooter = (props) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+
   background: transparent;
   border: 1px solid rgba(245, 244, 244, 0.08);
-  color: rgba(245, 244, 244, 0.88);
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  text-decoration: none !important;
+
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
+/* base icon color */
 .jcSocialSvg {
   width: 16px;
   height: 16px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  display: block;
 }
 
+/* ✅ force base fill color (works regardless of SVG attributes) */
+.jcSocialBtn .jcSocialSvg,
+.jcSocialBtn .jcSocialSvg * {
+  fill: rgba(245, 244, 244, 0.88) !important;
+}
+
+/* ✅ hover = blue highlight (direct fill override) */
 .jcSocialBtn:hover {
   transform: translateY(-1px);
-  color: #25c3e2 !important;
   background: rgba(37, 195, 226, 0.08);
   border-color: rgba(37, 195, 226, 0.28);
 }
 
-.jcDivider {
-  width: 100%;
-  height: 1px;
-  background: rgba(245, 244, 244, 0.1);
+.jcSocialBtn:hover .jcSocialSvg,
+.jcSocialBtn:hover .jcSocialSvg * {
+  fill: #25c3e2 !important;
 }
 
-.jcLegalWrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  text-align: center;
+/* optional: keyboard focus also blue */
+.jcSocialBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.25);
 }
 
-.jcLegalLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  justify-content: center;
+.jcSocialBtn:focus-visible .jcSocialSvg,
+.jcSocialBtn:focus-visible .jcSocialSvg * {
+  fill: #25c3e2 !important;
 }
 
-.jcLegal {
-  color: rgba(245, 244, 244, 0.85);
-  text-decoration: none !important;
-  font-size: 13px;
-}
+        .jcDivider {
+          width: 100%;
+          height: 1px;
+          background: rgba(245, 244, 244, 0.1);
+        }
 
-.jcLegal:hover {
-  color: #25c3e2;
-  text-decoration: underline !important;
-}
+        .jcLegalWrap {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          text-align: center;
+        }
 
-.jcCopy {
-  color: rgba(245, 244, 244, 0.85);
-  font-size: 13px;
-}
+        .jcLegalLinks {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 14px;
+          justify-content: center;
+          align-items: center;
+        }
 
-.jcLastLine {
-  opacity: 0.75;
-  max-width: 900px;
-  line-height: 1.6;
-  font-size: 13px;
-}
+        .jcLegal {
+          color: rgba(245, 244, 244, 0.85);
+          text-decoration: none !important;
+          opacity: 0.9;
+          transition: opacity 0.15s, color 0.15s;
+          font-size: 13px;
+        }
 
-@media (max-width: 991px) {
-  .jcTop {
-    grid-template-columns: 1fr;
-    justify-items: center;
-  }
-  .jcSocial {
-    justify-content: center;
-  }
-  .jcMenu {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
+        .jcLegal:hover {
+          color: #25c3e2;
+          opacity: 1;
+          text-decoration: underline !important;
+          text-underline-offset: 3px;
+        }
 
-@media (max-width: 479px) {
-  .jcMenu {
-    min-width: 92vw;
-  }
-}
-`}</style>
+        .jcCopy {
+          color: rgba(245, 244, 244, 0.85);
+          font-size: 13px;
+        }
+
+        .jcLastLine {
+          opacity: 0.75;
+          max-width: 900px;
+          line-height: 1.6;
+          font-size: 13px;
+        }
+
+        @media (max-width: 991px) {
+          .jcTop {
+            grid-template-columns: 1fr;
+            justify-items: center;
+          }
+          .jcSocial {
+            justify-content: center;
+          }
+          .jcMenu {
+            left: 50%;
+            transform: translateX(-50%);
+          }
+        }
+
+        @media (max-width: 479px) {
+          .jcMenu {
+            min-width: 92vw;
+          }
+        }
+      `}</style>
     </>
   )
 }
