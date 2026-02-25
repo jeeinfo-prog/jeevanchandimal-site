@@ -498,7 +498,7 @@ const JeevanChandimalNewFooter = (props) => {
           align-items: center;
           justify-content: center;
           background: rgba(0, 0, 0, 0.55);
-          border: 1px solid rgba(245, 244, 244, 0.1);
+          border: 0px solid rgba(245, 244, 244, 0.1);
           color: rgba(245, 244, 244, 0.92);
           text-decoration: none !important;
           transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
