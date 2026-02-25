@@ -472,47 +472,43 @@ const JeevanChandimalNewFooter = (props) => {
   }
 }
 
-        .jcSocial {
-          display: inline-flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
+        /* SOCIAL ICONS — stroke version (hover always works) */
+.jcSocial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
-        .jcSocialBtn {
-          width: 40px;
-          height: 40px;
-          border-radius: 14px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(0, 0, 0, 0.55);
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          color: rgba(245, 244, 244, 0.92);
-          text-decoration: none !important;
-          transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
-            box-shadow 0.15s ease;
-        }
+.jcSocialBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(245, 244, 244, 0.08);
+  color: rgba(245, 244, 244, 0.88);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
 
-        .jcSocialBtn:hover {
-          transform: translateY(-1px);
-          background: rgba(37, 195, 226, 0.1);
-          border-color: rgba(37, 195, 226, 0.35);
-          color: #25c3e2;
-          box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
-        }
-
-        .jcSocialSvg {
+.jcSocialSvg {
   width: 16px;
   height: 16px;
-  display: block;
-
   stroke: currentColor;
   fill: none;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.jcSocialBtn:hover {
+  transform: translateY(-1px);
+  color: #25c3e2 !important;
+  background: rgba(37, 195, 226, 0.08);
+  border-color: rgba(37, 195, 226, 0.28);
 }
 
         .jcDivider {
