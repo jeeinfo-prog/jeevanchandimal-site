@@ -3,8 +3,6 @@ import PropTypes from 'prop-types'
 
 const Philosophy = (props) => {
   const [activeTab, setActiveTab] = useState(0)
-
-  // ✅ auto-rotate images (every 4.5s) + pause on interaction
   const [paused, setPaused] = useState(false)
 
   const images = useMemo(() => {
@@ -44,12 +42,10 @@ const Philosophy = (props) => {
         <div className="philosophy-container2 thq-section-max-width">
           {/* TABS */}
           <div className="philosophy-thq-tabs-menu-elm">
-            {/* TAB 1 */}
             <button
               type="button"
               onClick={() => onTab(0)}
               className={`philoTab menuItem ${activeTab === 0 ? 'isActiveItem' : ''}`}
-              aria-pressed={activeTab === 0}
             >
               <div className="philoTabInner">
                 <h2 className="thq-heading-2">{props.feature1Title ?? <span>Philosophy</span>}</h2>
@@ -61,17 +57,13 @@ const Philosophy = (props) => {
                   )}
                 </span>
               </div>
-              <span className="hoverArrow" aria-hidden="true">
-                →
-              </span>
+              <span className="hoverArrow">→</span>
             </button>
 
-            {/* TAB 2 */}
             <button
               type="button"
               onClick={() => onTab(1)}
               className={`philoTab menuItem ${activeTab === 1 ? 'isActiveItem' : ''}`}
-              aria-pressed={activeTab === 1}
             >
               <div className="philoTabInner">
                 <span className="thq-body-small">
@@ -83,9 +75,7 @@ const Philosophy = (props) => {
                   )}
                 </span>
               </div>
-              <span className="hoverArrow" aria-hidden="true">
-                →
-              </span>
+              <span className="hoverArrow">→</span>
             </button>
           </div>
 
@@ -124,7 +114,6 @@ const Philosophy = (props) => {
           justify-content: center;
         }
 
-        /* ✅ tab cards (same cinematic hover like SkillsOverview) */
         .philoTab {
           width: 100%;
           text-align: left;
@@ -134,39 +123,25 @@ const Philosophy = (props) => {
           padding: 18px;
           cursor: pointer;
           display: flex;
-          align-items: flex-start;
           justify-content: space-between;
           gap: 12px;
           color: #f5f4f4;
           opacity: 0.92;
-          transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, background 220ms ease,
-            color 220ms ease;
-          position: relative;
-          will-change: transform;
+          transition: all 0.22s ease;
         }
 
-        .philoTabInner {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        /* ✅ hover = BLUE text */
         .menuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
           color: #25c3e2 !important;
         }
 
-        /* ✅ cinematic hover glow + lift */
         .philoTab:hover {
           transform: translateY(-3px) scale(1.01);
           border-color: rgba(37, 195, 226, 0.28);
           box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(37, 195, 226, 0.15);
-          background: rgba(255, 255, 255, 0.03);
         }
 
-        /* active item stays blue */
         .menuItem.isActiveItem {
           background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
           border: 1px solid rgba(37, 195, 226, 0.18);
@@ -175,20 +150,12 @@ const Philosophy = (props) => {
           font-weight: 700;
         }
 
-        .philoTab:focus-visible {
-          outline: 2px solid rgba(37, 195, 226, 0.6);
-          outline-offset: 3px;
-        }
-
-        /* arrow reveal like SkillsOverview */
         .hoverArrow {
           font-size: 18px;
-          line-height: 1;
           opacity: 0;
           transform: translateX(-6px);
           transition: all 220ms ease;
           color: #25c3e2;
-          padding-top: 2px;
         }
 
         .philoTab:hover .hoverArrow {
@@ -196,21 +163,19 @@ const Philosophy = (props) => {
           transform: translateX(0);
         }
 
-        /* IMAGE PANEL */
         .philosophy-thq-image-container-elm {
           display: flex;
           flex-direction: column;
           gap: 12px;
           align-items: center;
           justify-content: center;
-          min-height: 100%;
         }
 
         /* match Collaboration image card size */
 .imgCard {
   position: relative;
   width: 100%;
-  height: 440px; /* ✅ same visual height as Collaboration */
+  height: 360px; /* ✅ same visual height as Collaboration */
   overflow: hidden;
   border-radius: 16px;
   border: 1px solid rgba(245, 244, 244, 0.12);
@@ -226,30 +191,21 @@ const Philosophy = (props) => {
   transition: transform 320ms ease, filter 320ms ease;
 }
 
-        /* ✅ same small hover on images */
         .imgCard:hover .philo-img {
           transform: scale(1.05);
           filter: saturate(1.08) contrast(1.06);
         }
 
         .imgOverlay {
-          pointer-events: none;
           position: absolute;
           inset: 0;
-          background: radial-gradient(70% 70% at 50% 25%, rgba(255, 255, 255, 0.06), transparent 60%),
-            linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.5));
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.5));
           opacity: 0.9;
-          transition: opacity 320ms ease;
-        }
-
-        .imgCard:hover .imgOverlay {
-          opacity: 0.98;
         }
 
         .imgMeta {
           width: 100%;
           display: flex;
-          align-items: center;
           justify-content: space-between;
           gap: 10px;
           color: rgba(245, 244, 244, 0.9);
@@ -263,7 +219,6 @@ const Philosophy = (props) => {
           border-radius: 999px;
           background: rgba(34, 34, 34, 0.5);
           border: 1px solid rgba(245, 244, 244, 0.12);
-          backdrop-filter: blur(10px);
         }
 
         .imgHint {
@@ -273,18 +228,6 @@ const Philosophy = (props) => {
           border-radius: 999px;
           background: rgba(34, 34, 34, 0.35);
           border: 1px solid rgba(245, 244, 244, 0.1);
-          backdrop-filter: blur(10px);
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0.6;
-            transform: translateY(2px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
         }
 
         @media (max-width: 991px) {
@@ -304,34 +247,8 @@ const Philosophy = (props) => {
 
 Philosophy.defaultProps = {
   rootClassName: '',
-
   feature1ImgSrc: '/about/philosophy-mood.jpg',
   feature2ImgSrc: '/about/philosophy-presence.jpg',
-
-  feature1ImgAlt: 'Moody cinematic frame',
-  feature2ImgAlt: 'Atmospheric visual presence',
-
-  // ✅ optional arrays for auto rotation
-  feature1Imgs: undefined,
-  feature2Imgs: undefined,
-}
-
-Philosophy.propTypes = {
-  rootClassName: PropTypes.string,
-
-  feature1Title: PropTypes.element,
-  feature1Description: PropTypes.element,
-  feature2Description: PropTypes.element,
-
-  feature1ImgSrc: PropTypes.string,
-  feature2ImgSrc: PropTypes.string,
-
-  feature1ImgAlt: PropTypes.string,
-  feature2ImgAlt: PropTypes.string,
-
-  // ✅ pass arrays to auto-change images per tab
-  feature1Imgs: PropTypes.arrayOf(PropTypes.string),
-  feature2Imgs: PropTypes.arrayOf(PropTypes.string),
 }
 
 export default Philosophy
