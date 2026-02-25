@@ -324,79 +324,67 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcNav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
 
-/* ✅ footer middle links = pill like navbar/login buttons */
-.jcLink {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  color: #f5f4f4;
-  text-decoration: none !important;
-  font-size: 14px;
-  letter-spacing: 0.2px;
-  opacity: 0.92;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  box-sizing: border-box;
-  transition: background 0.18s ease, color 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
-}
+        .jcLink {
+          color: #f5f4f4;
+          text-decoration: none !important;
+          font-size: 14px;
+          opacity: 0.9;
+          padding: 10px 8px;
+          border-radius: 10px;
+          transition: opacity 0.15s, background 0.15s, color 0.15s;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
 
-.jcLink:hover {
-  opacity: 1;
-  background: rgba(245, 244, 244, 0.06);
-  color: #25c3e2 !important; /* ✅ hover = blue text */
-}
+        .jcLink:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.06);
+        }
 
-/* ✅ footer active pill highlight (same style as navbar) */
-.isActive {
-  height: 32px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
-  border: 1px solid rgba(37, 195, 226, 0.22);
-  color: #25c3e2 !important;
-  opacity: 1;
-  font-weight: 700;
-  box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
-}
+        .isActive {
+          color: #25c3e2;
+          opacity: 1;
+          background: rgba(37, 195, 226, 0.14);
+          border: 1px solid rgba(37, 195, 226, 0.25);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
+        }
 
-/* ✅ Work/Services toggle wrapper pill */
-.jcDropToggle {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
+        .jcDrop {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+        }
 
-/* ✅ hovering anywhere on the toggle makes Work/Services text blue */
-.jcDropToggle:hover .jcLink {
-  color: #25c3e2 !important;
-}
+        .jcDropToggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
 
         .jcArrow {
-  width: 26px;
-  height: 26px;
-  border-radius: 999px; /* ✅ match pill vibe */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(245, 244, 244, 0.12);
-  background: rgba(0, 0, 0, 0.18);
-  transition: background 0.15s, border-color 0.15s;
-}
+          width: 26px;
+          height: 26px;
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.18);
+          transition: background 0.15s, border-color 0.15s;
+        }
 
-.jcArrow:hover {
-  background: rgba(245, 244, 244, 0.06);
-  border-color: rgba(245, 244, 244, 0.18);
-}
+        .jcArrow:hover {
+          background: rgba(245, 244, 244, 0.06);
+          border-color: rgba(245, 244, 244, 0.18);
+        }
 
         .jcArrowSvg {
           width: 16px;
@@ -443,32 +431,30 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcMenuItem {
-  color: #f5f4f4;
-  text-decoration: none !important;
-  font-size: 14px;
-  padding: 10px 10px;
-  border-radius: 10px;
-  opacity: 0.92;
-  transition: background 0.15s, opacity 0.15s, color 0.15s, border-color 0.15s;
-  display: block;
-  border: 1px solid transparent;
-}
+          color: #f5f4f4;
+          text-decoration: none !important;
+          font-size: 14px;
+          padding: 10px 10px;
+          border-radius: 10px;
+          opacity: 0.92;
+          transition: background 0.15s, opacity 0.15s, color 0.15s, border-color 0.15s;
+          display: block;
+          border: 1px solid transparent;
+        }
 
-/* ✅ hover = blue text */
-.jcMenuItem:hover {
-  opacity: 1;
-  background: rgba(245, 244, 244, 0.08);
-  color: #25c3e2 !important;
-}
+        .jcMenuItem:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.08);
+        }
 
-/* ✅ active = same blue + highlight */
-.isActiveItem {
-  background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
-  border: 1px solid rgba(37, 195, 226, 0.18);
-  color: #25c3e2 !important;
-  opacity: 1;
-  font-weight: 700;
-}
+        /* ✅ Active dropdown child highlight */
+        .isActiveItem {
+          color: #25c3e2;
+          opacity: 1;
+          background: rgba(37, 195, 226, 0.14);
+          border-color: rgba(37, 195, 226, 0.25);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
+        }
 
 @media (min-width: 992px) {
   .jcDrop:hover .jcMenu,
