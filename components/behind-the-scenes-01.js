@@ -2,7 +2,6 @@ import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'reac
 import PropTypes from 'prop-types'
 
 const BehindTheScenes01 = (props) => {
-  // ✅ Editable gallery data (pass items from About page)
   const items = useMemo(() => {
     if (props.items?.length) return props.items
     return [
@@ -61,19 +60,16 @@ const BehindTheScenes01 = (props) => {
     let cancelled = false
     if (!items?.length) return
 
-    // pick best landscape: ratio > 1.18, score favors wide + large
     const measure = (src) =>
       new Promise((resolve) => {
         const img = new window.Image()
         img.decoding = 'async'
-        img.loading = 'eager'
         img.onload = () => resolve({ w: img.naturalWidth || 0, h: img.naturalHeight || 0, ok: true })
         img.onerror = () => resolve({ w: 0, h: 0, ok: false })
         img.src = src
       })
 
     ;(async () => {
-      // only in browser
       if (typeof window === 'undefined') return
 
       const results = await Promise.all(
@@ -84,24 +80,18 @@ const BehindTheScenes01 = (props) => {
           const ar = h > 0 ? w / h : 0
           const area = w * h
 
-          // Landscape preference: wide + decent resolution
           const isLandscape = ar >= 1.18
-          // Score: width factor + area factor (gentle)
           const score = isLandscape ? ar * Math.log10(Math.max(area, 10)) : 0
 
-          return { idx, ar, area, score, ok: m.ok }
+          return { idx, score }
         })
       )
 
       if (cancelled) return
 
-      // Choose max score; fallback to 0 if nothing qualifies
-      let best = results[0] || { idx: 0, score: 0 }
-      for (const r of results) {
-        if (r.score > best.score) best = r
-      }
-
-      setHeroIndex(best?.score > 0 ? best.idx : 0)
+      let best = { idx: 0, score: 0 }
+      for (const r of results) if (r.score > best.score) best = r
+      setHeroIndex(best.score > 0 ? best.idx : 0)
     })()
 
     return () => {
@@ -110,10 +100,13 @@ const BehindTheScenes01 = (props) => {
   }, [items])
 
   const heroItem = items[heroIndex]
-  const masonryItems = useMemo(
-    () => items.map((it, originalIndex) => ({ ...it, originalIndex })).filter((it) => it.originalIndex !== heroIndex),
-    [items, heroIndex]
-  )
+
+  // ✅ below grid: exactly 6 images (excluding hero)
+  const gridItems = useMemo(() => {
+    const withOriginalIndex = items.map((it, originalIndex) => ({ ...it, originalIndex }))
+    const rest = withOriginalIndex.filter((it) => it.originalIndex !== heroIndex)
+    return rest.slice(0, 6)
+  }, [items, heroIndex])
 
   return (
     <>
@@ -141,9 +134,8 @@ const BehindTheScenes01 = (props) => {
             </p>
           </header>
 
-          {/* HERO + MASONRY */}
           <div className="btsLayout">
-            {/* HERO (auto-picked best landscape) */}
+            {/* HERO */}
             {heroItem && (
               <button
                 type="button"
@@ -162,18 +154,18 @@ const BehindTheScenes01 = (props) => {
               </button>
             )}
 
-            {/* MASONRY (rest) */}
-            <div className="masonry">
-              {masonryItems.map((it) => (
+            {/* ✅ 6 IMAGES GRID (2 rows × 3 columns) */}
+            <div className="grid6">
+              {gridItems.map((it) => (
                 <button
                   key={it.id}
                   type="button"
-                  className="masonryItem"
+                  className="gridItem"
                   onClick={() => openAt(it.originalIndex)}
                   aria-label={`Open ${it.alt || 'BTS image'} preview`}
                 >
                   <div className="card">
-                    <img src={it.src} alt={it.alt || ''} className="imgAuto" loading="lazy" />
+                    <img src={it.src} alt={it.alt || ''} className="gridImg" loading="lazy" />
                     <div className="overlay" />
                     <div className="meta">
                       <span className="tag">BTS</span>
@@ -187,7 +179,7 @@ const BehindTheScenes01 = (props) => {
         </div>
       </section>
 
-      {/* ✅ CINEMATIC LIGHTBOX */}
+      {/* LIGHTBOX */}
       {lightboxOpen && (
         <div className="lbOverlay" role="dialog" aria-modal="true" aria-label="Image preview">
           <button type="button" className="lbBackdrop" onClick={close} aria-label="Close preview" />
@@ -212,12 +204,7 @@ const BehindTheScenes01 = (props) => {
               </button>
 
               <div className="lbFrame">
-                <img
-                  src={items[activeIndex]?.src}
-                  alt={items[activeIndex]?.alt || ''}
-                  className="lbImg"
-                  draggable="false"
-                />
+                <img src={items[activeIndex]?.src} alt={items[activeIndex]?.alt || ''} className="lbImg" />
                 <div className="lbGrain" />
                 <div className="lbVignette" />
               </div>
@@ -236,7 +223,6 @@ const BehindTheScenes01 = (props) => {
       )}
 
       <style jsx>{`
-        /* ====== SECTION ====== */
         .btsWrap {
           width: 100%;
           position: relative;
@@ -268,7 +254,6 @@ const BehindTheScenes01 = (props) => {
           margin: 0;
         }
 
-        /* ===== HERO + MASONRY LAYOUT ===== */
         .btsLayout {
           width: 100%;
           display: flex;
@@ -358,17 +343,15 @@ const BehindTheScenes01 = (props) => {
           outline-offset: 2px;
         }
 
-        /* ===== MASONRY ===== */
-        .masonry {
-          column-count: 3;
-          column-gap: var(--dl-layout-space-oneandhalfunits);
+        /* ===== GRID 6 (aligned) ===== */
+        .grid6 {
           width: 100%;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: var(--dl-layout-space-oneandhalfunits);
         }
 
-        .masonryItem {
-          break-inside: avoid;
-          margin-bottom: var(--dl-layout-space-oneandhalfunits);
-          width: 100%;
+        .gridItem {
           border: 0;
           padding: 0;
           background: transparent;
@@ -385,11 +368,11 @@ const BehindTheScenes01 = (props) => {
           background: rgba(0, 0, 0, 0.2);
         }
 
-        .imgAuto {
+        .gridImg {
           width: 100%;
-          height: auto;
-          display: block;
+          height: 230px; /* ✅ aligned cards */
           object-fit: cover;
+          display: block;
           transform: scale(1.02);
           filter: saturate(1.05) contrast(1.02);
           transition: transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -437,21 +420,21 @@ const BehindTheScenes01 = (props) => {
           border: 1px solid rgba(245, 244, 244, 0.1);
         }
 
-        .masonryItem:hover .imgAuto {
+        .gridItem:hover .gridImg {
           transform: scale(1.06);
           filter: saturate(1.12) contrast(1.06);
         }
 
-        .masonryItem:hover .overlay {
+        .gridItem:hover .overlay {
           opacity: 0.95;
         }
 
-        .masonryItem:focus-visible .card {
+        .gridItem:focus-visible .card {
           outline: 2px solid rgba(0, 153, 255, 0.65);
           outline-offset: 2px;
         }
 
-        /* ====== LIGHTBOX ====== */
+        /* ===== LIGHTBOX ===== */
         .lbOverlay {
           position: fixed;
           inset: 0;
@@ -547,10 +530,8 @@ const BehindTheScenes01 = (props) => {
           height: 100%;
           object-fit: contain;
           display: block;
-          transform: scale(1.01);
         }
 
-        /* optional grain file: public/about/grain.png */
         .lbGrain {
           pointer-events: none;
           position: absolute;
@@ -584,12 +565,6 @@ const BehindTheScenes01 = (props) => {
           cursor: pointer;
           display: grid;
           place-items: center;
-          transition: transform 180ms ease, background 180ms ease;
-        }
-
-        .lbNav:hover {
-          transform: translateY(-1px);
-          background: rgba(34, 34, 34, 0.7);
         }
 
         .lbFooter {
@@ -617,10 +592,12 @@ const BehindTheScenes01 = (props) => {
           white-space: nowrap;
         }
 
-        /* ====== RESPONSIVE ====== */
         @media (max-width: 991px) {
-          .masonry {
-            column-count: 2;
+          .grid6 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .gridImg {
+            height: 220px;
           }
           .heroImg {
             height: clamp(300px, 58vw, 420px);
@@ -636,8 +613,11 @@ const BehindTheScenes01 = (props) => {
         }
 
         @media (max-width: 767px) {
-          .masonry {
-            column-count: 1;
+          .grid6 {
+            grid-template-columns: 1fr;
+          }
+          .gridImg {
+            height: 260px;
           }
           .heroMeta {
             flex-direction: column;
@@ -645,9 +625,6 @@ const BehindTheScenes01 = (props) => {
           }
           .heroImg {
             height: 320px;
-          }
-          .lbBody {
-            padding: 12px;
           }
           .lbFooter {
             flex-direction: column;
@@ -671,8 +648,6 @@ BehindTheScenes01.defaultProps = {
 BehindTheScenes01.propTypes = {
   heading1: PropTypes.element,
   content1: PropTypes.element,
-
-  // ✅ preferred (editable)
   items: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,
