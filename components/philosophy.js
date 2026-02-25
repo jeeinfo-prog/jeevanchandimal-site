@@ -100,19 +100,20 @@ const Philosophy = (props) => {
 
       <style jsx>{`
         .philosophy-container2 {
-          width: 100%;
-          display: grid;
-          gap: var(--dl-layout-space-fiveunits);
-          grid-template-columns: 1fr 1fr;
-          align-items: center;
-        }
+  width: 100%;
+  display: grid;
+  gap: var(--dl-layout-space-fiveunits);
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch; /* ✅ was center */
+}
 
         .philosophy-thq-tabs-menu-elm {
-          display: flex;
-          flex-direction: column;
-          gap: var(--dl-layout-space-twounits);
-          justify-content: center;
-        }
+  display: flex;
+  flex-direction: column;
+  gap: var(--dl-layout-space-twounits);
+  justify-content: flex-end; /* ✅ push tabs to bottom */
+  height: 100%; /* ✅ match image column height */
+}
 
         .philoTab {
           width: 100%;
