@@ -90,10 +90,7 @@ const Philosophy = (props) => {
               <div className="imgOverlay" />
             </div>
 
-            <div className="imgMeta">
-              <span className="imgTag">{activeTab === 0 ? 'PHILOSOPHY' : 'PRESENCE'}</span>
-              <span className="imgHint">Auto</span>
-            </div>
+            
           </div>
         </div>
       </div>
@@ -204,32 +201,6 @@ const Philosophy = (props) => {
           opacity: 0.9;
         }
 
-        .imgMeta {
-          width: 100%;
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          color: rgba(245, 244, 244, 0.9);
-        }
-
-        .imgTag {
-          font-size: 12px;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          padding: 8px 10px;
-          border-radius: 999px;
-          background: rgba(34, 34, 34, 0.5);
-          border: 1px solid rgba(245, 244, 244, 0.12);
-        }
-
-        .imgHint {
-          font-size: 12px;
-          opacity: 0.75;
-          padding: 8px 10px;
-          border-radius: 999px;
-          background: rgba(34, 34, 34, 0.35);
-          border: 1px solid rgba(245, 244, 244, 0.1);
-        }
 
         @media (max-width: 991px) {
           .philosophy-container2 {
