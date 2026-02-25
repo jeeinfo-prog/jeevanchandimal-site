@@ -714,27 +714,30 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .menuItem {
-          color: #f5f4f4;
-          text-decoration: none !important;
-          font-size: 14px;
-          padding: 10px 10px;
-          border-radius: 10px;
-          opacity: 0.92;
-          transition: background 0.15s, opacity 0.15s;
-        }
+  color: #f5f4f4;
+  text-decoration: none !important;
+  font-size: 14px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  opacity: 0.92;
+  transition: background 0.15s, opacity 0.15s, color 0.15s;
+}
 
-        .menuItem:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.08);
-        }
+/* ✅ hover = BLUE text */
+.menuItem:hover {
+  opacity: 1;
+  background: rgba(245, 244, 244, 0.08);
+  color: #25c3e2 !important;
+}
 
-        .menuItem.isActiveItem {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
-          border: 1px solid rgba(37, 195, 226, 0.18);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 700;
-        }
+/* active item stays blue */
+.menuItem.isActiveItem {
+  background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
+  border: 1px solid rgba(37, 195, 226, 0.18);
+  color: #25c3e2 !important;
+  opacity: 1;
+  font-weight: 700;
+}
 
         /* ========= RIGHT ========= */
         .navRight {
