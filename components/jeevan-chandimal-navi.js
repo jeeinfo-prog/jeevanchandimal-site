@@ -542,43 +542,65 @@ export default function JeevanChandimalNavi(props) {
         }
 
         /* ========= DESKTOP LINKS ========= */
-        .navLinks {
-          display: none;
-          align-items: center;
-          justify-content: center; /* ✅ truly centered */
-          gap: 18px;
-          min-width: 0;
-        }
+.navLinks {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-width: 0;
+}
 
-        .navLink,
-        .dropLabel {
-          color: #f5f4f4;
-          text-decoration: none !important;
-          font-size: 14px;
-          letter-spacing: 0.2px;
-          opacity: 0.92;
-          padding: 10px 8px;
-          border-radius: 10px;
-          transition: opacity 0.15s, background 0.15s;
-          display: inline-flex;
-          align-items: center;
-        }
+/* ✅ make center links pill-shaped like Login/Logout */
+.navLink,
+.dropLabel {
+  height: 32px;                 /* same as .pill */
+  padding: 0 12px;              /* same feel as .pill */
+  border-radius: 999px;         /* ✅ pill shape */
+  color: #f5f4f4;
+  text-decoration: none !important;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  opacity: 0.92;
+  transition: opacity 0.15s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+}
 
-        .navLink:hover,
-        .dropLabel:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-        }
+/* hover stays nice */
+.navLink:hover,
+.dropLabel:hover {
+  opacity: 1;
+  background: rgba(245, 244, 244, 0.06);
+}
 
-        /* keep highlighted text BLUE */
-        .isActive {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
-          border: 1px solid rgba(37, 195, 226, 0.22);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 700;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
-        }
+/* ✅ active highlight also pill shaped */
+.isActive {
+  height: 32px; /* ensure consistent pill height */
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
+  border: 1px solid rgba(37, 195, 226, 0.22);
+  color: #25c3e2 !important;
+  opacity: 1;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
+}
+
+/* ✅ make Work/Services whole toggle pill shaped (matches Login/Logout) */
+.dropToggle {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  outline: none;
+}
+
+/* remove the old extra spacing because pill now adds padding */
+.chev {
+  margin-left: 2px;
+}
 
         /* ========= DROPDOWN ========= */
         .drop {
