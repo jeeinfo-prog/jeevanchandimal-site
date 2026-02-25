@@ -392,7 +392,7 @@ const JeevanChandimalNewFooter = (props) => {
   .jcArrow {
   width: 26px;
   height: 26px;
-  border-radius: 999px;
+  border-radius: 99px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
