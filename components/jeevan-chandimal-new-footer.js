@@ -220,47 +220,37 @@ const JeevanChandimalNewFooter = (props) => {
             <div className="jcSocial" aria-label="Social links">
               <SocialLink href={props.facebookUrl} label="Facebook">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M13.5 22v-8h2.7l.4-3H13.5V9.1c0-.9.3-1.6 1.7-1.6h1.4V4.8c-.2 0-1.2-.1-2.3-.1c-2.3 0-3.9 1.4-3.9 4V11H7.9v3h2.5v8h3.1z"
-                  />
-                </svg>
+  <path d="M15 3h-2a4 4 0 0 0-4 4v3H7v3h2v8h3v-8h2.5l.5-3H12V7a1 1 0 0 1 1-1h2z" />
+</svg>
               </SocialLink>
 
               <SocialLink href={props.instagramUrl} label="Instagram">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9A5.5 5.5 0 0 1 16.5 22h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2zm9 2h-9A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4zM12 7a5 5 0 1 1 0 10a5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6a3 3 0 0 0 0-6zm5.2-.9a1.1 1.1 0 1 1 0 2.2a1.1 1.1 0 0 1 0-2.2z"
-                  />
-                </svg>
+  <rect x="3" y="3" width="18" height="18" rx="5" ry="5" />
+  <circle cx="12" cy="12" r="4" />
+  <circle cx="17" cy="7" r="1" />
+</svg>
               </SocialLink>
 
               <SocialLink href={props.xUrl} label="X">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M18.3 2H21l-6.9 7.9L22 22h-6.7l-5.2-6.8L4.2 22H2l7.4-8.5L2 2h6.9l4.7 6.2L18.3 2zm-1.2 18h1.5L7.7 3.9H6.1L17.1 20z"
-                  />
-                </svg>
+  <path d="M4 4l7 8-7 8h2l6-7 6 7h2l-7-8 7-8h-2l-6 7-6-7z" />
+</svg>
               </SocialLink>
 
               <SocialLink href={props.linkedinUrl} label="LinkedIn">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M6 6.8A2.4 2.4 0 1 1 6 2a2.4 2.4 0 0 1 0 4.8zM4.6 22V9H7.4v13H4.6zM9.3 9H12v1.8h.1c.4-.8 1.5-2 3.4-2c3 0 3.6 2 3.6 4.7V22h-2.8v-7.1c0-1.7 0-3.8-2.3-3.8c-2.3 0-2.7 1.8-2.7 3.7V22H9.3V9z"
-                  />
-                </svg>
+  <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4V9h4v2" />
+  <rect x="2" y="9" width="4" height="12" />
+  <circle cx="4" cy="4" r="2" />
+</svg>
               </SocialLink>
 
               <SocialLink href={props.youtubeUrl} label="YouTube">
                 <svg viewBox="0 0 24 24" className="jcSocialSvg" aria-hidden="true">
-                  <path
-                    fill="currentColor"
-                    d="M21.8 8.1a3 3 0 0 0-2.1-2.1C17.9 5.5 12 5.5 12 5.5s-5.9 0-7.7.5A3 3 0 0 0 2.2 8.1A31.2 31.2 0 0 0 1.8 12c0 1.3.1 2.6.4 3.9a3 3 0 0 0 2.1 2.1c1.8.5 7.7.5 7.7.5s5.9 0 7.7-.5a3 3 0 0 0 2.1-2.1c.3-1.3.4-2.6.4-3.9c0-1.3-.1-2.6-.4-3.9zM10 15.2V8.8L15.5 12L10 15.2z"
-                  />
-                </svg>
+  <path d="M22 12s0-3.5-.5-5a2 2 0 0 0-1.4-1.4C18.5 5 12 5 12 5s-6.5 0-8.1.6A2 2 0 0 0 2.5 7c-.5 1.5-.5 5-.5 5s0 3.5.5 5a2 2 0 0 0 1.4 1.4C5.5 19 12 19 12 19s6.5 0 8.1-.6a2 2 0 0 0 1.4-1.4c.5-1.5.5-5 .5-5z" />
+  <polygon points="10 9 15 12 10 15 10 9" />
+</svg>
               </SocialLink>
             </div>
           </div>
@@ -514,9 +504,16 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcSocialSvg {
-          width: 18px;
-          height: 18px;
-        }
+  width: 16px;
+  height: 16px;
+  display: block;
+
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
         .jcDivider {
           width: 100%;
