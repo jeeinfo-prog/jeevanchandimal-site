@@ -472,7 +472,7 @@ const JeevanChandimalNewFooter = (props) => {
   }
 }
 
-        /* SOCIAL ICONS — stroke version (hover always works) */
+        /* SOCIAL ICONS */
 .jcSocial {
   display: inline-flex;
   align-items: center;
@@ -481,6 +481,7 @@ const JeevanChandimalNewFooter = (props) => {
   flex-wrap: wrap;
 }
 
+/* ✅ thinner, minimal buttons */
 .jcSocialBtn {
   width: 32px;
   height: 32px;
@@ -488,27 +489,49 @@ const JeevanChandimalNewFooter = (props) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+
   background: transparent;
   border: 1px solid rgba(245, 244, 244, 0.08);
-  color: rgba(245, 244, 244, 0.88);
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+  text-decoration: none !important;
+
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
 
+/* base icon color */
 .jcSocialSvg {
   width: 16px;
   height: 16px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  display: block;
 }
 
+/* ✅ force base fill color (works regardless of SVG attributes) */
+.jcSocialBtn .jcSocialSvg,
+.jcSocialBtn .jcSocialSvg * {
+  fill: rgba(245, 244, 244, 0.88) !important;
+}
+
+/* ✅ hover = blue highlight (direct fill override) */
 .jcSocialBtn:hover {
   transform: translateY(-1px);
-  color: #25c3e2 !important;
   background: rgba(37, 195, 226, 0.08);
   border-color: rgba(37, 195, 226, 0.28);
+}
+
+.jcSocialBtn:hover .jcSocialSvg,
+.jcSocialBtn:hover .jcSocialSvg * {
+  fill: #25c3e2 !important;
+}
+
+/* optional: keyboard focus also blue */
+.jcSocialBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.25);
+}
+
+.jcSocialBtn:focus-visible .jcSocialSvg,
+.jcSocialBtn:focus-visible .jcSocialSvg * {
+  fill: #25c3e2 !important;
 }
 
         .jcDivider {
