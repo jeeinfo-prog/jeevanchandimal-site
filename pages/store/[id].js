@@ -22,9 +22,70 @@ const PRICES = {
   },
 }
 
+/* ================== currency defaults (USD first) ================== */
+const STORAGE_CCY_KEY = 'jc_currency_v1'
+const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
+const DEFAULT_CURRENCY = 'USD'
+
+function safeJsonParse(v, fallback) {
+  try {
+    return JSON.parse(v)
+  } catch {
+    return fallback
+  }
+}
+
+function round2(n) {
+  const x = Number(n || 0)
+  return Math.round(x * 100) / 100
+}
+
+function readCurrency() {
+  if (typeof window === 'undefined') return DEFAULT_CURRENCY
+  const raw = window.localStorage.getItem(STORAGE_CCY_KEY)
+  const c = String(raw || '').trim().toUpperCase()
+  return c === 'LKR' ? 'LKR' : 'USD'
+}
+
+function writeCurrency(ccy) {
+  if (typeof window === 'undefined') return
+  const c = String(ccy || '').trim().toUpperCase() === 'LKR' ? 'LKR' : 'USD'
+  window.localStorage.setItem(STORAGE_CCY_KEY, c)
+}
+
+// Reads usd->lkr from your FX lock object in cart.js
+function readUsdLkrRate() {
+  if (typeof window === 'undefined') return null
+  const raw = window.localStorage.getItem(STORAGE_FX_LOCK_KEY)
+  const lock = safeJsonParse(raw, null)
+  const v = lock?.usdLkr ?? lock?.rate ?? lock?.usd_lkr ?? null
+  const n = Number(v)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n
+}
+
+function getUnitPrice({ currency, license, format, usdLkrRate }) {
+  const ccy = String(currency || '').toUpperCase() === 'LKR' ? 'LKR' : 'USD'
+  const lic = String(license || '').trim().toLowerCase()
+  const fmt = String(format || '').trim().toLowerCase()
+
+  const baseUsd = PRICES?.USD?.[lic]?.[fmt] != null ? Number(PRICES.USD[lic][fmt]) : 0
+  if (ccy === 'USD') return baseUsd
+
+  // ✅ LKR derived from USD × locked rate (preferred)
+  if (usdLkrRate != null && Number.isFinite(Number(usdLkrRate)) && Number(usdLkrRate) > 0) {
+    return round2(baseUsd * Number(usdLkrRate))
+  }
+
+  // fallback if no rate exists
+  const fallbackLkr = PRICES?.LKR?.[lic]?.[fmt] != null ? Number(PRICES.LKR[lic][fmt]) : 0
+  return fallbackLkr
+}
+
 function formatMoney(currency, amount) {
-  if (currency === 'LKR') return `LKR ${Number(amount).toLocaleString('en-LK')}`
-  return `$${Number(amount)}`
+  const n = Number(amount || 0)
+  if (currency === 'LKR') return `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  return `$${n}`
 }
 
 function isValidEmail(v) {
@@ -132,7 +193,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [error, setError] = React.useState(initialError || '')
   const [photo, setPhoto] = React.useState(initialPhoto)
 
-  const [currency, setCurrency] = React.useState('LKR')
+  // ✅ default currency USD + persisted currency + reads FX lock rate
+  const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
+  const [usdLkrRate, setUsdLkrRate] = React.useState(null)
+
   const [license, setLicense] = React.useState('personal')
   const [format, setFormat] = React.useState('jpg')
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
@@ -206,6 +270,15 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   // ✅ cart ui
   const [cartQty, setCartQty] = React.useState(1)
   const [cartMsg, setCartMsg] = React.useState('')
+
+  // ✅ load currency + fx lock on mount
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const c = readCurrency()
+    setCurrency(c)
+    writeCurrency(c) // ensure stored default exists
+    setUsdLkrRate(readUsdLkrRate())
+  }, [])
 
   // preview
   const previewSrc = photo?.id
@@ -568,7 +641,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
       return
     }
 
-    const unitPrice = PRICES?.[currency]?.[license]?.[format] ?? 0
+    const unitPrice = getUnitPrice({ currency, license, format, usdLkrRate })
     if (!unitPrice || Number(unitPrice) <= 0) {
       alert('Price not available.')
       return
@@ -688,7 +761,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
   /* ---------------- pricing ---------------- */
 
-  const price = PRICES?.[currency]?.[license]?.[format] ?? 0
+  const price = getUnitPrice({ currency, license, format, usdLkrRate })
 
   return (
     <>
@@ -762,14 +835,20 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
             <button
               type="button"
               className={`tbtn ${currency === 'LKR' ? 'active' : ''}`}
-              onClick={() => setCurrency('LKR')}
+              onClick={() => {
+                setCurrency('LKR')
+                writeCurrency('LKR')
+              }}
             >
               LKR
             </button>
             <button
               type="button"
               className={`tbtn ${currency === 'USD' ? 'active' : ''}`}
-              onClick={() => setCurrency('USD')}
+              onClick={() => {
+                setCurrency('USD')
+                writeCurrency('USD')
+              }}
             >
               USD
             </button>
@@ -893,8 +972,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                         </div>
                       ) : null}
 
-                      
-
                       {photo.exif?.lensModel ? (
                         <div>
                           <strong>Lens:</strong> {photo.exif.lensModel}
@@ -963,26 +1040,26 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               <aside className="buyCard">
                 <h1 className="title">{photo.title}</h1>
                 <div className="badgeRow">
-  {photo?.location ? <span className="badge">📍 {photo.location}</span> : null}
+                  {photo?.location ? <span className="badge">📍 {photo.location}</span> : null}
 
-  {photo?.exif?.make || photo?.exif?.model ? (
-    <span className="badge">
-      📷 {[photo.exif?.make, photo.exif?.model].filter(Boolean).join(' ')}
-    </span>
-  ) : null}
+                  {photo?.exif?.make || photo?.exif?.model ? (
+                    <span className="badge">
+                      📷 {[photo.exif?.make, photo.exif?.model].filter(Boolean).join(' ')}
+                    </span>
+                  ) : null}
 
-  {resolution ? <span className="badge">🖼️ {resolution}</span> : null}
+                  {resolution ? <span className="badge">🖼️ {resolution}</span> : null}
 
-  {format === 'jpg' && (exactJpgMB || jpgSizeMB) ? (
-  <span className="badge">
-    💾 {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
-  </span>
-) : null}
+                  {format === 'jpg' && (exactJpgMB || jpgSizeMB) ? (
+                    <span className="badge">
+                      💾 {exactJpgMB ? `${exactJpgMB} MB` : `~${jpgSizeMB} MB`}
+                    </span>
+                  ) : null}
 
-{format === 'raw' && rawAvailable && rawSizeMB ? (
-  <span className="badge">💾 ~{rawSizeMB} MB</span>
-) : null}
-</div>
+                  {format === 'raw' && rawAvailable && rawSizeMB ? (
+                    <span className="badge">💾 ~{rawSizeMB} MB</span>
+                  ) : null}
+                </div>
                 {isMember ? (
                   <div className="memberBadge">{String(memberPlan || 'member').toUpperCase()}</div>
                 ) : null}
@@ -1028,7 +1105,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     />
                   </div>
 
-                  <p className="fine">We’ll send your receipt and secure download link to this email.</p>
+                  <p className="fine">
+                    We’ll send your receipt and secure download link to this email.
+                  </p>
                 </div>
 
                 {!isMember && (
@@ -1060,8 +1139,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                       </div>
 
                       <p className="fine">
-                        Personal: non-commercial use. Commercial: ads, branding, client work. Editorial:
-                        news, blogs, documentary.
+                        Personal: non-commercial use. Commercial: ads, branding, client work.
+                        Editorial: news, blogs, documentary.
                       </p>
                     </div>
 
@@ -1190,8 +1269,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     </div>
 
                     <p className="digitalNotice">
-                      This is a digital product. No physical item will be shipped. Files are delivered
-                      instantly after successful payment.
+                      This is a digital product. No physical item will be shipped. Files are
+                      delivered instantly after successful payment.
                     </p>
 
                     <div className="termsRow">
@@ -1264,18 +1343,19 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
                       <a className="relCard">
                         <div className="relThumb">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
                         <div className="relMeta">
                           <div className="relName">{p.title || 'Untitled'}</div>
                           <div className="relCaption">
-  {String(p.description || '').trim()
-    ? String(p.description).trim()
-    : Array.isArray(p.tags) && p.tags[0]
-    ? `#${p.tags[0]}`
-    : 'Sri Lanka photography'}
-</div>
+                            {String(p.description || '').trim()
+                              ? String(p.description).trim()
+                              : Array.isArray(p.tags) && p.tags[0]
+                              ? `#${p.tags[0]}`
+                              : 'Sri Lanka photography'}
+                          </div>
                         </div>
                       </a>
                     </Link>
@@ -1303,6 +1383,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
                       <a className="relCard">
                         <div className="relThumb">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
@@ -1361,6 +1442,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               onPointerLeave={endPointerPan}
               onContextMenu={preventSave}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
                 alt={photo?.title || 'Preview'}
@@ -1370,9 +1452,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 style={{
                   transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   cursor: isPanning ? 'grabbing' : 'grab',
-
-                  // ✅ important: blocks iOS long-press "Save Image"
-                  // and still allows pan because pointer events are on the container
                   pointerEvents: 'none',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
@@ -1946,34 +2025,34 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         }
 
         .badgeRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 8px;
+        }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  border: 1px solid rgba(245, 244, 244, 0.12);
-  background: rgba(255, 255, 255, 0.02);
-  opacity: 0.92;
-}
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(255, 255, 255, 0.02);
+          opacity: 0.92;
+        }
 
-.relCaption {
-  font-size: 12px;
-  opacity: 0.82;
-  line-height: 1.35;
-  margin-top: 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+        .relCaption {
+          font-size: 12px;
+          opacity: 0.82;
+          line-height: 1.35;
+          margin-top: 4px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
 
         /* Zoom modal */
         .zoomOverlay {
@@ -2020,8 +2099,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           display: grid;
           place-items: center;
 
-          touch-action: none; /* ✅ REQUIRED for mobile drag */
-          -webkit-user-select: none; /* block text/image selection */
+          touch-action: none;
+          -webkit-user-select: none;
           user-select: none;
         }
 
@@ -2031,9 +2110,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           width: auto;
           height: auto;
 
-          pointer-events: none; /* ✅ image can't be long-pressed */
+          pointer-events: none;
           -webkit-user-drag: none;
-          -webkit-touch-callout: none; /* iOS: no save image popup */
+          -webkit-touch-callout: none;
           user-select: none;
         }
 

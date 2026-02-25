@@ -11,6 +11,52 @@ import { addToCart } from '../../lib/cart'
 
 const PLACEHOLDER = '/placeholder.png'
 
+/* ================== currency defaults ================== */
+const STORAGE_CCY_KEY = 'jc_currency_v1'
+const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
+const DEFAULT_CURRENCY = 'USD'
+
+function safeJsonParse(v, fallback) {
+  try {
+    return JSON.parse(v)
+  } catch {
+    return fallback
+  }
+}
+
+function readCurrency() {
+  if (typeof window === 'undefined') return DEFAULT_CURRENCY
+  const raw = window.localStorage.getItem(STORAGE_CCY_KEY)
+  const c = String(raw || '').trim().toUpperCase()
+  return c === 'LKR' ? 'LKR' : 'USD'
+}
+
+function writeCurrency(ccy) {
+  if (typeof window === 'undefined') return
+  const c = String(ccy || '').trim().toUpperCase() === 'LKR' ? 'LKR' : 'USD'
+  window.localStorage.setItem(STORAGE_CCY_KEY, c)
+}
+
+function round2(n) {
+  const x = Number(n || 0)
+  return Math.round(x * 100) / 100
+}
+
+function readUsdLkrRate() {
+  if (typeof window === 'undefined') return null
+  const raw = window.localStorage.getItem(STORAGE_FX_LOCK_KEY)
+  const lock = safeJsonParse(raw, null)
+
+  // support a few shapes:
+  // { usdLkr: 310.12, lockedAt: 123... }
+  // { rate: 310.12, ... }
+  // { usd_lkr: 310.12, ... }
+  const v = lock?.usdLkr ?? lock?.rate ?? lock?.usd_lkr ?? null
+  const n = Number(v)
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n
+}
+
 const PRICES = {
   LKR: {
     personal: { jpg: 2500, raw: 4000 },
@@ -39,6 +85,27 @@ function money(currency, amount) {
   return `$${n}`
 }
 
+function getUnitPrice({ currency, license, format, usdLkrRate }) {
+  const ccy = String(currency || '').toUpperCase() === 'LKR' ? 'LKR' : 'USD'
+  const lic = String(license || '').trim().toLowerCase()
+  const fmt = String(format || '').trim().toLowerCase()
+
+  const baseUsd =
+    PRICES?.USD?.[lic]?.[fmt] != null ? Number(PRICES.USD[lic][fmt]) : 0
+
+  if (ccy === 'USD') return baseUsd
+
+  // ✅ LKR adjusted from USD * rate (if available); fallback to static LKR table
+  if (usdLkrRate != null && Number.isFinite(Number(usdLkrRate)) && Number(usdLkrRate) > 0) {
+    return round2(baseUsd * Number(usdLkrRate))
+  }
+
+  const fallbackLkr =
+    PRICES?.LKR?.[lic]?.[fmt] != null ? Number(PRICES.LKR[lic][fmt]) : 0
+
+  return fallbackLkr
+}
+
 export default function StoreIndex() {
   const router = useRouter()
 
@@ -48,9 +115,23 @@ export default function StoreIndex() {
   const [error, setError] = React.useState('')
   const [origin, setOrigin] = React.useState('') // ✅ for normalizing relative URLs
 
+  // ✅ Default currency = USD (persisted)
+  const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
+
+  // ✅ FX rate (optional) used to adjust LKR from USD
+  const [usdLkrRate, setUsdLkrRate] = React.useState(null)
+
   React.useEffect(() => {
     if (typeof window === 'undefined') return
     setOrigin(window.location.origin)
+  }, [])
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const c = readCurrency()
+    setCurrency(c)
+    writeCurrency(c) // ensure stored (defaults to USD)
+    setUsdLkrRate(readUsdLkrRate())
   }, [])
 
   // ✅ Read q or tag from URL on load
@@ -263,7 +344,15 @@ export default function StoreIndex() {
                             e.stopPropagation()
                           }}
                         >
-                          <CartMini photo={p} />
+                          <CartMini
+                            photo={p}
+                            currency={currency}
+                            setCurrency={(ccy) => {
+                              setCurrency(ccy)
+                              writeCurrency(ccy)
+                            }}
+                            usdLkrRate={usdLkrRate}
+                          />
                         </div>
                       </div>
                     </a>
@@ -543,14 +632,19 @@ export default function StoreIndex() {
 
 /* ---------------- small inline cart UI ---------------- */
 
-function CartMini({ photo }) {
+function CartMini({ photo, currency, setCurrency, usdLkrRate }) {
   const [license, setLicense] = React.useState('personal')
   const [format, setFormat] = React.useState('jpg')
-  const [currency, setCurrency] = React.useState('LKR')
   const [msg, setMsg] = React.useState('')
 
-  const unitPrice =
-    PRICES?.[currency]?.[license]?.[format] != null ? Number(PRICES[currency][license][format]) : 0
+  const ccy = String(currency || '').toUpperCase() === 'LKR' ? 'LKR' : 'USD'
+
+  const unitPrice = getUnitPrice({
+    currency: ccy,
+    license,
+    format,
+    usdLkrRate,
+  })
 
   function onAdd() {
     addToCart({
@@ -559,7 +653,7 @@ function CartMini({ photo }) {
       thumbUrl: photo.thumbUrl || '',
       license,
       format,
-      currency,
+      currency: ccy,
       unitPrice,
       qty: 1,
     })
@@ -588,15 +682,27 @@ function CartMini({ photo }) {
           <option value="raw">RAW</option>
         </select>
 
-        <select className="sel" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-          <option value="LKR">LKR</option>
+        <select
+          className="sel"
+          value={ccy}
+          onChange={(e) => {
+            const next = String(e.target.value || '').toUpperCase() === 'LKR' ? 'LKR' : 'USD'
+            setCurrency(next) // persists via parent
+          }}
+        >
           <option value="USD">USD</option>
+          <option value="LKR">LKR</option>
         </select>
       </div>
 
       <div className="row2">
         {/* ✅ No price on store grid */}
-        <button className="btn" type="button" onClick={onAdd} title={`Add to cart • ${money(currency, unitPrice)}`}>
+        <button
+          className="btn"
+          type="button"
+          onClick={onAdd}
+          title={`Add to cart • ${money(ccy, unitPrice)}`}
+        >
           Add to cart
         </button>
         {msg ? <span className="msg">{msg}</span> : null}
