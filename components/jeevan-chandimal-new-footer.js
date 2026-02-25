@@ -443,32 +443,30 @@ const JeevanChandimalNewFooter = (props) => {
         }
 
         .jcMenuItem {
-  color: #f5f4f4;
-  text-decoration: none !important;
-  font-size: 14px;
-  padding: 10px 10px;
-  border-radius: 10px;
-  opacity: 0.92;
-  transition: background 0.15s, opacity 0.15s, color 0.15s, border-color 0.15s;
-  display: block;
-  border: 1px solid transparent;
-}
+          color: #f5f4f4;
+          text-decoration: none !important;
+          font-size: 14px;
+          padding: 10px 10px;
+          border-radius: 10px;
+          opacity: 0.92;
+          transition: background 0.15s, opacity 0.15s, color 0.15s, border-color 0.15s;
+          display: block;
+          border: 1px solid transparent;
+        }
 
-/* ✅ hover = blue text */
-.jcMenuItem:hover {
-  opacity: 1;
-  background: rgba(245, 244, 244, 0.08);
-  color: #25c3e2 !important;
-}
+        .jcMenuItem:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.08);
+        }
 
-/* ✅ active = same blue + highlight */
-.isActiveItem {
-  background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
-  border: 1px solid rgba(37, 195, 226, 0.18);
-  color: #25c3e2 !important;
-  opacity: 1;
-  font-weight: 700;
-}
+        /* ✅ Active dropdown child highlight */
+        .isActiveItem {
+          color: #25c3e2;
+          opacity: 1;
+          background: rgba(37, 195, 226, 0.14);
+          border-color: rgba(37, 195, 226, 0.25);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.05) inset;
+        }
 
 @media (min-width: 992px) {
   .jcDrop:hover .jcMenu,
@@ -481,59 +479,41 @@ const JeevanChandimalNewFooter = (props) => {
   }
 }
 
-        /* SOCIAL ICONS */
-.jcSocial {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+        .jcSocial {
+          display: inline-flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
 
-/* ✅ thinner, minimal buttons */
-.jcSocialBtn {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+        .jcSocialBtn {
+          width: 40px;
+          height: 40px;
+          border-radius: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.55);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          color: rgba(245, 244, 244, 0.92);
+          text-decoration: none !important;
+          transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+            box-shadow 0.15s ease;
+        }
 
-  background: transparent;
-  border: 1px solid rgba(245, 244, 244, 0.08);
+        .jcSocialBtn:hover {
+          transform: translateY(-1px);
+          background: rgba(37, 195, 226, 0.1);
+          border-color: rgba(37, 195, 226, 0.35);
+          color: #25c3e2;
+          box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+        }
 
-  color: rgba(245, 244, 244, 0.88);
-  text-decoration: none !important;
-
-  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-/* ✅ FORCE svg to follow text color (fixes “no hover highlight”) */
-.jcSocialSvg {
-  width: 16px;
-  height: 16px;
-  display: block;
-  fill: currentColor;
-}
-
-.jcSocialSvg * {
-  fill: currentColor;
-}
-
-/* ✅ hover = blue highlight */
-.jcSocialBtn:hover {
-  transform: translateY(-1px);
-  color: #25c3e2 !important;
-  background: rgba(37, 195, 226, 0.08);
-  border-color: rgba(37, 195, 226, 0.28);
-}
-
-/* optional: keyboard focus also blue */
-.jcSocialBtn:focus-visible {
-  outline: none;
-  color: #25c3e2 !important;
-  box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.25);
-}
+        .jcSocialSvg {
+          width: 18px;
+          height: 18px;
+        }
 
         .jcDivider {
           width: 100%;
