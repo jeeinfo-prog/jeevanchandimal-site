@@ -5,46 +5,35 @@ const Process01 = (props) => {
   const [activeTab, setActiveTab] = useState(0)
   const [paused, setPaused] = useState(false)
 
+  /* ---------- image pools ---------- */
   const images = useMemo(() => {
-    const t0 = (props.feature1Imgs?.length ? props.feature1Imgs : [props.feature1ImgSrc]).filter(Boolean)
-    const t1 = (props.feature2Imgs?.length ? props.feature2Imgs : [props.feature2ImgSrc]).filter(Boolean)
-    const t2 = (props.feature3Imgs?.length ? props.feature3Imgs : [props.feature3ImgSrc]).filter(Boolean)
-    return {
-      0: t0.length ? t0 : ['/about/process-concept.jpg'],
-      1: t1.length ? t1 : ['/about/process-observation.jpg'],
-      2: t2.length ? t2 : ['/about/process-detail.jpg'],
-    }
-  }, [
-    props.feature1Imgs,
-    props.feature2Imgs,
-    props.feature3Imgs,
-    props.feature1ImgSrc,
-    props.feature2ImgSrc,
-    props.feature3ImgSrc,
-  ])
+    const tab1 = (props.feature1Imgs?.length ? props.feature1Imgs : [props.feature1ImgSrc]).filter(Boolean)
+    const tab2 = (props.feature2Imgs?.length ? props.feature2Imgs : [props.feature2ImgSrc]).filter(Boolean)
+    const tab3 = (props.feature3Imgs?.length ? props.feature3Imgs : [props.feature3ImgSrc]).filter(Boolean)
 
-  const [i0, setI0] = useState(0)
-  const [i1, setI1] = useState(0)
-  const [i2, setI2] = useState(0)
+    return {
+      0: tab1.length ? tab1 : ['/about/process-concept.jpg'],
+      1: tab2.length ? tab2 : ['/about/process-observation.jpg'],
+      2: tab3.length ? tab3 : ['/about/process-detail.jpg'],
+    }
+  }, [props.feature1Imgs, props.feature2Imgs, props.feature3Imgs, props.feature1ImgSrc, props.feature2ImgSrc, props.feature3ImgSrc])
+
+  const [idx0, setIdx0] = useState(0)
+  const [idx1, setIdx1] = useState(0)
+  const [idx2, setIdx2] = useState(0)
 
   useEffect(() => {
     if (paused) return
     const id = setInterval(() => {
-      if (activeTab === 0) setI0((i) => (i + 1) % images[0].length)
-      if (activeTab === 1) setI1((i) => (i + 1) % images[1].length)
-      if (activeTab === 2) setI2((i) => (i + 1) % images[2].length)
+      if (activeTab === 0) setIdx0((i) => (i + 1) % images[0].length)
+      if (activeTab === 1) setIdx1((i) => (i + 1) % images[1].length)
+      if (activeTab === 2) setIdx2((i) => (i + 1) % images[2].length)
     }, 4500)
     return () => clearInterval(id)
   }, [paused, activeTab, images])
 
-  const onTab = (n) => {
-    setActiveTab(n)
-    setPaused(true)
-    window.setTimeout(() => setPaused(false), 7000)
-  }
-
   const currentSrc =
-    activeTab === 0 ? images[0][i0] : activeTab === 1 ? images[1][i1] : images[2][i2]
+    activeTab === 0 ? images[0][idx0] : activeTab === 1 ? images[1][idx1] : images[2][idx2]
 
   const currentAlt =
     activeTab === 0
@@ -53,26 +42,39 @@ const Process01 = (props) => {
       ? props.feature2ImgAlt || 'Observation and framing'
       : props.feature3ImgAlt || 'Craft and detail'
 
+  const onTab = (n) => {
+    setActiveTab(n)
+    setPaused(true)
+    window.setTimeout(() => setPaused(false), 7000)
+  }
+
+  const bottomImg =
+    activeTab === 0
+      ? props.feature1ImgAltSrc || '/about/process-concept-2.jpg'
+      : activeTab === 1
+      ? props.feature2ImgAltSrc || '/about/process-observation-2.jpg'
+      : props.feature3ImgAltSrc || '/about/process-detail-2.jpg'
+
   return (
     <>
       <div className={`thq-section-padding ${props.rootClassName}`}>
         <div className="process-01-container2 thq-section-max-width">
-          {/* TABS */}
+
+          {/* ---------- TEXT TABS ---------- */}
           <div className="process-01-thq-tabs-menu-elm">
-            {/* TAB 1 */}
             <button
               type="button"
               onClick={() => onTab(0)}
               className={`processTab menuItem ${activeTab === 0 ? 'isActiveItem' : ''}`}
             >
-              <div className="processTabInner">
+              <div>
                 <h2 className="thq-heading-2">{props.feature1Title2 ?? <span>Process</span>}</h2>
                 <h3 className="thq-heading-3">{props.feature1Title11 ?? <span>Concept First</span>}</h3>
                 <span className="thq-body-small">
                   {props.feature1Description2 ?? (
                     <span>
-                      Every collaboration begins with intention. Atmosphere, emotional direction, and story are defined
-                      before production begins.
+                      Every collaboration begins with intention. Atmosphere, emotional direction,
+                      and story are defined before production begins.
                     </span>
                   )}
                 </span>
@@ -80,19 +82,18 @@ const Process01 = (props) => {
               <span className="hoverArrow">→</span>
             </button>
 
-            {/* TAB 2 */}
             <button
               type="button"
               onClick={() => onTab(1)}
               className={`processTab menuItem ${activeTab === 1 ? 'isActiveItem' : ''}`}
             >
-              <div className="processTabInner">
+              <div>
                 <h3 className="thq-heading-3">{props.feature3Title ?? <span>Observation Over Noise</span>}</h3>
                 <span className="thq-body-small">
                   {props.feature3Description ?? (
                     <span>
-                      I prefer quiet moments to forced gestures. Real presence over performance. Stillness often reveals
-                      more than motion.
+                      I prefer quiet moments to forced gestures. Real presence over performance.
+                      Stillness often reveals more than motion.
                     </span>
                   )}
                 </span>
@@ -100,19 +101,17 @@ const Process01 = (props) => {
               <span className="hoverArrow">→</span>
             </button>
 
-            {/* TAB 3 */}
             <button
               type="button"
               onClick={() => onTab(2)}
               className={`processTab menuItem ${activeTab === 2 ? 'isActiveItem' : ''}`}
             >
-              <div className="processTabInner">
+              <div>
                 <h3 className="thq-heading-3">{props.feature3Title1 ?? <span>Craft & Detail</span>}</h3>
                 <span className="thq-body-small">
                   {props.feature3Description1 ?? (
                     <span>
                       From lighting and composition to sound texture and pacing, every element is refined with care.
-                      Small decisions shape the final experience.
                     </span>
                   )}
                 </span>
@@ -121,15 +120,24 @@ const Process01 = (props) => {
             </button>
           </div>
 
-          {/* IMAGE PANEL */}
+          {/* ---------- RIGHT IMAGE STACK ---------- */}
           <div
             className="process-01-thq-image-container-elm"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
           >
-            <div className="imgCard">
-              <img src={currentSrc} alt={currentAlt} className="process-img" loading="lazy" />
-              <div className="imgOverlay" />
+            <div className="imgColumn">
+
+              <div className="imgCard small">
+                <img src={currentSrc} alt={currentAlt} className="process-img" loading="lazy" />
+                <div className="imgOverlay" />
+              </div>
+
+              <div className="imgCard small">
+                <img src={bottomImg} alt="Supporting process frame" className="process-img" loading="lazy" />
+                <div className="imgOverlay" />
+              </div>
+
             </div>
           </div>
         </div>
@@ -141,17 +149,16 @@ const Process01 = (props) => {
           display: grid;
           gap: var(--dl-layout-space-fiveunits);
           grid-template-columns: 1fr 1fr;
-          align-items: center; /* ✅ center text & image */
+          align-items: center;
         }
 
         .process-01-thq-tabs-menu-elm {
           display: flex;
           flex-direction: column;
           gap: var(--dl-layout-space-twounits);
-          justify-content: center; /* ✅ center column */
+          justify-content: center;
         }
 
-        /* TAB CARD */
         .processTab {
           width: 100%;
           text-align: left;
@@ -165,27 +172,13 @@ const Process01 = (props) => {
           gap: 12px;
           color: #f5f4f4;
           opacity: 0.92;
-          transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease,
-            background 220ms ease, color 220ms ease;
-        }
-
-        .processTabInner {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
+          transition: all 0.22s ease;
         }
 
         .menuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
           color: #25c3e2 !important;
-        }
-
-        .processTab:hover {
-          transform: translateY(-3px) scale(1.01);
-          border-color: rgba(37, 195, 226, 0.28);
-          box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(37, 195, 226, 0.15);
-          background: rgba(255, 255, 255, 0.03);
         }
 
         .menuItem.isActiveItem {
@@ -209,19 +202,18 @@ const Process01 = (props) => {
           transform: translateX(0);
         }
 
-        /* IMAGE PANEL */
-        .process-01-thq-image-container-elm {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100%;
+        .imgColumn {
+          width: 100%;
+          display: grid;
+          grid-template-rows: 1fr 1fr;
+          gap: var(--dl-layout-space-oneandhalfunits);
+          height: 360px;
         }
 
-        /* ✅ same card height as other sections */
-        .imgCard {
+        .imgCard.small {
           position: relative;
           width: 100%;
-          height: 360px;
+          height: 100%;
           overflow: hidden;
           border-radius: 16px;
           border: 1px solid rgba(245, 244, 244, 0.12);
@@ -232,12 +224,11 @@ const Process01 = (props) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          display: block;
           transform: scale(1.01);
           transition: transform 320ms ease, filter 320ms ease;
         }
 
-        .imgCard:hover .process-img {
+        .imgCard.small:hover .process-img {
           transform: scale(1.05);
           filter: saturate(1.08) contrast(1.06);
         }
@@ -255,11 +246,11 @@ const Process01 = (props) => {
             gap: var(--dl-layout-space-twounits);
           }
 
-          .process-01-thq-tabs-menu-elm {
-            order: 2;
+          .imgColumn {
+            height: auto;
           }
 
-          .imgCard {
+          .imgCard.small {
             height: 320px;
           }
         }
@@ -270,44 +261,9 @@ const Process01 = (props) => {
 
 Process01.defaultProps = {
   rootClassName: '',
-
   feature1ImgSrc: '/about/process-concept.jpg',
   feature2ImgSrc: '/about/process-observation.jpg',
   feature3ImgSrc: '/about/process-detail.jpg',
-
-  feature1ImgAlt: 'Concept planning',
-  feature2ImgAlt: 'Observation and framing',
-  feature3ImgAlt: 'Craft and detail',
-
-  feature1Imgs: undefined,
-  feature2Imgs: undefined,
-  feature3Imgs: undefined,
-}
-
-Process01.propTypes = {
-  rootClassName: PropTypes.string,
-
-  feature1Title2: PropTypes.element,
-  feature1Title11: PropTypes.element,
-  feature1Description2: PropTypes.element,
-
-  feature3Title: PropTypes.element,
-  feature3Description: PropTypes.element,
-
-  feature3Title1: PropTypes.element,
-  feature3Description1: PropTypes.element,
-
-  feature1ImgSrc: PropTypes.string,
-  feature2ImgSrc: PropTypes.string,
-  feature3ImgSrc: PropTypes.string,
-
-  feature1ImgAlt: PropTypes.string,
-  feature2ImgAlt: PropTypes.string,
-  feature3ImgAlt: PropTypes.string,
-
-  feature1Imgs: PropTypes.arrayOf(PropTypes.string),
-  feature2Imgs: PropTypes.arrayOf(PropTypes.string),
-  feature3Imgs: PropTypes.arrayOf(PropTypes.string),
 }
 
 export default Process01
