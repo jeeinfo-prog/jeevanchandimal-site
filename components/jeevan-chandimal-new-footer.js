@@ -390,28 +390,22 @@ const JeevanChandimalNewFooter = (props) => {
 
         /* ✅ Arrow border removed + background matched */
   .jcArrow {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none; /* removed border */
-    background: transparent; /* match footer background */
-    transition: background 0.15s, border-color 0.15s;
-  }
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+}
 
-  .jcArrow:hover {
-    background: rgba(245, 244, 244, 0.06);
-  }
-
-  .jcArrowSvg {
-    width: 16px;
-    height: 16px;
-    fill: rgba(245, 244, 244, 0.85);
-    transform: rotate(0deg);
-    transition: transform 0.18s ease;
-  }
+.jcArrowSvg {
+  width: 16px;
+  height: 16px;
+  fill: rgba(245, 244, 244, 0.85);
+  transition: transform 0.18s ease;
+}
 
         .teleport-rotate .jcArrowSvg {
           transform: rotate(90deg);
