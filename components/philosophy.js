@@ -171,24 +171,25 @@ const Philosophy = (props) => {
           justify-content: center;
         }
 
-        .imgCard {
-          position: relative;
-          width: 100%;
-          overflow: hidden;
-          border-radius: 16px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
-        }
+        /* match Collaboration image card size */
+.imgCard {
+  position: relative;
+  width: 100%;
+  height: 360px; /* ✅ same visual height as Collaboration */
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(245, 244, 244, 0.12);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+}
 
-        /* ✅ RESTORED FIXED HEIGHT */
-        .philo-img {
-          width: 100%;
-          height: 520px;
-          object-fit: cover;
-          display: block;
-          transform: scale(1.01);
-          transition: transform 320ms ease, filter 320ms ease;
-        }
+.philo-img {
+  width: 100%;
+  height: 100%; /* ✅ fill card */
+  object-fit: cover;
+  display: block;
+  transform: scale(1.01);
+  transition: transform 320ms ease, filter 320ms ease;
+}
 
         .imgCard:hover .philo-img {
           transform: scale(1.05);
