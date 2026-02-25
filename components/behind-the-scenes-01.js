@@ -255,11 +255,11 @@ const BehindTheScenes01 = (props) => {
         }
 
         .btsLayout {
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: var(--dl-layout-space-twoandhalfunits);
-        }
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dl-layout-space-oneandhalfunits); /* ✅ same gap as grid */
+}
 
         /* ===== HERO ===== */
         .heroBtn {
