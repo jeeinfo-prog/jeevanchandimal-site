@@ -8,23 +8,58 @@ function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
 }
 
-function resolveTierFromMembershipPlan(plan) {
-  const raw = String(plan || '').trim().toLowerCase()
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+}
 
-  // legacy mapping (your memberships.plan currently stores monthly/yearly/lifetime)
-  if (raw === 'monthly') return 'basic'
+function addMonths(date, months) {
+  const d = new Date(date.getTime())
+  const day = d.getDate()
+  d.setMonth(d.getMonth() + months)
+
+  // handle month overflow (e.g., Jan 31 -> Feb)
+  if (d.getDate() < day) d.setDate(0)
+  return d
+}
+
+/**
+ * ✅ Final tiers + limits (your chosen numbers)
+ * Basic: 20 JPG / month
+ * Pro: 75 JPG / month
+ * Elite: 200 downloads / month + RAW access
+ */
+const LIMITS = {
+  basic: 20,
+  pro: 75,
+  elite: 200,
+}
+
+function resolveTierFromMemberRow(member) {
+  // Prefer explicit tier-like fields if present
+  const direct = String(member?.tier || member?.license || '').trim().toLowerCase()
+  if (['basic', 'pro', 'elite'].includes(direct)) return direct
+
+  // Legacy / fallback from plan
+  const raw = String(member?.plan || member?.membership_plan || '').trim().toLowerCase()
+
+  // ✅ IMPORTANT: your current UI sends plan='monthly' to mean PRO.
+  if (raw === 'monthly') return 'pro'
   if (raw === 'yearly') return 'pro'
   if (raw === 'lifetime') return 'elite'
 
-  // if already a tier
   if (['basic', 'pro', 'elite'].includes(raw)) return raw
-
   return null
 }
 
-function formatForTier(tier) {
-  // BASIC/PRO => JPG, ELITE => RAW ZIP
-  return tier === 'elite' ? 'raw' : 'jpg'
+function safeRequestedFormat(v) {
+  const f = String(v || '').trim().toLowerCase()
+  return f === 'raw' ? 'raw' : 'jpg'
+}
+
+function allowedFormatForTier(tier, requested) {
+  // BASIC/PRO => JPG only
+  if (tier === 'elite') return requested === 'raw' ? 'raw' : 'jpg'
+  return 'jpg'
 }
 
 // ✅ Resolve correct R2 key from photos table
@@ -54,7 +89,7 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
  * - So we MUST set order_kind='membership' to bypass that constraint.
  * - Your orders.id has no default, so we MUST generate UUID.
  */
-async function ensureMemberOrder(email, membershipPlan = 'monthly') {
+async function ensureMemberOrder(email, membershipPlan = 'pro') {
   const code = `MEMBER_${email}`
 
   const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
@@ -70,27 +105,79 @@ async function ensureMemberOrder(email, membershipPlan = 'monthly') {
     status: 'PAID',
     paid_at: new Date().toISOString(),
     amount: 0,
-    currency: 'LKR',
+    currency: 'USD',
 
     // ✅ critical: prevents "photo_id required" check constraint
     order_kind: 'membership',
 
-    // helpful fields (only if these columns exist in your orders table)
+    // legacy-ish fields (only if columns exist — safe even if ignored)
     membership_plan: membershipPlan || null,
-    membership_term: membershipPlan || null,
+    membership_term: 'monthly',
 
     // keep non-photo markers
     license: 'membership',
     format: 'membership',
 
-    // unlimited
+    // not used for membership caps (caps enforced in memberships table)
     download_limit: 0,
     download_count: 0,
+
+    // placeholders for NOT NULL / legacy fields if your table has them
+    photo_id: 'membership',
+    delivery_object_key: 'membership',
   }
 
   const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
   if (ins.error) throw new Error(ins.error.message)
   return ins.data
+}
+
+/**
+ * ✅ Ensure billing cycle + used counter exists and is current.
+ * Returns { used, limit } and updates DB if it resets cycle.
+ */
+async function ensureUsageWindow(memberRow, tier) {
+  const limit = LIMITS[tier] ?? 0
+  const now = new Date()
+
+  const used0 = Number(memberRow?.monthly_download_used ?? memberRow?.downloads_used ?? 0)
+  const startRaw = memberRow?.billing_cycle_start || memberRow?.cycle_start || memberRow?.created_at
+  const start = startRaw ? new Date(startRaw) : now
+
+  // If no start or invalid, reset
+  if (!startRaw || Number.isNaN(start.getTime())) {
+    await supabaseAdmin
+      .from('memberships')
+      .update({
+        billing_cycle_start: now.toISOString(),
+        monthly_download_used: 0,
+        monthly_download_limit: limit,
+      })
+      .eq('id', memberRow.id)
+
+    return { used: 0, limit }
+  }
+
+  const nextReset = addMonths(start, 1)
+  if (now >= nextReset) {
+    await supabaseAdmin
+      .from('memberships')
+      .update({
+        billing_cycle_start: now.toISOString(),
+        monthly_download_used: 0,
+        monthly_download_limit: limit,
+      })
+      .eq('id', memberRow.id)
+
+    return { used: 0, limit }
+  }
+
+  // keep limit stored if missing
+  if (!memberRow?.monthly_download_limit || Number(memberRow.monthly_download_limit) !== limit) {
+    await supabaseAdmin.from('memberships').update({ monthly_download_limit: limit }).eq('id', memberRow.id)
+  }
+
+  return { used: Math.max(0, used0), limit }
 }
 
 export default async function handler(req, res) {
@@ -104,14 +191,22 @@ export default async function handler(req, res) {
   try {
     const photoId = String(req.body?.photoId || '').trim()
     const email = normalizeEmail(req.body?.email)
+    const requestedFormat = safeRequestedFormat(req.body?.format) // 'jpg' | 'raw' (elite can choose)
 
-    if (!photoId || !email) return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
+    if (!photoId || !email) {
+      return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ ok: false, error: 'Invalid email' })
+    }
 
     // ✅ Membership check (your table: memberships)
+    // Try to fetch all possible fields (safe even if some columns don't exist)
     const { data: member, error: mErr } = await supabaseAdmin
       .from('memberships')
-      .select('plan,status,end_date,created_at')
+      .select(
+        'id,email,status,plan,tier,license,term,end_date,created_at,billing_cycle_start,monthly_download_limit,monthly_download_used'
+      )
       .eq('email', email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -125,10 +220,23 @@ export default async function handler(req, res) {
       return res.status(403).json({ ok: false, error: 'Membership expired' })
     }
 
-    const tier = resolveTierFromMembershipPlan(member.plan)
-    if (!tier) return res.status(403).json({ ok: false, error: 'Invalid plan' })
+    const tier = resolveTierFromMemberRow(member)
+    if (!tier) return res.status(403).json({ ok: false, error: 'Invalid membership tier' })
 
-    const format = formatForTier(tier)
+    // ✅ billing cycle + cap enforcement
+    const { used, limit } = await ensureUsageWindow(member, tier)
+    if (limit > 0 && used >= limit) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Monthly download limit reached',
+        tier,
+        used,
+        limit,
+      })
+    }
+
+    // ✅ Determine allowed format
+    const format = allowedFormatForTier(tier, requestedFormat)
     const ext = format === 'raw' ? 'zip' : 'jpg'
 
     // ✅ Resolve object key from photos table
@@ -136,8 +244,8 @@ export default async function handler(req, res) {
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
     // ✅ Ensure we have a membership order row that won't violate constraints
-    const membershipPlan = String(member.plan || '').trim().toLowerCase() || 'monthly'
-    const memberOrder = await ensureMemberOrder(email, membershipPlan)
+    // Store tier for clarity (not used for caps)
+    const memberOrder = await ensureMemberOrder(email, tier)
 
     // ✅ One-time token row (required by /api/download which uses consume_download_token RPC)
     const jti = crypto.randomUUID()
@@ -152,6 +260,23 @@ export default async function handler(req, res) {
     if (insTok.error) {
       console.error('download_tokens insert failed:', insTok.error.message)
       return res.status(500).json({ ok: false, error: 'Server error' })
+    }
+
+    // ✅ increment usage (optimistic concurrency to reduce race conditions)
+    const nextUsed = used + 1
+    const upd = await supabaseAdmin
+      .from('memberships')
+      .update({ monthly_download_used: nextUsed })
+      .eq('id', member.id)
+      .eq('monthly_download_used', used) // only update if unchanged
+
+    if (upd.error) {
+      // If this fails due to race, be safe: deny with retry message
+      console.error('membership usage update failed:', upd.error.message)
+      return res.status(409).json({
+        ok: false,
+        error: 'Please retry download (usage updated).',
+      })
     }
 
     // ✅ Build download token payload matching pages/api/download.js requirements
@@ -173,6 +298,9 @@ export default async function handler(req, res) {
       ok: true,
       tier,
       type: format,
+      used: nextUsed,
+      limit,
+      remaining: Math.max(0, limit - nextUsed),
       url: `/api/download?token=${encodeURIComponent(token)}`,
     })
   } catch (e) {

@@ -5,25 +5,26 @@ import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { payhereInitHash } from '../../../lib/payhere'
 
 /**
- * Membership pricing:
- * tier:  basic | pro | elite
- * term:  monthly | yearly | lifetime
+ * ✅ Membership pricing (USD base)
+ * - Your UI currently uses plan='monthly' to mean Pro monthly (backward compatibility).
+ * - Currency can be USD or LKR.
+ * - LKR is auto-converted from USD on the server.
  */
-const PRICES = {
+const USD_BASE_PRICES = {
   basic: {
-    monthly: { LKR: 9500, USD: 29 },
-    yearly: { LKR: 95000, USD: 290 },
-    lifetime: { LKR: 250000, USD: 850 },
+    monthly: 49,
+    yearly: 490,
+    lifetime: 1490,
   },
   pro: {
-    monthly: { LKR: 18500, USD: 55 },
-    yearly: { LKR: 185000, USD: 550 },
-    lifetime: { LKR: 450000, USD: 1500 },
+    monthly: 89,
+    yearly: 890,
+    lifetime: 2490,
   },
   elite: {
-    monthly: { LKR: 28500, USD: 85 },
-    yearly: { LKR: 285000, USD: 850 },
-    lifetime: { LKR: 650000, USD: 2200 },
+    monthly: 149,
+    yearly: 1490,
+    lifetime: 3990,
   },
 }
 
@@ -41,26 +42,40 @@ function cleanLower(v, fallback) {
   return s || fallback
 }
 
+function toNumber(v, fallback) {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+function usdToLkr(usd, fxRate) {
+  // PayHere supports 2 decimals; LKR typically integer display,
+  // but we keep 2 decimals safe for gateway.
+  const x = Number(usd || 0) * Number(fxRate || 0)
+  return Math.round(x * 100) / 100
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
   try {
-    // ✅ accept both old + new request shapes
-    // old: { email, plan, currency } where plan was monthly/yearly/lifetime (pro assumed)
-    // new: { email, tier, term, currency }
+    /**
+     * ✅ accept both old + new request shapes
+     * old: { email, plan, currency } where plan was monthly/yearly/lifetime (pro assumed)
+     * new: { email, tier, term, currency }
+     */
     const body = req.body || {}
 
     const email = String(body.email || '').trim().toLowerCase()
-    const currency = cleanUpper(body.currency, 'LKR')
+    const currency = cleanUpper(body.currency, 'USD')
 
     // tier/term normalization
     let tier = cleanLower(body.tier, '')
     let term = cleanLower(body.term, '')
 
     // Backward compatibility:
-    // if UI still sends { plan: 'monthly' }, treat it as term and default tier to 'pro'
+    // If UI sends { plan: 'monthly' }, treat it as term and default tier to 'pro'
     if (!term && body.plan) term = cleanLower(body.plan, '')
     if (!tier) tier = 'pro'
     if (!term) term = 'monthly'
@@ -84,10 +99,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
-    const amount = PRICES?.[tier]?.[term]?.[currency]
-    if (!amount) {
+    // ✅ USD base amount for the selection
+    const usdAmount = USD_BASE_PRICES?.[tier]?.[term]
+    if (!usdAmount) {
       return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
     }
+
+    // ✅ FX rate for auto-conversion (you can wire real FX later)
+    // Use env var so you can change without deploy:
+    // MEMBERSHIP_USD_LKR_RATE=320 (example)
+    const fxRate = toNumber(process.env.MEMBERSHIP_USD_LKR_RATE, 320)
+
+    // ✅ final amount + currency for PayHere
+    const amount = currency === 'LKR' ? usdToLkr(usdAmount, fxRate) : usdAmount
 
     // ✅ server env only
     const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
@@ -112,6 +136,9 @@ export default async function handler(req, res) {
      * So we store membership details using existing columns:
      * - license = tier (basic/pro/elite)
      * - format  = term (monthly/yearly/lifetime)
+     *
+     * Also: store USD base + fx info in optional columns if you have them,
+     * but DO NOT require them (keep stable).
      */
     const payload = {
       id: orderId,
@@ -137,6 +164,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: error.message })
     }
 
+    // ✅ PayHere init hash with final amount+currency that will be posted from client
     const hash = payhereInitHash({
       merchantId,
       merchantSecret,
@@ -152,6 +180,9 @@ export default async function handler(req, res) {
       currency,
       tier,
       term,
+      // helpful for UI (optional)
+      usdAmount,
+      fxRate: currency === 'LKR' ? fxRate : undefined,
       hash,
       notifyUrl: webhookBase ? `${webhookBase}/api/payhere/notify` : undefined,
     })

@@ -96,7 +96,6 @@ function addMonths(date, months) {
   const d = new Date(date)
   const day = d.getUTCDate()
   d.setUTCMonth(d.getUTCMonth() + months)
-  // handle month-end rollover (e.g. Jan 31 + 1 month)
   if (d.getUTCDate() < day) d.setUTCDate(0)
   return d
 }
@@ -105,6 +104,13 @@ function addYears(date, years) {
   const d = new Date(date)
   d.setUTCFullYear(d.getUTCFullYear() + years)
   return d
+}
+
+// ✅ monthly caps (your final numbers)
+const MEMBER_LIMITS = {
+  basic: 20,
+  pro: 75,
+  elite: 200,
 }
 
 /* ===== DOWNLOAD LIMIT HELPERS ===== */
@@ -268,7 +274,7 @@ function verifyMd5WithAnySecret(payload) {
 
 function orderLooksLikeCart(order_id, custom_1, dbOrder) {
   const kindRaw = String(custom_1 || '').trim().toLowerCase()
-  const isCartByCustom = kindRaw === 'cart' // correct for cart flow
+  const isCartByCustom = kindRaw === 'cart'
   const isCartByPrefix = String(order_id || '').startsWith('CART_')
   const isCartByDb = String(dbOrder?.order_kind || '').toLowerCase() === 'cart'
   return isCartByCustom || isCartByPrefix || isCartByDb
@@ -283,8 +289,6 @@ function orderLooksLikeMembership(custom_1, dbOrder) {
 
 function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency }) {
   if (!dbOrder) return true
-
-  // If DB has no amount/currency, skip.
   if (!dbOrder.amount || !dbOrder.currency) return true
 
   const dbAmount = normalizePayhereAmount(dbOrder.amount)
@@ -337,14 +341,17 @@ export default async function handler(req, res) {
     // Try to find DB row early (helps kind detection + amount validation)
     let dbOrder = null
     try {
-      if (String(order_id || '').startsWith('CART_') || String(custom_1 || '').trim().toLowerCase() === 'cart') {
+      if (
+        String(order_id || '').startsWith('CART_') ||
+        String(custom_1 || '').trim().toLowerCase() === 'cart'
+      ) {
         dbOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
       } else {
         dbOrder = await findSingleOrderByRef(order_id)
       }
     } catch {}
 
-    // Verify signature (try sandbox or live secrets based on flag)
+    // Verify signature
     const ok = verifyMd5WithAnySecret({
       merchant_id,
       order_id,
@@ -434,12 +441,7 @@ export default async function handler(req, res) {
             .eq('id', order.id)
         }
 
-        const freshRes = await supabaseAdmin
-          .from('orders')
-          .select('*')
-          .eq('id', order.id)
-          .maybeSingle()
-
+        const freshRes = await supabaseAdmin.from('orders').select('*').eq('id', order.id).maybeSingle()
         if (freshRes.error) {
           console.error('membership refetch failed:', freshRes.error.message)
           return res.status(200).send('OK')
@@ -447,32 +449,38 @@ export default async function handler(req, res) {
 
         const o = freshRes.data || order
 
+        // ✅ your membership order encodes: license=tier, format=term
         const tier = normalizeMembershipTier(o.license)
         const term = normalizeMembershipTerm(o.format)
 
         const now = new Date()
-        let expiresAt = null
-        if (term === 'monthly') expiresAt = addMonths(now, 1).toISOString()
-        if (term === 'yearly') expiresAt = addYears(now, 1).toISOString()
-        if (term === 'lifetime') expiresAt = addYears(now, 100).toISOString()
+        let endDate = null
+        if (term === 'monthly') endDate = addMonths(now, 1).toISOString()
+        if (term === 'yearly') endDate = addYears(now, 1).toISOString()
+        if (term === 'lifetime') endDate = addYears(now, 100).toISOString()
 
-        // Activate membership
+        const monthlyLimit = MEMBER_LIMITS[tier] ?? 75
+
+        // ✅ Activate membership in *memberships* table (this matches /api/member/download.js)
         try {
-          const upsertPayload = {
+          const payload = {
             email,
-            plan: tier,
+            plan: tier, // store tier in plan (your existing code expects member.plan)
             status: 'active',
-            expires_at: expiresAt,
-            updated_at: new Date().toISOString(),
+            end_date: endDate,
+
+            // caps + cycle
+            billing_cycle_start: now.toISOString(),
+            monthly_download_limit: monthlyLimit,
+            monthly_download_used: 0,
+
+            updated_at: now.toISOString(),
           }
 
-          const up = await supabaseAdmin
-            .from('members')
-            .upsert(upsertPayload, { onConflict: 'email' })
-
-          if (up.error) console.error('members upsert error:', up.error.message)
+          const up = await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'email' })
+          if (up.error) console.error('memberships upsert error:', up.error.message)
         } catch (e) {
-          console.error('members activate error:', e?.message || e)
+          console.error('memberships activate error:', e?.message || e)
         }
 
         // Receipt email (send once)
@@ -555,20 +563,20 @@ export default async function handler(req, res) {
 
         // ✅ IMPORTANT: if paid cart has no items, mark it clearly in DB
         if (items.length === 0) {
-  console.error('Cart order has no items array:', o.id)
+          console.error('Cart order has no items array:', o.id)
 
-  await supabaseAdmin
-    .from('orders')
-    .update({
-      status: 'PAID_NO_ITEMS',
-      payhere_payment_id: payment_id || null,
-      payhere_status_code: status_code || null,
-      payhere_status_message: status_message || null,
-    })
-    .eq('id', o.id)
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              status: 'PAID_NO_ITEMS',
+              payhere_payment_id: payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', o.id)
 
-  return res.status(200).send('OK')
-}
+          return res.status(200).send('OK')
+        }
 
         // Ensure download_limit on cart order
         const desiredLimit = cartLimitFromItems(items)
@@ -728,12 +736,7 @@ export default async function handler(req, res) {
           .eq('id', order.id)
       }
 
-      const { data: fresh } = await supabaseAdmin
-        .from('orders')
-        .select('*')
-        .eq('id', order.id)
-        .single()
-
+      const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).single()
       const o = fresh || order
 
       const email = normalizeEmail(o.email)
