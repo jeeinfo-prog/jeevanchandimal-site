@@ -5,40 +5,8 @@ import Link from 'next/link'
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
-/* ================== helpers ================== */
-
-const STORAGE_CCY_KEY = 'jc_currency_v1'
-const DEFAULT_CURRENCY = 'USD'
-
-// ✅ Prices in both currencies (you can adjust anytime)
-const PRICES = {
-  USD: {
-    basic: 29,
-    pro: 59,
-  },
-  LKR: {
-    basic: 8500,
-    pro: 18500,
-  },
-}
-
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
-}
-
-function safeCurrency(v) {
-  const c = String(v || '').trim().toUpperCase()
-  return c === 'LKR' ? 'LKR' : 'USD'
-}
-
-function readCurrency() {
-  if (typeof window === 'undefined') return DEFAULT_CURRENCY
-  return safeCurrency(window.localStorage.getItem(STORAGE_CCY_KEY))
-}
-
-function writeCurrency(ccy) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_CCY_KEY, safeCurrency(ccy))
 }
 
 function formatPayhereAmount(n) {
@@ -46,127 +14,86 @@ function formatPayhereAmount(n) {
   return x.toFixed(2)
 }
 
-function formatMoney(currency, amount) {
-  const c = safeCurrency(currency)
+function formatMoney(ccy, amount) {
   const n = Number(amount || 0)
-  if (c === 'LKR') return `LKR ${Math.round(n).toLocaleString('en-LK')}`
-  return `$${Math.round(n)}`
+  if (ccy === 'LKR') return `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  // USD
+  return `$${n.toLocaleString('en-US')}`
 }
 
-/* ================== reveal hook ================== */
+export default function Memberships() {
+  const [email, setEmail] = React.useState('')
+  const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
+  const [error, setError] = React.useState('')
 
-function useRevealOnScroll() {
+  // ✅ Pricing toggle (default USD)
+  const [currency, setCurrency] = React.useState('USD') // USD | LKR
+
+  // FAQ tabs + accordion
+  const [faqTab, setFaqTab] = React.useState('General') // General | Licensing | Billing
+  const [openFaq, setOpenFaq] = React.useState(-1)
+
+  // ---------------- reveal on scroll ----------------
   React.useEffect(() => {
     if (typeof window === 'undefined') return
 
     const els = Array.from(document.querySelectorAll('[data-reveal]'))
     if (!els.length) return
 
-    // initial state
-    els.forEach((el) => {
-      el.classList.add('revealInit')
-    })
+    // Reduced motion support
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    const io = new IntersectionObserver(
+    if (prefersReduced) {
+      els.forEach((el) => el.classList.add('is-visible'))
+      return
+    }
+
+    const obs = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
           if (e.isIntersecting) {
-            e.target.classList.add('revealIn')
-            io.unobserve(e.target)
+            e.target.classList.add('is-visible')
+            obs.unobserve(e.target)
           }
         })
       },
-      { threshold: 0.16 }
+      { threshold: 0.12, rootMargin: '0px 0px -10% 0px' }
     )
 
-    els.forEach((el) => io.observe(el))
-
-    return () => io.disconnect()
+    els.forEach((el) => obs.observe(el))
+    return () => obs.disconnect()
   }, [])
-}
-
-/* ================== page ================== */
-
-export default function Memberships() {
-  useRevealOnScroll()
-
-  const [email, setEmail] = React.useState('')
-  const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
-  const [error, setError] = React.useState('')
-
-  // ✅ default USD + persisted toggle
-  const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
-
-  // FAQ tabs + accordion
-  const tabs = React.useMemo(() => ['General', 'Usage', 'Billing'], [])
-  const [faqTab, setFaqTab] = React.useState('General')
-  const [openFaq, setOpenFaq] = React.useState(-1)
-
-  const faqs = React.useMemo(() => {
-    const map = {
-      General: [
-        {
-          q: 'What does the membership include?',
-          a: 'Membership gives you access to a curated archive of cinematic imagery. New work is added as the archive grows.',
-        },
-        {
-          q: 'Is there a limit to how many images I can download?',
-          a: 'Limits depend on the plan. Pro is designed for high-volume use with generous access.',
-        },
-        {
-          q: 'How often is new content added?',
-          a: 'New images are added regularly, reflecting ongoing projects, travels, and visual explorations.',
-        },
-      ],
-      Usage: [
-        {
-          q: 'How can I use the images?',
-          a: 'Images can be used for personal, editorial, and commercial projects depending on your plan. Full usage terms are outlined in the license.',
-        },
-        {
-          q: 'Are the images sold exclusively?',
-          a: 'No. Images are licensed, not sold exclusively. The same image may be licensed to multiple members or clients.',
-        },
-        {
-          q: 'Are high-resolution files included?',
-          a: 'Yes. JPG files are delivered as professionally graded, high-resolution files suitable for digital and print.',
-        },
-      ],
-      Billing: [
-        {
-          q: 'Can I cancel anytime?',
-          a: 'Yes. You can cancel at any time. Your access remains active until the end of your billing period.',
-        },
-        {
-          q: 'Do you offer refunds?',
-          a: 'Due to the nature of digital access, memberships are generally non-refundable once activated. Please review plan details before subscribing.',
-        },
-        {
-          q: 'Do downloads expire if I cancel membership?',
-          a: 'No. Anything downloaded during an active membership can continue to be used under the license terms at the time of download.',
-        },
-      ],
-    }
-    return map[faqTab] || map.General
-  }, [faqTab])
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return
-
-    const savedEmail = window.localStorage.getItem('user_email')
-    if (savedEmail && !email) setEmail(savedEmail)
-
-    const c = readCurrency()
-    setCurrency(c)
-    writeCurrency(c) // ensure stored
-
+    const saved = window.localStorage.getItem('user_email')
+    if (saved && !email) setEmail(saved)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // reset accordion when tab changes
   React.useEffect(() => {
     setOpenFaq(-1)
   }, [faqTab])
+
+  // -------- Prices (display + checkout) --------
+  const PRICES = React.useMemo(
+    () => ({
+      USD: {
+        basic: 29,
+        pro: 59,
+        elite: 119,
+      },
+      LKR: {
+        basic: 8500,
+        pro: 18500,
+        elite: 38500,
+      },
+    }),
+    []
+  )
 
   async function startMembershipCheckout(plan) {
     try {
@@ -178,18 +105,18 @@ export default function Memberships() {
         return
       }
 
-      // ✅ save for badge + member checks later
+      // ✅ save for badge + member downloads later
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('user_email', cleanEmail)
       }
 
       setLoadingPlan(plan)
 
-      // 1) create membership order in DB (server returns hash)
+      // 1) create order in DB (server returns hash)
       const res = await fetch('/api/membership/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, plan, currency }),
+        body: JSON.stringify({ email: cleanEmail, plan, currency }), // ✅ use selected currency
       })
 
       const json = await res.json()
@@ -204,8 +131,10 @@ export default function Memberships() {
         String(process.env.NEXT_PUBLIC_SITE_URL || '').trim() ||
         (typeof window !== 'undefined' ? window.location.origin : '')
 
+      // In prod this should be your deployed domain (NOT localhost)
       const webhookBase = String(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || '').trim() || siteUrl
 
+      // ✅ safe default: sandbox true if env missing
       const sandboxFlag = String(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX ?? 'true')
         .toLowerCase()
         .trim()
@@ -221,15 +150,16 @@ export default function Memberships() {
 
       const orderId = json.orderId
       const amount = json.amount
-      const payCurrency = json.currency
+      const serverCurrency = json.currency
       const hash = json.hash
 
-      if (!orderId || !amount || !payCurrency || !hash) {
+      if (!orderId || !amount || !serverCurrency || !hash) {
         setError('Missing order details from server (orderId/amount/currency/hash).')
         setLoadingPlan('')
         return
       }
 
+      // ✅ include email so success page can set localStorage + badge works
       const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(
         orderId
       )}&email=${encodeURIComponent(cleanEmail)}`
@@ -252,7 +182,7 @@ export default function Memberships() {
 
         order_id: orderId,
         items: `Membership (${plan})`,
-        currency: payCurrency,
+        currency: serverCurrency,
         amount: formatPayhereAmount(amount),
 
         // ✅ REQUIRED (fixes Unauthorized payment request)
@@ -288,6 +218,68 @@ export default function Memberships() {
     }
   }
 
+  const faqsAll = React.useMemo(
+    () => [
+      // GENERAL
+      {
+        tab: 'General',
+        q: 'What does the membership include?',
+        a: 'Membership gives you access to a curated collection of cinematic imagery, with downloads and usage based on your selected plan. New work is added regularly as the archive grows.',
+      },
+      {
+        tab: 'General',
+        q: 'Is there a limit to how many images I can download?',
+        a: 'Download limits depend on your plan. Each membership tier clearly defines monthly limits or unlimited access.',
+      },
+      {
+        tab: 'General',
+        q: 'How often is new content added?',
+        a: 'New images are added regularly, reflecting ongoing projects, travels, and visual explorations.',
+      },
+      // LICENSING
+      {
+        tab: 'Licensing',
+        q: 'How can I use the images?',
+        a: 'Images can be used for personal, editorial, and commercial projects according to your membership tier. Full usage details are outlined clearly in the license terms.',
+      },
+      {
+        tab: 'Licensing',
+        q: 'Can I use the images for client work?',
+        a: 'Yes. Client use is allowed depending on your membership plan. Higher tiers offer broader commercial usage.',
+      },
+      {
+        tab: 'Licensing',
+        q: 'Are the images sold exclusively?',
+        a: 'No. Images are licensed, not sold exclusively. The same image may be licensed to multiple members or clients.',
+      },
+      {
+        tab: 'Licensing',
+        q: 'Are high-resolution files included?',
+        a: 'Yes. Images are provided as professionally graded high-resolution files (tier dependent).',
+      },
+      // BILLING
+      {
+        tab: 'Billing',
+        q: 'Can I cancel my membership anytime?',
+        a: 'Yes. You can cancel at any time. Your access will remain active until the end of your current billing period.',
+      },
+      {
+        tab: 'Billing',
+        q: 'Do downloads expire if I cancel my membership?',
+        a: 'No. Images downloaded during an active membership can continue to be used according to the license terms under which they were obtained.',
+      },
+      {
+        tab: 'Billing',
+        q: 'Do you offer refunds?',
+        a: 'Due to the nature of digital access, memberships are non-refundable once activated. Please review plan details before subscribing.',
+      },
+    ],
+    []
+  )
+
+  const faqs = faqsAll.filter((x) => x.tab === faqTab)
+  const tabs = ['General', 'Licensing', 'Billing']
+
   return (
     <>
       <Head>
@@ -303,32 +295,29 @@ export default function Memberships() {
       <main className="membership-page thq-section-padding">
         <div className="thq-section-max-width">
           {/* HERO */}
-          <section className="hero" data-reveal>
-            <h1 className="thq-heading-1 center">Membership</h1>
-            <p className="thq-body-large center sub">
+          <div className="membership-hero" data-reveal>
+            <h1 className="thq-heading-1">Membership</h1>
+            <p className="thq-body-large">
               Unlimited access to a curated archive of cinematic photography. Built for filmmakers,
               agencies, brands, and publishers.
             </p>
 
             {/* Currency toggle */}
-            <div className="toggleRow">
-              <span className="toggleLabel">Currency</span>
-              <div className="togglePills" role="tablist" aria-label="Currency toggle">
-                {['USD', 'LKR'].map((c) => {
-                  const active = currency === c
+            <div className="currencyBar">
+              <span className="currencyLabel">Pricing</span>
+              <div className="currencyToggle" role="tablist" aria-label="Currency toggle">
+                {['USD', 'LKR'].map((ccy) => {
+                  const active = currency === ccy
                   return (
                     <button
-                      key={c}
+                      key={ccy}
                       type="button"
-                      className={`pill ${active ? 'active' : ''}`}
-                      onClick={() => {
-                        const next = safeCurrency(c)
-                        setCurrency(next)
-                        writeCurrency(next)
-                      }}
-                      aria-pressed={active ? 'true' : 'false'}
+                      className={`currencyPill ${active ? 'active' : ''}`}
+                      onClick={() => setCurrency(ccy)}
+                      role="tab"
+                      aria-selected={active ? 'true' : 'false'}
                     >
-                      <span>{c}</span>
+                      <span className="pillText">{ccy}</span>
                       <span className="pillArrow" aria-hidden="true">
                         →
                       </span>
@@ -345,10 +334,9 @@ export default function Memberships() {
                 className="emailInput"
                 value={email}
                 onChange={(e) => {
-                  const v = e.target.value
-                  setEmail(v)
+                  setEmail(e.target.value)
                   if (typeof window !== 'undefined') {
-                    window.localStorage.setItem('user_email', v)
+                    window.localStorage.setItem('user_email', e.target.value)
                   }
                 }}
                 placeholder="you@example.com"
@@ -356,81 +344,151 @@ export default function Memberships() {
               />
               {error ? <p className="errorText">{error}</p> : null}
             </div>
+          </div>
+
+          {/* PLANS */}
+          <div className="membership-grid" data-reveal>
+            {/* BASIC */}
+            <div className="membership-card">
+              <h3 className="thq-heading-3">Basic</h3>
+              <p className="price">{formatMoney(currency, PRICES[currency].basic)} / month</p>
+
+              <ul>
+                <li>✔ Personal use</li>
+                <li>✔ JPG downloads</li>
+                <li>✔ Standard resolution</li>
+                <li>✖ Commercial license</li>
+                <li>✖ RAW files</li>
+              </ul>
+
+              <button className="thq-button-outline" disabled>
+                Coming Soon
+              </button>
+            </div>
+
+            {/* PRO (mapped to monthly) */}
+            <div className="membership-card featured">
+              <h3 className="thq-heading-3">Pro</h3>
+              <p className="price">{formatMoney(currency, PRICES[currency].pro)} / month</p>
+
+              <ul>
+                <li>✔ Commercial license</li>
+                <li>✔ Unlimited JPG downloads</li>
+                <li>✔ High resolution</li>
+                <li>✔ Priority support</li>
+                <li>✖ RAW files</li>
+              </ul>
+
+              {/* Included in Pro strip */}
+              <div className="proStrip">
+                <span>Unlimited JPG</span>
+                <span>Commercial</span>
+                <span>High-res</span>
+                <span>Priority</span>
+              </div>
+
+              <button
+                className="thq-button-filled"
+                onClick={() => startMembershipCheckout('monthly')}
+                disabled={loadingPlan === 'monthly'}
+              >
+                {loadingPlan === 'monthly' ? 'Redirecting…' : 'Get Pro Access'}
+              </button>
+
+              <p className="smallNote">
+                You’ll be redirected to PayHere to complete payment. (Currency: {currency})
+              </p>
+            </div>
+
+            {/* ELITE */}
+            <div className="membership-card">
+              <h3 className="thq-heading-3">Elite</h3>
+              <p className="price">{formatMoney(currency, PRICES[currency].elite)} / month</p>
+
+              <ul>
+                <li>✔ Full commercial license</li>
+                <li>✔ Unlimited downloads</li>
+                <li>✔ RAW + JPG access</li>
+                <li>✔ Early access to new collections</li>
+                <li>✔ Direct collaboration options</li>
+              </ul>
+
+              <button className="thq-button-outline" disabled>
+                Apply for Elite
+              </button>
+
+              <p className="smallNote">
+                Want Elite now? <Link href="/contact">Contact me</Link>.
+              </p>
+            </div>
+          </div>
+
+          {/* FEATURE LIST */}
+          <div className="membership-features" data-reveal>
+            <h2 className="thq-heading-2">Why Membership?</h2>
+
+            <div className="feature-grid">
+              <div>
+                <h4>Unlimited Access</h4>
+                <p>Download without per-image licensing.</p>
+              </div>
+
+              <div>
+                <h4>Commercial Ready</h4>
+                <p>Use in film, advertising, and editorial projects.</p>
+              </div>
+
+              <div>
+                <h4>Curated Archive</h4>
+                <p>No stock clutter — only cinematic work.</p>
+              </div>
+
+              <div>
+                <h4>New Work Monthly</h4>
+                <p>Fresh collections added regularly.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* LICENSE OVERVIEW */}
+          <section className="cineBlock" data-reveal>
+            <h2 className="thq-heading-2 center">License Overview</h2>
+            <div className="cineMiniGrid">
+              <div className="cineMiniCard">Personal use ✔</div>
+              <div className="cineMiniCard">Editorial use ✔</div>
+              <div className="cineMiniCard">Commercial use ✔ (Pro+)</div>
+              <div className="cineMiniCard">
+                <Link href="/license">View full license →</Link>
+              </div>
+            </div>
           </section>
 
-          {/* PLANS (cinematic 360 cards) */}
+          {/* TRUST */}
           <section className="cineBlock" data-reveal>
-            <h2 className="thq-heading-2 center">Choose your plan</h2>
+            <h2 className="thq-heading-2 center">Trusted by</h2>
+            <div className="trustRow">
+              <span>Filmmakers</span>
+              <span>Agencies</span>
+              <span>Brands</span>
+              <span>Publishers</span>
+            </div>
+          </section>
 
-            <div className="cineGrid">
-              {/* BASIC */}
-              <div className="cineCard">
-                <div className="cineTop">
-                  <h3 className="cineTitle">Basic</h3>
-                  <p className="cinePrice">{formatMoney(currency, PRICES[currency].basic)} / month</p>
-                </div>
-
-                <ul className="cineList">
-                  <li>✔ Personal use</li>
-                  <li>✔ JPG downloads</li>
-                  <li>✔ Standard resolution</li>
-                  <li>✖ Commercial license</li>
-                  <li>✖ RAW files</li>
-                </ul>
-
-                <button className="thq-button-outline cineBtn" disabled>
-                  Coming Soon
-                </button>
+          {/* HOW IT WORKS */}
+          <section className="cineBlock" data-reveal>
+            <h2 className="thq-heading-2 center">How it works</h2>
+            <div className="stepsGrid">
+              <div className="stepCard">
+                <h4>1. Subscribe</h4>
+                <p>Choose a plan and complete secure checkout.</p>
               </div>
-
-              {/* PRO */}
-              <div className="cineCard featured">
-                <div className="cineTop">
-                  <h3 className="cineTitle">Pro</h3>
-                  <p className="cinePrice">{formatMoney(currency, PRICES[currency].pro)} / month</p>
-                </div>
-
-                <ul className="cineList">
-                  <li>✔ Commercial license</li>
-                  <li>✔ Unlimited JPG downloads</li>
-                  <li>✔ High resolution</li>
-                  <li>✔ Priority support</li>
-                  <li>✖ RAW files</li>
-                </ul>
-
-                <button
-                  className="thq-button-filled cineBtn"
-                  onClick={() => startMembershipCheckout('monthly')}
-                  disabled={loadingPlan === 'monthly'}
-                >
-                  {loadingPlan === 'monthly' ? 'Redirecting…' : 'Get Pro Access'}
-                </button>
-
-                <p className="smallNote">You’ll be redirected to PayHere to complete payment.</p>
+              <div className="stepCard">
+                <h4>2. Download</h4>
+                <p>Access the cinematic archive instantly.</p>
               </div>
-
-              {/* ELITE */}
-              <div className="cineCard">
-                <div className="cineTop">
-                  <h3 className="cineTitle">Elite</h3>
-                  <p className="cinePrice">Custom / month</p>
-                </div>
-
-                <ul className="cineList">
-                  <li>✔ Full commercial license</li>
-                  <li>✔ Unlimited downloads</li>
-                  <li>✔ RAW + JPG access</li>
-                  <li>✔ Early access to new collections</li>
-                  <li>✔ Direct collaboration options</li>
-                </ul>
-
-                <button className="thq-button-outline cineBtn" disabled>
-                  Apply for Elite
-                </button>
-
-                <p className="smallNote">
-                  Want Elite now? <Link href="/contact">Contact me</Link>.
-                </p>
+              <div className="stepCard">
+                <h4>3. Use</h4>
+                <p>Apply images in film, advertising, and editorial projects.</p>
               </div>
             </div>
           </section>
@@ -548,118 +606,121 @@ export default function Memberships() {
           </section>
 
           {/* RETURNING MEMBER */}
-          <section className="cineBlock" data-reveal>
-            <div className="ctaCard subtle">
-              <h3>Already a member?</h3>
-              <p>Go directly to your downloads and archive.</p>
+<section className="cineBlock" data-reveal>
+  <div className="ctaCard subtle">
+    <h3>Already a member?</h3>
+    <p>Go directly to your downloads and archive.</p>
 
-              <Link href="/member-access" legacyBehavior>
-                <a className="thq-button-outline">Member access</a>
-              </Link>
-            </div>
-          </section>
+    <Link href="/member-access" legacyBehavior>
+      <a className="thq-button-outline">Member access</a>
+    </Link>
+  </div>
+</section>
         </div>
       </main>
 
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
-        .center {
-          text-align: center;
-        }
-
-        /* ---------- reveal ---------- */
-        .revealInit {
+        /* reveal */
+        [data-reveal] {
           opacity: 0;
-          transform: translateY(12px);
-          transition: opacity 600ms ease, transform 600ms ease;
+          transform: translateY(14px);
+          transition: opacity 700ms ease, transform 700ms ease;
           will-change: opacity, transform;
         }
-        .revealIn {
+        [data-reveal].is-visible {
           opacity: 1;
           transform: translateY(0);
         }
 
-        /* ---------- hero ---------- */
-        .hero {
-          max-width: 920px;
-          margin: 0 auto var(--dl-layout-space-fiveunits);
-          display: grid;
-          gap: 18px;
-          justify-items: center;
-        }
-        .sub {
+        .membership-hero {
+          text-align: center;
           max-width: 760px;
-          opacity: 0.9;
-          line-height: 1.7;
+          margin: 0 auto var(--dl-layout-space-fiveunits);
         }
 
-        .toggleRow {
-          margin-top: 6px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-          justify-content: center;
+        .currencyBar {
+          margin: var(--dl-layout-space-twounits) auto 0;
+          display: grid;
+          gap: 10px;
+          justify-items: center;
         }
-        .toggleLabel {
+
+        .currencyLabel {
           font-size: 13px;
-          opacity: 0.85;
+          opacity: 0.9;
         }
-        .togglePills {
+
+        .currencyToggle {
           display: inline-flex;
           gap: 10px;
           flex-wrap: wrap;
           justify-content: center;
         }
-        .pill {
-          border: 1px solid rgba(245, 244, 244, 0.16);
+
+        .currencyPill {
+          cursor: pointer;
+          border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(255, 255, 255, 0.02);
-          color: inherit;
+          color: #f5f4f4;
           border-radius: 999px;
           padding: 10px 14px;
-          cursor: pointer;
           display: inline-flex;
           align-items: center;
           gap: 10px;
-          font-size: 12px;
-          font-weight: 800;
-          opacity: 0.86;
-          transition: 0.18s ease;
+          transition: 0.25s ease;
+          backdrop-filter: blur(8px);
         }
-        .pill:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-          transform: translateY(-1px);
+
+        .pillText {
+          font-weight: 650;
+          letter-spacing: 0.2px;
+          font-size: 13px;
+          opacity: 0.95;
         }
-        .pill.active {
-          border-color: rgba(37, 195, 226, 0.7);
-          background: rgba(37, 195, 226, 0.08);
-          opacity: 1;
-        }
+
         .pillArrow {
           opacity: 0;
           transform: translateX(-4px);
-          transition: 0.18s ease;
+          transition: 0.25s ease;
+          font-size: 14px;
         }
-        .pill:hover .pillArrow,
-        .pill.active .pillArrow {
+
+        .currencyPill:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+
+        .currencyPill:hover .pillArrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .currencyPill.active {
+          border-color: rgba(37, 195, 226, 0.75);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.14);
+          background: rgba(37, 195, 226, 0.06);
+        }
+
+        .currencyPill.active .pillArrow {
           opacity: 1;
           transform: translateX(0);
         }
 
         .emailBox {
-          width: 100%;
+          margin: var(--dl-layout-space-twounits) auto 0;
           max-width: 520px;
           text-align: left;
           display: grid;
           gap: 10px;
-          margin-top: 6px;
         }
+
         .emailLabel {
           font-size: 14px;
           opacity: 0.9;
         }
+
         .emailInput {
           width: 100%;
           padding: 12px 14px;
@@ -669,312 +730,392 @@ export default function Memberships() {
           color: #f5f4f4;
           outline: none;
         }
+
         .emailInput:focus {
           border-color: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12);
         }
+
         .errorText {
           margin: 0;
           font-size: 13px;
           color: #ffb3b3;
         }
 
-        /* ---------- cinematic blocks ---------- */
-        .cineBlock {
-          margin-top: var(--dl-layout-space-fiveunits);
-        }
-
-        /* ---------- cinematic 360 cards ---------- */
-        .cineGrid {
-          margin-top: var(--dl-layout-space-threeunits);
+        .membership-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 18px;
-          justify-items: center;
+          grid-template-columns: repeat(3, 1fr);
+          gap: var(--dl-layout-space-threeunits);
         }
 
-        .cineCard {
-          width: 360px;
-          border-radius: 18px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
+        .membership-card {
+          border: 1px solid rgba(245, 244, 244, 0.15);
+          padding: var(--dl-layout-space-threeunits);
+          border-radius: var(--dl-layout-radius-cardradius);
           background: rgba(255, 255, 255, 0.02);
-          backdrop-filter: blur(8px);
-          padding: 18px 18px 16px;
+          backdrop-filter: blur(6px);
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-        }
-        .cineCard:hover {
-          transform: translateY(-4px);
-          border-color: rgba(245, 244, 244, 0.3);
-          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+          gap: var(--dl-layout-space-twounits);
+          transition: 0.3s;
         }
 
-        .cineCard.featured {
-          border-color: rgba(37, 195, 226, 0.65);
-          background: rgba(37, 195, 226, 0.07);
+        .membership-card:hover {
+          border-color: rgba(245, 244, 244, 0.35);
+          transform: translateY(-2px);
         }
 
-        .cineTop {
-          display: grid;
-          gap: 4px;
-        }
-        .cineTitle {
-          margin: 0;
-          font-size: 18px;
-        }
-        .cinePrice {
-          margin: 0;
-          font-size: 14px;
-          opacity: 0.9;
+        .featured {
+          border-color: var(--dl-color-theme-primary1);
+          background: rgba(37, 195, 226, 0.06);
         }
 
-        .cineList {
+        .price {
+          font-size: 22px;
+          font-weight: 600;
+        }
+
+        ul {
           list-style: none;
           padding: 0;
           margin: 0;
-          display: grid;
+          display: flex;
+          flex-direction: column;
           gap: 8px;
-          opacity: 0.95;
-          font-size: 13px;
         }
 
-        .cineBtn {
-          margin-top: 6px;
+        .proStrip {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: -6px;
+        }
+
+        .proStrip span {
+          font-size: 12px;
+          opacity: 0.9;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
         }
 
         .smallNote {
           margin: 0;
           font-size: 12px;
           opacity: 0.85;
-          line-height: 1.5;
         }
 
-        /* ---------- compare table ---------- */
+        .membership-features {
+          margin-top: var(--dl-layout-space-fiveunits);
+          text-align: center;
+        }
+
+        .feature-grid {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: var(--dl-layout-space-threeunits);
+        }
+
+        /* 🎬 Cinematic blocks */
+        .cineBlock {
+          margin-top: var(--dl-layout-space-fiveunits);
+          text-align: center;
+        }
+
+        .center {
+          text-align: center;
+        }
+
+        .cineMiniGrid {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: grid;
+          grid-template-columns: repeat(4, 260px);
+          justify-content: center;
+          gap: var(--dl-layout-space-twounits);
+        }
+
+        .cineMiniCard {
+          padding: 18px;
+          border-radius: 14px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(6px);
+          transition: 0.25s ease;
+        }
+
+        .cineMiniCard:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+
+        .trustRow {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: flex;
+          gap: var(--dl-layout-space-threeunits);
+          justify-content: center;
+          opacity: 0.85;
+          flex-wrap: wrap;
+        }
+
+        .stepsGrid {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: grid;
+          grid-template-columns: repeat(3, 300px);
+          justify-content: center;
+          gap: var(--dl-layout-space-threeunits);
+        }
+
+        .stepCard {
+          padding: 24px;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          transition: 0.25s ease;
+        }
+
+        .stepCard:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+          transform: translateY(-2px);
+        }
+
         .compareWrap {
           margin-top: var(--dl-layout-space-threeunits);
           display: flex;
           justify-content: center;
         }
+
         .compareTable {
           width: 100%;
-          max-width: 860px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          border-radius: 18px;
-          overflow: hidden;
+          max-width: 820px;
           display: grid;
-          grid-template-columns: 1.4fr 1fr 1fr;
+          grid-template-columns: 1.2fr 0.9fr 0.9fr;
+          gap: 10px;
+          text-align: center;
+          padding: 18px;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(255, 255, 255, 0.02);
-        }
-        .compareTable > div {
-          padding: 14px 14px;
-          border-bottom: 1px solid rgba(245, 244, 244, 0.08);
-          border-right: 1px solid rgba(245, 244, 244, 0.08);
-          font-size: 13px;
-          opacity: 0.95;
-        }
-        .compareTable > div:nth-child(3n) {
-          border-right: 0;
-        }
-        .compareHead {
-          font-weight: 800;
-          background: rgba(0, 0, 0, 0.22);
+          backdrop-filter: blur(6px);
         }
 
-        /* ---------- FAQ cinematic ---------- */
+        .compareHead {
+          font-weight: 700;
+          opacity: 0.95;
+        }
+
+        /* FAQ cinematic 360 + tabs */
         .faqWrap {
           margin-top: var(--dl-layout-space-fiveunits);
         }
+
         .faqHead {
-          max-width: 920px;
-          margin: 0 auto;
+          text-align: center;
+          max-width: 760px;
+          margin: 0 auto var(--dl-layout-space-threeunits);
         }
+
         .faqSub {
-          opacity: 0.9;
-          line-height: 1.7;
-          margin-top: 10px;
+          opacity: 0.85;
         }
 
         .faqTabs {
-          margin-top: 18px;
+          margin-top: var(--dl-layout-space-twounits);
           display: flex;
-          flex-wrap: wrap;
           gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
         }
+
         .faqTab {
-          border: 1px solid rgba(245, 244, 244, 0.16);
+          cursor: pointer;
+          border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(255, 255, 255, 0.02);
-          color: inherit;
+          color: #f5f4f4;
           border-radius: 999px;
           padding: 10px 14px;
-          cursor: pointer;
           display: inline-flex;
           align-items: center;
           gap: 10px;
-          font-size: 12px;
-          font-weight: 800;
-          opacity: 0.86;
-          transition: 0.18s ease;
+          transition: 0.25s ease;
+          backdrop-filter: blur(8px);
         }
-        .faqTab:hover {
-          opacity: 1;
-          background: rgba(245, 244, 244, 0.06);
-          transform: translateY(-1px);
+
+        .faqTabLabel {
+          font-weight: 650;
+          letter-spacing: 0.2px;
+          font-size: 13px;
+          opacity: 0.95;
         }
-        .faqTab.active {
-          border-color: rgba(37, 195, 226, 0.7);
-          background: rgba(37, 195, 226, 0.08);
-          opacity: 1;
-        }
+
         .faqTabArrow {
           opacity: 0;
           transform: translateX(-4px);
-          transition: 0.18s ease;
+          transition: 0.25s ease;
+          font-size: 14px;
         }
-        .faqTab:hover .faqTabArrow,
+
+        .faqTab:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+
+        .faqTab:hover .faqTabArrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .faqTab.active {
+          border-color: rgba(37, 195, 226, 0.75);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.14);
+          background: rgba(37, 195, 226, 0.06);
+        }
+
         .faqTab.active .faqTabArrow {
           opacity: 1;
           transform: translateX(0);
         }
 
         .faqCineGrid {
-          margin-top: 18px;
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 18px;
-          justify-items: center;
+          grid-template-columns: repeat(2, 360px);
+          justify-content: center;
+          gap: var(--dl-layout-space-threeunits);
         }
+
         .faqCineCard {
           width: 360px;
           border-radius: 18px;
           border: 1px solid rgba(245, 244, 244, 0.12);
           background: rgba(255, 255, 255, 0.02);
           backdrop-filter: blur(8px);
+          transition: 0.35s ease;
+          position: relative;
           overflow: hidden;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
         }
+
         .faqCineCard:hover {
+          border-color: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.25), 0 18px 48px rgba(0, 0, 0, 0.45);
           transform: translateY(-4px);
-          border-color: rgba(245, 244, 244, 0.3);
-          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
         }
+
         .faqCineCard.active {
-          border-color: rgba(37, 195, 226, 0.7);
-          background: rgba(37, 195, 226, 0.06);
+          border-color: rgba(37, 195, 226, 0.75);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.35), 0 22px 54px rgba(0, 0, 0, 0.55);
         }
 
         .faqTrigger {
           width: 100%;
-          border: 0;
+          cursor: pointer;
+          border: none;
+          outline: none;
           background: transparent;
           color: inherit;
-          cursor: pointer;
-          padding: 14px 14px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 14px;
+          padding: 20px 20px;
           text-align: left;
         }
+
         .faqQ {
-          font-size: 13px;
-          font-weight: 800;
+          font-weight: 650;
           line-height: 1.35;
-          opacity: 0.95;
+          letter-spacing: 0.2px;
         }
+
         .faqIcon {
-          width: 36px;
-          height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
           border-radius: 12px;
-          border: 1px solid rgba(245, 244, 244, 0.16);
-          display: grid;
-          place-items: center;
-          opacity: 0.9;
-          background: rgba(0, 0, 0, 0.2);
-          flex: 0 0 auto;
-          transition: 0.18s ease;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          flex-shrink: 0;
+          transition: 0.25s ease;
         }
+
         .faqCineCard:hover .faqIcon {
-          border-color: rgba(245, 244, 244, 0.28);
+          border-color: rgba(37, 195, 226, 0.6);
+          box-shadow: 0 0 12px rgba(37, 195, 226, 0.35);
         }
+
         .faqSvg {
           width: 18px;
           height: 18px;
-          fill: currentColor;
-          opacity: 0.9;
         }
 
         .faqAnswer {
-          padding: 0 14px 14px;
-          border-top: 1px solid rgba(245, 244, 244, 0.1);
-          animation: fadeIn 260ms ease;
-        }
-        .faqA {
-          margin: 12px 0 0;
-          opacity: 0.9;
-          line-height: 1.7;
+          padding: 0 20px 20px;
+          animation: fadeIn 240ms ease;
         }
 
-        /* ---------- CTA cards ---------- */
-        .ctaCard {
-          width: 100%;
-          max-width: 860px;
-          margin: 0 auto;
-          border-radius: 18px;
-          border: 1px solid rgba(37, 195, 226, 0.45);
-          background: rgba(37, 195, 226, 0.08);
-          padding: 22px 18px;
-          text-align: center;
-          display: grid;
-          gap: 10px;
-        }
-        .ctaCard h3 {
-          margin: 0;
-          font-size: 18px;
-        }
-        .ctaCard p {
+        .faqA {
           margin: 0;
           opacity: 0.9;
-          line-height: 1.7;
         }
+
+        /* CTA cards */
+        .ctaCard {
+          max-width: 560px;
+          margin: 0 auto;
+          padding: 28px;
+          border-radius: 18px;
+          border: 1px solid rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.06);
+          display: grid;
+          gap: 12px;
+        }
+
         .ctaCard.subtle {
-          border-color: rgba(245, 244, 244, 0.14);
+          border-color: rgba(245, 244, 244, 0.18);
           background: rgba(255, 255, 255, 0.02);
         }
 
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
+        @media (max-width: 991px) {
+          .membership-grid {
+            grid-template-columns: 1fr;
           }
-          to {
-            opacity: 1;
-            transform: translateY(0);
+
+          .feature-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .cineMiniGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .stepsGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .compareTable {
+            grid-template-columns: 1fr;
+            text-align: left;
+          }
+
+          .faqCineGrid {
+            grid-template-columns: 1fr;
+            justify-content: center;
+          }
+
+          .faqCineCard {
+            width: 100%;
           }
         }
 
-        /* ---------- responsive ---------- */
-        @media (max-width: 1100px) {
-          .cineGrid,
-          .faqCineGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-        }
-        @media (max-width: 760px) {
-          .cineGrid,
-          .faqCineGrid {
+        @media (max-width: 479px) {
+          .feature-grid {
             grid-template-columns: 1fr;
-          }
-          .cineCard,
-          .faqCineCard {
-            width: 100%;
-            max-width: 420px;
-          }
-          .compareTable {
-            grid-template-columns: 1.2fr 1fr 1fr;
           }
         }
       `}</style>
     </>
   )
-}
+} 
