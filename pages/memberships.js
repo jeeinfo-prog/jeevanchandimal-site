@@ -10,18 +10,11 @@ import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 const STORAGE_CCY_KEY = 'jc_currency_v1'
 const DEFAULT_CURRENCY = 'USD'
 
-// ✅ Prices in both currencies (adjust anytime)
-const PRICES = {
-  USD: {
-    basic: 29,
-    pro: 59,
-    elite: 119,
-  },
-  LKR: {
-    basic: 8500,
-    pro: 18500,
-    elite: 38500,
-  },
+// ✅ USD base prices (server enforces + auto-converts LKR at checkout)
+const PRICES_USD = {
+  basic: 49,
+  pro: 89,
+  elite: 149,
 }
 
 function isValidEmail(v) {
@@ -52,7 +45,6 @@ function formatMoney(currency, amount) {
   const c = safeCurrency(currency)
   const n = Number(amount || 0)
   if (c === 'LKR') return `LKR ${Math.round(n).toLocaleString('en-LK')}`
-  // USD (keep clean)
   return `$${Number(n).toLocaleString('en-US')}`
 }
 
@@ -65,7 +57,6 @@ function useRevealOnScroll() {
     const els = Array.from(document.querySelectorAll('[data-reveal]'))
     if (!els.length) return
 
-    // Reduced motion support
     const prefersReduced =
       window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -74,10 +65,7 @@ function useRevealOnScroll() {
       return
     }
 
-    // initial state
-    els.forEach((el) => {
-      el.classList.add('revealInit')
-    })
+    els.forEach((el) => el.classList.add('revealInit'))
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -124,7 +112,7 @@ export default function Memberships() {
       {
         tab: 'General',
         q: 'Is there a limit to how many images I can download?',
-        a: 'Download limits depend on your plan. Each membership tier clearly defines monthly limits or unlimited access.',
+        a: 'Yes. Each plan includes a monthly download cap to protect the archive. Your usage resets every billing cycle.',
       },
       {
         tab: 'General',
@@ -150,7 +138,7 @@ export default function Memberships() {
       {
         tab: 'Licensing',
         q: 'Are high-resolution files included?',
-        a: 'Yes. Images are provided as professionally graded high-resolution files (tier dependent).',
+        a: 'Yes. JPG files are delivered as professionally graded, high-resolution files suitable for digital and print (tier dependent).',
       },
       // BILLING
       {
@@ -208,6 +196,7 @@ export default function Memberships() {
       setLoadingPlan(plan)
 
       // 1) create membership order in DB (server returns hash)
+      // NOTE: UI sends plan='monthly' -> server assumes tier='pro' (backward compatible)
       const res = await fetch('/api/membership/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -277,7 +266,7 @@ export default function Memberships() {
         currency: payCurrency,
         amount: formatPayhereAmount(amount),
 
-        // ✅ REQUIRED (fixes Unauthorized payment request)
+        // ✅ REQUIRED
         hash,
 
         // Buyer details
@@ -389,7 +378,7 @@ export default function Memberships() {
               <div className="cineCard">
                 <div className="cineTop">
                   <h3 className="cineTitle">Basic</h3>
-                  <p className="cinePrice">{formatMoney(currency, PRICES[safeCurrency(currency)].basic)} / month</p>
+                  <p className="cinePrice">{formatMoney('USD', PRICES_USD.basic)} / month</p>
                 </div>
 
                 <ul className="cineList">
@@ -400,6 +389,8 @@ export default function Memberships() {
                   <li>✖ RAW files</li>
                 </ul>
 
+                <div className="capNote">20 JPG downloads / month</div>
+
                 <button className="thq-button-outline cineBtn" disabled>
                   Coming Soon
                 </button>
@@ -409,16 +400,18 @@ export default function Memberships() {
               <div className="cineCard featured">
                 <div className="cineTop">
                   <h3 className="cineTitle">Pro</h3>
-                  <p className="cinePrice">{formatMoney(currency, PRICES[safeCurrency(currency)].pro)} / month</p>
+                  <p className="cinePrice">{formatMoney('USD', PRICES_USD.pro)} / month</p>
                 </div>
 
                 <ul className="cineList">
                   <li>✔ Commercial license</li>
-                  <li>✔ Unlimited JPG downloads</li>
-                  <li>✔ High resolution</li>
+                  <li>✔ Monthly access</li>
+                  <li>✔ High resolution JPG</li>
                   <li>✔ Priority support</li>
                   <li>✖ RAW files</li>
                 </ul>
+
+                <div className="capNote">75 JPG downloads / month</div>
 
                 <button
                   className="thq-button-filled cineBtn"
@@ -435,36 +428,39 @@ export default function Memberships() {
               <div className="cineCard">
                 <div className="cineTop">
                   <h3 className="cineTitle">Elite</h3>
-                  <p className="cinePrice">{formatMoney(currency, PRICES[safeCurrency(currency)].elite)} / month</p>
+                  <p className="cinePrice">{formatMoney('USD', PRICES_USD.elite)} / month</p>
                 </div>
 
                 <ul className="cineList">
                   <li>✔ Full commercial license</li>
-                  <li>✔ Unlimited downloads</li>
-                  <li>✔ RAW + JPG access</li>
+                  <li>✔ JPG + RAW access</li>
                   <li>✔ Early access to new collections</li>
+                  <li>✔ Agency-friendly usage</li>
                   <li>✔ Direct collaboration options</li>
                 </ul>
 
+                <div className="capNote">200 downloads / month + RAW</div>
+
                 <button className="thq-button-outline cineBtn" disabled>
-                  Apply for Elite
+                  Coming Soon
                 </button>
 
                 <p className="smallNote">
-                  Want Elite now? <Link href="/contact">Contact me</Link>.
+                  Elite checkout is coming soon. <Link href="/contact">Contact me</Link> if you need
+                  access now.
                 </p>
               </div>
             </div>
           </section>
 
-          {/* FEATURE LIST (kept from v1) */}
+          {/* FEATURE LIST */}
           <section className="membership-features" data-reveal>
             <h2 className="thq-heading-2">Why Membership?</h2>
 
             <div className="feature-grid">
               <div>
-                <h4>Unlimited Access</h4>
-                <p>Download without per-image licensing.</p>
+                <h4>Curated Archive</h4>
+                <p>No stock clutter — only cinematic work.</p>
               </div>
 
               <div>
@@ -473,8 +469,8 @@ export default function Memberships() {
               </div>
 
               <div>
-                <h4>Curated Archive</h4>
-                <p>No stock clutter — only cinematic work.</p>
+                <h4>Clear Limits</h4>
+                <p>Monthly caps protect the archive while keeping pricing fair.</p>
               </div>
 
               <div>
@@ -484,7 +480,7 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* LICENSE OVERVIEW (kept from v1) */}
+          {/* LICENSE OVERVIEW */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">License Overview</h2>
             <div className="cineMiniGrid">
@@ -497,7 +493,7 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* TRUST (kept from v1) */}
+          {/* TRUST */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">Trusted by</h2>
             <div className="trustRow">
@@ -508,7 +504,7 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* HOW IT WORKS (kept from v1) */}
+          {/* HOW IT WORKS */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">How it works</h2>
             <div className="stepsGrid">
@@ -518,7 +514,7 @@ export default function Memberships() {
               </div>
               <div className="stepCard">
                 <h4>2. Download</h4>
-                <p>Access the cinematic archive instantly.</p>
+                <p>Access your member downloads instantly.</p>
               </div>
               <div className="stepCard">
                 <h4>3. Use</h4>
@@ -527,7 +523,7 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* PLAN COMPARISON (kept) */}
+          {/* PLAN COMPARISON */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">Plan comparison</h2>
 
@@ -538,8 +534,8 @@ export default function Memberships() {
                 <div className="compareHead">Pro</div>
 
                 <div>JPG downloads</div>
-                <div>✔</div>
-                <div>✔ Unlimited</div>
+                <div>✔ 20 / mo</div>
+                <div>✔ 75 / mo</div>
 
                 <div>RAW files</div>
                 <div>✖</div>
@@ -553,14 +549,14 @@ export default function Memberships() {
                 <div>Standard</div>
                 <div>High</div>
 
-                <div>Price</div>
-                <div>{formatMoney(currency, PRICES[safeCurrency(currency)].basic)}</div>
-                <div>{formatMoney(currency, PRICES[safeCurrency(currency)].pro)}</div>
+                <div>Price (USD)</div>
+                <div>{formatMoney('USD', PRICES_USD.basic)}</div>
+                <div>{formatMoney('USD', PRICES_USD.pro)}</div>
               </div>
             </div>
           </section>
 
-          {/* FAQ (kept) */}
+          {/* FAQ */}
           <div className="faqWrap" data-reveal>
             <div className="faqHead">
               <h2 className="thq-heading-2">Frequently Asked Questions</h2>
@@ -626,7 +622,7 @@ export default function Memberships() {
             </div>
           </div>
 
-          {/* CUSTOM LICENSING CTA (kept) */}
+          {/* CUSTOM LICENSING CTA */}
           <section className="cineBlock" data-reveal>
             <div className="ctaCard">
               <h3>Need custom licensing?</h3>
@@ -637,11 +633,12 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* RETURNING MEMBER (kept) */}
+          {/* RETURNING MEMBER */}
           <section className="cineBlock" data-reveal>
             <div className="ctaCard subtle">
               <h3>Already a member?</h3>
               <p>Go directly to your downloads and archive.</p>
+
               <Link href="/member-access" legacyBehavior>
                 <a className="thq-button-outline">Member access</a>
               </Link>
@@ -669,9 +666,20 @@ export default function Memberships() {
           transform: translateY(0);
         }
 
+        /* ✅ prevent “shift left” feeling */
+        .hero,
+        .membership-features,
+        .faqHead,
+        .compareWrap,
+        .cineBlock {
+          width: 100%;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
         /* ---------- hero ---------- */
         .hero {
-          max-width: 920px;
+          max-width: 860px;
           margin: 0 auto var(--dl-layout-space-fiveunits);
           display: grid;
           gap: 18px;
@@ -767,13 +775,18 @@ export default function Memberships() {
           color: #ffb3b3;
         }
 
-        /* ---------- plans ---------- */
+        /* ---------- cinematic blocks ---------- */
         .cineBlock {
           margin-top: var(--dl-layout-space-fiveunits);
           text-align: center;
         }
 
+        /* ✅ earlier card sizing (fluid + capped) */
         .cineGrid {
+          width: 100%;
+          max-width: 1200px;
+          margin-left: auto;
+          margin-right: auto;
           margin-top: var(--dl-layout-space-threeunits);
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -782,7 +795,8 @@ export default function Memberships() {
         }
 
         .cineCard {
-          width: 360px;
+          width: 100%;
+          max-width: 380px;
           border-radius: 18px;
           border: 1px solid rgba(245, 244, 244, 0.12);
           background: rgba(255, 255, 255, 0.02);
@@ -792,6 +806,7 @@ export default function Memberships() {
           flex-direction: column;
           gap: 12px;
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+          text-align: left;
         }
         .cineCard:hover {
           transform: translateY(-4px);
@@ -826,7 +841,15 @@ export default function Memberships() {
           gap: 8px;
           opacity: 0.95;
           font-size: 13px;
-          text-align: left;
+        }
+
+        .capNote {
+          font-size: 12px;
+          opacity: 0.85;
+          padding: 8px 10px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
         }
 
         .cineBtn {
@@ -840,13 +863,14 @@ export default function Memberships() {
           line-height: 1.5;
         }
 
-        /* ---------- features (from v1) ---------- */
+        /* ---------- features ---------- */
         .membership-features {
           margin-top: var(--dl-layout-space-fiveunits);
           text-align: center;
         }
         .feature-grid {
-          margin-top: var(--dl-layout-space-threeunits);
+          max-width: 1200px;
+          margin: var(--dl-layout-space-threeunits) auto 0;
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: var(--dl-layout-space-threeunits);
@@ -861,7 +885,7 @@ export default function Memberships() {
           line-height: 1.7;
         }
 
-        /* ---------- license mini grid (from v1) ---------- */
+        /* ---------- license mini grid ---------- */
         .cineMiniGrid {
           margin-top: var(--dl-layout-space-threeunits);
           display: grid;
@@ -948,12 +972,11 @@ export default function Memberships() {
         /* ---------- FAQ ---------- */
         .faqWrap {
           margin-top: var(--dl-layout-space-fiveunits);
-          text-align: left;
+          text-align: center;
         }
         .faqHead {
           max-width: 920px;
           margin: 0 auto;
-          text-align: center;
         }
         .faqSub {
           opacity: 0.9;
@@ -1005,20 +1028,24 @@ export default function Memberships() {
         }
 
         .faqCineGrid {
-          margin-top: 18px;
+          width: 100%;
+          max-width: 1200px;
+          margin: 18px auto 0;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 18px;
           justify-items: center;
         }
         .faqCineCard {
-          width: 360px;
+          width: 100%;
+          max-width: 380px;
           border-radius: 18px;
           border: 1px solid rgba(245, 244, 244, 0.12);
           background: rgba(255, 255, 255, 0.02);
           backdrop-filter: blur(8px);
           overflow: hidden;
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+          text-align: left;
         }
         .faqCineCard:hover {
           transform: translateY(-4px);
@@ -1120,6 +1147,33 @@ export default function Memberships() {
           }
         }
 
+        /* --- theme buttons (only this page) --- */
+        :global(.thq-button-filled) {
+          border-radius: 999px !important;
+          border: 1px solid rgba(37, 195, 226, 0.55) !important;
+          background: rgba(37, 195, 226, 0.16) !important;
+          color: #f5f4f4 !important;
+          transition: 0.2s ease !important;
+        }
+        :global(.thq-button-filled:hover) {
+          background: rgba(37, 195, 226, 0.24) !important;
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.14) !important;
+          transform: translateY(-1px);
+        }
+
+        :global(.thq-button-outline) {
+          border-radius: 999px !important;
+          border: 1px solid rgba(245, 244, 244, 0.18) !important;
+          background: rgba(255, 255, 255, 0.02) !important;
+          color: #f5f4f4 !important;
+          transition: 0.2s ease !important;
+        }
+        :global(.thq-button-outline:hover) {
+          border-color: rgba(37, 195, 226, 0.45) !important;
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12) !important;
+          transform: translateY(-1px);
+        }
+
         /* ---------- responsive ---------- */
         @media (max-width: 1100px) {
           .cineGrid,
@@ -1138,11 +1192,6 @@ export default function Memberships() {
           .cineGrid,
           .faqCineGrid {
             grid-template-columns: 1fr;
-          }
-          .cineCard,
-          .faqCineCard {
-            width: 100%;
-            max-width: 420px;
           }
           .stepsGrid {
             grid-template-columns: 1fr;
