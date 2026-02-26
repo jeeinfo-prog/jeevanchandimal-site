@@ -6,7 +6,7 @@ const HomePageHero = (props) => {
   return (
     <>
       <div className="hero">
-        {/* background image (optional fallback if you use index bg) */}
+        {/* background image */}
         {props.image1Src && (
           <img
             alt={props.image1Alt}
@@ -46,13 +46,7 @@ const HomePageHero = (props) => {
           <div className="actions">
             <Link href="/work" legacyBehavior>
               <a className="btnPrimary" aria-label="Explore Work">
-                <span className="btnText">
-                  {props.action3 ?? (
-                    <Fragment>
-                      <span className="t">Explore Work</span>
-                    </Fragment>
-                  )}
-                </span>
+                <span className="btnText">Explore Work</span>
                 <span className="arrow">→</span>
               </a>
             </Link>
@@ -92,7 +86,8 @@ const HomePageHero = (props) => {
           max-width: 560px;
           display: flex;
           flex-direction: column;
-          gap: 10px; /* ✅ reduced gap */
+          gap: 12px; /* base gap */
+          margin-left: var(--dl-layout-space-fiveunits); /* ✅ 5 units left */
         }
 
         .name {
@@ -111,7 +106,8 @@ const HomePageHero = (props) => {
         }
 
         .tagline {
-          margin: 6px 0 0;
+          margin: 0;
+          margin-top: var(--dl-layout-space-twounits); /* ✅ extra 2 units gap */
           font-size: 16px;
           line-height: 1.7;
           color: rgba(245, 244, 244, 0.82);
@@ -119,22 +115,23 @@ const HomePageHero = (props) => {
         }
 
         .actions {
-          margin-top: 12px;
+          margin-top: var(--dl-layout-space-twounits); /* ✅ extra spacing before buttons */
           display: flex;
-          gap: 12px;
+          gap: 10px;
           flex-wrap: wrap;
         }
 
+        /* ========= SMALLER BUTTONS ========= */
         .btnPrimary,
         .btnGhost {
-          height: 42px;
-          padding: 0 16px 0 18px;
+          height: 36px; /* smaller */
+          padding: 0 14px 0 16px; /* reduced */
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
           text-decoration: none !important;
-          font-size: 12px;
+          font-size: 11px; /* smaller text */
           letter-spacing: 0.18em;
           text-transform: uppercase;
           font-weight: 900;
@@ -149,17 +146,12 @@ const HomePageHero = (props) => {
             rgba(37, 195, 226, 0.08)
           );
           color: #f5f4f4;
-          box-shadow: 0 18px 34px rgba(0, 0, 0, 0.38);
+          box-shadow: 0 14px 26px rgba(0, 0, 0, 0.35);
         }
 
         .btnPrimary:hover {
           transform: translateY(-1px);
           border-color: rgba(37, 195, 226, 0.7);
-          background: linear-gradient(
-            180deg,
-            rgba(37, 195, 226, 0.28),
-            rgba(37, 195, 226, 0.12)
-          );
         }
 
         .btnGhost {
@@ -184,6 +176,7 @@ const HomePageHero = (props) => {
             width: 100%;
             text-align: center;
             align-items: center;
+            margin-left: 0; /* remove left offset on mobile */
           }
         }
 
@@ -201,7 +194,7 @@ HomePageHero.defaultProps = {
   content1: undefined,
   action3: undefined,
   heading11: undefined,
-  image1Src: '', // you already use bg in index.js
+  image1Src: '/JC/jeevan-chandimal-1100h.jpg',
 }
 
 HomePageHero.propTypes = {
