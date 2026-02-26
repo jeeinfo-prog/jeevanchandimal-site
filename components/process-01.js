@@ -145,19 +145,19 @@ const Process01 = (props) => {
 
       <style jsx>{`
         .process-01-container2 {
-          width: 100%;
-          display: grid;
-          gap: var(--dl-layout-space-fiveunits);
-          grid-template-columns: 1fr 1fr;
-          align-items: center; /* ✅ center like other about sections */
-        }
+  width: 100%;
+  display: grid;
+  gap: var(--dl-layout-space-fiveunits);
+  grid-template-columns: 1fr 1fr;
+  align-items: center; /* ✅ vertical center */
+}
 
         .process-01-thq-tabs-menu-elm {
-          display: flex;
-          flex-direction: column;
-          gap: var(--dl-layout-space-twounits);
-          justify-content: center;
-        }
+  display: flex;
+  flex-direction: column;
+  gap: var(--dl-layout-space-twounits);
+  justify-content: center; /* ✅ center inside column */
+}
 
         .processTab {
           width: 100%;
@@ -215,12 +215,10 @@ const Process01 = (props) => {
         }
 
         .process-01-thq-image-container-elm {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 100%;
-          width: 100%;
-        }
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
         /* ✅ right column: top + bottom */
         .imgColumn {
