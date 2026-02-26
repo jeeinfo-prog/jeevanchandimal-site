@@ -16,10 +16,6 @@ const STORAGE_CCY_KEY = 'jc_currency_v1'
 const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
 const DEFAULT_CURRENCY = 'USD'
 
-/* ================== membership flag ================== */
-const STORAGE_MEMBER_ACTIVE_KEY = 'jc_member_active'
-const STORAGE_USER_EMAIL_KEY = 'user_email'
-
 function safeJsonParse(v, fallback) {
   try {
     return JSON.parse(v)
@@ -94,9 +90,7 @@ function getUnitPrice({ currency, license, format, usdLkrRate }) {
   const lic = String(license || '').trim().toLowerCase()
   const fmt = String(format || '').trim().toLowerCase()
 
-  const baseUsd =
-    PRICES?.USD?.[lic]?.[fmt] != null ? Number(PRICES.USD[lic][fmt]) : 0
-
+  const baseUsd = PRICES?.USD?.[lic]?.[fmt] != null ? Number(PRICES.USD[lic][fmt]) : 0
   if (ccy === 'USD') return baseUsd
 
   // ✅ LKR adjusted from USD * rate (if available); fallback to static LKR table
@@ -104,9 +98,7 @@ function getUnitPrice({ currency, license, format, usdLkrRate }) {
     return round2(baseUsd * Number(usdLkrRate))
   }
 
-  const fallbackLkr =
-    PRICES?.LKR?.[lic]?.[fmt] != null ? Number(PRICES.LKR[lic][fmt]) : 0
-
+  const fallbackLkr = PRICES?.LKR?.[lic]?.[fmt] != null ? Number(PRICES.LKR[lic][fmt]) : 0
   return fallbackLkr
 }
 
@@ -125,8 +117,14 @@ export default function StoreIndex() {
   // ✅ FX rate (optional) used to adjust LKR from USD
   const [usdLkrRate, setUsdLkrRate] = React.useState(null)
 
-  // ✅ member state (minimal UI-only)
-  const [memberActive, setMemberActive] = React.useState(false)
+  // ✅ Member status (store-wide badge/CTA)
+  const [member, setMember] = React.useState({
+    loading: true,
+    email: '',
+    isMember: false,
+    plan: '',
+    end_date: null,
+  })
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return
@@ -141,14 +139,49 @@ export default function StoreIndex() {
     setUsdLkrRate(readUsdLkrRate())
   }, [])
 
-  // ✅ Member flag (no API calls, no breaking)
+  // ✅ Check membership once (non-breaking)
   React.useEffect(() => {
     if (typeof window === 'undefined') return
-    const email = String(window.localStorage.getItem(STORAGE_USER_EMAIL_KEY) || '').trim()
-    const activeFlag = String(
-      window.localStorage.getItem(STORAGE_MEMBER_ACTIVE_KEY) || ''
-    ).trim()
-    setMemberActive(Boolean(email) && activeFlag === 'true')
+
+    const savedEmail = String(window.localStorage.getItem('user_email') || '')
+      .trim()
+      .toLowerCase()
+
+    if (!savedEmail) {
+      setMember({ loading: false, email: '', isMember: false, plan: '', end_date: null })
+      return
+    }
+
+    let alive = true
+
+    async function check() {
+      try {
+        setMember({ loading: true, email: savedEmail, isMember: false, plan: '', end_date: null })
+
+        const r = await fetch(`/api/member/status?email=${encodeURIComponent(savedEmail)}`, {
+          headers: { 'Cache-Control': 'no-store' },
+        })
+        const j = await r.json().catch(() => null)
+
+        if (!alive) return
+
+        const ok = Boolean(j?.ok)
+        const isMember = ok ? Boolean(j?.member) : false
+        const plan = isMember ? String(j?.plan || '') : ''
+        const end_date = isMember ? j?.end_date || null : null
+
+        setMember({ loading: false, email: savedEmail, isMember, plan, end_date })
+      } catch {
+        if (!alive) return
+        // ✅ fail-safe: store still works
+        setMember({ loading: false, email: savedEmail, isMember: false, plan: '', end_date: null })
+      }
+    }
+
+    check()
+    return () => {
+      alive = false
+    }
   }, [])
 
   // ✅ Read q or tag from URL on load
@@ -270,17 +303,44 @@ export default function StoreIndex() {
           </div>
         </header>
 
-        {/* ✅ Membership link bar (minimal) */}
+        {/* ✅ Member Access bar (non-breaking) */}
         <div className="memberBar">
-          {memberActive ? (
-            <Link href="/members" legacyBehavior>
-              <a className="memberBadge">Member Access Active →</a>
-            </Link>
-          ) : (
-            <Link href="/memberships" legacyBehavior>
-              <a className="memberJoin">Join Membership →</a>
-            </Link>
-          )}
+          <div className="memberLeft">
+            <div className="memberTitle">Member Access</div>
+            <div className="memberSub">
+              {member.loading
+                ? 'Checking membership…'
+                : member.isMember
+                ? `Active • ${member.plan ? `${member.plan} plan` : 'Member'}${
+                    member.end_date ? ` • Ends ${new Date(member.end_date).toLocaleDateString()}` : ''
+                  }`
+                : member.email
+                ? `No active membership for ${member.email}`
+                : 'Add your membership email on the Membership page to unlock access.'}
+            </div>
+          </div>
+
+          <div className="memberRight">
+            {member.isMember ? (
+              <>
+                <Link href="/memberships" legacyBehavior>
+                  <a className="memberBtnOutline">Manage Membership</a>
+                </Link>
+                <Link href="/license" legacyBehavior>
+                  <a className="memberBtn">License Terms →</a>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/memberships" legacyBehavior>
+                  <a className="memberBtn">Get Membership →</a>
+                </Link>
+                <Link href="/license" legacyBehavior>
+                  <a className="memberBtnOutline">View License</a>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
 
         {loading && <div className="empty">Loading photos…</div>}
@@ -327,9 +387,7 @@ export default function StoreIndex() {
                         <div className="overlay" aria-hidden="true">
                           <div className="overlayInner">
                             <div className="ovTitle">{p.title}</div>
-                            <div className="ovMeta">
-                              {firstTag ? `#${firstTag}` : 'View details'}
-                            </div>
+                            <div className="ovMeta">{firstTag ? `#${firstTag}` : 'View details'}</div>
                           </div>
                         </div>
                       </div>
@@ -349,11 +407,9 @@ export default function StoreIndex() {
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                router.replace(
-                                  { pathname: '/store', query: { tag: t } },
-                                  undefined,
-                                  { shallow: true }
-                                )
+                                router.replace({ pathname: '/store', query: { tag: t } }, undefined, {
+                                  shallow: true,
+                                })
                                 setQuery(t)
                               }}
                             >
@@ -453,8 +509,8 @@ export default function StoreIndex() {
           border: 1px solid rgba(245, 244, 244, 0.16);
           padding: 12px 14px;
           border-radius: 999px;
-          transition: opacity 0.18s ease, border-color 0.18s ease,
-            background 0.18s ease, transform 0.18s ease;
+          transition: opacity 0.18s ease, border-color 0.18s ease, background 0.18s ease,
+            transform 0.18s ease;
           background: rgba(255, 255, 255, 0.02);
           white-space: nowrap;
           display: inline-flex;
@@ -468,40 +524,67 @@ export default function StoreIndex() {
           transform: translateY(-1px);
         }
 
-        /* ✅ membership bar */
+        /* ✅ Member bar */
         .memberBar {
-          width: 100%;
+          margin: 14px 0 18px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(8px);
+          padding: 14px 14px;
           display: flex;
-          justify-content: center;
-          margin: 0 auto 18px;
+          gap: 14px;
+          align-items: center;
+          justify-content: space-between;
         }
-        .memberBadge,
-        .memberJoin {
+        .memberTitle {
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: 0.2px;
+        }
+        .memberSub {
+          margin-top: 4px;
+          font-size: 12px;
+          opacity: 0.82;
+          line-height: 1.45;
+        }
+        .memberRight {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .memberBtn,
+        .memberBtnOutline {
+          text-decoration: none;
+          padding: 11px 14px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          padding: 10px 14px;
-          border-radius: 999px;
-          text-decoration: none;
-          font-size: 13px;
-          font-weight: 700;
-          transition: 0.25s ease;
-          user-select: none;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: 0.2s ease;
         }
-        .memberBadge {
-          border: 1px solid rgba(37, 195, 226, 0.6);
-          background: rgba(37, 195, 226, 0.06);
+        .memberBtn {
+          border: 1px solid rgba(37, 195, 226, 0.55);
+          background: rgba(37, 195, 226, 0.08);
         }
-        .memberJoin {
-          border: 1px solid rgba(245, 244, 244, 0.22);
-          background: rgba(255, 255, 255, 0.02);
-          opacity: 0.92;
-        }
-        .memberBadge:hover,
-        .memberJoin:hover {
+        .memberBtn:hover {
+          border-color: rgba(37, 195, 226, 0.75);
           box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.12);
-          border-color: rgba(37, 195, 226, 0.65);
+        }
+        .memberBtnOutline {
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(255, 255, 255, 0.02);
+          color: inherit;
+          opacity: 0.9;
+        }
+        .memberBtnOutline:hover {
           opacity: 1;
+          border-color: rgba(245, 244, 244, 0.35);
         }
 
         .activeFilter {
@@ -541,8 +624,7 @@ export default function StoreIndex() {
           border-radius: 18px;
           overflow: hidden;
           background: rgba(255, 255, 255, 0.02);
-          transition: transform 0.18s ease, border-color 0.18s ease,
-            box-shadow 0.18s ease;
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
           will-change: transform;
         }
         .card:hover {
@@ -683,6 +765,18 @@ export default function StoreIndex() {
             min-width: 0;
           }
           .collectionsLink {
+            width: 100%;
+          }
+
+          .memberBar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .memberRight {
+            justify-content: flex-start;
+          }
+          .memberBtn,
+          .memberBtnOutline {
             width: 100%;
           }
         }
