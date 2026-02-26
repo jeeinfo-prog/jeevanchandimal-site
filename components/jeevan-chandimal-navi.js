@@ -707,14 +707,16 @@ export default function JeevanChandimalNavi(props) {
 
       <style jsx>{`
         .navWrap {
-          position: sticky;
-          top: 0;
-          z-index: 9999;
-          width: 100%;
-          background: rgba(34, 34, 34, 0.72);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid rgba(245, 244, 244, 0.08);
-        }
+  position: fixed;     /* ✅ always pinned */
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  width: 100%;
+  background: rgba(34, 34, 34, 0.72);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(245, 244, 244, 0.08);
+}
 
         .navShell {
           max-width: var(--dl-layout-size-maxwidth);

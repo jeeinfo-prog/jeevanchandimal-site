@@ -149,13 +149,15 @@ export default function Home() {
 
         /* ========= LAYOUT ========= */
         .main {
-          position: relative;
-          z-index: 1; /* above bg */
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  padding-top: 72px;  /* ✅ space for fixed navbar */
+}
 
         .section {
           width: 100%;
@@ -168,10 +170,7 @@ export default function Home() {
           width: 100%;
         }
 
-        /* hero gets a bit more breathing room */
-        .heroSection {
-          padding-top: 26px;
-        }
+
 
         /* subtle glass panel behind content for luxury feel */
         .section :global(.thq-section-padding) {
