@@ -43,6 +43,7 @@ export default function JeevanChandimalNavi(props) {
   const [mMembershipOpen, setMMembershipOpen] = useState(false)
 
   const [memberTier, setMemberTier] = useState('')
+  const [memberRemaining, setMemberRemaining] = useState(null) // ✅ countdown number
   const [userEmail, setUserEmail] = useState('')
 
   const [cartNum, setCartNum] = useState(0)
@@ -117,7 +118,7 @@ export default function JeevanChandimalNavi(props) {
     }
   }, [])
 
-  // ✅ Membership status refresh (NO manual refresh needed)
+  // ✅ Membership status refresh (NO manual refresh needed) + ✅ countdown
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -127,11 +128,20 @@ export default function JeevanChandimalNavi(props) {
     const cachedTier = normalizeTier(window.localStorage.getItem('member_tier') || '')
     if (cachedTier) setMemberTier(cachedTier)
 
+    // ✅ try load cached remaining
+    const cachedRemRaw = window.localStorage.getItem('member_remaining')
+    if (cachedRemRaw !== null && cachedRemRaw !== undefined && cachedRemRaw !== '') {
+      const n = Number(cachedRemRaw)
+      if (Number.isFinite(n)) setMemberRemaining(n)
+    }
+
     async function refreshMemberStatus() {
       const e = (window.localStorage.getItem('user_email') || '').trim().toLowerCase()
       if (!e) {
         setMemberTier('')
+        setMemberRemaining(null)
         window.localStorage.removeItem('member_tier')
+        window.localStorage.removeItem('member_remaining')
         return
       }
 
@@ -145,7 +155,9 @@ export default function JeevanChandimalNavi(props) {
         const isMember = !!(d?.member || d?.ok || d?.active)
         if (!isMember) {
           setMemberTier('')
+          setMemberRemaining(null)
           window.localStorage.removeItem('member_tier')
+          window.localStorage.removeItem('member_remaining')
           return
         }
 
@@ -155,9 +167,21 @@ export default function JeevanChandimalNavi(props) {
         if (tier) {
           setMemberTier(tier)
           window.localStorage.setItem('member_tier', tier)
+
+          // ✅ countdown from API
+          const remaining = Number(d?.remaining)
+          if (Number.isFinite(remaining)) {
+            setMemberRemaining(remaining)
+            window.localStorage.setItem('member_remaining', String(remaining))
+          } else {
+            setMemberRemaining(null)
+            window.localStorage.removeItem('member_remaining')
+          }
         } else {
           setMemberTier('')
+          setMemberRemaining(null)
           window.localStorage.removeItem('member_tier')
+          window.localStorage.removeItem('member_remaining')
         }
       } catch {
         // keep cached badge if fetch fails
@@ -190,9 +214,11 @@ export default function JeevanChandimalNavi(props) {
     try {
       window.localStorage.removeItem('user_email')
       window.localStorage.removeItem('member_tier')
+      window.localStorage.removeItem('member_remaining')
     } catch {}
     setUserEmail('')
     setMemberTier('')
+    setMemberRemaining(null)
     closeAll()
     router.push('/login')
   }
@@ -457,8 +483,17 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {/* ✅ Simple tier badge only */}
-              {memberTier ? <span className="pill pillAccent">{memberTier}</span> : null}
+              {/* ✅ Tier badge + countdown */}
+              {memberTier ? (
+                <span className="pill pillAccent">
+                  {memberTier}
+                  {memberRemaining !== null ? (
+                    <span className="pillBadge" aria-label={`Remaining downloads: ${memberRemaining}`}>
+                      {memberRemaining}
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
 
               {userEmail ? (
                 <>
@@ -645,7 +680,12 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {memberTier ? <div className="mBadge">{memberTier}</div> : null}
+              {memberTier ? (
+                <div className="mBadge">
+                  {memberTier}
+                  {memberRemaining !== null ? ` • ${memberRemaining}` : ''}
+                </div>
+              ) : null}
 
               {userEmail ? (
                 <button type="button" className="mLogout" onClick={logout}>
