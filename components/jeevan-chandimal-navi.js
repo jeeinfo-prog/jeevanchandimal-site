@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
-import { readCart } from '../lib/cart' // ✅ safer than importing cartCount
+import { readCart } from '../lib/cart'
 
 const NAV = {
   work: [
@@ -20,25 +20,13 @@ const NAV = {
   ],
 }
 
-function cleanLower(v) {
-  return String(v || '').trim().toLowerCase()
-}
-function cleanUpper(v) {
-  return String(v || '').trim().toUpperCase()
-}
-function shortTerm(term) {
-  const t = cleanLower(term)
-  if (t === 'monthly') return 'MONTHLY'
-  if (t === 'yearly') return 'YEARLY'
-  if (t === 'lifetime') return 'LIFETIME'
-  return cleanUpper(t || 'MEMBER')
-}
-function fmtTier(tier) {
-  const t = cleanLower(tier)
-  if (t === 'basic') return 'BASIC'
-  if (t === 'pro') return 'PRO'
-  if (t === 'elite') return 'ELITE'
-  return cleanUpper(t || 'MEMBER')
+function normalizeTier(v) {
+  const x = String(v || '').trim().toLowerCase()
+  if (x === 'basic') return 'BASIC'
+  if (x === 'pro') return 'PRO'
+  if (x === 'elite') return 'ELITE'
+  // legacy values sometimes come as monthly/yearly/lifetime — don’t show those as badge
+  return ''
 }
 
 export default function JeevanChandimalNavi(props) {
@@ -48,24 +36,27 @@ export default function JeevanChandimalNavi(props) {
 
   const [deskWorkOpen, setDeskWorkOpen] = useState(false)
   const [deskServicesOpen, setDeskServicesOpen] = useState(false)
+  const [deskMembershipOpen, setDeskMembershipOpen] = useState(false)
 
   const [mWorkOpen, setMWorkOpen] = useState(false)
   const [mServicesOpen, setMServicesOpen] = useState(false)
+  const [mMembershipOpen, setMMembershipOpen] = useState(false)
 
+  const [memberTier, setMemberTier] = useState('')
   const [userEmail, setUserEmail] = useState('')
-  const [member, setMember] = useState(null) // { tier, term, remaining, limit, used }
 
-  // ✅ Cart count
   const [cartNum, setCartNum] = useState(0)
 
-  const closeTimers = useRef({ work: null, services: null })
+  const closeTimers = useRef({ work: null, services: null, membership: null })
 
   const closeAll = () => {
     setMobileOpen(false)
     setDeskWorkOpen(false)
     setDeskServicesOpen(false)
+    setDeskMembershipOpen(false)
     setMWorkOpen(false)
     setMServicesOpen(false)
+    setMMembershipOpen(false)
   }
 
   const cancelCloseTimer = (key) => {
@@ -79,10 +70,10 @@ export default function JeevanChandimalNavi(props) {
     closeTimers.current[key] = setTimeout(() => {
       if (key === 'work') setDeskWorkOpen(false)
       if (key === 'services') setDeskServicesOpen(false)
+      if (key === 'membership') setDeskMembershipOpen(false)
     }, 140)
   }
 
-  // Close menus on route change
   useEffect(() => {
     if (!router?.events) return
     const onRoute = () => closeAll()
@@ -91,7 +82,7 @@ export default function JeevanChandimalNavi(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router?.events])
 
-  // ✅ Keep cart badge updated (same-tab + other tabs) — NO INTERVAL
+  // ✅ Cart badge (no interval)
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -108,7 +99,6 @@ export default function JeevanChandimalNavi(props) {
     }
 
     const refresh = () => setCartNum(getCount())
-
     refresh()
 
     const onStorage = (e) => {
@@ -121,79 +111,92 @@ export default function JeevanChandimalNavi(props) {
 
     window.addEventListener('storage', onStorage)
     window.addEventListener('jc_cart_updated', onCustom)
-
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('jc_cart_updated', onCustom)
     }
   }, [])
 
-  // ✅ Read local user + member status
+  // ✅ Membership status refresh (NO manual refresh needed)
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const email = window.localStorage.getItem('user_email') || ''
     setUserEmail(email)
 
-    // quick cache so badge shows instantly
-    try {
-      const cached = window.localStorage.getItem('member_status_v1')
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (parsed?.member) setMember(parsed)
-      }
-    } catch {}
+    const cachedTier = normalizeTier(window.localStorage.getItem('member_tier') || '')
+    if (cachedTier) setMemberTier(cachedTier)
 
-    if (!email) {
-      setMember(null)
+    async function refreshMemberStatus() {
+      const e = (window.localStorage.getItem('user_email') || '').trim().toLowerCase()
+      if (!e) {
+        setMemberTier('')
+        window.localStorage.removeItem('member_tier')
+        return
+      }
+
       try {
-        window.localStorage.removeItem('member_status_v1')
-      } catch {}
-      return
+        // bust cache (prevents 304 UI-staleness)
+        const url = `/api/member/status?email=${encodeURIComponent(e)}&t=${Date.now()}`
+        const r = await fetch(url, { cache: 'no-store' })
+        const d = await r.json().catch(() => ({}))
+
+        // accept multiple shapes
+        const isMember = !!(d?.member || d?.ok || d?.active)
+        if (!isMember) {
+          setMemberTier('')
+          window.localStorage.removeItem('member_tier')
+          return
+        }
+
+        const tierRaw = d?.tier || d?.plan || d?.membership?.tier || d?.membership?.plan
+        const tier = normalizeTier(tierRaw)
+
+        if (tier) {
+          setMemberTier(tier)
+          window.localStorage.setItem('member_tier', tier)
+        } else {
+          setMemberTier('')
+          window.localStorage.removeItem('member_tier')
+        }
+      } catch {
+        // keep cached badge if fetch fails
+      }
     }
 
-    fetch(`/api/member/status?email=${encodeURIComponent(email)}`, { method: 'GET' })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.member) {
-          const payload = {
-            member: true,
-            tier: d?.tier || d?.plan || 'pro',
-            term: d?.term || 'monthly',
-            used: Number(d?.used ?? 0),
-            limit: Number(d?.limit ?? 0),
-            remaining:
-              d?.remaining == null
-                ? null
-                : Number(d.remaining),
-          }
-          setMember(payload)
-          try {
-            window.localStorage.setItem('member_status_v1', JSON.stringify(payload))
-          } catch {}
-        } else {
-          setMember(null)
-          try {
-            window.localStorage.removeItem('member_status_v1')
-          } catch {}
-        }
-      })
-      .catch(() => {})
+    // initial + route changes
+    refreshMemberStatus()
+
+    // refresh when tab becomes active
+    const onFocus = () => refreshMemberStatus()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refreshMemberStatus()
+    }
+    // refresh when members page updates membership
+    const onMemberUpdated = () => refreshMemberStatus()
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('jc_member_updated', onMemberUpdated)
+
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('jc_member_updated', onMemberUpdated)
+    }
   }, [router.asPath])
 
   const logout = () => {
     try {
       window.localStorage.removeItem('user_email')
-      window.localStorage.removeItem('member_status_v1')
-      window.localStorage.removeItem('member_plan')
+      window.localStorage.removeItem('member_tier')
     } catch {}
     setUserEmail('')
-    setMember(null)
+    setMemberTier('')
     closeAll()
     router.push('/login')
   }
 
-  // Parent + child active highlight
   const isActive = (href) => {
     if (!href) return false
     if (href === '/work') return router.pathname.startsWith('/work')
@@ -214,13 +217,28 @@ export default function JeevanChandimalNavi(props) {
       if (which === 'work') {
         setDeskWorkOpen((v) => {
           const next = !v
-          if (next) setDeskServicesOpen(false)
+          if (next) {
+            setDeskServicesOpen(false)
+            setDeskMembershipOpen(false)
+          }
+          return next
+        })
+      } else if (which === 'services') {
+        setDeskServicesOpen((v) => {
+          const next = !v
+          if (next) {
+            setDeskWorkOpen(false)
+            setDeskMembershipOpen(false)
+          }
           return next
         })
       } else {
-        setDeskServicesOpen((v) => {
+        setDeskMembershipOpen((v) => {
           const next = !v
-          if (next) setDeskWorkOpen(false)
+          if (next) {
+            setDeskWorkOpen(false)
+            setDeskServicesOpen(false)
+          }
           return next
         })
       }
@@ -228,10 +246,10 @@ export default function JeevanChandimalNavi(props) {
     if (e.key === 'Escape') {
       setDeskWorkOpen(false)
       setDeskServicesOpen(false)
+      setDeskMembershipOpen(false)
     }
   }
 
-  // Close desktop dropdowns if click outside
   useEffect(() => {
     const onDoc = (e) => {
       const el = e.target
@@ -239,6 +257,7 @@ export default function JeevanChandimalNavi(props) {
       if (el.closest?.('.navShell')) return
       setDeskWorkOpen(false)
       setDeskServicesOpen(false)
+      setDeskMembershipOpen(false)
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
@@ -246,11 +265,6 @@ export default function JeevanChandimalNavi(props) {
 
   const workItems = useMemo(() => NAV.work, [])
   const serviceItems = useMemo(() => NAV.services, [])
-
-  const memberTier = fmtTier(member?.tier || member?.plan)
-  const memberTerm = shortTerm(member?.term)
-  const memberRemaining =
-    member?.member && member?.remaining != null ? Number(member.remaining) : null
 
   return (
     <>
@@ -276,6 +290,7 @@ export default function JeevanChandimalNavi(props) {
                 cancelCloseTimer('work')
                 setDeskWorkOpen(true)
                 setDeskServicesOpen(false)
+                setDeskMembershipOpen(false)
               }}
               onMouseLeave={() => scheduleClose('work')}
             >
@@ -288,13 +303,13 @@ export default function JeevanChandimalNavi(props) {
                 onClick={() => {
                   setDeskWorkOpen((v) => !v)
                   setDeskServicesOpen(false)
+                  setDeskMembershipOpen(false)
                 }}
                 onKeyDown={onDropdownKey('work')}
               >
                 <Link href="/work" legacyBehavior>
                   <a className="dropLabel">Work</a>
                 </Link>
-
                 <span className={`chev ${deskWorkOpen ? 'open' : ''}`} aria-hidden="true">
                   ▾
                 </span>
@@ -323,6 +338,7 @@ export default function JeevanChandimalNavi(props) {
                 cancelCloseTimer('services')
                 setDeskServicesOpen(true)
                 setDeskWorkOpen(false)
+                setDeskMembershipOpen(false)
               }}
               onMouseLeave={() => scheduleClose('services')}
             >
@@ -335,13 +351,13 @@ export default function JeevanChandimalNavi(props) {
                 onClick={() => {
                   setDeskServicesOpen((v) => !v)
                   setDeskWorkOpen(false)
+                  setDeskMembershipOpen(false)
                 }}
                 onKeyDown={onDropdownKey('services')}
               >
                 <Link href="/services" legacyBehavior>
                   <a className="dropLabel">Services</a>
                 </Link>
-
                 <span className={`chev ${deskServicesOpen ? 'open' : ''}`} aria-hidden="true">
                   ▾
                 </span>
@@ -367,13 +383,59 @@ export default function JeevanChandimalNavi(props) {
               <a className={`navLink ${activeClass('/store')}`}>Store</a>
             </Link>
 
-            <Link href="/memberships" legacyBehavior>
-              <a className={`navLink ${activeClass('/memberships')}`}>Membership</a>
-            </Link>
+            {/* ✅ Membership dropdown (Option C) */}
+            <div
+              className="drop"
+              onMouseEnter={() => {
+                cancelCloseTimer('membership')
+                setDeskMembershipOpen(true)
+                setDeskWorkOpen(false)
+                setDeskServicesOpen(false)
+              }}
+              onMouseLeave={() => scheduleClose('membership')}
+            >
+              <div
+                className={`dropToggle ${activeClass('/memberships') || activeClass('/members')}`}
+                role="button"
+                tabIndex={0}
+                aria-haspopup="menu"
+                aria-expanded={deskMembershipOpen ? 'true' : 'false'}
+                onClick={() => {
+                  setDeskMembershipOpen((v) => !v)
+                  setDeskWorkOpen(false)
+                  setDeskServicesOpen(false)
+                }}
+                onKeyDown={onDropdownKey('membership')}
+              >
+                <Link href="/memberships" legacyBehavior>
+                  <a className="dropLabel">Membership</a>
+                </Link>
+                <span className={`chev ${deskMembershipOpen ? 'open' : ''}`} aria-hidden="true">
+                  ▾
+                </span>
+              </div>
 
-            <Link href="/members" legacyBehavior>
-              <a className={`navLink ${activeClass('/members')}`}>Members</a>
-            </Link>
+              <div
+                className={`menu ${deskMembershipOpen ? 'show' : ''}`}
+                role="menu"
+                onMouseEnter={() => cancelCloseTimer('membership')}
+                onMouseLeave={() => scheduleClose('membership')}
+              >
+                <Link href="/memberships" legacyBehavior>
+                  <a className={`menuItem ${activeItemClass('/memberships')}`} role="menuitem">
+                    Membership Plans
+                  </a>
+                </Link>
+
+                {userEmail ? (
+                  <Link href="/members" legacyBehavior>
+                    <a className={`menuItem ${activeItemClass('/members')}`} role="menuitem">
+                      Member Downloads
+                    </a>
+                  </Link>
+                ) : null}
+              </div>
+            </div>
 
             <Link href="/about" legacyBehavior>
               <a className={`navLink ${activeClass('/about')}`}>About</a>
@@ -395,19 +457,8 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {/* ✅ Upgraded member badge: TIER • TERM + remaining */}
-              {member?.member ? (
-                <span className="pill pillAccent" title="Membership status">
-                  <span className="memberText">
-                    {memberTier} <span className="dot">•</span> {memberTerm}
-                  </span>
-                  {memberRemaining != null ? (
-                    <span className="pillBadge pillBadgeAccent" title="Remaining this cycle">
-                      {memberRemaining}
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
+              {/* ✅ Simple tier badge only */}
+              {memberTier ? <span className="pill pillAccent">{memberTier}</span> : null}
 
               {userEmail ? (
                 <>
@@ -435,6 +486,7 @@ export default function JeevanChandimalNavi(props) {
                 setMobileOpen(true)
                 setMWorkOpen(false)
                 setMServicesOpen(false)
+                setMMembershipOpen(false)
               }}
             >
               <span />
@@ -481,6 +533,7 @@ export default function JeevanChandimalNavi(props) {
                       e.preventDefault()
                       setMWorkOpen(true)
                       setMServicesOpen(false)
+                      setMMembershipOpen(false)
                       return
                     }
                     closeAll()
@@ -512,6 +565,7 @@ export default function JeevanChandimalNavi(props) {
                       e.preventDefault()
                       setMServicesOpen(true)
                       setMWorkOpen(false)
+                      setMMembershipOpen(false)
                       return
                     }
                     closeAll()
@@ -540,16 +594,46 @@ export default function JeevanChandimalNavi(props) {
                   Store
                 </a>
               </Link>
+
+              {/* ✅ Membership mobile dropdown */}
               <Link href="/memberships" legacyBehavior>
-                <a className={`mLink ${activeClass('/memberships')}`} onClick={closeAll}>
-                  Membership
+                <a
+                  className={`mLink mDrop ${activeClass('/memberships') || activeClass('/members')}`}
+                  onClick={(e) => {
+                    if (!mMembershipOpen) {
+                      e.preventDefault()
+                      setMMembershipOpen(true)
+                      setMWorkOpen(false)
+                      setMServicesOpen(false)
+                      return
+                    }
+                    closeAll()
+                  }}
+                >
+                  <span>Membership</span>
+                  <span className={`mChev ${mMembershipOpen ? 'open' : ''}`} aria-hidden="true">
+                    ▾
+                  </span>
                 </a>
               </Link>
-              <Link href="/members" legacyBehavior>
-                <a className={`mLink ${activeClass('/members')}`} onClick={closeAll}>
-                  Members
-                </a>
-              </Link>
+              {mMembershipOpen && (
+                <div className="mSub">
+                  <Link href="/memberships" legacyBehavior>
+                    <a className={`mSubLink ${activeItemClass('/memberships')}`} onClick={closeAll}>
+                      Membership Plans
+                    </a>
+                  </Link>
+
+                  {userEmail ? (
+                    <Link href="/members" legacyBehavior>
+                      <a className={`mSubLink ${activeItemClass('/members')}`} onClick={closeAll}>
+                        Member Downloads
+                      </a>
+                    </Link>
+                  ) : null}
+                </div>
+              )}
+
               <Link href="/about" legacyBehavior>
                 <a className={`mLink ${activeClass('/about')}`} onClick={closeAll}>
                   About
@@ -561,12 +645,7 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {member?.member ? (
-                <div className="mBadge">
-                  {memberTier} • {memberTerm}
-                  {memberRemaining != null ? ` • ${memberRemaining} left` : ''}
-                </div>
-              ) : null}
+              {memberTier ? <div className="mBadge">{memberTier}</div> : null}
 
               {userEmail ? (
                 <button type="button" className="mLogout" onClick={logout}>
@@ -587,7 +666,6 @@ export default function JeevanChandimalNavi(props) {
       </header>
 
       <style jsx>{`
-        /* ========= THEME ========= */
         .navWrap {
           position: sticky;
           top: 0;
@@ -598,7 +676,6 @@ export default function JeevanChandimalNavi(props) {
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
 
-        /* ✅ GRID LAYOUT: left / center / right */
         .navShell {
           max-width: var(--dl-layout-size-maxwidth);
           margin: 0 auto;
@@ -615,14 +692,12 @@ export default function JeevanChandimalNavi(props) {
           align-items: center;
           text-decoration: none !important;
         }
-
         .brandLogo {
           height: 44px;
           width: auto;
           display: block;
         }
 
-        /* ========= DESKTOP LINKS ========= */
         .navLinks {
           display: none;
           align-items: center;
@@ -641,7 +716,7 @@ export default function JeevanChandimalNavi(props) {
           font-size: 14px;
           letter-spacing: 0.2px;
           opacity: 0.92;
-          transition: opacity 0.15s, background 0.15s;
+          transition: opacity 0.15s, background 0.15s, color 0.15s;
           display: inline-flex;
           align-items: center;
           box-sizing: border-box;
@@ -665,13 +740,11 @@ export default function JeevanChandimalNavi(props) {
           box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
         }
 
-        /* ========= DROPDOWN ========= */
         .drop {
           position: relative;
           display: inline-flex;
           align-items: center;
         }
-
         .drop::after {
           content: '';
           position: absolute;
@@ -695,10 +768,6 @@ export default function JeevanChandimalNavi(props) {
           box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
         }
 
-        .dropToggle:hover .dropLabel {
-          color: #25c3e2 !important;
-        }
-
         .chev {
           width: 14px;
           height: 14px;
@@ -711,23 +780,7 @@ export default function JeevanChandimalNavi(props) {
           transition: transform 0.16s ease;
           margin-left: 2px;
         }
-
         .chev.open {
-          transform: rotate(0deg);
-        }
-
-        .mChev {
-          width: 14px;
-          height: 14px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 0.8;
-          transform: rotate(-90deg);
-          transition: transform 0.16s ease;
-        }
-
-        .mChev.open {
           transform: rotate(0deg);
         }
 
@@ -748,11 +801,9 @@ export default function JeevanChandimalNavi(props) {
           z-index: 99999;
           pointer-events: auto;
         }
-
         .menu.show {
           display: flex;
         }
-
         @keyframes dropIn {
           from {
             opacity: 0;
@@ -773,13 +824,11 @@ export default function JeevanChandimalNavi(props) {
           opacity: 0.92;
           transition: background 0.15s, opacity 0.15s, color 0.15s;
         }
-
         .menuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
           color: #25c3e2 !important;
         }
-
         .menuItem.isActiveItem {
           background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
           border: 1px solid rgba(37, 195, 226, 0.18);
@@ -788,7 +837,6 @@ export default function JeevanChandimalNavi(props) {
           font-weight: 700;
         }
 
-        /* ========= RIGHT ========= */
         .navRight {
           display: inline-flex;
           align-items: center;
@@ -825,7 +873,6 @@ export default function JeevanChandimalNavi(props) {
           opacity: 0.92;
           transition: opacity 0.15s, background 0.15s;
         }
-
         .pillLink:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.06);
@@ -839,7 +886,6 @@ export default function JeevanChandimalNavi(props) {
           opacity: 0.92;
           transition: opacity 0.15s, background 0.15s;
         }
-
         .pillBtn:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.06);
@@ -861,18 +907,8 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(37, 195, 226, 0.12);
           color: #25c3e2;
           font-weight: 900;
-          letter-spacing: 0.6px;
+          letter-spacing: 1px;
           font-size: 11px;
-        }
-
-        .memberText {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .dot {
-          opacity: 0.85;
         }
 
         .pillBadge {
@@ -884,16 +920,10 @@ export default function JeevanChandimalNavi(props) {
           align-items: center;
           justify-content: center;
           font-size: 10px;
-          font-weight: 900;
+          font-weight: 800;
           border: 1px solid rgba(37, 195, 226, 0.35);
           background: rgba(37, 195, 226, 0.14);
           color: #25c3e2;
-        }
-
-        .pillBadgeAccent {
-          border-color: rgba(245, 244, 244, 0.25);
-          background: rgba(0, 0, 0, 0.22);
-          color: #f5f4f4;
         }
 
         @media (max-width: 520px) {
@@ -915,7 +945,6 @@ export default function JeevanChandimalNavi(props) {
           gap: 6px;
           cursor: pointer;
         }
-
         .burger span {
           width: 18px;
           height: 2px;
@@ -923,18 +952,16 @@ export default function JeevanChandimalNavi(props) {
           border-radius: 2px;
         }
 
-        /* ========= MOBILE ========= */
+        /* mobile */
         .mOverlay {
           display: none;
         }
-
         .mOverlay.show {
           display: block;
           position: fixed;
           inset: 0;
           z-index: 10000;
         }
-
         .mBackdrop {
           position: fixed;
           inset: 0;
@@ -945,7 +972,6 @@ export default function JeevanChandimalNavi(props) {
           cursor: pointer;
           z-index: 0;
         }
-
         .mPanel {
           position: fixed;
           top: 0;
@@ -961,7 +987,6 @@ export default function JeevanChandimalNavi(props) {
           animation: slideIn 180ms ease forwards;
           z-index: 1;
         }
-
         @keyframes slideIn {
           from {
             transform: translateX(12px);
@@ -979,17 +1004,14 @@ export default function JeevanChandimalNavi(props) {
           justify-content: space-between;
           gap: 12px;
         }
-
         .mBrand {
           display: inline-flex;
           align-items: center;
           text-decoration: none !important;
         }
-
         .mLogo {
           height: 40px;
         }
-
         .mClose {
           border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(255, 255, 255, 0.04);
@@ -1007,7 +1029,6 @@ export default function JeevanChandimalNavi(props) {
           flex-direction: column;
           gap: 10px;
         }
-
         .mLink {
           color: #f5f4f4;
           text-decoration: none !important;
@@ -1019,6 +1040,24 @@ export default function JeevanChandimalNavi(props) {
           display: flex;
           align-items: center;
           justify-content: space-between;
+        }
+        .mLink:hover {
+          opacity: 1;
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        .mChev {
+          width: 14px;
+          height: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0.8;
+          transform: rotate(-90deg);
+          transition: transform 0.16s ease;
+        }
+        .mChev.open {
+          transform: rotate(0deg);
         }
 
         .mCartBadge {
@@ -1036,20 +1075,6 @@ export default function JeevanChandimalNavi(props) {
           color: #25c3e2;
         }
 
-        .mLink:hover {
-          opacity: 1;
-          background: rgba(255, 255, 255, 0.06);
-        }
-
-        .mLink.isActive {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.22), rgba(37, 195, 226, 0.1));
-          border-color: rgba(37, 195, 226, 0.22);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 700;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
-        }
-
         .mSub {
           margin-top: -4px;
           margin-left: 10px;
@@ -1059,7 +1084,6 @@ export default function JeevanChandimalNavi(props) {
           flex-direction: column;
           gap: 8px;
         }
-
         .mSubLink {
           color: rgba(245, 244, 244, 0.92);
           text-decoration: none !important;
@@ -1068,30 +1092,20 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(245, 244, 244, 0.06);
         }
-
         .mSubLink:hover {
           background: rgba(255, 255, 255, 0.06);
-        }
-
-        .mSubLink.isActiveItem {
-          background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
-          border-color: rgba(37, 195, 226, 0.18);
-          color: #25c3e2 !important;
-          opacity: 1;
-          font-weight: 800;
         }
 
         .mBadge {
           margin-top: 12px;
           align-self: flex-start;
           font-size: 11px;
-          padding: 8px 12px;
+          padding: 6px 12px;
           border: 1px solid rgba(37, 195, 226, 0.55);
           border-radius: 999px;
-          letter-spacing: 0.8px;
+          letter-spacing: 1px;
           color: #25c3e2;
           font-weight: 900;
-          background: rgba(37, 195, 226, 0.08);
         }
 
         .mLogout {
@@ -1105,7 +1119,6 @@ export default function JeevanChandimalNavi(props) {
           text-align: left;
           opacity: 0.92;
         }
-
         .mLogout:hover {
           opacity: 1;
           background: rgba(255, 255, 255, 0.07);
