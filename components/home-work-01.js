@@ -1,487 +1,473 @@
 import React, { Fragment } from 'react'
 import Link from 'next/link'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const HomeWork01 = (props) => {
   return (
     <>
-      <div
-        className={`home-work-01-thq-layout301-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="home-work-01-thq-max-width-elm thq-section-max-width">
-          <div className="home-work-01-thq-row-elm thq-grid-auto-300">
-            <div className="home-work-01-thq-feature1-elm">
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="home-work-01-thq-content-elm1 thq-flex-column">
-                <div className="home-work-01-thq-section-title-elm1 thq-flex-column">
-                  <Link href="/work-film">
-                    <a>
-                      <h3 className="home-work-01-thq-title1-elm thq-heading-3">
-                        {props.feature1Title ?? (
-                          <Fragment>
-                            <span className="home-work-01-text12">
-                              Film Production
-                            </span>
-                          </Fragment>
-                        )}
-                      </h3>
-                    </a>
-                  </Link>
-                  <span className="home-work-01-thq-description1-elm thq-body-small">
+      <section className={`hw thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="hwMax thq-section-max-width">
+          <div className="hwHeader">
+            <span className="kicker">DISCIPLINES</span>
+            <h2 className="title">Core Work</h2>
+            <p className="desc">
+              Film, sound, motion, and still imagery — crafted with atmosphere, restraint, and
+              narrative intent.
+            </p>
+          </div>
+
+          <div className="grid">
+            {/* FILM */}
+            <Link href="/work-film" legacyBehavior>
+              <a className="card" aria-label="Film Production — View work">
+                <div className="imgWrap">
+                  <img
+                    alt={props.feature1ImageAlt}
+                    src={props.feature1ImageSrc || '/home/hw-01.jpg'}
+                    className="img"
+                    loading="lazy"
+                  />
+                  <div className="shade" />
+                  <div className="badge">01</div>
+                </div>
+
+                <div className="content">
+                  <h3 className="h3">
+                    {props.feature1Title ?? (
+                      <Fragment>
+                        <span className="t">Film Production</span>
+                      </Fragment>
+                    )}
+                  </h3>
+
+                  <p className="p thq-body-small">
                     {props.feature1Description ?? (
                       <Fragment>
-                        <span className="home-work-01-text15">
-                          Stories shaped through image, motion, and sound.
+                        <span className="t">
+                          Stories shaped through light, pacing, and cinematic presence.
                         </span>
                       </Fragment>
                     )}
-                  </span>
-                </div>
-                <div className="home-work-01-thq-action-elm1 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
+                  </p>
+
+                  <div className="cta">
+                    <span className="ctaText">
                       {props.feature1Button ?? (
                         <Fragment>
-                          <span className="home-work-01-text18">
-                            Learn More
-                          </span>
+                          <span className="t">View Work</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
+                    <span className="arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="home-work-01-thq-feature2-elm">
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="home-work-01-thq-content-elm2 thq-flex-column">
-                <div className="home-work-01-thq-section-title-elm2 thq-flex-column">
-                  <Link href="/work-audio">
-                    <a>
-                      <strong className="home-work-01-thq-title2-elm thq-heading-3">
-                        {props.feature2Title ?? (
-                          <Fragment>
-                            <span className="home-work-01-text11">
-                              Audio Production
-                            </span>
-                          </Fragment>
-                        )}
-                      </strong>
-                    </a>
-                  </Link>
-                  <span className="home-work-01-thq-description2-elm thq-body-small">
+              </a>
+            </Link>
+
+            {/* AUDIO */}
+            <Link href="/work-audio" legacyBehavior>
+              <a className="card" aria-label="Audio Production — View work">
+                <div className="imgWrap">
+                  <img
+                    alt={props.feature2ImageAlt}
+                    src={props.feature2ImageSrc || '/home/hw-02.jpg'}
+                    className="img"
+                    loading="lazy"
+                  />
+                  <div className="shade" />
+                  <div className="badge">02</div>
+                </div>
+
+                <div className="content">
+                  <h3 className="h3">
+                    {props.feature2Title ?? (
+                      <Fragment>
+                        <span className="t">Audio Production</span>
+                      </Fragment>
+                    )}
+                  </h3>
+
+                  <p className="p thq-body-small">
                     {props.feature2Description ?? (
                       <Fragment>
-                        <span className="home-work-01-text19">
-                          Sound designed to support emotion and presence.
+                        <span className="t">
+                          Sound design and mixing that supports emotion and depth.
                         </span>
                       </Fragment>
                     )}
-                  </span>
-                </div>
-                <div className="home-work-01-thq-action-elm2 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
+                  </p>
+
+                  <div className="cta">
+                    <span className="ctaText">
                       {props.feature2Button ?? (
                         <Fragment>
-                          <span className="home-work-01-text20">
-                            Discover Now
-                          </span>
+                          <span className="t">View Work</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
+                    <span className="arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="home-work-01-thq-feature3-elm">
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="home-work-01-thq-content-elm3 thq-flex-column">
-                <div className="home-work-01-thq-section-title-elm3 thq-flex-column">
-                  <Link href="/work-animation">
-                    <a>
-                      <strong className="home-work-01-thq-title3-elm thq-heading-3">
-                        {props.feature3Title ?? (
-                          <Fragment>
-                            <span className="home-work-01-text14">
-                              Animation &amp; Motion
-                            </span>
-                          </Fragment>
-                        )}
-                      </strong>
-                    </a>
-                  </Link>
-                  <span className="home-work-01-thq-description3-elm thq-body-small">
+              </a>
+            </Link>
+
+            {/* ANIMATION */}
+            <Link href="/work-animation" legacyBehavior>
+              <a className="card" aria-label="Animation & Motion — View work">
+                <div className="imgWrap">
+                  <img
+                    alt={props.feature3ImageAlt}
+                    src={props.feature3ImageSrc || '/home/hw-03.jpg'}
+                    className="img"
+                    loading="lazy"
+                  />
+                  <div className="shade" />
+                  <div className="badge">03</div>
+                </div>
+
+                <div className="content">
+                  <h3 className="h3">
+                    {props.feature3Title ?? (
+                      <Fragment>
+                        <span className="t">Animation &amp; Motion</span>
+                      </Fragment>
+                    )}
+                  </h3>
+
+                  <p className="p thq-body-small">
                     {props.feature3Description ?? (
                       <Fragment>
-                        <span className="home-work-01-text17">
-                          Movement crafted with clarity, rhythm, and intent.
+                        <span className="t">
+                          Motion crafted with rhythm, clarity, and intentional detail.
                         </span>
                       </Fragment>
                     )}
-                  </span>
-                </div>
-                <div className="home-work-01-thq-action-elm3 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
+                  </p>
+
+                  <div className="cta">
+                    <span className="ctaText">
                       {props.feature3Button ?? (
                         <Fragment>
-                          <span className="home-work-01-text13">
-                            Get Support
-                          </span>
+                          <span className="t">View Work</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
+                    <span className="arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
-            <div className="home-work-01-thq-feature4-elm">
-              <img
-                alt={props.feature4ImageAlt}
-                src={props.feature4ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="home-work-01-thq-content-elm4 thq-flex-column">
-                <div className="home-work-01-thq-section-title-elm4 thq-flex-column">
-                  <Link href="/work-photography">
-                    <a>
-                      <strong className="home-work-01-thq-title4-elm thq-heading-3">
-                        {props.feature4Title ?? (
-                          <Fragment>
-                            <span className="home-work-01-text16">
-                              Photography
-                            </span>
-                          </Fragment>
-                        )}
-                      </strong>
-                    </a>
-                  </Link>
-                  <span className="home-work-01-thq-description4-elm thq-body-small">
+              </a>
+            </Link>
+
+            {/* PHOTO */}
+            <Link href="/work-photography" legacyBehavior>
+              <a className="card" aria-label="Photography — View work">
+                <div className="imgWrap">
+                  <img
+                    alt={props.feature4ImageAlt}
+                    src={props.feature4ImageSrc || '/home/hw-04.jpg'}
+                    className="img"
+                    loading="lazy"
+                  />
+                  <div className="shade" />
+                  <div className="badge">04</div>
+                </div>
+
+                <div className="content">
+                  <h3 className="h3">
+                    {props.feature4Title ?? (
+                      <Fragment>
+                        <span className="t">Photography</span>
+                      </Fragment>
+                    )}
+                  </h3>
+
+                  <p className="p thq-body-small">
                     {props.feature4Description ?? (
                       <Fragment>
-                        <span className="home-work-01-text10">
-                          Still imagery with cinematic depth and atmosphere.
+                        <span className="t">
+                          Still imagery with cinematic tone, texture, and atmosphere.
                         </span>
                       </Fragment>
                     )}
-                  </span>
-                </div>
-                <div className="home-work-01-thq-action-elm4 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
+                  </p>
+
+                  <div className="cta">
+                    <span className="ctaText">
                       {props.feature4Button ?? (
                         <Fragment>
-                          <span className="home-work-01-text21">
-                            Customize Your Experience
-                          </span>
+                          <span className="t">View Work</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
+                    <span className="arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </a>
+            </Link>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .home-work-01-thq-layout301-elm {
-            gap: var(--dl-layout-space-fiveunits);
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            padding-top: 112px;
-            padding-left: var(--dl-layout-space-twounits);
-            padding-right: var(--dl-layout-space-twounits);
-            flex-direction: column;
-            padding-bottom: var(--dl-layout-space-twounits);
-            justify-content: center;
-          }
-          .home-work-01-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .home-work-01-thq-row-elm {
-            width: 100%;
-          }
-          .home-work-01-thq-feature1-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .home-work-01-thq-content-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-section-title-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-title1-elm {
-            text-align: center;
-            text-decoration: none;
-          }
-          .home-work-01-thq-description1-elm {
-            text-align: center;
-          }
-          .home-work-01-thq-action-elm1 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .home-work-01-thq-feature2-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .home-work-01-thq-content-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-section-title-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-title2-elm {
-            text-align: center;
-            text-decoration: none;
-          }
-          .home-work-01-thq-description2-elm {
-            text-align: center;
-          }
-          .home-work-01-thq-action-elm2 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .home-work-01-thq-feature3-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .home-work-01-thq-content-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-section-title-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-title3-elm {
-            text-align: center;
-            text-decoration: none;
-          }
-          .home-work-01-thq-description3-elm {
-            text-align: center;
-          }
-          .home-work-01-thq-action-elm3 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .home-work-01-thq-feature4-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .home-work-01-thq-content-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-section-title-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .home-work-01-thq-title4-elm {
-            text-align: center;
-            text-decoration: none;
-          }
-          .home-work-01-thq-description4-elm {
-            text-align: center;
-          }
-          .home-work-01-thq-action-elm4 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .home-work-01-text10 {
-            display: inline-block;
-          }
-          .home-work-01-text11 {
-            display: inline-block;
-          }
-          .home-work-01-text12 {
-            display: inline-block;
-          }
-          .home-work-01-text13 {
-            display: inline-block;
-          }
-          .home-work-01-text14 {
-            display: inline-block;
-          }
-          .home-work-01-text15 {
-            display: inline-block;
-          }
-          .home-work-01-text16 {
-            display: inline-block;
-          }
-          .home-work-01-text17 {
-            display: inline-block;
-          }
-          .home-work-01-text18 {
-            display: inline-block;
-          }
-          .home-work-01-text19 {
-            display: inline-block;
-          }
-          .home-work-01-text20 {
-            display: inline-block;
-          }
-          .home-work-01-text21 {
-            display: inline-block;
-          }
+      </section>
 
-          .home-work-01root-class-name1 {
-            padding-top: 112px;
+      <style jsx>{`
+        .hw {
+          width: 100%;
+          position: relative;
+          overflow: visible; /* ✅ keep sticky nav working */
+          padding-top: 72px; /* less aggressive than 112 */
+        }
+
+        .hwMax {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+          align-items: center;
+        }
+
+        .hwHeader {
+          width: 100%;
+          text-align: center;
+          max-width: 980px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .kicker {
+          font-size: 11px;
+          letter-spacing: 0.28em;
+          font-weight: 900;
+          color: rgba(245, 244, 244, 0.72);
+        }
+
+        .title {
+          margin: 0;
+          font-size: 34px;
+          color: #f5f4f4;
+          letter-spacing: -0.02em;
+          text-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+        }
+
+        .desc {
+          margin: 4px auto 0;
+          color: rgba(245, 244, 244, 0.76);
+          line-height: 1.7;
+          font-size: 15px;
+          max-width: 70ch;
+        }
+
+        .grid {
+          width: 100%;
+          display: grid;
+          grid-template-columns: repeat(12, 1fr);
+          gap: 14px;
+        }
+
+        .card {
+          grid-column: span 6;
+          display: flex;
+          flex-direction: column;
+          border-radius: 18px;
+          overflow: hidden;
+          text-decoration: none !important;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(10, 10, 10, 0.55);
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+          transition: transform 220ms ease, border-color 220ms ease;
+          transform: translateZ(0);
+        }
+
+        .imgWrap {
+          position: relative;
+          height: 280px;
+          overflow: hidden;
+          background: #0b0b0b;
+        }
+
+        .img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.06) brightness(0.9);
+          transition: transform 600ms ease, filter 600ms ease;
+        }
+
+        .shade {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            180deg,
+            rgba(0, 0, 0, 0.12) 0%,
+            rgba(0, 0, 0, 0.05) 45%,
+            rgba(0, 0, 0, 0.65) 100%
+          );
+          pointer-events: none;
+        }
+
+        .badge {
+          position: absolute;
+          left: 14px;
+          top: 14px;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.18em;
+          color: #25c3e2;
+          border: 1px solid rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.1);
+          padding: 7px 10px;
+          border-radius: 999px;
+          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+        }
+
+        .content {
+          padding: 16px 16px 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          align-items: center;
+          text-align: center;
+        }
+
+        .h3 {
+          margin: 0;
+          color: #f5f4f4;
+          font-size: 18px;
+          letter-spacing: -0.01em;
+        }
+
+        .p {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.76);
+          line-height: 1.65;
+          font-size: 14px;
+          max-width: 52ch;
+        }
+
+        .cta {
+          margin-top: 6px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.03);
+          color: rgba(245, 244, 244, 0.9);
+          font-size: 12px;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          transition: background 200ms ease, border-color 200ms ease, transform 200ms ease;
+        }
+
+        .arrow {
+          color: #25c3e2;
+          font-weight: 900;
+          transform: translateY(-1px);
+        }
+
+        .card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(37, 195, 226, 0.22);
+        }
+
+        .card:hover .img {
+          transform: scale(1.09);
+          filter: saturate(1) contrast(1.1) brightness(0.98);
+        }
+
+        .card:hover .cta {
+          background: rgba(245, 244, 244, 0.06);
+          border-color: rgba(37, 195, 226, 0.22);
+          transform: translateY(-1px);
+        }
+
+        @media (max-width: 991px) {
+          .card {
+            grid-column: span 12;
           }
-          @media (max-width: 991px) {
-            .home-work-01-thq-row-elm {
-              width: auto;
-              align-items: center;
-              flex-direction: column;
-            }
-            .home-work-01-thq-feature1-elm {
-              width: 100%;
-            }
-            .home-work-01-thq-feature2-elm {
-              width: 100%;
-            }
-            .home-work-01-thq-feature3-elm {
-              width: 100%;
-            }
-            .home-work-01-thq-feature4-elm {
-              width: 100%;
-            }
+          .imgWrap {
+            height: 260px;
           }
-          @media (max-width: 479px) {
-            .home-work-01-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
+        }
+
+        @media (max-width: 520px) {
+          .imgWrap {
+            height: 220px;
           }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 HomeWork01.defaultProps = {
-  feature1ImageAlt: 'User-Friendly Interface Image Alt',
-  feature4Description: undefined,
-  feature3ImageSrc:
-    'https://images.unsplash.com/photo-1727434032765-9c4df88b6e02?ixid=M3w5MTMyMXwwfDF8c2VhcmNofDM4fHxhaXxlbnwwfHx8fDE3NjkyMTM1MTR8MA&ixlib=rb-4.1.0&w=600',
-  feature4ImageAlt: 'Customizable Solutions Image Alt',
-  feature3ImageAlt: '24/7 Customer Support Image Alt',
-  feature2Title: undefined,
-  feature1Title: undefined,
-  feature1ImageSrc:
-    'https://images.unsplash.com/photo-1518930259200-3e5b29f42096?ixid=M3w5MTMyMXwwfDF8c2VhcmNofDI2fHxmaWxtfGVufDB8fHx8MTc2OTIxMjkxNHww&ixlib=rb-4.1.0&w=600',
-  feature3Button: undefined,
-  feature2ImageAlt: 'Advanced Analytics Tools Image Alt',
-  feature3Title: undefined,
-  feature1Description: undefined,
-  feature4Title: undefined,
   rootClassName: '',
-  feature3Description: undefined,
-  feature1Button: undefined,
-  feature4ImageSrc:
-    'https://images.unsplash.com/photo-1590071089561-2087ff1fc418?ixid=M3w5MTMyMXwwfDF8c2VhcmNofDUyfHxwaG90b3xlbnwwfHx8fDE3NjkyMTM2MDB8MA&ixlib=rb-4.1.0&w=600',
+
+  // ✅ defaults to /public/home/ filenames
+  feature1ImageAlt: 'Film Production',
+  feature2ImageAlt: 'Audio Production',
+  feature3ImageAlt: 'Animation & Motion',
+  feature4ImageAlt: 'Photography',
+
+  feature1ImageSrc: '/home/hw-01.jpg',
+  feature2ImageSrc: '/home/hw-02.jpg',
+  feature3ImageSrc: '/home/hw-03.jpg',
+  feature4ImageSrc: '/home/hw-04.jpg',
+
+  feature1Title: undefined,
+  feature2Title: undefined,
+  feature3Title: undefined,
+  feature4Title: undefined,
+
+  feature1Description: undefined,
   feature2Description: undefined,
+  feature3Description: undefined,
+  feature4Description: undefined,
+
+  feature1Button: undefined,
   feature2Button: undefined,
+  feature3Button: undefined,
   feature4Button: undefined,
-  feature2ImageSrc:
-    'https://images.unsplash.com/photo-1466428996289-fb355538da1b?ixid=M3w5MTMyMXwwfDF8c2VhcmNofDE2fHxhdWRpb3xlbnwwfHx8fDE3NjkyMTM1NDF8MA&ixlib=rb-4.1.0&w=600',
 }
 
 HomeWork01.propTypes = {
-  feature1ImageAlt: PropTypes.string,
-  feature4Description: PropTypes.element,
-  feature3ImageSrc: PropTypes.string,
-  feature4ImageAlt: PropTypes.string,
-  feature3ImageAlt: PropTypes.string,
-  feature2Title: PropTypes.element,
-  feature1Title: PropTypes.element,
-  feature1ImageSrc: PropTypes.string,
-  feature3Button: PropTypes.element,
-  feature2ImageAlt: PropTypes.string,
-  feature3Title: PropTypes.element,
-  feature1Description: PropTypes.element,
-  feature4Title: PropTypes.element,
   rootClassName: PropTypes.string,
-  feature3Description: PropTypes.element,
-  feature1Button: PropTypes.element,
-  feature4ImageSrc: PropTypes.string,
-  feature2Description: PropTypes.element,
-  feature2Button: PropTypes.element,
-  feature4Button: PropTypes.element,
+
+  feature1ImageAlt: PropTypes.string,
+  feature2ImageAlt: PropTypes.string,
+  feature3ImageAlt: PropTypes.string,
+  feature4ImageAlt: PropTypes.string,
+
+  feature1ImageSrc: PropTypes.string,
   feature2ImageSrc: PropTypes.string,
+  feature3ImageSrc: PropTypes.string,
+  feature4ImageSrc: PropTypes.string,
+
+  feature1Title: PropTypes.element,
+  feature2Title: PropTypes.element,
+  feature3Title: PropTypes.element,
+  feature4Title: PropTypes.element,
+
+  feature1Description: PropTypes.element,
+  feature2Description: PropTypes.element,
+  feature3Description: PropTypes.element,
+  feature4Description: PropTypes.element,
+
+  feature1Button: PropTypes.element,
+  feature2Button: PropTypes.element,
+  feature3Button: PropTypes.element,
+  feature4Button: PropTypes.element,
 }
 
 export default HomeWork01
