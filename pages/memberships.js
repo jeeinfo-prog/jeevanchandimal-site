@@ -14,14 +14,58 @@ function formatPayhereAmount(n) {
   return x.toFixed(2)
 }
 
+function formatMoney(ccy, amount) {
+  const n = Number(amount || 0)
+  if (ccy === 'LKR') return `LKR ${Math.round(n).toLocaleString('en-LK')}`
+  // USD
+  return `$${n.toLocaleString('en-US')}`
+}
+
 export default function Memberships() {
   const [email, setEmail] = React.useState('')
   const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
   const [error, setError] = React.useState('')
 
+  // ✅ Pricing toggle (default USD)
+  const [currency, setCurrency] = React.useState('USD') // USD | LKR
+
   // FAQ tabs + accordion
   const [faqTab, setFaqTab] = React.useState('General') // General | Licensing | Billing
   const [openFaq, setOpenFaq] = React.useState(-1)
+
+  // ---------------- reveal on scroll ----------------
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const els = Array.from(document.querySelectorAll('[data-reveal]'))
+    if (!els.length) return
+
+    // Reduced motion support
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    if (prefersReduced) {
+      els.forEach((el) => el.classList.add('is-visible'))
+      return
+    }
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-visible')
+            obs.unobserve(e.target)
+          }
+        })
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -10% 0px' }
+    )
+
+    els.forEach((el) => obs.observe(el))
+    return () => obs.disconnect()
+  }, [])
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return
@@ -31,9 +75,25 @@ export default function Memberships() {
   }, [])
 
   React.useEffect(() => {
-    // close open accordion when switching tabs (clean UX)
     setOpenFaq(-1)
   }, [faqTab])
+
+  // -------- Prices (display + checkout) --------
+  const PRICES = React.useMemo(
+    () => ({
+      USD: {
+        basic: 29,
+        pro: 59,
+        elite: 119,
+      },
+      LKR: {
+        basic: 8500,
+        pro: 18500,
+        elite: 38500,
+      },
+    }),
+    []
+  )
 
   async function startMembershipCheckout(plan) {
     try {
@@ -56,7 +116,7 @@ export default function Memberships() {
       const res = await fetch('/api/membership/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, plan, currency: 'LKR' }),
+        body: JSON.stringify({ email: cleanEmail, plan, currency }), // ✅ use selected currency
       })
 
       const json = await res.json()
@@ -90,10 +150,10 @@ export default function Memberships() {
 
       const orderId = json.orderId
       const amount = json.amount
-      const currency = json.currency
+      const serverCurrency = json.currency
       const hash = json.hash
 
-      if (!orderId || !amount || !currency || !hash) {
+      if (!orderId || !amount || !serverCurrency || !hash) {
         setError('Missing order details from server (orderId/amount/currency/hash).')
         setLoadingPlan('')
         return
@@ -122,13 +182,13 @@ export default function Memberships() {
 
         order_id: orderId,
         items: `Membership (${plan})`,
-        currency,
+        currency: serverCurrency,
         amount: formatPayhereAmount(amount),
 
         // ✅ REQUIRED (fixes Unauthorized payment request)
         hash,
 
-        // Buyer details (PayHere can be picky if empty)
+        // Buyer details
         first_name: cleanEmail.split('@')[0] || 'Member',
         last_name: 'User',
         email: cleanEmail,
@@ -218,7 +278,6 @@ export default function Memberships() {
   )
 
   const faqs = faqsAll.filter((x) => x.tab === faqTab)
-
   const tabs = ['General', 'Licensing', 'Billing']
 
   return (
@@ -236,12 +295,37 @@ export default function Memberships() {
       <main className="membership-page thq-section-padding">
         <div className="thq-section-max-width">
           {/* HERO */}
-          <div className="membership-hero">
+          <div className="membership-hero" data-reveal>
             <h1 className="thq-heading-1">Membership</h1>
             <p className="thq-body-large">
               Unlimited access to a curated archive of cinematic photography. Built for filmmakers,
               agencies, brands, and publishers.
             </p>
+
+            {/* Currency toggle */}
+            <div className="currencyBar">
+              <span className="currencyLabel">Pricing</span>
+              <div className="currencyToggle" role="tablist" aria-label="Currency toggle">
+                {['USD', 'LKR'].map((ccy) => {
+                  const active = currency === ccy
+                  return (
+                    <button
+                      key={ccy}
+                      type="button"
+                      className={`currencyPill ${active ? 'active' : ''}`}
+                      onClick={() => setCurrency(ccy)}
+                      role="tab"
+                      aria-selected={active ? 'true' : 'false'}
+                    >
+                      <span className="pillText">{ccy}</span>
+                      <span className="pillArrow" aria-hidden="true">
+                        →
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
 
             {/* Email input */}
             <div className="emailBox">
@@ -263,11 +347,11 @@ export default function Memberships() {
           </div>
 
           {/* PLANS */}
-          <div className="membership-grid">
+          <div className="membership-grid" data-reveal>
             {/* BASIC */}
             <div className="membership-card">
               <h3 className="thq-heading-3">Basic</h3>
-              <p className="price">LKR 8,500 / month</p>
+              <p className="price">{formatMoney(currency, PRICES[currency].basic)} / month</p>
 
               <ul>
                 <li>✔ Personal use</li>
@@ -285,7 +369,7 @@ export default function Memberships() {
             {/* PRO (mapped to monthly) */}
             <div className="membership-card featured">
               <h3 className="thq-heading-3">Pro</h3>
-              <p className="price">LKR 18,500 / month</p>
+              <p className="price">{formatMoney(currency, PRICES[currency].pro)} / month</p>
 
               <ul>
                 <li>✔ Commercial license</li>
@@ -295,6 +379,14 @@ export default function Memberships() {
                 <li>✖ RAW files</li>
               </ul>
 
+              {/* Included in Pro strip */}
+              <div className="proStrip">
+                <span>Unlimited JPG</span>
+                <span>Commercial</span>
+                <span>High-res</span>
+                <span>Priority</span>
+              </div>
+
               <button
                 className="thq-button-filled"
                 onClick={() => startMembershipCheckout('monthly')}
@@ -303,13 +395,15 @@ export default function Memberships() {
                 {loadingPlan === 'monthly' ? 'Redirecting…' : 'Get Pro Access'}
               </button>
 
-              <p className="smallNote">You’ll be redirected to PayHere to complete payment.</p>
+              <p className="smallNote">
+                You’ll be redirected to PayHere to complete payment. (Currency: {currency})
+              </p>
             </div>
 
             {/* ELITE */}
             <div className="membership-card">
               <h3 className="thq-heading-3">Elite</h3>
-              <p className="price">LKR 38,500 / month</p>
+              <p className="price">{formatMoney(currency, PRICES[currency].elite)} / month</p>
 
               <ul>
                 <li>✔ Full commercial license</li>
@@ -330,7 +424,7 @@ export default function Memberships() {
           </div>
 
           {/* FEATURE LIST */}
-          <div className="membership-features">
+          <div className="membership-features" data-reveal>
             <h2 className="thq-heading-2">Why Membership?</h2>
 
             <div className="feature-grid">
@@ -356,8 +450,84 @@ export default function Memberships() {
             </div>
           </div>
 
+          {/* LICENSE OVERVIEW */}
+          <section className="cineBlock" data-reveal>
+            <h2 className="thq-heading-2 center">License Overview</h2>
+            <div className="cineMiniGrid">
+              <div className="cineMiniCard">Personal use ✔</div>
+              <div className="cineMiniCard">Editorial use ✔</div>
+              <div className="cineMiniCard">Commercial use ✔ (Pro+)</div>
+              <div className="cineMiniCard">
+                <Link href="/license">View full license →</Link>
+              </div>
+            </div>
+          </section>
+
+          {/* TRUST */}
+          <section className="cineBlock" data-reveal>
+            <h2 className="thq-heading-2 center">Trusted by</h2>
+            <div className="trustRow">
+              <span>Filmmakers</span>
+              <span>Agencies</span>
+              <span>Brands</span>
+              <span>Publishers</span>
+            </div>
+          </section>
+
+          {/* HOW IT WORKS */}
+          <section className="cineBlock" data-reveal>
+            <h2 className="thq-heading-2 center">How it works</h2>
+            <div className="stepsGrid">
+              <div className="stepCard">
+                <h4>1. Subscribe</h4>
+                <p>Choose a plan and complete secure checkout.</p>
+              </div>
+              <div className="stepCard">
+                <h4>2. Download</h4>
+                <p>Access the cinematic archive instantly.</p>
+              </div>
+              <div className="stepCard">
+                <h4>3. Use</h4>
+                <p>Apply images in film, advertising, and editorial projects.</p>
+              </div>
+            </div>
+          </section>
+
+          {/* PLAN COMPARISON */}
+          <section className="cineBlock" data-reveal>
+            <h2 className="thq-heading-2 center">Plan comparison</h2>
+
+            <div className="compareWrap">
+              <div className="compareTable">
+                <div className="compareHead">Feature</div>
+                <div className="compareHead">Basic</div>
+                <div className="compareHead">Pro</div>
+
+                <div>JPG downloads</div>
+                <div>✔</div>
+                <div>✔ Unlimited</div>
+
+                <div>RAW files</div>
+                <div>✖</div>
+                <div>✖</div>
+
+                <div>Commercial license</div>
+                <div>✖</div>
+                <div>✔</div>
+
+                <div>Resolution</div>
+                <div>Standard</div>
+                <div>High</div>
+
+                <div>Price</div>
+                <div>{formatMoney(currency, PRICES[currency].basic)}</div>
+                <div>{formatMoney(currency, PRICES[currency].pro)}</div>
+              </div>
+            </div>
+          </section>
+
           {/* FAQ */}
-          <div className="faqWrap">
+          <div className="faqWrap" data-reveal>
             <div className="faqHead">
               <h2 className="thq-heading-2">Frequently Asked Questions</h2>
               <p className="thq-body-large faqSub">
@@ -423,16 +593,118 @@ export default function Memberships() {
               })}
             </div>
           </div>
+
+          {/* CUSTOM LICENSING CTA */}
+          <section className="cineBlock" data-reveal>
+            <div className="ctaCard">
+              <h3>Need custom licensing?</h3>
+              <p>Agency plans, bulk access, and exclusive usage options available.</p>
+              <Link href="/contact" className="thq-button-filled">
+                Contact for custom plan
+              </Link>
+            </div>
+          </section>
+
+          {/* RETURNING MEMBER */}
+          <section className="cineBlock" data-reveal>
+            <div className="ctaCard subtle">
+              <h3>Already a member?</h3>
+              <p>Go directly to your downloads and archive.</p>
+              <Link href="/members" className="thq-button-outline">
+                Member access
+              </Link>
+            </div>
+          </section>
         </div>
       </main>
 
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
+        /* reveal */
+        [data-reveal] {
+          opacity: 0;
+          transform: translateY(14px);
+          transition: opacity 700ms ease, transform 700ms ease;
+          will-change: opacity, transform;
+        }
+        [data-reveal].is-visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
         .membership-hero {
           text-align: center;
           max-width: 760px;
           margin: 0 auto var(--dl-layout-space-fiveunits);
+        }
+
+        .currencyBar {
+          margin: var(--dl-layout-space-twounits) auto 0;
+          display: grid;
+          gap: 10px;
+          justify-items: center;
+        }
+
+        .currencyLabel {
+          font-size: 13px;
+          opacity: 0.9;
+        }
+
+        .currencyToggle {
+          display: inline-flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .currencyPill {
+          cursor: pointer;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          color: #f5f4f4;
+          border-radius: 999px;
+          padding: 10px 14px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          transition: 0.25s ease;
+          backdrop-filter: blur(8px);
+        }
+
+        .pillText {
+          font-weight: 650;
+          letter-spacing: 0.2px;
+          font-size: 13px;
+          opacity: 0.95;
+        }
+
+        .pillArrow {
+          opacity: 0;
+          transform: translateX(-4px);
+          transition: 0.25s ease;
+          font-size: 14px;
+        }
+
+        .currencyPill:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+
+        .currencyPill:hover .pillArrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .currencyPill.active {
+          border-color: rgba(37, 195, 226, 0.75);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.14);
+          background: rgba(37, 195, 226, 0.06);
+        }
+
+        .currencyPill.active .pillArrow {
+          opacity: 1;
+          transform: translateX(0);
         }
 
         .emailBox {
@@ -511,6 +783,22 @@ export default function Memberships() {
           gap: 8px;
         }
 
+        .proStrip {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: -6px;
+        }
+
+        .proStrip span {
+          font-size: 12px;
+          opacity: 0.9;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+        }
+
         .smallNote {
           margin: 0;
           font-size: 12px;
@@ -529,9 +817,95 @@ export default function Memberships() {
           gap: var(--dl-layout-space-threeunits);
         }
 
-        /* =======================
-           🎬 FAQ cinematic 360 + tabs
-           ======================= */
+        /* 🎬 Cinematic blocks */
+        .cineBlock {
+          margin-top: var(--dl-layout-space-fiveunits);
+          text-align: center;
+        }
+
+        .center {
+          text-align: center;
+        }
+
+        .cineMiniGrid {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: grid;
+          grid-template-columns: repeat(4, 260px);
+          justify-content: center;
+          gap: var(--dl-layout-space-twounits);
+        }
+
+        .cineMiniCard {
+          padding: 18px;
+          border-radius: 14px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(6px);
+          transition: 0.25s ease;
+        }
+
+        .cineMiniCard:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+
+        .trustRow {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: flex;
+          gap: var(--dl-layout-space-threeunits);
+          justify-content: center;
+          opacity: 0.85;
+          flex-wrap: wrap;
+        }
+
+        .stepsGrid {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: grid;
+          grid-template-columns: repeat(3, 300px);
+          justify-content: center;
+          gap: var(--dl-layout-space-threeunits);
+        }
+
+        .stepCard {
+          padding: 24px;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          transition: 0.25s ease;
+        }
+
+        .stepCard:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+          transform: translateY(-2px);
+        }
+
+        .compareWrap {
+          margin-top: var(--dl-layout-space-threeunits);
+          display: flex;
+          justify-content: center;
+        }
+
+        .compareTable {
+          width: 100%;
+          max-width: 820px;
+          display: grid;
+          grid-template-columns: 1.2fr 0.9fr 0.9fr;
+          gap: 10px;
+          text-align: center;
+          padding: 18px;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(6px);
+        }
+
+        .compareHead {
+          font-weight: 700;
+          opacity: 0.95;
+        }
+
+        /* FAQ cinematic 360 + tabs */
         .faqWrap {
           margin-top: var(--dl-layout-space-fiveunits);
         }
@@ -686,6 +1060,23 @@ export default function Memberships() {
           opacity: 0.9;
         }
 
+        /* CTA cards */
+        .ctaCard {
+          max-width: 560px;
+          margin: 0 auto;
+          padding: 28px;
+          border-radius: 18px;
+          border: 1px solid rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.06);
+          display: grid;
+          gap: 12px;
+        }
+
+        .ctaCard.subtle {
+          border-color: rgba(245, 244, 244, 0.18);
+          background: rgba(255, 255, 255, 0.02);
+        }
+
         @media (max-width: 991px) {
           .membership-grid {
             grid-template-columns: 1fr;
@@ -693,6 +1084,19 @@ export default function Memberships() {
 
           .feature-grid {
             grid-template-columns: 1fr 1fr;
+          }
+
+          .cineMiniGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .stepsGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .compareTable {
+            grid-template-columns: 1fr;
+            text-align: left;
           }
 
           .faqCineGrid {
