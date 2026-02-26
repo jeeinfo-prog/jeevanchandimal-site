@@ -20,6 +20,27 @@ const NAV = {
   ],
 }
 
+function cleanLower(v) {
+  return String(v || '').trim().toLowerCase()
+}
+function cleanUpper(v) {
+  return String(v || '').trim().toUpperCase()
+}
+function shortTerm(term) {
+  const t = cleanLower(term)
+  if (t === 'monthly') return 'MONTHLY'
+  if (t === 'yearly') return 'YEARLY'
+  if (t === 'lifetime') return 'LIFETIME'
+  return cleanUpper(t || 'MEMBER')
+}
+function fmtTier(tier) {
+  const t = cleanLower(tier)
+  if (t === 'basic') return 'BASIC'
+  if (t === 'pro') return 'PRO'
+  if (t === 'elite') return 'ELITE'
+  return cleanUpper(t || 'MEMBER')
+}
+
 export default function JeevanChandimalNavi(props) {
   const router = useRouter()
 
@@ -31,8 +52,8 @@ export default function JeevanChandimalNavi(props) {
   const [mWorkOpen, setMWorkOpen] = useState(false)
   const [mServicesOpen, setMServicesOpen] = useState(false)
 
-  const [memberPlan, setMemberPlan] = useState(null)
   const [userEmail, setUserEmail] = useState('')
+  const [member, setMember] = useState(null) // { tier, term, remaining, limit, used }
 
   // ✅ Cart count
   const [cartNum, setCartNum] = useState(0)
@@ -107,28 +128,54 @@ export default function JeevanChandimalNavi(props) {
     }
   }, [])
 
-  // Read local user + member plan
+  // ✅ Read local user + member status
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const email = window.localStorage.getItem('user_email') || ''
     setUserEmail(email)
 
-    const cachedPlan = window.localStorage.getItem('member_plan')
-    if (cachedPlan) setMemberPlan(cachedPlan)
+    // quick cache so badge shows instantly
+    try {
+      const cached = window.localStorage.getItem('member_status_v1')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed?.member) setMember(parsed)
+      }
+    } catch {}
 
-    if (!email) return
+    if (!email) {
+      setMember(null)
+      try {
+        window.localStorage.removeItem('member_status_v1')
+      } catch {}
+      return
+    }
 
-    fetch(`/api/member/status?email=${encodeURIComponent(email)}`)
+    fetch(`/api/member/status?email=${encodeURIComponent(email)}`, { method: 'GET' })
       .then((r) => r.json())
       .then((d) => {
         if (d?.member) {
-          const plan = d?.plan || cachedPlan || 'member'
-          setMemberPlan(plan)
-          window.localStorage.setItem('member_plan', plan)
+          const payload = {
+            member: true,
+            tier: d?.tier || d?.plan || 'pro',
+            term: d?.term || 'monthly',
+            used: Number(d?.used ?? 0),
+            limit: Number(d?.limit ?? 0),
+            remaining:
+              d?.remaining == null
+                ? null
+                : Number(d.remaining),
+          }
+          setMember(payload)
+          try {
+            window.localStorage.setItem('member_status_v1', JSON.stringify(payload))
+          } catch {}
         } else {
-          window.localStorage.removeItem('member_plan')
-          setMemberPlan(null)
+          setMember(null)
+          try {
+            window.localStorage.removeItem('member_status_v1')
+          } catch {}
         }
       })
       .catch(() => {})
@@ -137,10 +184,11 @@ export default function JeevanChandimalNavi(props) {
   const logout = () => {
     try {
       window.localStorage.removeItem('user_email')
+      window.localStorage.removeItem('member_status_v1')
       window.localStorage.removeItem('member_plan')
-    } catch (e) {}
+    } catch {}
     setUserEmail('')
-    setMemberPlan(null)
+    setMember(null)
     closeAll()
     router.push('/login')
   }
@@ -152,6 +200,8 @@ export default function JeevanChandimalNavi(props) {
     if (href === '/services') return router.pathname.startsWith('/services')
     if (href === '/store') return router.pathname.startsWith('/store')
     if (href === '/cart') return router.pathname.startsWith('/cart')
+    if (href === '/members') return router.pathname.startsWith('/members')
+    if (href === '/memberships') return router.pathname.startsWith('/memberships')
     return router.pathname === href
   }
 
@@ -196,6 +246,11 @@ export default function JeevanChandimalNavi(props) {
 
   const workItems = useMemo(() => NAV.work, [])
   const serviceItems = useMemo(() => NAV.services, [])
+
+  const memberTier = fmtTier(member?.tier || member?.plan)
+  const memberTerm = shortTerm(member?.term)
+  const memberRemaining =
+    member?.member && member?.remaining != null ? Number(member.remaining) : null
 
   return (
     <>
@@ -311,9 +366,15 @@ export default function JeevanChandimalNavi(props) {
             <Link href="/store" legacyBehavior>
               <a className={`navLink ${activeClass('/store')}`}>Store</a>
             </Link>
+
             <Link href="/memberships" legacyBehavior>
               <a className={`navLink ${activeClass('/memberships')}`}>Membership</a>
             </Link>
+
+            <Link href="/members" legacyBehavior>
+              <a className={`navLink ${activeClass('/members')}`}>Members</a>
+            </Link>
+
             <Link href="/about" legacyBehavior>
               <a className={`navLink ${activeClass('/about')}`}>About</a>
             </Link>
@@ -334,8 +395,18 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {memberPlan ? (
-                <span className="pill pillAccent">{String(memberPlan).toUpperCase()}</span>
+              {/* ✅ Upgraded member badge: TIER • TERM + remaining */}
+              {member?.member ? (
+                <span className="pill pillAccent" title="Membership status">
+                  <span className="memberText">
+                    {memberTier} <span className="dot">•</span> {memberTerm}
+                  </span>
+                  {memberRemaining != null ? (
+                    <span className="pillBadge pillBadgeAccent" title="Remaining this cycle">
+                      {memberRemaining}
+                    </span>
+                  ) : null}
+                </span>
               ) : null}
 
               {userEmail ? (
@@ -474,6 +545,11 @@ export default function JeevanChandimalNavi(props) {
                   Membership
                 </a>
               </Link>
+              <Link href="/members" legacyBehavior>
+                <a className={`mLink ${activeClass('/members')}`} onClick={closeAll}>
+                  Members
+                </a>
+              </Link>
               <Link href="/about" legacyBehavior>
                 <a className={`mLink ${activeClass('/about')}`} onClick={closeAll}>
                   About
@@ -485,7 +561,12 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {memberPlan && <div className="mBadge">{String(memberPlan).toUpperCase()}</div>}
+              {member?.member ? (
+                <div className="mBadge">
+                  {memberTier} • {memberTerm}
+                  {memberRemaining != null ? ` • ${memberRemaining} left` : ''}
+                </div>
+              ) : null}
 
               {userEmail ? (
                 <button type="button" className="mLogout" onClick={logout}>
@@ -542,78 +623,47 @@ export default function JeevanChandimalNavi(props) {
         }
 
         /* ========= DESKTOP LINKS ========= */
-.navLinks {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  min-width: 0;
-}
+        .navLinks {
+          display: none;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          min-width: 0;
+        }
 
-/* ✅ make center links pill-shaped like Login/Logout */
-.navLink,
-.dropLabel {
-  height: 32px;                 /* same as .pill */
-  padding: 0 12px;              /* same feel as .pill */
-  border-radius: 999px;         /* ✅ pill shape */
-  color: #f5f4f4;
-  text-decoration: none !important;
-  font-size: 14px;
-  letter-spacing: 0.2px;
-  opacity: 0.92;
-  transition: opacity 0.15s, background 0.15s;
-  display: inline-flex;
-  align-items: center;
-  box-sizing: border-box;
-}
+        .navLink,
+        .dropLabel {
+          height: 32px;
+          padding: 0 12px;
+          border-radius: 999px;
+          color: #f5f4f4;
+          text-decoration: none !important;
+          font-size: 14px;
+          letter-spacing: 0.2px;
+          opacity: 0.92;
+          transition: opacity 0.15s, background 0.15s;
+          display: inline-flex;
+          align-items: center;
+          box-sizing: border-box;
+        }
 
-/* hover: text turns BLUE like active */
-.navLink:hover,
-.dropLabel:hover {
-  opacity: 1;
-  background: rgba(245, 244, 244, 0.06);
-  color: #25c3e2 !important; /* ✅ blue text on hover */
-}
+        .navLink:hover,
+        .dropLabel:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.06);
+          color: #25c3e2 !important;
+        }
 
-/* active: keep blue text + pill highlight */
-.isActive {
-  height: 32px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
-  border: 1px solid rgba(37, 195, 226, 0.22);
-  color: #25c3e2 !important;
-  opacity: 1;
-  font-weight: 700;
-  box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
-}
-
-/* ✅ active highlight also pill shaped */
-.isActive {
-  height: 32px; /* ensure consistent pill height */
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
-  border: 1px solid rgba(37, 195, 226, 0.22);
-  color: #25c3e2 !important;
-  opacity: 1;
-  font-weight: 700;
-  box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
-}
-
-/* ✅ make Work/Services whole toggle pill shaped (matches Login/Logout) */
-.dropToggle {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  outline: none;
-}
-
-/* remove the old extra spacing because pill now adds padding */
-.chev {
-  margin-left: 2px;
-}
+        .isActive {
+          height: 32px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.24), rgba(37, 195, 226, 0.1));
+          border: 1px solid rgba(37, 195, 226, 0.22);
+          color: #25c3e2 !important;
+          opacity: 1;
+          font-weight: 700;
+          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.08);
+        }
 
         /* ========= DROPDOWN ========= */
         .drop {
@@ -632,11 +682,12 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .dropToggle {
+          height: 32px;
+          padding: 0 12px;
+          border-radius: 999px;
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 0;
-          border-radius: 12px;
           outline: none;
         }
 
@@ -645,8 +696,8 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .dropToggle:hover .dropLabel {
-  color: #25c3e2 !important;
-}
+          color: #25c3e2 !important;
+        }
 
         .chev {
           width: 14px;
@@ -658,7 +709,7 @@ export default function JeevanChandimalNavi(props) {
           font-size: 12px;
           transform: rotate(-90deg);
           transition: transform 0.16s ease;
-          margin-left: 4px;
+          margin-left: 2px;
         }
 
         .chev.open {
@@ -714,30 +765,28 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .menuItem {
-  color: #f5f4f4;
-  text-decoration: none !important;
-  font-size: 14px;
-  padding: 10px 10px;
-  border-radius: 10px;
-  opacity: 0.92;
-  transition: background 0.15s, opacity 0.15s, color 0.15s;
-}
+          color: #f5f4f4;
+          text-decoration: none !important;
+          font-size: 14px;
+          padding: 10px 10px;
+          border-radius: 10px;
+          opacity: 0.92;
+          transition: background 0.15s, opacity 0.15s, color 0.15s;
+        }
 
-/* ✅ hover = BLUE text */
-.menuItem:hover {
-  opacity: 1;
-  background: rgba(245, 244, 244, 0.08);
-  color: #25c3e2 !important;
-}
+        .menuItem:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.08);
+          color: #25c3e2 !important;
+        }
 
-/* active item stays blue */
-.menuItem.isActiveItem {
-  background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
-  border: 1px solid rgba(37, 195, 226, 0.18);
-  color: #25c3e2 !important;
-  opacity: 1;
-  font-weight: 700;
-}
+        .menuItem.isActiveItem {
+          background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
+          border: 1px solid rgba(37, 195, 226, 0.18);
+          color: #25c3e2 !important;
+          opacity: 1;
+          font-weight: 700;
+        }
 
         /* ========= RIGHT ========= */
         .navRight {
@@ -754,9 +803,8 @@ export default function JeevanChandimalNavi(props) {
           min-width: 0;
         }
 
-        /* ✅ ONE pill system for ALL right items */
         .pill {
-          height: 32px; /* ✅ reduced height */
+          height: 32px;
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -812,9 +860,19 @@ export default function JeevanChandimalNavi(props) {
           border: 1px solid rgba(37, 195, 226, 0.55);
           background: rgba(37, 195, 226, 0.12);
           color: #25c3e2;
-          font-weight: 800;
-          letter-spacing: 1px;
+          font-weight: 900;
+          letter-spacing: 0.6px;
           font-size: 11px;
+        }
+
+        .memberText {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .dot {
+          opacity: 0.85;
         }
 
         .pillBadge {
@@ -826,10 +884,16 @@ export default function JeevanChandimalNavi(props) {
           align-items: center;
           justify-content: center;
           font-size: 10px;
-          font-weight: 800;
+          font-weight: 900;
           border: 1px solid rgba(37, 195, 226, 0.35);
           background: rgba(37, 195, 226, 0.14);
           color: #25c3e2;
+        }
+
+        .pillBadgeAccent {
+          border-color: rgba(245, 244, 244, 0.25);
+          background: rgba(0, 0, 0, 0.22);
+          color: #f5f4f4;
         }
 
         @media (max-width: 520px) {
@@ -1015,19 +1079,19 @@ export default function JeevanChandimalNavi(props) {
           color: #25c3e2 !important;
           opacity: 1;
           font-weight: 800;
-          box-shadow: 0 8px 18px rgba(37, 195, 226, 0.06);
         }
 
         .mBadge {
           margin-top: 12px;
           align-self: flex-start;
           font-size: 11px;
-          padding: 6px 12px;
+          padding: 8px 12px;
           border: 1px solid rgba(37, 195, 226, 0.55);
           border-radius: 999px;
-          letter-spacing: 1px;
+          letter-spacing: 0.8px;
           color: #25c3e2;
-          font-weight: 800;
+          font-weight: 900;
+          background: rgba(37, 195, 226, 0.08);
         }
 
         .mLogout {
