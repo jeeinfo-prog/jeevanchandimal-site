@@ -80,105 +80,111 @@ export default function Home() {
       </div>
 
       <style jsx>{`
-        .page {
-          width: 100%;
-          min-height: 100vh;
-          position: relative;
-          overflow: hidden;
-          background: #0b0b0b;
-          color: #f5f4f4;
-        }
+  :global(html),
+  :global(body) {
+    height: 100%;
+  }
 
-        /* ========= CINEMATIC BACKGROUND ========= */
-        .heroBg {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          pointer-events: none;
-        }
+  :global(body) {
+    overflow-x: hidden;
+  }
 
-        .heroBgImg {
-          position: absolute;
-          inset: 0;
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          filter: saturate(0.9) contrast(1.05) brightness(0.78);
-          transform: scale(1.02);
-        }
+  .page {
+    width: 100%;
+    min-height: 100vh;
+    position: relative;
 
-        /* vignette + depth */
-        .heroBgVignette {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(
-              80% 60% at 50% 20%,
-              rgba(0, 0, 0, 0.12),
-              rgba(0, 0, 0, 0.72)
-            ),
-            linear-gradient(
-              180deg,
-              rgba(10, 10, 10, 0.25) 0%,
-              rgba(10, 10, 10, 0.72) 55%,
-              rgba(10, 10, 10, 0.92) 100%
-            );
-        }
+    /* ✅ allow sticky navbar to work */
+    overflow-x: hidden;
+    overflow-y: visible;
 
-        /* subtle film grain */
-        .heroBgGrain {
-          position: absolute;
-          inset: 0;
-          opacity: 0.08;
-          mix-blend-mode: overlay;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-          background-size: 240px 240px;
-        }
+    background: #0b0b0b;
+    color: #f5f4f4;
+  }
 
-        /* ========= LAYOUT ========= */
-        .main {
-          position: relative;
-          z-index: 1; /* above bg */
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
+  /* ========= CINEMATIC BACKGROUND ========= */
+  .heroBg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
 
-        .section {
-          width: 100%;
-          display: flex;
-          justify-content: center;
-        }
+  .heroBgImg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: saturate(0.9) contrast(1.05) brightness(0.78);
+    transform: scale(1.02);
+  }
 
-        /* add spacing between blocks */
-        .section :global(> *) {
-          width: 100%;
-        }
+  .heroBgVignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        80% 60% at 50% 20%,
+        rgba(0, 0, 0, 0.12),
+        rgba(0, 0, 0, 0.72)
+      ),
+      linear-gradient(
+        180deg,
+        rgba(10, 10, 10, 0.25) 0%,
+        rgba(10, 10, 10, 0.72) 55%,
+        rgba(10, 10, 10, 0.92) 100%
+      );
+  }
 
-        /* hero gets a bit more breathing room */
-        .heroSection {
-          padding-top: 26px;
-        }
+  .heroBgGrain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.08;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+    background-size: 240px 240px;
+  }
 
-        /* subtle glass panel behind content for luxury feel */
-        .section :global(.thq-section-padding) {
-          position: relative;
-        }
+  /* ========= LAYOUT ========= */
+  .main {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
 
-        /* Reduce harsh edges on huge screens */
-        @media (min-width: 1200px) {
-          .heroBgImg {
-            filter: saturate(0.95) contrast(1.07) brightness(0.76);
-          }
-        }
+  .section {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
 
-        /* If hero image missing, still looks good */
-        @media (prefers-reduced-motion: reduce) {
-          .heroBgImg {
-            transform: none;
-          }
-        }
-      `}</style>
+  .section :global(> *) {
+    width: 100%;
+  }
+
+  .heroSection {
+    padding-top: 26px;
+  }
+
+  .section :global(.thq-section-padding) {
+    position: relative;
+  }
+
+  @media (min-width: 1200px) {
+    .heroBgImg {
+      filter: saturate(0.95) contrast(1.07) brightness(0.76);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .heroBgImg {
+      transform: none;
+    }
+  }
+`}</style>
     </>
   )
 }
