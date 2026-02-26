@@ -16,7 +16,6 @@ function addMonths(date, months) {
   const d = new Date(date.getTime())
   const day = d.getDate()
   d.setMonth(d.getMonth() + months)
-
   // handle month overflow (e.g., Jan 31 -> Feb)
   if (d.getDate() < day) d.setDate(0)
   return d
@@ -35,12 +34,12 @@ const LIMITS = {
 }
 
 function resolveTierFromMemberRow(member) {
-  // Prefer explicit tier-like fields if present
-  const direct = String(member?.tier || member?.license || '').trim().toLowerCase()
+  // Prefer explicit tier-like fields if present (some older schemas used license/format)
+  const direct = String(member?.license || '').trim().toLowerCase()
   if (['basic', 'pro', 'elite'].includes(direct)) return direct
 
-  // Legacy / fallback from plan
-  const raw = String(member?.plan || member?.membership_plan || '').trim().toLowerCase()
+  // Primary: memberships.plan
+  const raw = String(member?.plan || '').trim().toLowerCase()
 
   // ✅ IMPORTANT: your current UI sends plan='monthly' to mean PRO.
   if (raw === 'monthly') return 'pro'
@@ -140,8 +139,8 @@ async function ensureUsageWindow(memberRow, tier) {
   const limit = LIMITS[tier] ?? 0
   const now = new Date()
 
-  const used0 = Number(memberRow?.monthly_download_used ?? memberRow?.downloads_used ?? 0)
-  const startRaw = memberRow?.billing_cycle_start || memberRow?.cycle_start || memberRow?.created_at
+  const used0 = Number(memberRow?.monthly_download_used ?? 0)
+  const startRaw = memberRow?.billing_cycle_start || memberRow?.created_at
   const start = startRaw ? new Date(startRaw) : now
 
   // If no start or invalid, reset
@@ -173,7 +172,7 @@ async function ensureUsageWindow(memberRow, tier) {
   }
 
   // keep limit stored if missing
-  if (!memberRow?.monthly_download_limit || Number(memberRow.monthly_download_limit) !== limit) {
+  if (memberRow?.monthly_download_limit == null || Number(memberRow.monthly_download_limit) !== limit) {
     await supabaseAdmin.from('memberships').update({ monthly_download_limit: limit }).eq('id', memberRow.id)
   }
 
@@ -191,7 +190,7 @@ export default async function handler(req, res) {
   try {
     const photoId = String(req.body?.photoId || '').trim()
     const email = normalizeEmail(req.body?.email)
-    const requestedFormat = safeRequestedFormat(req.body?.format) // 'jpg' | 'raw' (elite can choose)
+    const requestedFormat = safeRequestedFormat(req.body?.format) // 'jpg' | 'raw'
 
     if (!photoId || !email) {
       return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
@@ -201,11 +200,11 @@ export default async function handler(req, res) {
     }
 
     // ✅ Membership check (your table: memberships)
-    // Try to fetch all possible fields (safe even if some columns don't exist)
+    // NOTE: do NOT select columns that don't exist (tier/term/etc)
     const { data: member, error: mErr } = await supabaseAdmin
       .from('memberships')
       .select(
-        'id,email,status,plan,tier,license,term,end_date,created_at,billing_cycle_start,monthly_download_limit,monthly_download_used'
+        'id,email,status,plan,license,format,end_date,created_at,billing_cycle_start,monthly_download_limit,monthly_download_used'
       )
       .eq('email', email)
       .eq('status', 'active')
@@ -244,7 +243,6 @@ export default async function handler(req, res) {
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
     // ✅ Ensure we have a membership order row that won't violate constraints
-    // Store tier for clarity (not used for caps)
     const memberOrder = await ensureMemberOrder(email, tier)
 
     // ✅ One-time token row (required by /api/download which uses consume_download_token RPC)
@@ -268,15 +266,11 @@ export default async function handler(req, res) {
       .from('memberships')
       .update({ monthly_download_used: nextUsed })
       .eq('id', member.id)
-      .eq('monthly_download_used', used) // only update if unchanged
+      .eq('monthly_download_used', used)
 
     if (upd.error) {
-      // If this fails due to race, be safe: deny with retry message
       console.error('membership usage update failed:', upd.error.message)
-      return res.status(409).json({
-        ok: false,
-        error: 'Please retry download (usage updated).',
-      })
+      return res.status(409).json({ ok: false, error: 'Please retry download (usage updated).' })
     }
 
     // ✅ Build download token payload matching pages/api/download.js requirements
