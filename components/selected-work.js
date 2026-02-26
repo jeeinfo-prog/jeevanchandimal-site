@@ -1,7 +1,59 @@
 import React, { Fragment } from 'react'
 import PropTypes from 'prop-types'
+import Link from 'next/link'
 
 const SelectedWork = (props) => {
+  const tiles = [
+    {
+      key: '01',
+      href: '/work-film',
+      title: 'Film',
+      alt: props.feature1ImageAlt,
+      src: props.feature1ImageSrc || '/home/sw-01.jpg',
+      className: 'tile tileA',
+    },
+    {
+      key: '02',
+      href: '/work-audio',
+      title: 'Audio',
+      alt: props.feature2ImageAlt,
+      src: props.feature2ImageSrc || '/home/sw-02.jpg',
+      className: 'tile tileB',
+    },
+    {
+      key: '03',
+      href: '/work-animation',
+      title: 'Animation',
+      alt: props.feature3ImageAlt,
+      src: props.feature3ImageSrc || '/home/sw-03.jpg',
+      className: 'tile tileC',
+    },
+    {
+      key: '04',
+      href: '/work-photography',
+      title: 'Photography',
+      alt: props.feature1ImageAlt1,
+      src: props.feature1ImageSrc1 || '/home/sw-04.jpg',
+      className: 'tile tileD',
+    },
+    {
+      key: '05',
+      href: '/store',
+      title: 'Store',
+      alt: props.feature2ImageAlt1,
+      src: props.feature2ImageSrc1 || '/home/sw-05.jpg',
+      className: 'tile tileE',
+    },
+    {
+      key: '06',
+      href: '/memberships',
+      title: 'Membership',
+      alt: props.feature3ImageAlt1,
+      src: props.feature3ImageSrc1 || '/home/sw-06.jpg',
+      className: 'tile tileF',
+    },
+  ]
+
   return (
     <>
       <section className="sw thq-section-padding">
@@ -34,89 +86,27 @@ const SelectedWork = (props) => {
 
           {/* cinematic gallery grid */}
           <div className="grid">
-            <figure className="tile tileA">
-              <div className="imgWrap">
-                <img
-                  alt={props.feature1ImageAlt}
-                  src={props.feature1ImageSrc || '/home/sw-01.jpg'}
-                  className="img"
-                  loading="lazy"
-                />
-                <div className="overlay">
-                  <span className="chip">01</span>
-                </div>
-              </div>
-            </figure>
+            {tiles.map((t) => (
+              <Link href={t.href} key={t.key} legacyBehavior>
+                <a className={`${t.className} tileLink`} aria-label={`${t.title} — View`}>
+                  <div className="imgWrap">
+                    <img alt={t.alt} src={t.src} className="img" loading="lazy" />
+                    <div className="overlay">
+                      <div className="overlayTop">
+                        <span className="chip">{t.key}</span>
+                      </div>
 
-            <figure className="tile tileB">
-              <div className="imgWrap">
-                <img
-                  alt={props.feature2ImageAlt}
-                  src={props.feature2ImageSrc || '/home/sw-02.jpg'}
-                  className="img"
-                  loading="lazy"
-                />
-                <div className="overlay">
-                  <span className="chip">02</span>
-                </div>
-              </div>
-            </figure>
-
-            <figure className="tile tileC">
-              <div className="imgWrap">
-                <img
-                  alt={props.feature3ImageAlt}
-                  src={props.feature3ImageSrc || '/home/sw-03.jpg'}
-                  className="img"
-                  loading="lazy"
-                />
-                <div className="overlay">
-                  <span className="chip">03</span>
-                </div>
-              </div>
-            </figure>
-
-            <figure className="tile tileD">
-              <div className="imgWrap">
-                <img
-                  alt={props.feature1ImageAlt1}
-                  src={props.feature1ImageSrc1 || '/home/sw-04.jpg'}
-                  className="img"
-                  loading="lazy"
-                />
-                <div className="overlay">
-                  <span className="chip">04</span>
-                </div>
-              </div>
-            </figure>
-
-            <figure className="tile tileE">
-              <div className="imgWrap">
-                <img
-                  alt={props.feature2ImageAlt1}
-                  src={props.feature2ImageSrc1 || '/home/sw-05.jpg'}
-                  className="img"
-                  loading="lazy"
-                />
-                <div className="overlay">
-                  <span className="chip">05</span>
-                </div>
-              </div>
-            </figure>
-
-            <figure className="tile tileF">
-              <div className="imgWrap">
-                <img
-                  alt={props.feature3ImageAlt1}
-                  src={props.feature3ImageSrc1 || '/home/sw-06.jpg'}
-                  className="img"
-                  loading="lazy"
-                />
-                <div className="overlay">
-                  <span className="chip">06</span>
-                </div>
-              </div>
-            </figure>
+                      <div className="overlayBottom">
+                        <div className="meta">
+                          <div className="metaTitle">{t.title}</div>
+                          <div className="metaSub">View →</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
@@ -175,6 +165,12 @@ const SelectedWork = (props) => {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
           gap: 14px;
+        }
+
+        .tileLink {
+          display: block;
+          text-decoration: none !important;
+          color: inherit;
         }
 
         .tile {
@@ -236,16 +232,27 @@ const SelectedWork = (props) => {
           position: absolute;
           inset: 0;
           display: flex;
-          align-items: flex-end;
-          justify-content: flex-start;
+          flex-direction: column;
+          justify-content: space-between;
           padding: 14px;
           background: linear-gradient(
             180deg,
-            rgba(0, 0, 0, 0) 55%,
-            rgba(0, 0, 0, 0.6) 100%
+            rgba(0, 0, 0, 0.15) 0%,
+            rgba(0, 0, 0, 0) 45%,
+            rgba(0, 0, 0, 0.62) 100%
           );
           opacity: 0;
           transition: opacity 320ms ease;
+        }
+
+        .overlayTop {
+          display: flex;
+          justify-content: flex-start;
+        }
+
+        .overlayBottom {
+          display: flex;
+          justify-content: flex-start;
         }
 
         .chip {
@@ -260,12 +267,39 @@ const SelectedWork = (props) => {
           box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
         }
 
-        .tile:hover .img {
+        .meta {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .metaTitle {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          color: rgba(245, 244, 244, 0.92);
+          text-transform: uppercase;
+        }
+
+        .metaSub {
+          font-size: 12px;
+          letter-spacing: 0.18em;
+          color: rgba(245, 244, 244, 0.72);
+          text-transform: uppercase;
+        }
+
+        .tileLink:hover .img {
           transform: scale(1.09);
           filter: saturate(1) contrast(1.1) brightness(0.98);
         }
-        .tile:hover .overlay {
+        .tileLink:hover .overlay {
           opacity: 1;
+        }
+
+        .tileLink:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 2px rgba(37, 195, 226, 0.35);
+          border-radius: 18px;
         }
 
         /* ========= RESPONSIVE ========= */
@@ -324,9 +358,7 @@ SelectedWork.defaultProps = {
   feature2ImageAlt1: 'Selected work image 05',
   feature3ImageAlt: 'Selected work image 03',
 
-  // ✅ NEW: default to /public/home/ sw-xx files
-  // Put images here:
-  // /public/home/sw-01.jpg ... sw-06.jpg
+  // ✅ default to /public/home/ sw-xx files
   feature1ImageSrc: '/home/sw-01.jpg',
   feature2ImageSrc: '/home/sw-02.jpg',
   feature3ImageSrc: '/home/sw-03.jpg',
