@@ -606,15 +606,16 @@ export default function Memberships() {
           </section>
 
           {/* RETURNING MEMBER */}
-          <section className="cineBlock" data-reveal>
-            <div className="ctaCard subtle">
-              <h3>Already a member?</h3>
-              <p>Go directly to your downloads and archive.</p>
-              <Link href="/members" className="thq-button-outline">
-                Member access
-              </Link>
-            </div>
-          </section>
+<section className="cineBlock" data-reveal>
+  <div className="ctaCard subtle">
+    <h3>Already a member?</h3>
+    <p>Go directly to your downloads and archive.</p>
+
+    <Link href="/member-access" legacyBehavior>
+      <a className="thq-button-outline">Member access</a>
+    </Link>
+  </div>
+</section>
         </div>
       </main>
 
