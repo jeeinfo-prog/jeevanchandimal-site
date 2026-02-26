@@ -19,12 +19,21 @@ export default function Memberships() {
   const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
   const [error, setError] = React.useState('')
 
+  // FAQ tabs + accordion
+  const [faqTab, setFaqTab] = React.useState('General') // General | Licensing | Billing
+  const [openFaq, setOpenFaq] = React.useState(-1)
+
   React.useEffect(() => {
     if (typeof window === 'undefined') return
     const saved = window.localStorage.getItem('user_email')
     if (saved && !email) setEmail(saved)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  React.useEffect(() => {
+    // close open accordion when switching tabs (clean UX)
+    setOpenFaq(-1)
+  }, [faqTab])
 
   async function startMembershipCheckout(plan) {
     try {
@@ -148,6 +157,69 @@ export default function Memberships() {
       setLoadingPlan('')
     }
   }
+
+  const faqsAll = React.useMemo(
+    () => [
+      // GENERAL
+      {
+        tab: 'General',
+        q: 'What does the membership include?',
+        a: 'Membership gives you access to a curated collection of cinematic imagery, with downloads and usage based on your selected plan. New work is added regularly as the archive grows.',
+      },
+      {
+        tab: 'General',
+        q: 'Is there a limit to how many images I can download?',
+        a: 'Download limits depend on your plan. Each membership tier clearly defines monthly limits or unlimited access.',
+      },
+      {
+        tab: 'General',
+        q: 'How often is new content added?',
+        a: 'New images are added regularly, reflecting ongoing projects, travels, and visual explorations.',
+      },
+      // LICENSING
+      {
+        tab: 'Licensing',
+        q: 'How can I use the images?',
+        a: 'Images can be used for personal, editorial, and commercial projects according to your membership tier. Full usage details are outlined clearly in the license terms.',
+      },
+      {
+        tab: 'Licensing',
+        q: 'Can I use the images for client work?',
+        a: 'Yes. Client use is allowed depending on your membership plan. Higher tiers offer broader commercial usage.',
+      },
+      {
+        tab: 'Licensing',
+        q: 'Are the images sold exclusively?',
+        a: 'No. Images are licensed, not sold exclusively. The same image may be licensed to multiple members or clients.',
+      },
+      {
+        tab: 'Licensing',
+        q: 'Are high-resolution files included?',
+        a: 'Yes. Images are provided as professionally graded high-resolution files (tier dependent).',
+      },
+      // BILLING
+      {
+        tab: 'Billing',
+        q: 'Can I cancel my membership anytime?',
+        a: 'Yes. You can cancel at any time. Your access will remain active until the end of your current billing period.',
+      },
+      {
+        tab: 'Billing',
+        q: 'Do downloads expire if I cancel my membership?',
+        a: 'No. Images downloaded during an active membership can continue to be used according to the license terms under which they were obtained.',
+      },
+      {
+        tab: 'Billing',
+        q: 'Do you offer refunds?',
+        a: 'Due to the nature of digital access, memberships are non-refundable once activated. Please review plan details before subscribing.',
+      },
+    ],
+    []
+  )
+
+  const faqs = faqsAll.filter((x) => x.tab === faqTab)
+
+  const tabs = ['General', 'Licensing', 'Billing']
 
   return (
     <>
@@ -283,6 +355,74 @@ export default function Memberships() {
               </div>
             </div>
           </div>
+
+          {/* FAQ */}
+          <div className="faqWrap">
+            <div className="faqHead">
+              <h2 className="thq-heading-2">Frequently Asked Questions</h2>
+              <p className="thq-body-large faqSub">
+                Quick answers before you subscribe. If you need anything else,{' '}
+                <Link href="/contact">contact me</Link>.
+              </p>
+
+              {/* Tabs */}
+              <div className="faqTabs" role="tablist" aria-label="FAQ categories">
+                {tabs.map((t) => {
+                  const active = faqTab === t
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`faqTab ${active ? 'active' : ''}`}
+                      onClick={() => setFaqTab(t)}
+                      role="tab"
+                      aria-selected={active ? 'true' : 'false'}
+                    >
+                      <span className="faqTabLabel">{t}</span>
+                      <span className="faqTabArrow" aria-hidden="true">
+                        →
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Cinematic 360 grid */}
+            <div className="faqCineGrid">
+              {faqs.map((item, idx) => {
+                const isOpen = openFaq === idx
+                return (
+                  <div className={`faqCineCard ${isOpen ? 'active' : ''}`} key={`${faqTab}-${idx}`}>
+                    <button
+                      type="button"
+                      className="faqTrigger"
+                      onClick={() => setOpenFaq((v) => (v === idx ? -1 : idx))}
+                    >
+                      <span className="faqQ">{item.q}</span>
+                      <span className="faqIcon" aria-hidden="true">
+                        {!isOpen ? (
+                          <svg viewBox="0 0 1024 1024" className="faqSvg">
+                            <path d="M213.333 554.667h256v256c0 23.552 19.115 42.667 42.667 42.667s42.667-19.115 42.667-42.667v-256h256c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-256v-256c0-23.552-19.115-42.667-42.667-42.667s-42.667 19.115-42.667 42.667v256h-256c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667z"></path>
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 1024 1024" className="faqSvg">
+                            <path d="M213.333 554.667h597.333c23.552 0 42.667-19.115 42.667-42.667s-19.115-42.667-42.667-42.667h-597.333c-23.552 0-42.667 19.115-42.667 42.667s19.115 42.667 42.667 42.667z"></path>
+                          </svg>
+                        )}
+                      </span>
+                    </button>
+
+                    {isOpen ? (
+                      <div className="faqAnswer">
+                        <p className="faqA thq-body-small">{item.a}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </main>
 
@@ -320,6 +460,7 @@ export default function Memberships() {
 
         .emailInput:focus {
           border-color: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12);
         }
 
         .errorText {
@@ -348,6 +489,7 @@ export default function Memberships() {
 
         .membership-card:hover {
           border-color: rgba(245, 244, 244, 0.35);
+          transform: translateY(-2px);
         }
 
         .featured {
@@ -387,6 +529,163 @@ export default function Memberships() {
           gap: var(--dl-layout-space-threeunits);
         }
 
+        /* =======================
+           🎬 FAQ cinematic 360 + tabs
+           ======================= */
+        .faqWrap {
+          margin-top: var(--dl-layout-space-fiveunits);
+        }
+
+        .faqHead {
+          text-align: center;
+          max-width: 760px;
+          margin: 0 auto var(--dl-layout-space-threeunits);
+        }
+
+        .faqSub {
+          opacity: 0.85;
+        }
+
+        .faqTabs {
+          margin-top: var(--dl-layout-space-twounits);
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .faqTab {
+          cursor: pointer;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          color: #f5f4f4;
+          border-radius: 999px;
+          padding: 10px 14px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          transition: 0.25s ease;
+          backdrop-filter: blur(8px);
+        }
+
+        .faqTabLabel {
+          font-weight: 650;
+          letter-spacing: 0.2px;
+          font-size: 13px;
+          opacity: 0.95;
+        }
+
+        .faqTabArrow {
+          opacity: 0;
+          transform: translateX(-4px);
+          transition: 0.25s ease;
+          font-size: 14px;
+        }
+
+        .faqTab:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+
+        .faqTab:hover .faqTabArrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .faqTab.active {
+          border-color: rgba(37, 195, 226, 0.75);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.14);
+          background: rgba(37, 195, 226, 0.06);
+        }
+
+        .faqTab.active .faqTabArrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .faqCineGrid {
+          display: grid;
+          grid-template-columns: repeat(2, 360px);
+          justify-content: center;
+          gap: var(--dl-layout-space-threeunits);
+        }
+
+        .faqCineCard {
+          width: 360px;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(8px);
+          transition: 0.35s ease;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .faqCineCard:hover {
+          border-color: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.25), 0 18px 48px rgba(0, 0, 0, 0.45);
+          transform: translateY(-4px);
+        }
+
+        .faqCineCard.active {
+          border-color: rgba(37, 195, 226, 0.75);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.35), 0 22px 54px rgba(0, 0, 0, 0.55);
+        }
+
+        .faqTrigger {
+          width: 100%;
+          cursor: pointer;
+          border: none;
+          outline: none;
+          background: transparent;
+          color: inherit;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 20px 20px;
+          text-align: left;
+        }
+
+        .faqQ {
+          font-weight: 650;
+          line-height: 1.35;
+          letter-spacing: 0.2px;
+        }
+
+        .faqIcon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          flex-shrink: 0;
+          transition: 0.25s ease;
+        }
+
+        .faqCineCard:hover .faqIcon {
+          border-color: rgba(37, 195, 226, 0.6);
+          box-shadow: 0 0 12px rgba(37, 195, 226, 0.35);
+        }
+
+        .faqSvg {
+          width: 18px;
+          height: 18px;
+        }
+
+        .faqAnswer {
+          padding: 0 20px 20px;
+          animation: fadeIn 240ms ease;
+        }
+
+        .faqA {
+          margin: 0;
+          opacity: 0.9;
+        }
+
         @media (max-width: 991px) {
           .membership-grid {
             grid-template-columns: 1fr;
@@ -394,6 +693,21 @@ export default function Memberships() {
 
           .feature-grid {
             grid-template-columns: 1fr 1fr;
+          }
+
+          .faqCineGrid {
+            grid-template-columns: 1fr;
+            justify-content: center;
+          }
+
+          .faqCineCard {
+            width: 100%;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .feature-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
