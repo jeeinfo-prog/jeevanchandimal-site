@@ -16,14 +16,12 @@ function cleanLower(v) {
 function resolveTierTermFromMembershipRow(memberRow) {
   const planRaw = cleanLower(memberRow?.plan)
 
-  // legacy mapping (your old memberships.plan stored monthly/yearly/lifetime)
   if (planRaw === 'monthly') return { tier: 'basic', term: 'monthly' }
   if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
   if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
 
-  // new: plan stores tier
   if (['basic', 'pro', 'elite'].includes(planRaw)) {
-    const end = memberRow?.end_date || memberRow?.expires_at || null
+    const end = memberRow?.end_date || null
     if (!end) return { tier: planRaw, term: 'monthly' }
 
     const now = Date.now()
@@ -57,7 +55,6 @@ function cycleKey(term, now = new Date()) {
   return `${yyyy}-${mm}`
 }
 
-// ✅ Resolve correct R2 key from photos table
 async function resolveObjectKeyFromPhotos(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) return null
@@ -77,11 +74,6 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
 }
 
-/**
- * ✅ Create/reuse a membership order row per cycle.
- * - code: MEMBER_<cycle>_<email>
- * - download_count/limit enforce the tier quota per cycle
- */
 async function ensureMemberOrder(email, tier, term) {
   const code = `MEMBER_${cycleKey(term)}_${email}`
 
@@ -100,11 +92,9 @@ async function ensureMemberOrder(email, tier, term) {
     currency: 'LKR',
     order_kind: 'membership',
 
-    // keep non-photo markers
     photo_id: 'membership',
     delivery_object_key: 'membership',
 
-    // store membership metadata in existing fields
     license: cleanLower(tier), // tier
     format: cleanLower(term), // term
 
@@ -133,10 +123,10 @@ export default async function handler(req, res) {
     if (!photoId || !email) return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
     if (!isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
 
-    // ✅ Membership check (your table: memberships)
+    // ✅ IMPORTANT: do NOT select expires_at (doesn't exist in your table)
     const { data: member, error: mErr } = await supabaseAdmin
       .from('memberships')
-      .select('plan,status,end_date,expires_at,created_at')
+      .select('plan,status,end_date,created_at')
       .eq('email', email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -146,29 +136,26 @@ export default async function handler(req, res) {
     if (mErr) return res.status(500).json({ ok: false, error: mErr.message })
     if (!member) return res.status(403).json({ ok: false, error: 'Not a member' })
 
-    const endDate = member.end_date || member.expires_at || null
+    const endDate = member.end_date || null
     if (endDate && new Date(endDate) < new Date()) {
       return res.status(403).json({ ok: false, error: 'Membership expired' })
     }
 
     const { tier, term } = resolveTierTermFromMembershipRow(member)
 
-    // ✅ Format gating: RAW only for ELITE
     const canRaw = cleanLower(tier) === 'elite'
     const format = requestedFormat === 'raw' && canRaw ? 'raw' : 'jpg'
     const ext = format === 'raw' ? 'zip' : 'jpg'
 
-    // ✅ Resolve object key from photos table
     const objectKey = await resolveObjectKeyFromPhotos(photoId, format)
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
-    // ✅ Ensure we have a membership order row per cycle (enforces limits via download_count)
     const memberOrder = await ensureMemberOrder(email, tier, term)
 
-    // If already exceeded, block early (even before token)
     const used = Number(memberOrder?.download_count ?? 0)
     const limit = Number(memberOrder?.download_limit ?? limitForTier(tier))
     const remaining = Math.max(0, limit - used)
+
     if (remaining <= 0) {
       return res.status(403).json({
         ok: false,
@@ -181,7 +168,6 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ One-time token row (required by /api/download which uses consume_download_token RPC)
     const jti = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
@@ -210,8 +196,6 @@ export default async function handler(req, res) {
       '1h'
     )
 
-    // Note: used/remaining will update after /api/download consumes token (download_count increment)
-    // Return current counters for UI/navbar
     return res.status(200).json({
       ok: true,
       tier,

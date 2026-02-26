@@ -27,13 +27,11 @@ function resolveTierTermFromMembershipRow(memberRow) {
 
   // tier stored in plan
   if (['basic', 'pro', 'elite'].includes(planRaw)) {
-    // infer term from end_date if possible (fallback monthly)
-    const end = memberRow?.end_date || memberRow?.expires_at || null
+    const end = memberRow?.end_date || null
     if (!end) return { tier: planRaw, term: 'monthly' }
 
     const now = Date.now()
     const diffDays = Math.round((new Date(end).getTime() - now) / 86400000)
-
     if (diffDays > 3000) return { tier: planRaw, term: 'lifetime' }
     if (diffDays > 300) return { tier: planRaw, term: 'yearly' }
     return { tier: planRaw, term: 'monthly' }
@@ -61,6 +59,7 @@ function cycleKey(term, now = new Date()) {
 
 async function getOrCreateMemberOrder(email, tier, term) {
   const code = `MEMBER_${cycleKey(term)}_${email}`
+
   const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
   if (!existing.error && existing.data) return existing.data
 
@@ -76,11 +75,9 @@ async function getOrCreateMemberOrder(email, tier, term) {
     currency: 'LKR',
     order_kind: 'membership',
 
-    // keep non-photo markers
     photo_id: 'membership',
     delivery_object_key: 'membership',
 
-    // store membership metadata in existing columns
     license: cleanLower(tier), // tier
     format: cleanLower(term), // term
 
@@ -100,10 +97,10 @@ export default async function handler(req, res) {
     const email = normalizeEmail(req.query?.email)
     if (!email || !isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
 
-    // memberships table (your project uses this for access)
+    // ✅ IMPORTANT: do NOT select expires_at (doesn't exist in your table)
     const { data: member, error } = await supabaseAdmin
       .from('memberships')
-      .select('plan,status,end_date,expires_at,created_at')
+      .select('plan,status,end_date,created_at')
       .eq('email', email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -113,16 +110,14 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ ok: false, error: error.message })
     if (!member) return res.status(200).json({ ok: true, member: false })
 
-    const endDate = member.end_date || member.expires_at || null
+    const endDate = member.end_date || null
     if (endDate && new Date(endDate) < new Date()) {
       return res.status(200).json({ ok: true, member: false })
     }
 
     const { tier, term } = resolveTierTermFromMembershipRow(member)
 
-    // usage from orders(download_count/download_limit) per cycle
     const order = await getOrCreateMemberOrder(email, tier, term)
-
     const used = Number(order?.download_count ?? 0)
     const limit = Number(order?.download_limit ?? limitForTier(tier))
     const remaining = Math.max(0, limit - used)
