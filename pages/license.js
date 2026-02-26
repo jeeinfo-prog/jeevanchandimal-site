@@ -1,172 +1,367 @@
 // pages/license.js
 import React from 'react'
-import Link from 'next/link'
-import LegalSeo from '../components/LegalSeo'
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import LegalSeo from '../components/LegalSeo'
 
 export default function License() {
   return (
     <>
       <LegalSeo
-        title="License Terms | Jeevan Chandimal"
-        description="License terms for photography downloads and membership access on JeevanChandimal.com — including personal, editorial, and commercial usage."
+        title="License Agreement | Jeevan Chandimal"
+        description="License Agreement for digital photography downloads and usage at JeevanChandimal.com."
         path="/license"
       />
 
-      {/* ✅ NAV */}
       <JeevanChandimalNavi />
 
       <main className="wrap">
-        <h1>License Terms</h1>
+        <header className="hero">
+          <h1>License Agreement</h1>
+          <p className="sub">
+            This License Agreement explains how you may use images downloaded or purchased from{' '}
+            <strong>JeevanChandimal.com</strong>. By downloading, purchasing, or using any image,
+            you agree to these terms.
+          </p>
 
-        <p>
-          This License Terms page explains how you may use digital photography and assets
-          downloaded from <strong>JeevanChandimal.com</strong> (including purchases and
-          membership downloads). By downloading or using any file, you agree to these terms.
-        </p>
+          <div className="topLinks" aria-label="Quick links">
+            <a className="pill" href="#license-types">
+              License Types
+            </a>
+            <a className="pill" href="#permitted-use">
+              Permitted Use
+            </a>
+            <a className="pill" href="#restrictions">
+              Restrictions
+            </a>
+            <a className="pill" href="#credits">
+              Credit
+            </a>
+            <a className="pill" href="#refunds">
+              Refunds
+            </a>
+            <a className="pill" href="#contact">
+              Contact
+            </a>
+          </div>
+        </header>
 
-        <p className="note">
-          If you need a custom license (exclusive usage, extended distribution, or agency-wide
-          usage), please <Link href="/contact">contact me</Link>.
-        </p>
+        <section className="card">
+          <h2 id="license-types">1) License Types</h2>
+          <p>
+            Licenses are granted per image and may be included via membership, or purchased
+            individually. The applicable license for your use is the one selected at checkout (or
+            assigned by your membership plan).
+          </p>
 
-        <h2>Definitions</h2>
-        <ul>
-          <li>
-            <strong>Asset / Image / File</strong> — any digital photo or visual file downloaded
-            from the site (JPG/RAW or other formats).
-          </li>
-          <li>
-            <strong>License</strong> — permission to use the file under the conditions below.
-          </li>
-          <li>
-            <strong>Member</strong> — an active membership subscriber with download access.
-          </li>
-          <li>
-            <strong>Client Work</strong> — work produced for a client (brand, agency, publisher).
-          </li>
-        </ul>
+          <div className="grid">
+            <div className="box">
+              <h3>Personal</h3>
+              <ul>
+                <li>Personal projects and non-commercial use</li>
+                <li>Social posting (non-sponsored)</li>
+                <li>Wall art / prints for personal display</li>
+              </ul>
+            </div>
 
-        <h2>General Rules (Applies to All Licenses)</h2>
-        <ul>
-          <li>You receive a <strong>license</strong>, not ownership of copyright.</li>
-          <li>You may crop, resize, and color grade the file.</li>
-          <li>You may not claim the file as your own or trademark it.</li>
-          <li>You may not use the file unlawfully or misleadingly.</li>
-        </ul>
+            <div className="box">
+              <h3>Editorial</h3>
+              <ul>
+                <li>News, blogs, documentary, education</li>
+                <li>Magazine / article illustration</li>
+                <li>
+                  Must not imply endorsement by people/brands unless you have explicit permission
+                </li>
+              </ul>
+            </div>
 
-        <h2>License Types</h2>
+            <div className="box">
+              <h3>Commercial</h3>
+              <ul>
+                <li>Advertising, marketing, promotional use</li>
+                <li>Brand campaigns, agency work</li>
+                <li>Web, social, print, and broadcast promos</li>
+              </ul>
+            </div>
+          </div>
 
-        <h3>1) Personal License</h3>
-        <ul>
-          <li>✔ Personal social posts (non-sponsored)</li>
-          <li>✔ Personal website / portfolio</li>
-          <li>✔ Personal prints</li>
-          <li>✖ Brand advertising</li>
-          <li>✖ Client projects</li>
-          <li>✖ Resale or redistribution</li>
-        </ul>
+          <p className="note">
+            Note: Some images may contain recognizable people, property, trademarks, or artwork.
+            You are responsible for obtaining any additional releases required for your specific
+            use case.
+          </p>
+        </section>
 
-        <h3>2) Editorial License</h3>
-        <ul>
-          <li>✔ News / blog / documentary</li>
-          <li>✔ Educational use</li>
-          <li>✖ Advertising or promotions</li>
-          <li>✖ Product packaging</li>
-          <li>✖ Resale or redistribution</li>
-        </ul>
+        <section className="card">
+          <h2 id="permitted-use">2) Permitted Use</h2>
+          <p>You may:</p>
+          <ul>
+            <li>Use the image in projects consistent with the license you selected</li>
+            <li>Resize, crop, and color grade the image for your project needs</li>
+            <li>Use in digital and print formats (web, social, editorial, brochures, posters)</li>
+            <li>Use in client work if your license or membership plan allows it</li>
+          </ul>
 
-        <h3>3) Commercial License</h3>
-        <ul>
-          <li>✔ Brand websites and campaigns</li>
-          <li>✔ Client work</li>
-          <li>✔ Paid advertising</li>
-          <li>✖ Resale or sublicensing</li>
-          <li>✖ Stock redistribution</li>
-        </ul>
+          <p className="note">
+            Membership users may download and use images according to the active plan limits and
+            license scope shown on the Membership page.
+          </p>
+        </section>
 
-        <h2>Prohibited Uses</h2>
-        <ul>
-          <li>Redistributing original files</li>
-          <li>Reselling as templates or packs</li>
-          <li>AI training datasets</li>
-          <li>Misleading endorsement</li>
-        </ul>
+        <section className="card">
+          <h2 id="restrictions">3) Restrictions</h2>
+          <p>You may not:</p>
+          <ul>
+            <li>Resell, redistribute, or give away the original file (or near-original copy)</li>
+            <li>Upload the file to stock sites, marketplaces, or “free download” platforms</li>
+            <li>Use in logos, trademarks, or as a primary brand mark</li>
+            <li>
+              Use in illegal, defamatory, hateful, or pornographic content, or otherwise harmful
+              contexts
+            </li>
+            <li>
+              Claim authorship or register copyright ownership of the image (ownership remains with
+              Jeevan Chandimal)
+            </li>
+            <li>
+              Share membership download access with others (each membership is for one account /
+              email)
+            </li>
+          </ul>
+        </section>
 
-        <h2>Membership Downloads</h2>
-        <ul>
-          <li>Downloads remain licensed after cancellation</li>
-          <li>No new downloads after membership ends</li>
-          <li>Access is for the subscriber/organization only</li>
-        </ul>
+        <section className="card">
+          <h2>4) Delivery, Downloads, and File Handling</h2>
+          <ul>
+            <li>Downloads are delivered via secure links and may have limits for security</li>
+            <li>Keep backups of your purchased files</li>
+            <li>
+              If you experience download problems, contact support with your Order ID for
+              re-delivery
+            </li>
+          </ul>
+        </section>
 
-        <h2>Attribution</h2>
-        <p>
-          Not required unless editorial. Optional credit: <strong>© Jeevan Chandimal</strong>.
-        </p>
+        <section className="card">
+          <h2 id="credits">5) Credit & Attribution</h2>
+          <p>
+            Credit is appreciated and may be required for some editorial uses. If credit is needed
+            or requested, use:
+          </p>
+          <p className="quote">Photo © Jeevan Chandimal — JeevanChandimal.com</p>
+        </section>
 
-        <h2>Refunds</h2>
-        <p>
-          See <Link href="/refund-policy">Refund Policy</Link> for details.
-        </p>
+        <section className="card">
+          <h2>6) Ownership</h2>
+          <p>
+            All images remain the intellectual property of <strong>Jeevan Chandimal</strong>.
+            Purchasing or downloading grants a license to use — not ownership of the image.
+          </p>
+        </section>
 
-        <h2>Contact</h2>
-        <p>
-          📧 <strong>info@jeevanchandimal.com</strong>
-        </p>
+        <section className="card">
+          <h2 id="refunds">7) Refunds</h2>
+          <p>
+            Digital downloads are generally non-refundable once delivered or downloaded. Please
+            review the{' '}
+            <a className="link" href="/refund-policy">
+              Refund Policy
+            </a>{' '}
+            for full details and exceptions (corrupt file, wrong file, verified system error).
+          </p>
+        </section>
 
-        <p className="small">
-          <strong>Last updated:</strong> February 26, 2026
-        </p>
+        <section className="card">
+          <h2>8) Changes to This License</h2>
+          <p>
+            We may update this License Agreement from time to time. Changes will be posted on this
+            page. Your use of the site after changes means you accept the updated terms.
+          </p>
+        </section>
+
+        <section className="card">
+          <h2 id="contact">9) Contact</h2>
+          <p>
+            Questions about licensing or usage rights? Contact:
+            <br />
+            📧 <strong>info@jeevanchandimal.com</strong>
+          </p>
+
+          <div className="actions">
+            <a className="btn" href="/store">
+              Browse Store →
+            </a>
+            <a className="btnOutline" href="/memberships">
+              Membership →
+            </a>
+          </div>
+        </section>
       </main>
 
-      {/* ✅ FOOTER */}
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
         .wrap {
-          max-width: 900px;
+          max-width: 980px;
           margin: 0 auto;
-          padding: 60px 20px 100px;
-          line-height: 1.7;
+          padding: 54px 20px 100px;
+          line-height: 1.75;
+        }
+
+        .hero {
+          text-align: center;
+          margin-bottom: 22px;
         }
 
         h1 {
-          margin-bottom: 20px;
+          margin: 0 0 10px;
+          font-size: 42px;
+          line-height: 1.08;
+        }
+
+        .sub {
+          margin: 0 auto;
+          max-width: 820px;
+          opacity: 0.9;
+        }
+
+        .topLinks {
+          margin-top: 18px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          justify-content: center;
+        }
+
+        .pill {
+          text-decoration: none;
+          font-size: 12px;
+          padding: 10px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(255, 255, 255, 0.02);
+          opacity: 0.9;
+          transition: 0.2s ease;
+        }
+        .pill:hover {
+          opacity: 1;
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.12);
+        }
+
+        .card {
+          margin-top: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 18px;
+          padding: 22px 20px;
+          backdrop-filter: blur(8px);
         }
 
         h2 {
-          margin-top: 30px;
-          margin-bottom: 10px;
+          margin: 0 0 10px;
+          font-size: 20px;
+          line-height: 1.25;
         }
 
         h3 {
-          margin-top: 18px;
-          margin-bottom: 8px;
+          margin: 0 0 10px;
+          font-size: 16px;
         }
 
         ul {
-          margin-left: 20px;
-          margin-top: 10px;
+          margin: 10px 0 0;
+          padding-left: 18px;
         }
 
         li {
-          margin-bottom: 6px;
+          margin: 6px 0;
+        }
+
+        .grid {
+          margin-top: 14px;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .box {
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          border-radius: 16px;
+          padding: 14px 14px;
+          background: rgba(0, 0, 0, 0.18);
         }
 
         .note {
-          margin-top: 10px;
-          padding: 12px 14px;
-          border-radius: 12px;
-          border: 1px solid rgba(245, 244, 244, 0.18);
-          background: rgba(255, 255, 255, 0.02);
+          margin-top: 12px;
+          font-size: 13px;
+          opacity: 0.9;
         }
 
-        .small {
-          margin-top: 30px;
-          font-size: 13px;
-          opacity: 0.85;
+        .quote {
+          margin: 10px 0 0;
+          padding: 12px 14px;
+          border-radius: 14px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .link {
+          text-decoration: underline;
+        }
+
+        .actions {
+          margin-top: 14px;
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .btn {
+          text-decoration: none;
+          padding: 12px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(37, 195, 226, 0.55);
+          background: rgba(37, 195, 226, 0.08);
+          font-weight: 800;
+          transition: 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .btn:hover {
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.12);
+          border-color: rgba(37, 195, 226, 0.7);
+        }
+
+        .btnOutline {
+          text-decoration: none;
+          padding: 12px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(255, 255, 255, 0.02);
+          font-weight: 800;
+          opacity: 0.9;
+          transition: 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .btnOutline:hover {
+          opacity: 1;
+          border-color: rgba(245, 244, 244, 0.35);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+
+        @media (max-width: 991px) {
+          h1 {
+            font-size: 34px;
+          }
+          .grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </>
