@@ -126,11 +126,19 @@ export default function Members() {
       setChecking(false)
 
       // ✅ update nav badge without refresh
-      try {
-        const tierUpper = normalizeTierUpper(status.tier)
-        if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
-        window.dispatchEvent(new Event('jc_member_updated'))
-      } catch {}
+try {
+  const tierUpper = normalizeTierUpper(status.tier)
+  if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
+
+  // ✅ store remaining countdown
+  if (Number.isFinite(Number(status.remaining))) {
+    window.localStorage.setItem('member_remaining', String(Number(status.remaining)))
+  } else {
+    window.localStorage.removeItem('member_remaining')
+  }
+
+  window.dispatchEvent(new Event('jc_member_updated'))
+} catch {}
 
       // ✅ load archive
       loadLibrary()
@@ -212,11 +220,16 @@ export default function Members() {
       })
 
       // ✅ keep nav badge updated without refresh
-      try {
-        const tierUpper = normalizeTierUpper(j?.tier || member?.tier)
-        if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
-        window.dispatchEvent(new Event('jc_member_updated'))
-      } catch {}
+try {
+  const tierUpper = normalizeTierUpper(j?.tier || member?.tier)
+  if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
+
+  if (Number.isFinite(Number(j?.remaining))) {
+    window.localStorage.setItem('member_remaining', String(Number(j.remaining)))
+  }
+
+  window.dispatchEvent(new Event('jc_member_updated'))
+} catch {}
 
       if (j?.url) window.location.href = j.url
     } catch (e) {
