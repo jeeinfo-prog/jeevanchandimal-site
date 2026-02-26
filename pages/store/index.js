@@ -16,6 +16,10 @@ const STORAGE_CCY_KEY = 'jc_currency_v1'
 const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
 const DEFAULT_CURRENCY = 'USD'
 
+/* ================== membership flag ================== */
+const STORAGE_MEMBER_ACTIVE_KEY = 'jc_member_active'
+const STORAGE_USER_EMAIL_KEY = 'user_email'
+
 function safeJsonParse(v, fallback) {
   try {
     return JSON.parse(v)
@@ -121,6 +125,9 @@ export default function StoreIndex() {
   // ✅ FX rate (optional) used to adjust LKR from USD
   const [usdLkrRate, setUsdLkrRate] = React.useState(null)
 
+  // ✅ member state (minimal UI-only)
+  const [memberActive, setMemberActive] = React.useState(false)
+
   React.useEffect(() => {
     if (typeof window === 'undefined') return
     setOrigin(window.location.origin)
@@ -132,6 +139,16 @@ export default function StoreIndex() {
     setCurrency(c)
     writeCurrency(c) // ensure stored (defaults to USD)
     setUsdLkrRate(readUsdLkrRate())
+  }, [])
+
+  // ✅ Member flag (no API calls, no breaking)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const email = String(window.localStorage.getItem(STORAGE_USER_EMAIL_KEY) || '').trim()
+    const activeFlag = String(
+      window.localStorage.getItem(STORAGE_MEMBER_ACTIVE_KEY) || ''
+    ).trim()
+    setMemberActive(Boolean(email) && activeFlag === 'true')
   }, [])
 
   // ✅ Read q or tag from URL on load
@@ -252,6 +269,19 @@ export default function StoreIndex() {
             </Link>
           </div>
         </header>
+
+        {/* ✅ Membership link bar (minimal) */}
+        <div className="memberBar">
+          {memberActive ? (
+            <Link href="/members" legacyBehavior>
+              <a className="memberBadge">Member Access Active →</a>
+            </Link>
+          ) : (
+            <Link href="/memberships" legacyBehavior>
+              <a className="memberJoin">Join Membership →</a>
+            </Link>
+          )}
+        </div>
 
         {loading && <div className="empty">Loading photos…</div>}
         {!loading && error && <div className="empty">{error}</div>}
@@ -436,6 +466,42 @@ export default function StoreIndex() {
           border-color: rgba(245, 244, 244, 0.35);
           background: rgba(245, 244, 244, 0.06);
           transform: translateY(-1px);
+        }
+
+        /* ✅ membership bar */
+        .memberBar {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          margin: 0 auto 18px;
+        }
+        .memberBadge,
+        .memberJoin {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 14px;
+          border-radius: 999px;
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 700;
+          transition: 0.25s ease;
+          user-select: none;
+        }
+        .memberBadge {
+          border: 1px solid rgba(37, 195, 226, 0.6);
+          background: rgba(37, 195, 226, 0.06);
+        }
+        .memberJoin {
+          border: 1px solid rgba(245, 244, 244, 0.22);
+          background: rgba(255, 255, 255, 0.02);
+          opacity: 0.92;
+        }
+        .memberBadge:hover,
+        .memberJoin:hover {
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.12);
+          border-color: rgba(37, 195, 226, 0.65);
+          opacity: 1;
         }
 
         .activeFilter {
