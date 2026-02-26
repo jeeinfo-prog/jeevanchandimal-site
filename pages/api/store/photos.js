@@ -19,10 +19,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // optional: /api/store/photos?limit=200
     const limit = clampInt(req.query?.limit, 1, 2000, 2000)
 
-    // ✅ IMPORTANT: do NOT select columns that aren't in your table (e.g. location)
     const { data, error } = await supabaseAdmin
       .from('photos')
       .select('id,title,description,tags,preview_url,thumb_url,created_at')
