@@ -12,10 +12,12 @@ function isValidEmail(v) {
 function cleanLower(v) {
   return String(v || '').trim().toLowerCase()
 }
+function normalizeFormat(v) {
+  return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
+}
 
 function resolveTierTermFromMembershipRow(memberRow) {
   const planRaw = cleanLower(memberRow?.plan)
-
   if (planRaw === 'monthly') return { tier: 'basic', term: 'monthly' }
   if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
   if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
@@ -24,8 +26,7 @@ function resolveTierTermFromMembershipRow(memberRow) {
     const end = memberRow?.end_date || null
     if (!end) return { tier: planRaw, term: 'monthly' }
 
-    const now = Date.now()
-    const diffDays = Math.round((new Date(end).getTime() - now) / 86400000)
+    const diffDays = Math.round((new Date(end).getTime() - Date.now()) / 86400000)
     if (diffDays > 3000) return { tier: planRaw, term: 'lifetime' }
     if (diffDays > 300) return { tier: planRaw, term: 'yearly' }
     return { tier: planRaw, term: 'monthly' }
@@ -40,10 +41,6 @@ function limitForTier(tier) {
   if (t === 'pro') return 75
   if (t === 'elite') return 200
   return 75
-}
-
-function normalizeFormat(v) {
-  return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
 
 function cycleKey(term, now = new Date()) {
@@ -74,6 +71,55 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
 }
 
+/**
+ * ✅ Insert order with fallback:
+ * If your orders table is missing some optional columns, retry without them.
+ */
+async function safeInsertOrder(payload) {
+  const attempt = async (obj) => supabaseAdmin.from('orders').insert(obj).select('*').maybeSingle()
+
+  // try full payload first
+  let r = await attempt(payload)
+  if (!r.error) return r.data
+
+  const msg = String(r.error.message || '')
+
+  // If error looks like "column X does not exist", strip optional fields and retry
+  if (msg.toLowerCase().includes('does not exist') && msg.toLowerCase().includes('column')) {
+    const minimal = { ...payload }
+
+    // strip OPTIONAL fields (keep essentials)
+    delete minimal.download_limit
+    delete minimal.download_count
+    delete minimal.license
+    delete minimal.format
+    delete minimal.delivery_object_key
+
+    r = await attempt(minimal)
+    if (!r.error) return r.data
+
+    // final retry: ultra-minimal (only safest keys)
+    const ultra = {
+      id: payload.id,
+      code: payload.code,
+      email: payload.email,
+      status: payload.status,
+      paid_at: payload.paid_at,
+      amount: payload.amount,
+      currency: payload.currency,
+      order_kind: payload.order_kind,
+      photo_id: payload.photo_id,
+    }
+
+    const r3 = await attempt(ultra)
+    if (!r3.error) return r3.data
+
+    throw new Error(r3.error.message)
+  }
+
+  throw new Error(r.error.message)
+}
+
 async function ensureMemberOrder(email, tier, term) {
   const code = `MEMBER_${cycleKey(term)}_${email}`
 
@@ -82,6 +128,7 @@ async function ensureMemberOrder(email, tier, term) {
 
   const id = crypto.randomUUID()
 
+  // Full payload (best case)
   const payload = {
     id,
     code,
@@ -90,21 +137,22 @@ async function ensureMemberOrder(email, tier, term) {
     paid_at: new Date().toISOString(),
     amount: 0,
     currency: 'LKR',
+
+    // ✅ critical: avoid photo constraints
     order_kind: 'membership',
 
+    // some schemas require these, keep them when possible
     photo_id: 'membership',
     delivery_object_key: 'membership',
 
-    license: cleanLower(tier), // tier
-    format: cleanLower(term), // term
-
+    // meter fields (if present in your schema)
+    license: cleanLower(tier),
+    format: cleanLower(term),
     download_limit: limitForTier(tier),
     download_count: 0,
   }
 
-  const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
-  if (ins.error) throw new Error(ins.error.message)
-  return ins.data
+  return await safeInsertOrder(payload)
 }
 
 export default async function handler(req, res) {
@@ -123,7 +171,7 @@ export default async function handler(req, res) {
     if (!photoId || !email) return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
     if (!isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
 
-    // ✅ IMPORTANT: do NOT select expires_at (doesn't exist in your table)
+    // ✅ memberships table (no expires_at!)
     const { data: member, error: mErr } = await supabaseAdmin
       .from('memberships')
       .select('plan,status,end_date,created_at')
@@ -152,20 +200,16 @@ export default async function handler(req, res) {
 
     const memberOrder = await ensureMemberOrder(email, tier, term)
 
+    // ✅ Best-effort metering: only enforce if columns exist
     const used = Number(memberOrder?.download_count ?? 0)
     const limit = Number(memberOrder?.download_limit ?? limitForTier(tier))
     const remaining = Math.max(0, limit - used)
 
+    // If you want strict limit only when the schema supports it:
+    // If download_limit/download_count columns don't exist, remaining will still be computed,
+    // but consumption happens in your /api/download RPC anyway.
     if (remaining <= 0) {
-      return res.status(403).json({
-        ok: false,
-        error: 'Monthly download limit reached.',
-        tier,
-        term,
-        used,
-        limit,
-        remaining: 0,
-      })
+      return res.status(403).json({ ok: false, error: 'Monthly download limit reached.', tier, term, used, limit, remaining: 0 })
     }
 
     const jti = crypto.randomUUID()
@@ -179,7 +223,7 @@ export default async function handler(req, res) {
 
     if (insTok.error) {
       console.error('download_tokens insert failed:', insTok.error.message)
-      return res.status(500).json({ ok: false, error: 'Server error' })
+      return res.status(500).json({ ok: false, error: insTok.error.message })
     }
 
     const token = createDownloadToken(

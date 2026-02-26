@@ -1,93 +1,37 @@
 // pages/api/member/status.js
-import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
 }
-
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
-
 function cleanLower(v) {
   return String(v || '').trim().toLowerCase()
 }
 
 function resolveTierTermFromMembershipRow(memberRow) {
-  // memberships.plan could be:
-  // - legacy: monthly/yearly/lifetime
-  // - new: basic/pro/elite
   const planRaw = cleanLower(memberRow?.plan)
 
-  // legacy mapping
+  // legacy mapping (if your old plan stored monthly/yearly/lifetime)
   if (planRaw === 'monthly') return { tier: 'basic', term: 'monthly' }
   if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
   if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
 
-  // tier stored in plan
+  // new style (plan stores tier)
   if (['basic', 'pro', 'elite'].includes(planRaw)) {
+    // best-effort term inference from end_date (optional)
     const end = memberRow?.end_date || null
     if (!end) return { tier: planRaw, term: 'monthly' }
 
-    const now = Date.now()
-    const diffDays = Math.round((new Date(end).getTime() - now) / 86400000)
+    const diffDays = Math.round((new Date(end).getTime() - Date.now()) / 86400000)
     if (diffDays > 3000) return { tier: planRaw, term: 'lifetime' }
     if (diffDays > 300) return { tier: planRaw, term: 'yearly' }
     return { tier: planRaw, term: 'monthly' }
   }
 
   return { tier: 'pro', term: 'monthly' }
-}
-
-function limitForTier(tier) {
-  const t = cleanLower(tier)
-  if (t === 'basic') return 20
-  if (t === 'pro') return 75
-  if (t === 'elite') return 200
-  return 75
-}
-
-function cycleKey(term, now = new Date()) {
-  const t = cleanLower(term)
-  const yyyy = now.getUTCFullYear()
-  const mm = String(now.getUTCMonth() + 1).padStart(2, '0')
-  if (t === 'yearly') return `${yyyy}`
-  if (t === 'lifetime') return `LIFE`
-  return `${yyyy}-${mm}` // monthly
-}
-
-async function getOrCreateMemberOrder(email, tier, term) {
-  const code = `MEMBER_${cycleKey(term)}_${email}`
-
-  const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
-  if (!existing.error && existing.data) return existing.data
-
-  const id = crypto.randomUUID()
-
-  const payload = {
-    id,
-    code,
-    email,
-    status: 'PAID',
-    paid_at: new Date().toISOString(),
-    amount: 0,
-    currency: 'LKR',
-    order_kind: 'membership',
-
-    photo_id: 'membership',
-    delivery_object_key: 'membership',
-
-    license: cleanLower(tier), // tier
-    format: cleanLower(term), // term
-
-    download_limit: limitForTier(tier),
-    download_count: 0,
-  }
-
-  const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
-  if (ins.error) throw new Error(ins.error.message)
-  return ins.data
 }
 
 export default async function handler(req, res) {
@@ -97,7 +41,7 @@ export default async function handler(req, res) {
     const email = normalizeEmail(req.query?.email)
     if (!email || !isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
 
-    // ✅ IMPORTANT: do NOT select expires_at (doesn't exist in your table)
+    // ✅ IMPORTANT: select ONLY columns that actually exist in memberships
     const { data: member, error } = await supabaseAdmin
       .from('memberships')
       .select('plan,status,end_date,created_at')
@@ -117,19 +61,15 @@ export default async function handler(req, res) {
 
     const { tier, term } = resolveTierTermFromMembershipRow(member)
 
-    const order = await getOrCreateMemberOrder(email, tier, term)
-    const used = Number(order?.download_count ?? 0)
-    const limit = Number(order?.download_limit ?? limitForTier(tier))
-    const remaining = Math.max(0, limit - used)
+    // ✅ “Option C” badge: tier + term
+    const plan = `${tier} ${term}` // e.g. "pro monthly"
 
     return res.status(200).json({
       ok: true,
       member: true,
+      plan, // used by navbar badge
       tier,
       term,
-      used,
-      limit,
-      remaining,
       ends_at: endDate,
     })
   } catch (e) {
