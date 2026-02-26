@@ -145,19 +145,19 @@ const Process01 = (props) => {
 
       <style jsx>{`
         .process-01-container2 {
-  width: 100%;
-  display: grid;
-  gap: var(--dl-layout-space-fiveunits);
-  grid-template-columns: 1fr 1fr;
-  align-items: center; /* ✅ vertical center */
-}
+          width: 100%;
+          display: grid;
+          gap: var(--dl-layout-space-fiveunits);
+          grid-template-columns: 1fr 1fr;
+          align-items: center; /* ✅ center text vs tall image stack */
+        }
 
         .process-01-thq-tabs-menu-elm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dl-layout-space-twounits);
-  justify-content: center; /* ✅ center inside column */
-}
+          display: flex;
+          flex-direction: column;
+          gap: var(--dl-layout-space-twounits);
+          justify-content: center; /* ✅ keep text vertically centered */
+        }
 
         .processTab {
           width: 100%;
@@ -181,6 +181,7 @@ const Process01 = (props) => {
           gap: 10px;
         }
 
+        /* ✅ hover = BLUE text */
         .menuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
@@ -193,6 +194,7 @@ const Process01 = (props) => {
           box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(37, 195, 226, 0.15);
         }
 
+        /* active item stays blue */
         .menuItem.isActiveItem {
           background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
           border: 1px solid rgba(37, 195, 226, 0.18);
@@ -214,25 +216,28 @@ const Process01 = (props) => {
           transform: translateX(0);
         }
 
+        /* ✅ right image stack wrapper */
         .process-01-thq-image-container-elm {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
 
-        /* ✅ right column: top + bottom */
+        /* ✅ total block = 740px */
         .imgColumn {
-  width: 100%;
-  height: 740px; /* ✅ total block */
-  display: flex;
-  flex-direction: column;
-  gap: 20px; /* ✅ ensures total feels like 740 */
-}
+          width: 100%;
+          height: 740px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px; /* 360 + 20 + 360 = 740 */
+        }
 
+        /* ✅ each image = 360px */
         .imgCard.small {
           position: relative;
           width: 100%;
-          height: 360px; /* ✅ each image */
+          height: 360px;
           overflow: hidden;
           border-radius: 16px;
           border: 1px solid rgba(245, 244, 244, 0.12);
@@ -268,8 +273,13 @@ const Process01 = (props) => {
             gap: var(--dl-layout-space-twounits);
           }
 
+          .process-01-thq-tabs-menu-elm {
+            order: 2;
+          }
+
           .imgColumn {
             height: auto;
+            gap: var(--dl-layout-space-oneandhalfunits);
           }
 
           .imgCard.small {
