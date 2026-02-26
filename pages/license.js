@@ -1,7 +1,9 @@
 // pages/license.js
 import React from 'react'
-import LegalSeo from '../components/LegalSeo'
 import Link from 'next/link'
+import LegalSeo from '../components/LegalSeo'
+import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 export default function License() {
   return (
@@ -11,6 +13,9 @@ export default function License() {
         description="License terms for photography downloads and membership access on JeevanChandimal.com — including personal, editorial, and commercial usage."
         path="/license"
       />
+
+      {/* ✅ NAV */}
+      <JeevanChandimalNavi />
 
       <main className="wrap">
         <h1>License Terms</h1>
@@ -45,120 +50,69 @@ export default function License() {
 
         <h2>General Rules (Applies to All Licenses)</h2>
         <ul>
-          <li>
-            You receive a <strong>license</strong> to use the file — you do <strong>not</strong>{' '}
-            own the copyright.
-          </li>
-          <li>
-            You may <strong>crop</strong>, <strong>resize</strong>, and <strong>color grade</strong>{' '}
-            the file to match your project.
-          </li>
-          <li>
-            You may not claim the file as your own or register it as a trademark.
-          </li>
-          <li>
-            You may not use the file in a way that is unlawful, defamatory, or misleading.
-          </li>
+          <li>You receive a <strong>license</strong>, not ownership of copyright.</li>
+          <li>You may crop, resize, and color grade the file.</li>
+          <li>You may not claim the file as your own or trademark it.</li>
+          <li>You may not use the file unlawfully or misleadingly.</li>
         </ul>
 
         <h2>License Types</h2>
 
         <h3>1) Personal License</h3>
-        <p>For individual / non-client use (portfolio, personal projects, home prints).</p>
         <ul>
           <li>✔ Personal social posts (non-sponsored)</li>
           <li>✔ Personal website / portfolio</li>
-          <li>✔ Personal prints (non-commercial)</li>
-          <li>✖ Brand advertising or paid campaigns</li>
+          <li>✔ Personal prints</li>
+          <li>✖ Brand advertising</li>
           <li>✖ Client projects</li>
           <li>✖ Resale or redistribution</li>
         </ul>
 
         <h3>2) Editorial License</h3>
-        <p>
-          For news, documentary, blog, or editorial usage where the image illustrates a story.
-        </p>
         <ul>
-          <li>✔ News / magazine / blog editorial use</li>
-          <li>✔ Documentary / educational use</li>
-          <li>✔ Social posts related to editorial content</li>
-          <li>✖ Advertising / promotions (paid or sponsored)</li>
+          <li>✔ News / blog / documentary</li>
+          <li>✔ Educational use</li>
+          <li>✖ Advertising or promotions</li>
           <li>✖ Product packaging</li>
           <li>✖ Resale or redistribution</li>
         </ul>
 
-        <h3>3) Commercial License (Pro / higher tiers or commercial purchase)</h3>
-        <p>For business, brand, and client-facing commercial projects.</p>
+        <h3>3) Commercial License</h3>
         <ul>
-          <li>✔ Brand websites, landing pages</li>
-          <li>✔ Advertising and paid campaigns</li>
-          <li>✔ Client work (agency / production / marketing)</li>
-          <li>✔ Social media promotions</li>
-          <li>✖ Resale, sublicensing, or redistribution</li>
-          <li>✖ Use in “print-on-demand” templates / stock bundles</li>
+          <li>✔ Brand websites and campaigns</li>
+          <li>✔ Client work</li>
+          <li>✔ Paid advertising</li>
+          <li>✖ Resale or sublicensing</li>
+          <li>✖ Stock redistribution</li>
         </ul>
 
-        <h2>Prohibited Uses (Not Allowed Under Any Standard License)</h2>
+        <h2>Prohibited Uses</h2>
         <ul>
-          <li>
-            <strong>Redistribution</strong>: sharing the original files or making them available
-            for download (Google Drive, Dropbox, bundles, stock sites, torrents, etc.).
-          </li>
-          <li>
-            <strong>Resale</strong>: selling the file as-is or as part of a pack/template/product
-            where the image is the primary value.
-          </li>
-          <li>
-            <strong>Sub-licensing</strong>: granting others rights to use the file.
-          </li>
-          <li>
-            <strong>AI training / dataset use</strong>: using files to train or build datasets
-            (unless you have written permission).
-          </li>
-          <li>
-            <strong>Misleading use</strong>: implying endorsement by a person/brand/location if not
-            true.
-          </li>
+          <li>Redistributing original files</li>
+          <li>Reselling as templates or packs</li>
+          <li>AI training datasets</li>
+          <li>Misleading endorsement</li>
         </ul>
-
-        <h2>Team / Seat Usage</h2>
-        <p>
-          Standard licenses are intended for use by the purchaser or the purchasing organization.
-          If you need multi-team distribution across departments, or usage across multiple client
-          accounts, request a custom license.
-        </p>
 
         <h2>Membership Downloads</h2>
         <ul>
-          <li>
-            Files downloaded during an active membership remain licensed under the terms of the
-            membership tier at the time of download.
-          </li>
-          <li>
-            If you cancel, your prior downloads do not “expire”, but your ability to download new
-            files ends when your billing period ends.
-          </li>
-          <li>
-            Membership access is for the subscriber/organization and may not be shared publicly.
-          </li>
+          <li>Downloads remain licensed after cancellation</li>
+          <li>No new downloads after membership ends</li>
+          <li>Access is for the subscriber/organization only</li>
         </ul>
 
         <h2>Attribution</h2>
         <p>
-          Attribution is not required unless specified for an editorial arrangement. If you do
-          credit, use: <strong>© Jeevan Chandimal</strong>.
+          Not required unless editorial. Optional credit: <strong>© Jeevan Chandimal</strong>.
         </p>
 
         <h2>Refunds</h2>
         <p>
-          Digital purchases are typically non-refundable once delivered. See{' '}
-          <Link href="/refund-policy">Refund Policy</Link> for details.
+          See <Link href="/refund-policy">Refund Policy</Link> for details.
         </p>
 
         <h2>Contact</h2>
         <p>
-          For custom licensing, questions, or permissions, contact:
-          <br />
           📧 <strong>info@jeevanchandimal.com</strong>
         </p>
 
@@ -166,6 +120,9 @@ export default function License() {
           <strong>Last updated:</strong> February 26, 2026
         </p>
       </main>
+
+      {/* ✅ FOOTER */}
+      <JeevanChandimalNewFooter />
 
       <style jsx>{`
         .wrap {
