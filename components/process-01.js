@@ -224,17 +224,17 @@ const Process01 = (props) => {
 
         /* ✅ right column: top + bottom */
         .imgColumn {
-          width: 100%;
-          height: 360px; /* total */
-          display: grid;
-          grid-template-rows: 1fr 1fr;
-          gap: var(--dl-layout-space-oneandhalfunits);
-        }
+  width: 100%;
+  height: 740px; /* ✅ total block */
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* ✅ ensures total feels like 740 */
+}
 
         .imgCard.small {
           position: relative;
           width: 100%;
-          height: 100%;
+          height: 360px; /* ✅ each image */
           overflow: hidden;
           border-radius: 16px;
           border: 1px solid rgba(245, 244, 244, 0.12);
