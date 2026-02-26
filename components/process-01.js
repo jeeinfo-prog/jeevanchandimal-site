@@ -42,7 +42,13 @@ const Process01 = (props) => {
   const safeLen = pool.length || 1
 
   const currentSrc = pool[currentIdx % safeLen] || '/about/process-concept.jpg'
-  const bottomSrc = pool.length > 1 ? pool[(currentIdx + 1) % safeLen] : currentSrc
+
+  const bottomSrc =
+    activeTab === 0
+      ? '/about/process-bottom-concept.jpg'
+      : activeTab === 1
+      ? '/about/process-bottom-observation.jpg'
+      : '/about/process-bottom-detail.jpg'
 
   const currentAlt =
     activeTab === 0
@@ -61,6 +67,7 @@ const Process01 = (props) => {
     <>
       <div className={`thq-section-padding ${props.rootClassName}`}>
         <div className="process-01-container2 thq-section-max-width">
+
           {/* TEXT TABS */}
           <div className="process-01-thq-tabs-menu-elm">
             <button
@@ -129,6 +136,7 @@ const Process01 = (props) => {
             onMouseLeave={() => setPaused(false)}
           >
             <div className="imgColumn">
+
               <div className="imgCard small">
                 <img src={currentSrc} alt={currentAlt} className="process-img" loading="lazy" />
                 <div className="imgOverlay" />
@@ -138,8 +146,10 @@ const Process01 = (props) => {
                 <img src={bottomSrc} alt="Supporting process frame" className="process-img" loading="lazy" />
                 <div className="imgOverlay" />
               </div>
+
             </div>
           </div>
+
         </div>
       </div>
 
@@ -149,14 +159,14 @@ const Process01 = (props) => {
           display: grid;
           gap: var(--dl-layout-space-fiveunits);
           grid-template-columns: 1fr 1fr;
-          align-items: center; /* ✅ center text vs tall image stack */
+          align-items: center;
         }
 
         .process-01-thq-tabs-menu-elm {
           display: flex;
           flex-direction: column;
           gap: var(--dl-layout-space-twounits);
-          justify-content: center; /* ✅ keep text vertically centered */
+          justify-content: center;
         }
 
         .processTab {
@@ -181,7 +191,6 @@ const Process01 = (props) => {
           gap: 10px;
         }
 
-        /* ✅ hover = BLUE text */
         .menuItem:hover {
           opacity: 1;
           background: rgba(245, 244, 244, 0.08);
@@ -191,10 +200,10 @@ const Process01 = (props) => {
         .processTab:hover {
           transform: translateY(-3px) scale(1.01);
           border-color: rgba(37, 195, 226, 0.28);
-          box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(37, 195, 226, 0.15);
+          box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35),
+            0 0 0 1px rgba(37, 195, 226, 0.15);
         }
 
-        /* active item stays blue */
         .menuItem.isActiveItem {
           background: linear-gradient(180deg, rgba(37, 195, 226, 0.2), rgba(37, 195, 226, 0.08));
           border: 1px solid rgba(37, 195, 226, 0.18);
@@ -216,7 +225,6 @@ const Process01 = (props) => {
           transform: translateX(0);
         }
 
-        /* ✅ right image stack wrapper */
         .process-01-thq-image-container-elm {
           width: 100%;
           display: flex;
@@ -224,16 +232,14 @@ const Process01 = (props) => {
           justify-content: center;
         }
 
-        /* ✅ total block = 740px */
         .imgColumn {
           width: 100%;
           height: 740px;
           display: flex;
           flex-direction: column;
-          gap: 20px; /* 360 + 20 + 360 = 740 */
+          gap: 20px;
         }
 
-        /* ✅ each image = 360px */
         .imgCard.small {
           position: relative;
           width: 100%;
@@ -293,44 +299,9 @@ const Process01 = (props) => {
 
 Process01.defaultProps = {
   rootClassName: '',
-
   feature1ImgSrc: '/about/process-concept.jpg',
   feature2ImgSrc: '/about/process-observation.jpg',
   feature3ImgSrc: '/about/process-detail.jpg',
-
-  feature1ImgAlt: 'Concept planning',
-  feature2ImgAlt: 'Observation and framing',
-  feature3ImgAlt: 'Craft and detail',
-
-  feature1Imgs: undefined,
-  feature2Imgs: undefined,
-  feature3Imgs: undefined,
-}
-
-Process01.propTypes = {
-  rootClassName: PropTypes.string,
-
-  feature1Title2: PropTypes.element,
-  feature1Title11: PropTypes.element,
-  feature1Description2: PropTypes.element,
-
-  feature3Title: PropTypes.element,
-  feature3Description: PropTypes.element,
-
-  feature3Title1: PropTypes.element,
-  feature3Description1: PropTypes.element,
-
-  feature1ImgSrc: PropTypes.string,
-  feature2ImgSrc: PropTypes.string,
-  feature3ImgSrc: PropTypes.string,
-
-  feature1ImgAlt: PropTypes.string,
-  feature2ImgAlt: PropTypes.string,
-  feature3ImgAlt: PropTypes.string,
-
-  feature1Imgs: PropTypes.arrayOf(PropTypes.string),
-  feature2Imgs: PropTypes.arrayOf(PropTypes.string),
-  feature3Imgs: PropTypes.arrayOf(PropTypes.string),
 }
 
 export default Process01
