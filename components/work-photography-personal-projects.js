@@ -1,327 +1,311 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const WorkPhotographyPersonalProjects = (props) => {
   return (
     <>
-      <div className="work-photography-personal-projects-thq-layout300-elm thq-section-padding">
-        <div className="work-photography-personal-projects-thq-max-width-elm thq-section-max-width">
-          <div className="work-photography-personal-projects-thq-section-title-elm">
-            <div className="work-photography-personal-projects-thq-content-elm1">
-              <h2 className="work-photography-personal-projects-thq-text-elm1 thq-heading-2">
-                {props.heading1 ?? (
-                  <Fragment>
-                    <span className="work-photography-personal-projects-text8">
-                      Personal projects
-                    </span>
-                  </Fragment>
-                )}
-              </h2>
-              <span className="work-photography-personal-projects-thq-text-elm2 thq-body-large">
-                {props.content1 ?? (
-                  <Fragment>
-                    <span className="work-photography-personal-projects-text3">
-                      Independent photographic work developed through
-                      exploration and long-form observation. These projects
-                      reflect ongoing personal interests in nature, landscape,
-                      and human presence within space.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-          </div>
-          <div className="work-photography-personal-projects-thq-content-elm2">
-            <div className="work-photography-personal-projects-thq-row-elm thq-flex-row">
-              <div className="work-photography-personal-projects-thq-feature1-elm">
+      <section className="wrap thq-section-padding">
+        <div className="shell thq-section-max-width">
+          <header className="head">
+            <h2 className="title thq-heading-2">
+              {props.heading1 ?? (
+                <Fragment>
+                  <span>Personal projects</span>
+                </Fragment>
+              )}
+            </h2>
+
+            <p className="subtitle thq-body-large">
+              {props.content1 ?? (
+                <Fragment>
+                  <span>
+                    Independent photographic work developed through exploration
+                    and long-form observation. These projects reflect ongoing
+                    personal interests in nature, landscape, and human presence
+                    within space.
+                  </span>
+                </Fragment>
+              )}
+            </p>
+          </header>
+
+          <div className="grid">
+            {/* Card 1 */}
+            <article className="card">
+              <div className="media">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt={props.feature1ImageAlt}
                   src={props.feature1ImageSrc}
-                  className="thq-img-ratio-4-3"
+                  className="img"
+                  loading="lazy"
                 />
-                <div className="work-photography-personal-projects-thq-content-elm3">
-                  <h3 className="work-photography-personal-projects-thq-feature1-title-elm thq-heading-3">
-                    {props.feature1Title ?? (
-                      <Fragment>
-                        <span className="work-photography-personal-projects-text4">
-                          Intuitive Design
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature1Description ?? (
-                      <Fragment>
-                        <span className="work-photography-personal-projects-text7">
-                          We prioritize user experience with our intuitive and
-                          user-friendly designs.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
+                <div className="shade" />
               </div>
-              <div className="work-photography-personal-projects-thq-feature2-elm">
+
+              <div className="body">
+                <h3 className="cardTitle thq-heading-3">
+                  {props.feature1Title ?? (
+                    <Fragment>
+                      <span>Nature & Atmosphere</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <p className="cardDesc thq-body-small">
+                  {props.feature1Description ?? (
+                    <Fragment>
+                      <span>
+                        Studies of weather, light, and quiet rhythm — built around
+                        mood and texture.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+              </div>
+            </article>
+
+            {/* Card 2 */}
+            <article className="card">
+              <div className="media">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt={props.feature2ImageAlt}
                   src={props.feature2ImageSrc}
-                  className="thq-img-ratio-4-3"
+                  className="img"
+                  loading="lazy"
                 />
-                <div className="work-photography-personal-projects-thq-content-elm4">
-                  <h3 className="thq-heading-3">
-                    {props.feature2Title ?? (
-                      <Fragment>
-                        <span className="work-photography-personal-projects-text2">
-                          Powerful Analytics Tools
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature2Description ?? (
-                      <Fragment>
-                        <span className="work-photography-personal-projects-text5">
-                          Gain valuable insights and make informed decisions
-                          with our advanced analytics tools.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
+                <div className="shade" />
               </div>
-              <div className="work-photography-personal-projects-thq-feature3-elm">
+
+              <div className="body">
+                <h3 className="cardTitle thq-heading-3">
+                  {props.feature2Title ?? (
+                    <Fragment>
+                      <span>Landscape observations</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <p className="cardDesc thq-body-small">
+                  {props.feature2Description ?? (
+                    <Fragment>
+                      <span>
+                        Long-form frames shaped by place — distance, scale, and
+                        the feeling of space.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+              </div>
+            </article>
+
+            {/* Card 3 */}
+            <article className="card">
+              <div className="media">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   alt={props.feature3ImageAlt}
                   src={props.feature3ImageSrc}
-                  className="thq-img-ratio-4-3"
+                  className="img"
+                  loading="lazy"
                 />
-                <div className="work-photography-personal-projects-thq-content-elm5">
-                  <h3 className="thq-heading-3">
-                    {props.feature3Title ?? (
-                      <Fragment>
-                        <span className="work-photography-personal-projects-text1">
-                          AI &amp; Animations
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature3Description ?? (
-                      <Fragment>
-                        <span className="work-photography-personal-projects-text6">
-                          Incorporate cutting-edge AI and animations to enhance
-                          your projects and captivate your audience.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
+                <div className="shade" />
               </div>
-            </div>
+
+              <div className="body">
+                <h3 className="cardTitle thq-heading-3">
+                  {props.feature3Title ?? (
+                    <Fragment>
+                      <span>Human presence</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <p className="cardDesc thq-body-small">
+                  {props.feature3Description ?? (
+                    <Fragment>
+                      <span>
+                        Small moments inside larger worlds — scenes that feel lived-in
+                        and honest.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+              </div>
+            </article>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .work-photography-personal-projects-thq-layout300-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
+      </section>
+
+      <style jsx>{`
+        .wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .shell {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .head {
+          max-width: 860px;
+          margin: 0 auto;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .title {
+          margin: 0;
+        }
+
+        .subtitle {
+          margin: 0;
+          opacity: 0.9;
+          line-height: 1.65;
+        }
+
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(12, 1fr);
+          gap: 16px;
+        }
+
+        .card {
+          grid-column: span 4;
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(34, 34, 34, 0.35);
+          backdrop-filter: blur(12px);
+          box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+          transition: transform 0.18s ease, border-color 0.18s ease,
+            box-shadow 0.18s ease;
+        }
+
+        .card:hover {
+          transform: translateY(-3px);
+          border-color: rgba(120, 166, 255, 0.35);
+          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+        }
+
+        .media {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          background: rgba(0, 0, 0, 0.2);
+          overflow: hidden;
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.28s ease;
+        }
+
+        .card:hover .img {
+          transform: scale(1.07);
+        }
+
+        .shade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0),
+            rgba(0, 0, 0, 0.55)
+          );
+        }
+
+        .body {
+          padding: 14px 14px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .cardTitle {
+          margin: 0;
+          text-align: left;
+        }
+
+        .cardDesc {
+          margin: 0;
+          opacity: 0.86;
+          line-height: 1.55;
+          text-align: left;
+        }
+
+        @media (max-width: 991px) {
+          .card {
+            grid-column: span 6;
           }
-          .work-photography-personal-projects-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
+        }
+
+        @media (max-width: 767px) {
+          .head {
+            text-align: left;
+            margin: 0;
           }
-          .work-photography-personal-projects-thq-section-title-elm {
-            gap: 16px;
-            width: 100%;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
+          .card {
+            grid-column: span 12;
           }
-          .work-photography-personal-projects-thq-content-elm1 {
-            gap: 24px;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-thq-text-elm1 {
-            text-align: center;
-          }
-          .work-photography-personal-projects-thq-text-elm2 {
-            text-align: center;
-          }
-          .work-photography-personal-projects-thq-content-elm2 {
-            gap: 48px;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-thq-row-elm {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-            justify-content: center;
-          }
-          .work-photography-personal-projects-thq-feature1-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            overflow: hidden;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-thq-content-elm3 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-thq-feature1-title-elm {
-            text-align: center;
-          }
-          .work-photography-personal-projects-thq-feature2-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            overflow: hidden;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-thq-content-elm4 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-thq-feature3-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            overflow: hidden;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-thq-content-elm5 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .work-photography-personal-projects-text1 {
-            display: inline-block;
-          }
-          .work-photography-personal-projects-text2 {
-            display: inline-block;
-          }
-          .work-photography-personal-projects-text3 {
-            display: inline-block;
-          }
-          .work-photography-personal-projects-text4 {
-            display: inline-block;
-          }
-          .work-photography-personal-projects-text5 {
-            display: inline-block;
-          }
-          .work-photography-personal-projects-text6 {
-            display: inline-block;
-          }
-          .work-photography-personal-projects-text7 {
-            display: inline-block;
-          }
-          .work-photography-personal-projects-text8 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .work-photography-personal-projects-thq-section-title-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 767px) {
-            .work-photography-personal-projects-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .work-photography-personal-projects-thq-section-title-elm {
-              width: auto;
-            }
-            .work-photography-personal-projects-thq-text-elm1 {
-              text-align: center;
-            }
-            .work-photography-personal-projects-thq-row-elm {
-              flex-direction: column;
-            }
-            .work-photography-personal-projects-thq-feature2-elm {
-              width: auto;
-            }
-            .work-photography-personal-projects-thq-feature3-elm {
-              width: auto;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 WorkPhotographyPersonalProjects.defaultProps = {
-  feature2ImageAlt: 'Analytics Tools Image',
-  feature3Title: undefined,
-  feature2Title: undefined,
-  feature1ImageAlt: 'Intuitive Design Image',
-  feature1ImageSrc:
-    '/Photography/1x1/arcade%2001_1x1_2000x2000_u_100-1400w.png',
-  feature2ImageSrc:
-    '/Photography/1x1/beira%20lake%20%20colombo%2C%20sri%20lanka._1x1_2000x2000_u_100-1400w.png',
-  feature3ImageSrc:
-    '/Photography/1x1/floating%20market%20-%20pettah%20%20colombo%2C%20sri%20lanka._1x1_2000x2000_u_100-1400w.png',
-  feature3ImageAlt: 'AI & Animations Image',
+  heading1: undefined,
   content1: undefined,
+
+  // ✅ New file naming system
+  feature1ImageSrc: '/work/photography/wpp-01.jpg',
+  feature2ImageSrc: '/work/photography/wpp-02.jpg',
+  feature3ImageSrc: '/work/photography/wpp-03.jpg',
+
+  feature1ImageAlt: 'Personal project 01',
+  feature2ImageAlt: 'Personal project 02',
+  feature3ImageAlt: 'Personal project 03',
+
   feature1Title: undefined,
+  feature2Title: undefined,
+  feature3Title: undefined,
+
+  feature1Description: undefined,
   feature2Description: undefined,
   feature3Description: undefined,
-  feature1Description: undefined,
-  heading1: undefined,
 }
 
 WorkPhotographyPersonalProjects.propTypes = {
-  feature2ImageAlt: PropTypes.string,
-  feature3Title: PropTypes.element,
-  feature2Title: PropTypes.element,
-  feature1ImageAlt: PropTypes.string,
+  heading1: PropTypes.element,
+  content1: PropTypes.element,
+
   feature1ImageSrc: PropTypes.string,
   feature2ImageSrc: PropTypes.string,
   feature3ImageSrc: PropTypes.string,
+
+  feature1ImageAlt: PropTypes.string,
+  feature2ImageAlt: PropTypes.string,
   feature3ImageAlt: PropTypes.string,
-  content1: PropTypes.element,
+
   feature1Title: PropTypes.element,
+  feature2Title: PropTypes.element,
+  feature3Title: PropTypes.element,
+
+  feature1Description: PropTypes.element,
   feature2Description: PropTypes.element,
   feature3Description: PropTypes.element,
-  feature1Description: PropTypes.element,
-  heading1: PropTypes.element,
 }
 
 export default WorkPhotographyPersonalProjects
