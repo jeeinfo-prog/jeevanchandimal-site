@@ -1,7 +1,6 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
+import Link from 'next/link'
 
 const WorkPhotographyHero = (props) => {
   return (
@@ -9,13 +8,13 @@ const WorkPhotographyHero = (props) => {
       <div className="work-photography-hero-container1 thq-section-padding">
         <video
           src={props.videoSrc}
-          loop="true"
-          muted="true"
-          poster="https://play.teleporthq.io/static/svg/videoposter.svg"
-          autoPlay="true"
-          playsInline="true"
+          loop
+          muted
+          autoPlay
+          playsInline
           className="work-photography-hero-video"
-        ></video>
+        />
+
         <div className="work-photography-hero-thq-column-elm">
           <div className="work-photography-hero-thq-content-elm">
             <h1 className="thq-heading-2 work-photography-hero-thq-text-elm1">
@@ -27,174 +26,113 @@ const WorkPhotographyHero = (props) => {
                 </Fragment>
               )}
             </h1>
+
             <p className="thq-body-large work-photography-hero-thq-text-elm2">
               {props.content1 ?? (
                 <Fragment>
                   <span className="work-photography-hero-text2">
-                    A collection of photographs created with cinematic depth and
-                    restraint.
+                    A collection of photographs created with cinematic depth and restraint.
                   </span>
                 </Fragment>
               )}
             </p>
-            <div className="work-photography-hero-container2">
-              <input
-                type="email"
-                placeholder={props.textinputPlaceholder}
-                className="work-photography-hero-textinput thq-input"
-              />
-              <div className="work-photography-hero-container3">
-                <button className="work-photography-hero-thq-button-elm thq-button-filled">
-                  <span className="thq-body-small">
-                    {props.action3 ?? (
-                      <Fragment>
-                        <span className="work-photography-hero-text1">
-                          Explore Work
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </button>
-              </div>
+
+            {/* ✅ CTA only */}
+            <div className="work-photography-hero-container3">
+              <Link href="/contact" legacyBehavior>
+                <a className="cineBtn">Create together</a>
+              </Link>
             </div>
           </div>
         </div>
       </div>
-      <style jsx>
-        {`
-          .work-photography-hero-container1 {
-            width: 100%;
-            height: 1015px;
-            display: flex;
-            position: relative;
-            align-items: center;
-            flex-direction: row;
-          }
-          .work-photography-hero-video {
-            top: 0px;
-            left: 0px;
-            right: 0px;
-            width: 100%;
-            height: 100%;
-            margin: auto;
-            position: absolute;
-            object-fit: cover;
-          }
+
+      <style jsx>{`
+        .work-photography-hero-container1 {
+          width: 100%;
+          height: 1015px;
+          display: flex;
+          position: relative;
+          align-items: center;
+          flex-direction: row;
+        }
+
+        .work-photography-hero-video {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          filter: brightness(0.72) contrast(1.05) saturate(0.9);
+        }
+
+        .work-photography-hero-thq-column-elm {
+          gap: 24px;
+          z-index: 1;
+          max-width: 560px;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .work-photography-hero-thq-content-elm {
+          gap: var(--dl-layout-space-oneandhalfunits);
+          display: flex;
+          flex-direction: column;
+          animation: fadeInLeft 500ms ease;
+        }
+
+        .work-photography-hero-container3 {
+          margin-top: 10px;
+        }
+
+        /* ✅ Cinematic CTA button (matches site theme) */
+        .cineBtn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 12px 20px;
+          border-radius: 999px;
+          border: 1px solid rgba(37, 195, 226, 0.55);
+          background: rgba(37, 195, 226, 0.16);
+          color: #f5f4f4;
+          font-size: 13px;
+          font-weight: 700;
+          text-decoration: none;
+          transition: 0.2s ease;
+          backdrop-filter: blur(6px);
+        }
+
+        .cineBtn:hover {
+          background: rgba(37, 195, 226, 0.24);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.14);
+          transform: translateY(-1px);
+        }
+
+        .work-photography-hero-text1,
+        .work-photography-hero-text2,
+        .work-photography-hero-text3 {
+          display: inline-block;
+        }
+
+        @media (max-width: 767px) {
           .work-photography-hero-thq-column-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            z-index: 1;
-            max-width: 560px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-photography-hero-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            animation-name: fadeInLeft;
-            flex-direction: column;
-            animation-delay: 0s;
-            animation-duration: 500ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .work-photography-hero-container2 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 0 0 auto;
-            display: flex;
-            align-self: stretch;
+            width: 100%;
             align-items: center;
-            flex-direction: row;
-            justify-content: flex-start;
+            text-align: center;
           }
-          .work-photography-hero-textinput {
-            width: 70%;
-            background-color: transparent;
-          }
-          .work-photography-hero-container3 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-          }
-          .work-photography-hero-thq-button-elm {
-            gap: var(--dl-layout-space-halfunit);
-            flex: 1;
-            display: flex;
-            box-sizing: content-box;
-            align-items: center;
-            border-color: var(--dl-color-theme-primary1);
-            border-style: solid;
-            border-width: 1px;
-            justify-content: center;
-            background-color: var(--dl-color-theme-primary1);
-          }
-          .work-photography-hero-text1 {
-            display: inline-block;
-          }
-          .work-photography-hero-text2 {
-            display: inline-block;
-          }
-          .work-photography-hero-text3 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .work-photography-hero-thq-column-elm {
-              align-self: center;
-            }
-          }
-          @media (max-width: 767px) {
-            .work-photography-hero-thq-column-elm {
-              width: 100%;
-            }
-            .work-photography-hero-thq-text-elm1 {
-              text-align: center;
-            }
-            .work-photography-hero-thq-text-elm2 {
-              text-align: center;
-            }
-            .work-photography-hero-container2 {
-              flex-direction: column;
-            }
-            .work-photography-hero-textinput {
-              width: 100%;
-            }
-            .work-photography-hero-container3 {
-              width: 100%;
-            }
-            .work-photography-hero-thq-button-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 479px) {
-            .work-photography-hero-container3 {
-              width: 100%;
-            }
-            .work-photography-hero-thq-button-elm {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 WorkPhotographyHero.defaultProps = {
-  textinputPlaceholder: 'Create together',
-  action3: undefined,
-  content1: undefined,
   videoSrc: '/Photography/Video/photography%2001.mov',
+  content1: undefined,
   heading1: undefined,
 }
 
 WorkPhotographyHero.propTypes = {
-  textinputPlaceholder: PropTypes.string,
-  action3: PropTypes.element,
   content1: PropTypes.element,
   videoSrc: PropTypes.string,
   heading1: PropTypes.element,
