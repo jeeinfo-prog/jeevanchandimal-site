@@ -1,326 +1,336 @@
-import React, { Fragment } from 'react'
-
+import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const WorkStockPreview = (props) => {
+  // ✅ Local fallback: public/work/photography/wsp-01.jpg ... wsp-08.jpg
+  const staticFallback = useMemo(
+    () =>
+      Array.from({ length: 8 }, (_, i) => {
+        const num = String(i + 1).padStart(2, '0')
+        return `/work/photography/wsp-${num}.jpg`
+      }),
+    []
+  )
+
+  const [items, setItems] = useState(() =>
+    staticFallback.map((src, i) => ({
+      src,
+      alt: `Stock preview ${i + 1}`,
+      href: props.storeHref || '/store',
+    }))
+  )
+  const [loading, setLoading] = useState(false)
+
+  const headingNode =
+    props.heading1 ?? (
+      <Fragment>
+        <span>Stock Preview</span>
+      </Fragment>
+    )
+
+  const descNode =
+    props.content1 ?? (
+      <Fragment>
+        <span>
+          A selection of images available for licensing, presented as visual
+          previews rather than a commercial catalog. Each image links to the
+          store for usage details, while maintaining consistency with the
+          overall photographic language.
+        </span>
+      </Fragment>
+    )
+
+  // ✅ Load from store (API)
+  async function loadRandom() {
+    if (!props.apiEndpoint) return
+    try {
+      setLoading(true)
+      const res = await fetch(props.apiEndpoint, { headers: { Accept: 'application/json' } })
+      const data = await res.json()
+
+      // Supports:
+      // { images: ["url", ...] }
+      // or { images: [{src, alt?, href?}, ...] }
+      const list = Array.isArray(data?.images) ? data.images : []
+
+      const normalized = list
+        .map((x, idx) => {
+          if (typeof x === 'string') {
+            return { src: x, alt: `Stock preview ${idx + 1}`, href: props.storeHref || '/store' }
+          }
+          return {
+            src: x?.src || x?.url,
+            alt: x?.alt || `Stock preview ${idx + 1}`,
+            href: x?.href || props.storeHref || '/store',
+          }
+        })
+        .filter((x) => x?.src)
+
+      if (normalized.length) {
+        setItems(normalized)
+      } else if (props.fallbackToStaticOnEmpty) {
+        setItems(
+          staticFallback.map((src, i) => ({
+            src,
+            alt: `Stock preview ${i + 1}`,
+            href: props.storeHref || '/store',
+          }))
+        )
+      }
+    } catch {
+      if (props.fallbackToStaticOnError) {
+        setItems(
+          staticFallback.map((src, i) => ({
+            src,
+            alt: `Stock preview ${i + 1}`,
+            href: props.storeHref || '/store',
+          }))
+        )
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // initial
+  useEffect(() => {
+    if (props.apiEndpoint) loadRandom()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.apiEndpoint])
+
   return (
     <>
-      <div className="work-stock-preview-thq-gallery3-elm thq-section-padding">
-        <div className="work-stock-preview-thq-max-width-elm thq-section-max-width">
-          <div className="work-stock-preview-thq-section-title-elm">
-            <h2 className="work-stock-preview-thq-text-elm1 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="work-stock-preview-text2">
-                    Stock Preview
-                  </span>
-                </Fragment>
+      <section className="wrap thq-section-padding">
+        <div className="shell thq-section-max-width">
+          <header className="head">
+            <h2 className="title thq-heading-2">{headingNode}</h2>
+            <p className="desc thq-body-large">{descNode}</p>
+
+            <div className="headActions">
+              {props.apiEndpoint && (
+                <button className="refreshBtn" type="button" onClick={loadRandom} disabled={loading}>
+                  {loading ? 'Loading…' : 'Refresh'}
+                </button>
               )}
-            </h2>
-            <span className="work-stock-preview-thq-text-elm2 thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="work-stock-preview-text1">
-                    A selection of images available for licensing, presented as
-                    visual previews rather than a commercial catalog. Each image
-                    links to the store for usage details, while maintaining
-                    consistency with the overall photographic language.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="work-stock-preview-container1 thq-grid-4">
-            <div className="work-stock-preview-container2">
-              <img
-                alt={props.image1Alt}
-                src={props.image1Src}
-                className="work-stock-preview-thq-image1-elm thq-img-ratio-16-9"
-              />
+
+              <a className="storeBtn" href={props.storeHref || '/store'}>
+                <span className="thq-body-small">Open Store</span>
+                <svg viewBox="0 0 1024 1024" className="icon">
+                  <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                </svg>
+              </a>
             </div>
-            <div className="work-stock-preview-container3">
-              <img
-                alt={props.image2Alt}
-                src={props.image2Src}
-                className="work-stock-preview-thq-image2-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-stock-preview-container4">
-              <img
-                alt={props.image3Alt}
-                src={props.image3Src}
-                className="work-stock-preview-thq-image3-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-stock-preview-container5">
-              <img
-                alt={props.image4Alt}
-                src={props.image4Src}
-                className="work-stock-preview-thq-image4-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-stock-preview-container6">
-              <img
-                alt={props.image5Alt}
-                src={props.image5Src}
-                className="work-stock-preview-thq-image5-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-stock-preview-container7">
-              <img
-                alt={props.image6Alt}
-                src={props.image6Src}
-                className="work-stock-preview-thq-image6-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-stock-preview-container8">
-              <img
-                alt={props.image7Alt}
-                src={props.image7Src}
-                className="work-stock-preview-thq-image7-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-stock-preview-container9">
-              <img
-                alt={props.image8Alt}
-                src={props.image8Src}
-                className="work-stock-preview-thq-image8-elm thq-img-ratio-16-9"
-              />
-            </div>
+          </header>
+
+          <div className="grid">
+            {items.map((it, idx) => (
+              <a key={`${it.src}-${idx}`} className="tile" href={it.href || props.storeHref || '/store'}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="img" src={it.src} alt={it.alt || `Stock preview ${idx + 1}`} loading="lazy" />
+                <div className="shade" />
+                <div className="chip">License</div>
+              </a>
+            ))}
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .work-stock-preview-thq-gallery3-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
+      </section>
+
+      <style jsx>{`
+        .wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .shell {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .head {
+          max-width: 900px;
+          margin: 0 auto;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .title {
+          margin: 0;
+        }
+
+        .desc {
+          margin: 0;
+          opacity: 0.9;
+          line-height: 1.65;
+        }
+
+        .headActions {
+          margin-top: 8px;
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .refreshBtn {
+          padding: 9px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.06);
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .refreshBtn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(120, 166, 255, 0.45);
+          background: rgba(120, 166, 255, 0.1);
+        }
+
+        .refreshBtn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .storeBtn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(120, 166, 255, 0.35);
+          background: rgba(120, 166, 255, 0.14);
+          text-decoration: none;
+          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .storeBtn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(120, 166, 255, 0.55);
+          background: rgba(120, 166, 255, 0.18);
+        }
+
+        .icon {
+          width: 18px;
+          height: 18px;
+        }
+
+        /* ✅ Clean grid (no gaps) */
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(12, 1fr);
+          gap: 14px;
+          width: 100%;
+        }
+
+        .tile {
+          grid-column: span 3;
+          position: relative;
+          overflow: hidden;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(0, 0, 0, 0.25);
+          aspect-ratio: 16 / 9;
+          box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+          transform: translateZ(0);
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+          text-decoration: none;
+          display: block;
+        }
+
+        .tile:hover {
+          transform: translateY(-3px);
+          border-color: rgba(120, 166, 255, 0.35);
+          box-shadow: 0 22px 55px rgba(0, 0, 0, 0.42);
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.28s ease;
+        }
+
+        .tile:hover .img {
+          transform: scale(1.07);
+        }
+
+        .shade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.0),
+            rgba(0, 0, 0, 0.55)
+          );
+        }
+
+        .chip {
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.3px;
+        }
+
+        @media (max-width: 991px) {
+          .tile {
+            grid-column: span 6;
           }
-          .work-stock-preview-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
+        }
+
+        @media (max-width: 767px) {
+          .head {
+            text-align: left;
+            margin: 0;
           }
-          .work-stock-preview-thq-section-title-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: auto;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
+          .headActions {
+            justify-content: flex-start;
           }
-          .work-stock-preview-thq-text-elm1 {
-            text-align: center;
+          .tile {
+            grid-column: span 12;
           }
-          .work-stock-preview-thq-text-elm2 {
-            text-align: center;
-          }
-          .work-stock-preview-container1 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: 100%;
-          }
-          .work-stock-preview-container2 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image1-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-            align-self: center;
-          }
-          .work-stock-preview-container3 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image2-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-            align-self: center;
-          }
-          .work-stock-preview-container4 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image3-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-stock-preview-container5 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image4-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-stock-preview-container6 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image5-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-stock-preview-container7 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image6-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-stock-preview-container8 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image7-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-stock-preview-container9 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-stock-preview-thq-image8-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-stock-preview-text1 {
-            display: inline-block;
-          }
-          .work-stock-preview-text2 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .work-stock-preview-thq-image1-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-stock-preview-thq-image2-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-stock-preview-thq-image3-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-stock-preview-thq-image4-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-stock-preview-thq-image5-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-stock-preview-thq-image6-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-stock-preview-thq-image7-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-stock-preview-thq-image8-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-          }
-          @media (max-width: 767px) {
-            .work-stock-preview-thq-section-title-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 WorkStockPreview.defaultProps = {
-  image2Src: '/Pic 01/maligawa-01-400h.jpg',
-  image3Src: '/Pic 01/sigiriya-02-400h.jpg',
-  image7Src: '/Photography/3x2/_dsc5544_3x2_2000x1333_u_100-400h.png',
-  image1Alt: 'Film Production',
-  image5Src:
-    '/Photography/1x1/lake%20-%20matale%2C%20sri%20lanka._1x1_2000x2000_u_100-600w.png',
-  image8Alt: 'Dedicated Customer Support',
-  image1Src: '/Pic 01/ruwanweliseya-01-400h.jpg',
-  content1: undefined,
-  image6Src:
-    '/Photography/1x1/wild%20elephant%20-%20senanayake%20samudraya%20ampara%2C%20sri%20lanka._1x1_2000x2000_u_100-600w.png',
-  image8Src: '/Photography/3x2/_jee1691_3x2_2000x1333_u_100-400h.jpg',
-  image7Alt: 'Powerful Analytics Tools',
-  image6Alt: 'Intuitive Design',
-  image4Alt: 'Photography',
-  image4Src:
-    '/Photography/1x1/lotus%20tower_full%20resolution_4702x7050_u_0_1x1_2000x2000_u_100-600w.png',
-  image5Alt: 'Customized Solutions',
   heading1: undefined,
-  image2Alt: 'Audio Production',
-  image3Alt: 'Animation & Graphics',
+  content1: undefined,
+
+  // ✅ Store auto-load (recommended)
+  apiEndpoint: '/api/gallery/random?limit=8',
+
+  // ✅ where each image should link
+  storeHref: '/store',
+
+  fallbackToStaticOnError: true,
+  fallbackToStaticOnEmpty: true,
 }
 
 WorkStockPreview.propTypes = {
-  image2Src: PropTypes.string,
-  image3Src: PropTypes.string,
-  image7Src: PropTypes.string,
-  image1Alt: PropTypes.string,
-  image5Src: PropTypes.string,
-  image8Alt: PropTypes.string,
-  image1Src: PropTypes.string,
-  content1: PropTypes.element,
-  image6Src: PropTypes.string,
-  image8Src: PropTypes.string,
-  image7Alt: PropTypes.string,
-  image6Alt: PropTypes.string,
-  image4Alt: PropTypes.string,
-  image4Src: PropTypes.string,
-  image5Alt: PropTypes.string,
   heading1: PropTypes.element,
-  image2Alt: PropTypes.string,
-  image3Alt: PropTypes.string,
+  content1: PropTypes.element,
+
+  apiEndpoint: PropTypes.string,
+  storeHref: PropTypes.string,
+
+  fallbackToStaticOnError: PropTypes.bool,
+  fallbackToStaticOnEmpty: PropTypes.bool,
 }
 
 export default WorkStockPreview
