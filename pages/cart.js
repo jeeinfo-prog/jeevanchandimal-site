@@ -8,7 +8,17 @@ import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 import * as CartLib from '../lib/cart'
-import { readFxLock, writeFxLock, clearFxLock as clearFxLockShared, DEFAULT_FX } from '../lib/fx'
+
+// ✅ Shared FX helpers (live + lock)
+import {
+  DEFAULT_FX,
+  getFxForDisplay,
+  hasFxLock,
+  readFxLock,
+  writeFxLock,
+  clearFxLock as clearFxLockLib,
+  fetchLiveFx,
+} from '../lib/fx'
 
 // ---------- helpers ----------
 const STORAGE_CART_KEY = 'jc_cart_v1'
@@ -46,8 +56,7 @@ function formatMoneySimple(currency, amount) {
 function readLS(key, fallback = null) {
   if (typeof window === 'undefined') return fallback
   try {
-    const v = window.localStorage.getItem(key)
-    return v == null ? fallback : v
+    return window.localStorage.getItem(key)
   } catch {
     return fallback
   }
@@ -60,9 +69,8 @@ function writeLS(key, value) {
   } catch {}
 }
 
-// ✅ FIX: Currency normalization should default to USD unless explicitly LKR
 function normCurrency(v) {
-  return String(v || '').trim().toUpperCase() === 'LKR' ? 'LKR' : 'USD'
+  return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
 function normLicense(v) {
   const x = String(v || '').toLowerCase()
@@ -245,7 +253,6 @@ function submitPayHereForm(action, fields) {
   try {
     form.submit()
   } finally {
-    // best-effort cleanup (submit causes navigation anyway)
     try {
       document.body.removeChild(form)
     } catch {}
@@ -264,7 +271,7 @@ export default function CartPage() {
   const [busy, setBusy] = React.useState(false)
 
   // ✅ FX state (live + lock at checkout)
-  const [fxLiveUsdLkr, setFxLiveUsdLkr] = React.useState(DEFAULT_FX)
+  const [fxLiveUsdLkr, setFxLiveUsdLkr] = React.useState(getFxForDisplay())
   const [fxLockedUsdLkr, setFxLockedUsdLkr] = React.useState(readFxLock())
   const fxRateUsdLkr = fxLockedUsdLkr || fxLiveUsdLkr
 
@@ -306,30 +313,33 @@ export default function CartPage() {
     }
   }, [load])
 
-  // ✅ Load live FX + existing lock (if any)
+  // ✅ Live FX refresh every 6 hours (only if NOT locked)
   React.useEffect(() => {
     let alive = true
 
-    // load lock from shared fx.js (numeric only)
+    // initial sync
     const lockedRate = readFxLock()
-    if (lockedRate) setFxLockedUsdLkr(lockedRate)
+    setFxLockedUsdLkr(lockedRate)
+    setFxLiveUsdLkr(getFxForDisplay())
 
-    async function run() {
+    async function refreshNow() {
       try {
-        const r = await fetch('/api/fx-rate', { cache: 'no-store' })
-        const data = await r.json().catch(() => null)
         if (!alive) return
-
-        // expects: { ok:true, usdLkr }
-        const usdLkr = data?.ok ? data?.usdLkr : null
-        if (usdLkr != null) setFxLiveUsdLkr(normalizeRate(usdLkr, DEFAULT_FX))
+        if (hasFxLock()) return // 🔒 keep stable when locked
+        const rate = await fetchLiveFx()
+        if (!alive) return
+        setFxLiveUsdLkr(rate)
       } catch {}
     }
 
-    run()
+    refreshNow()
+
+    const SIX_HOURS = 6 * 60 * 60 * 1000
+    const t = setInterval(refreshNow, SIX_HOURS)
 
     return () => {
       alive = false
+      clearInterval(t)
     }
   }, [])
 
@@ -419,7 +429,9 @@ export default function CartPage() {
   }
 
   function clearFxLock() {
-    clearFxLockShared()
+    try {
+      clearFxLockLib()
+    } catch {}
     setFxLockedUsdLkr(null)
     setNote('Rate unlocked (live rate active).')
     setTimeout(() => setNote(''), 1400)
@@ -450,11 +462,11 @@ export default function CartPage() {
       return
     }
 
-    // ✅ Lock FX at checkout time (so totals match server-side)
+    // ✅ Lock FX at checkout time (stable totals)
     let lockRate = fxLockedUsdLkr
     if (!lockRate) {
       lockRate = normalizeRate(fxLiveUsdLkr, DEFAULT_FX)
-      writeFxLock(lockRate) // ✅ shared numeric lock
+      writeFxLock(lockRate)
       setFxLockedUsdLkr(lockRate)
     }
 
@@ -467,7 +479,7 @@ export default function CartPage() {
         const rawUnit = Number(it.unitPrice || it._price || getUnitPrice(it, itemCcy) || 0)
         const qty = clamp(it._qty || it.qty || 1, 1, 99)
 
-        // convert to checkout currency
+        // convert to checkout currency using locked rate
         const unitPrice = convertAmount(rawUnit, itemCcy, ccy, lockRate)
 
         return {
@@ -500,7 +512,6 @@ export default function CartPage() {
 
       const data = await r.json().catch(() => ({}))
 
-      // ✅ Backward compatible: redirectUrl (old) OR action+fields (new)
       if (!r.ok || !data?.ok) {
         setBusy(false)
         setNote(data?.error || 'Checkout failed')
