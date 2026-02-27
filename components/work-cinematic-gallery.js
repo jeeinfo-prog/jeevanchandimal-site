@@ -1,332 +1,436 @@
-import React, { Fragment } from 'react'
-
+import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
+
+/**
+ * WorkCinematicGallery (Vercel normal Next ✅)
+ * - Beautiful masonry layout + hover glow
+ * - Lightbox modal (ESC/←/→ supported)
+ * - Auto-random images from your photo store via API (optional)
+ * - Static fallback uses /public/work/photography/cg-01.jpg ... cg-12.jpg
+ *
+ * Usage:
+ *   <WorkCinematicGallery apiEndpoint="/api/gallery/random?limit=18" />
+ *   or static only:
+ *   <WorkCinematicGallery />
+ */
 
 const WorkCinematicGallery = (props) => {
+  // ✅ Static fallback (public/work/photography/cg-01.jpg ... cg-12.jpg)
+  const staticFallback = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const num = String(i + 1).padStart(2, '0')
+        return `/work/photography/cg-${num}.jpg`
+      }),
+    []
+  )
+
+  const [images, setImages] = useState(
+    Array.isArray(props.images) && props.images.length ? props.images : staticFallback
+  )
+  const [loading, setLoading] = useState(false)
+  const [activeIdx, setActiveIdx] = useState(-1)
+
+  const headingNode =
+    props.heading1 ?? (
+      <Fragment>
+        <span className="titleText">Cinematic Gallery</span>
+      </Fragment>
+    )
+
+  const descNode =
+    props.content1 ?? (
+      <Fragment>
+        <span>
+          A curated selection of photographs presented as standalone visual studies.
+          These images focus on atmosphere, composition, and tonal depth—allowing
+          each frame to exist without explanation.
+        </span>
+      </Fragment>
+    )
+
+  // ✅ Optional: Fetch random images from your store (Vercel normal Next supports API routes)
+  useEffect(() => {
+    let alive = true
+
+    async function run() {
+      if (!props.apiEndpoint) return
+      try {
+        setLoading(true)
+        const res = await fetch(props.apiEndpoint, { headers: { Accept: 'application/json' } })
+        const data = await res.json()
+
+        // expected:
+        //  { images: [ "https://...", ... ] }
+        //  OR { images: [ { src: "...", alt?: "..." }, ... ] }
+        const list = Array.isArray(data?.images) ? data.images : []
+        const normalized = list
+          .map((x) => (typeof x === 'string' ? { src: x } : x))
+          .filter((x) => x?.src)
+
+        if (!alive) return
+
+        if (normalized.length) {
+          setImages(normalized.map((x) => x.src))
+        } else if (props.fallbackToStaticOnEmpty) {
+          setImages(staticFallback)
+        }
+      } catch (e) {
+        if (!alive) return
+        if (props.fallbackToStaticOnError) setImages(staticFallback)
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+
+    run()
+    return () => {
+      alive = false
+    }
+  }, [props.apiEndpoint, props.fallbackToStaticOnEmpty, props.fallbackToStaticOnError, staticFallback])
+
+  // ✅ Optional: shuffle on load (useful for static mode or after API load)
+  useEffect(() => {
+    if (!props.shuffle) return
+    setImages((prev) => {
+      const a = [...prev]
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[a[i], a[j]] = [a[j], a[i]]
+      }
+      return a
+    })
+    // run once when component mounts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ✅ Lightbox keyboard
+  useEffect(() => {
+    function onKey(e) {
+      if (activeIdx < 0) return
+      if (e.key === 'Escape') setActiveIdx(-1)
+      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(images.length - 1, i + 1))
+      if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [activeIdx, images.length])
+
+  function open(idx) {
+    setActiveIdx(idx)
+  }
+
+  function close() {
+    setActiveIdx(-1)
+  }
+
   return (
     <>
-      <div
-        className={`work-cinematic-gallery-thq-gallery3-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="work-cinematic-gallery-thq-max-width-elm thq-section-max-width">
-          <div className="work-cinematic-gallery-thq-section-title-elm">
-            <h2 className="work-cinematic-gallery-thq-text-elm1 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="work-cinematic-gallery-text2">
-                    Cinematic Gallery
-                  </span>
-                </Fragment>
-              )}
-            </h2>
-            <span className="work-cinematic-gallery-thq-text-elm2 thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="work-cinematic-gallery-text1">
-                    A curated selection of photographs presented as standalone
-                    visual studies. These images focus on atmosphere,
-                    composition, and tonal depth, allowing each frame to exist
-                    without explanation.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="work-cinematic-gallery-container1 thq-grid-4">
-            <div className="work-cinematic-gallery-container2">
-              <img
-                alt={props.image1Alt}
-                src={props.image1Src}
-                className="work-cinematic-gallery-thq-image1-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-cinematic-gallery-container3">
-              <img
-                alt={props.image2Alt}
-                src={props.image2Src}
-                className="work-cinematic-gallery-thq-image2-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-cinematic-gallery-container4">
-              <img
-                alt={props.image3Alt}
-                src={props.image3Src}
-                className="work-cinematic-gallery-thq-image3-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-cinematic-gallery-container5">
-              <img
-                alt={props.image4Alt}
-                src={props.image4Src}
-                className="work-cinematic-gallery-thq-image4-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-cinematic-gallery-container6">
-              <img
-                alt={props.image5Alt}
-                src={props.image5Src}
-                className="work-cinematic-gallery-thq-image5-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-cinematic-gallery-container7">
-              <img
-                alt={props.image6Alt}
-                src={props.image6Src}
-                className="work-cinematic-gallery-thq-image6-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-cinematic-gallery-container8">
-              <img
-                alt={props.image7Alt}
-                src={props.image7Src}
-                className="work-cinematic-gallery-thq-image7-elm thq-img-ratio-16-9"
-              />
-            </div>
-            <div className="work-cinematic-gallery-container9">
-              <img
-                alt={props.image8Alt}
-                src={props.image8Src}
-                className="work-cinematic-gallery-thq-image8-elm thq-img-ratio-16-9"
-              />
-            </div>
+      <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="shell thq-section-max-width">
+          <header className="head">
+            <h2 className="title thq-heading-2">{headingNode}</h2>
+            <p className="desc thq-body-large">{descNode}</p>
+
+            {loading && (
+              <div className="loading thq-body-small">Loading random images…</div>
+            )}
+          </header>
+
+          <div className="masonry" aria-busy={loading ? 'true' : 'false'}>
+            {images.map((src, idx) => (
+              <button
+                key={`${src}-${idx}`}
+                type="button"
+                className="tile"
+                onClick={() => open(idx)}
+                aria-label={`Open image ${idx + 1}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="img"
+                  src={src}
+                  alt={`Gallery image ${idx + 1}`}
+                  loading="lazy"
+                />
+                <span className="glow" />
+              </button>
+            ))}
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .work-cinematic-gallery-thq-gallery3-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-cinematic-gallery-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .work-cinematic-gallery-thq-section-title-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: auto;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-cinematic-gallery-thq-text-elm1 {
-            text-align: center;
-          }
-          .work-cinematic-gallery-thq-text-elm2 {
-            text-align: center;
-          }
-          .work-cinematic-gallery-container1 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: 100%;
-          }
-          .work-cinematic-gallery-container2 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image1-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-            align-self: center;
-          }
-          .work-cinematic-gallery-container3 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image2-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-            align-self: center;
-          }
-          .work-cinematic-gallery-container4 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image3-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-cinematic-gallery-container5 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image4-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-cinematic-gallery-container6 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image5-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-cinematic-gallery-container7 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image6-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-cinematic-gallery-container8 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image7-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-cinematic-gallery-container9 {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-          .work-cinematic-gallery-thq-image8-elm {
-            width: 100%;
-            height: 340px;
-            max-width: 600px;
-          }
-          .work-cinematic-gallery-text1 {
-            display: inline-block;
-          }
-          .work-cinematic-gallery-text2 {
-            display: inline-block;
-          }
+      </section>
 
-          @media (max-width: 991px) {
-            .work-cinematic-gallery-thq-image1-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-cinematic-gallery-thq-image2-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-cinematic-gallery-thq-image3-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-cinematic-gallery-thq-image4-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-cinematic-gallery-thq-image5-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-cinematic-gallery-thq-image6-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-cinematic-gallery-thq-image7-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
-            .work-cinematic-gallery-thq-image8-elm {
-              flex: 0 0 auto;
-              width: 100%;
-              height: 400px;
-            }
+      {/* ✅ Lightbox */}
+      {activeIdx >= 0 && images[activeIdx] && (
+        <div className="lightbox" role="dialog" aria-modal="true" onClick={close}>
+          <div className="lbInner" onClick={(e) => e.stopPropagation()}>
+            <button className="lbClose" type="button" onClick={close} aria-label="Close">
+              ✕
+            </button>
+
+            <button
+              className="lbNav lbPrev"
+              type="button"
+              onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
+              disabled={activeIdx === 0}
+              aria-label="Previous"
+            >
+              ‹
+            </button>
+
+            <div className="lbMedia">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="lbImg" src={images[activeIdx]} alt={`Preview ${activeIdx + 1}`} />
+              <div className="lbMeta thq-body-small">
+                {activeIdx + 1} / {images.length}
+              </div>
+            </div>
+
+            <button
+              className="lbNav lbNext"
+              type="button"
+              onClick={() => setActiveIdx((i) => Math.min(images.length - 1, i + 1))}
+              disabled={activeIdx === images.length - 1}
+              aria-label="Next"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .shell {
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+        }
+
+        .head {
+          max-width: 900px;
+          margin: 0 auto;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .title {
+          margin: 0;
+        }
+
+        .titleText {
+          display: inline-block;
+          letter-spacing: 0.2px;
+        }
+
+        .desc {
+          margin: 0;
+          opacity: 0.9;
+          line-height: 1.65;
+        }
+
+        .loading {
+          margin-top: 6px;
+          opacity: 0.75;
+        }
+
+        /* ✅ Masonry layout */
+        .masonry {
+          column-count: 4;
+          column-gap: 14px;
+          width: 100%;
+        }
+
+        .tile {
+          width: 100%;
+          border: 0;
+          padding: 0;
+          margin: 0 0 14px 0;
+          background: transparent;
+          display: inline-block; /* important for columns */
+          cursor: pointer;
+          border-radius: 16px;
+          overflow: hidden;
+          position: relative;
+          outline: none;
+          box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+          transform: translateZ(0);
+        }
+
+        .img {
+          width: 100%;
+          height: auto;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.25s ease;
+        }
+
+        .glow {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+            800px circle at 50% 50%,
+            rgba(120, 166, 255, 0.18),
+            rgba(0, 0, 0, 0)
+          );
+          opacity: 0;
+          transition: opacity 0.25s ease;
+          pointer-events: none;
+        }
+
+        .tile:hover .img {
+          transform: scale(1.06);
+        }
+        .tile:hover .glow {
+          opacity: 1;
+        }
+
+        /* ✅ Lightbox */
+        .lightbox {
+          position: fixed;
+          inset: 0;
+          z-index: 99999;
+          background: rgba(0, 0, 0, 0.78);
+          backdrop-filter: blur(8px);
+          display: grid;
+          place-items: center;
+          padding: 18px;
+        }
+
+        .lbInner {
+          width: min(1100px, 100%);
+          display: grid;
+          grid-template-columns: 54px 1fr 54px;
+          gap: 10px;
+          align-items: center;
+          position: relative;
+        }
+
+        .lbMedia {
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.35);
+          box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+          position: relative;
+        }
+
+        .lbImg {
+          width: 100%;
+          height: auto;
+          display: block;
+        }
+
+        .lbMeta {
+          position: absolute;
+          left: 12px;
+          bottom: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.45);
+          opacity: 0.9;
+        }
+
+        .lbClose {
+          position: absolute;
+          top: -12px;
+          right: -8px;
+          width: 44px;
+          height: 44px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.45);
+          color: inherit;
+          cursor: pointer;
+        }
+
+        .lbNav {
+          width: 54px;
+          height: 54px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.45);
+          color: inherit;
+          cursor: pointer;
+          font-size: 34px;
+          line-height: 1;
+          display: grid;
+          place-items: center;
+          transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .lbNav:hover {
+          transform: translateY(-1px);
+          border-color: rgba(120, 166, 255, 0.45);
+        }
+
+        .lbNav:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        /* Responsive masonry */
+        @media (max-width: 991px) {
+          .masonry {
+            column-count: 3;
           }
-          @media (max-width: 767px) {
-            .work-cinematic-gallery-thq-section-title-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
+        }
+        @media (max-width: 767px) {
+          .head {
+            text-align: left;
+            margin: 0;
           }
-        `}
-      </style>
+          .masonry {
+            column-count: 2;
+          }
+        }
+        @media (max-width: 479px) {
+          .masonry {
+            column-count: 1;
+          }
+          .lbInner {
+            grid-template-columns: 44px 1fr 44px;
+          }
+          .lbNav {
+            width: 44px;
+            height: 44px;
+            font-size: 28px;
+          }
+        }
+      `}</style>
     </>
   )
 }
 
 WorkCinematicGallery.defaultProps = {
-  content1: undefined,
-  image3Alt: 'Animation & Graphics',
-  image7Src:
-    '/Photography/1x1/kovil%2002%20%20hatton%2C%20sri%20lanka._1x1_2000x2000_u_100-600w.png',
-  image2Alt: 'Audio Production',
-  image7Alt: 'Customized Solutions',
-  image1Alt: 'Film Production',
   heading1: undefined,
-  image2Src: '/Photography/1x1/_jee3136_1x1_2000x2000_u_100-600w.png',
-  image6Alt: 'Soundtrack Composition',
-  image8Src: '/Photography/1x1/jee064332_1x1_2000x2000_u_100-600w.png',
-  image1Src: '/Photography/1x1/_jee8143_1x1_2000x2000_u_100-600w.png',
-  image5Src:
-    '/Photography/1x1/maruthanamadam%20anjaneya%20kovil%20%20jaffna%2C%20sri%20lanka._1x1_2000x2000_u_100-600w.png',
-  image5Alt: 'Character Animation',
-  image8Alt: 'Dedicated Customer Support',
+  content1: undefined,
   rootClassName: '',
-  image3Src: '/Photography/1x1/_jee83936_1x1_2000x2000_u_100-600w.png',
-  image4Src:
-    '/Photography/1x1/beira%20lake%20%20colombo%2C%20sri%20lanka._1x1_2000x2000_u_100-600w.png',
-  image6Src:
-    '/Photography/1x1/gangarama%20perahera%2008_1x1_2000x2000_u_100-600w.png',
-  image4Alt: 'Photography Services',
+  images: undefined, // optional override (array of strings)
+  apiEndpoint: '', // optional (string): "/api/gallery/random?limit=18"
+  shuffle: false, // optional: shuffle current list on load
+  fallbackToStaticOnError: true,
+  fallbackToStaticOnEmpty: true,
 }
 
 WorkCinematicGallery.propTypes = {
-  content1: PropTypes.element,
-  image3Alt: PropTypes.string,
-  image7Src: PropTypes.string,
-  image2Alt: PropTypes.string,
-  image7Alt: PropTypes.string,
-  image1Alt: PropTypes.string,
   heading1: PropTypes.element,
-  image2Src: PropTypes.string,
-  image6Alt: PropTypes.string,
-  image8Src: PropTypes.string,
-  image1Src: PropTypes.string,
-  image5Src: PropTypes.string,
-  image5Alt: PropTypes.string,
-  image8Alt: PropTypes.string,
+  content1: PropTypes.element,
   rootClassName: PropTypes.string,
-  image3Src: PropTypes.string,
-  image4Src: PropTypes.string,
-  image6Src: PropTypes.string,
-  image4Alt: PropTypes.string,
+  images: PropTypes.arrayOf(PropTypes.string),
+  apiEndpoint: PropTypes.string,
+  shuffle: PropTypes.bool,
+  fallbackToStaticOnError: PropTypes.bool,
+  fallbackToStaticOnEmpty: PropTypes.bool,
 }
 
 export default WorkCinematicGallery
