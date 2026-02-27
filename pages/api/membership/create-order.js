@@ -6,26 +6,17 @@ import { payhereInitHash } from '../../../lib/payhere'
 
 /**
  * ✅ Membership pricing (USD base)
- * - Your UI currently uses plan='monthly' to mean Pro monthly (backward compatibility).
- * - Currency can be USD or LKR.
- * - LKR is auto-converted from USD on the server.
+ * - UI may send: { email, plan, currency } where plan=monthly/yearly/lifetime and tier assumed 'pro'
+ * - Or new shape: { email, tier, term, currency_display }
+ *
+ * ✅ IMPORTANT (recommended):
+ * - Always charge PayHere in **LKR** for memberships (stable for Sri Lanka gateway)
+ * - UI currency toggle is for display only.
  */
 const USD_BASE_PRICES = {
-  basic: {
-    monthly: 49,
-    yearly: 490,
-    lifetime: 1490,
-  },
-  pro: {
-    monthly: 89,
-    yearly: 890,
-    lifetime: 2490,
-  },
-  elite: {
-    monthly: 149,
-    yearly: 1490,
-    lifetime: 3990,
-  },
+  basic: { monthly: 49, yearly: 490, lifetime: 1490 },
+  pro: { monthly: 89, yearly: 890, lifetime: 2490 },
+  elite: { monthly: 149, yearly: 1490, lifetime: 3990 },
 }
 
 function isValidEmail(v) {
@@ -44,14 +35,35 @@ function cleanLower(v, fallback) {
 
 function toNumber(v, fallback) {
   const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? n : fallback
+  return Number.isFinite(n) ? n : fallback
+}
+
+// Basic sanity for FX (prevents garbage / malicious values)
+function normalizeFxRate(v, fallback) {
+  const n = Number(v)
+  // USD->LKR realistic guardrails (adjust if needed)
+  if (!Number.isFinite(n) || n < 100 || n > 1000) return fallback
+  return n
 }
 
 function usdToLkr(usd, fxRate) {
-  // PayHere supports 2 decimals; LKR typically integer display,
-  // but we keep 2 decimals safe for gateway.
+  // PayHere supports 2 decimals; keep 2 decimals for gateway safety
   const x = Number(usd || 0) * Number(fxRate || 0)
   return Math.round(x * 100) / 100
+}
+
+async function fetchLiveUsdLkr(fallback) {
+  try {
+    // Use the same upstream you already use in /api/fx-rate
+    const r = await fetch('https://open.er-api.com/v6/latest/USD', {
+      headers: { 'Cache-Control': 'no-store' },
+    })
+    const data = await r.json().catch(() => null)
+    const rate = data?.rates?.LKR
+    const n = Number(rate)
+    if (r.ok && Number.isFinite(n) && n > 0) return n
+  } catch {}
+  return fallback
 }
 
 export default async function handler(req, res) {
@@ -61,14 +73,15 @@ export default async function handler(req, res) {
 
   try {
     /**
-     * ✅ accept both old + new request shapes
+     * ✅ Accept both old + new request shapes
      * old: { email, plan, currency } where plan was monthly/yearly/lifetime (pro assumed)
-     * new: { email, tier, term, currency }
+     * new: { email, tier, term, currency_display, fx_rate }
      */
     const body = req.body || {}
 
     const email = String(body.email || '').trim().toLowerCase()
-    const currency = cleanUpper(body.currency, 'USD')
+    if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
+    if (!isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
 
     // tier/term normalization
     let tier = cleanLower(body.tier, '')
@@ -80,13 +93,6 @@ export default async function handler(req, res) {
     if (!tier) tier = 'pro'
     if (!term) term = 'monthly'
 
-    if (!email || !tier || !term) {
-      return res.status(400).json({ ok: false, error: 'Missing email, tier, or term' })
-    }
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ ok: false, error: 'Invalid email' })
-    }
-
     const validTiers = ['basic', 'pro', 'elite']
     const validTerms = ['monthly', 'yearly', 'lifetime']
     if (!validTiers.includes(tier)) {
@@ -95,25 +101,32 @@ export default async function handler(req, res) {
     if (!validTerms.includes(term)) {
       return res.status(400).json({ ok: false, error: 'Invalid term' })
     }
-    if (!['LKR', 'USD'].includes(currency)) {
+
+    // Display currency only (UI toggle)
+    const currencyDisplay = cleanUpper(body.currency_display || body.currency, 'USD')
+    if (!['LKR', 'USD'].includes(currencyDisplay)) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
-    // ✅ USD base amount for the selection
+    // USD base amount for selection
     const usdAmount = USD_BASE_PRICES?.[tier]?.[term]
     if (!usdAmount) {
       return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
     }
 
-    // ✅ FX rate for auto-conversion (you can wire real FX later)
-    // Use env var so you can change without deploy:
-    // MEMBERSHIP_USD_LKR_RATE=320 (example)
-    const fxRate = toNumber(process.env.MEMBERSHIP_USD_LKR_RATE, 320)
+    // ✅ Determine FX rate:
+    // - prefer client-provided fx_rate (locked in browser) if valid
+    // - else env fallback
+    // - else fetch live
+    const envFallback = normalizeFxRate(process.env.MEMBERSHIP_USD_LKR_RATE, 300)
+    const clientFx = normalizeFxRate(body.fx_rate, null)
+    const fxRate = clientFx || (await fetchLiveUsdLkr(envFallback))
 
-    // ✅ final amount + currency for PayHere
-    const amount = currency === 'LKR' ? usdToLkr(usdAmount, fxRate) : usdAmount
+    // ✅ Always charge memberships in LKR
+    const payCurrency = 'LKR'
+    const amount = usdToLkr(usdAmount, fxRate)
 
-    // ✅ server env only
+    // server env only
     const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
     const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
     const siteUrl = String(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim()
@@ -131,25 +144,23 @@ export default async function handler(req, res) {
     const orderId = crypto.randomUUID()
 
     /**
-     * ✅ IMPORTANT:
-     * Your orders table does NOT have membership_term/membership_tier.
-     * So we store membership details using existing columns:
+     * ✅ Store membership details using existing orders columns:
      * - license = tier (basic/pro/elite)
      * - format  = term (monthly/yearly/lifetime)
      *
-     * Also: store USD base + fx info in optional columns if you have them,
-     * but DO NOT require them (keep stable).
+     * ⚠️ Don’t add new columns here unless you KNOW they exist in Supabase,
+     * otherwise insert will fail.
      */
     const payload = {
       id: orderId,
       email,
       order_kind: 'membership',
 
-      // store membership metadata in existing fields
       license: tier,
       format: term,
 
-      currency,
+      // store actual PayHere charge currency+amount
+      currency: payCurrency,
       amount,
       status: 'PENDING',
 
@@ -164,26 +175,31 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: error.message })
     }
 
-    // ✅ PayHere init hash with final amount+currency that will be posted from client
+    // PayHere init hash with final amount+currency that will be posted from client
     const hash = payhereInitHash({
       merchantId,
       merchantSecret,
       orderId,
       amount,
-      currency,
+      currency: payCurrency,
     })
 
     return res.status(200).json({
       ok: true,
       orderId,
+
+      // ✅ PayHere values
       amount,
-      currency,
+      currency: payCurrency,
+      hash,
+
+      // helpful to UI (display + debug)
       tier,
       term,
-      // helpful for UI (optional)
       usdAmount,
-      fxRate: currency === 'LKR' ? fxRate : undefined,
-      hash,
+      fxRate,
+      currencyDisplay,
+
       notifyUrl: webhookBase ? `${webhookBase}/api/payhere/notify` : undefined,
     })
   } catch (e) {

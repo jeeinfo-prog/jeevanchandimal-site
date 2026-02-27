@@ -8,7 +8,9 @@ import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 /* ================== helpers ================== */
 
 const STORAGE_CCY_KEY = 'jc_currency_v1'
+const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
 const DEFAULT_CURRENCY = 'USD'
+const DEFAULT_FX = 300 // fallback: 1 USD = 300 LKR
 
 // ✅ USD base prices (server enforces + auto-converts LKR at checkout)
 const PRICES_USD = {
@@ -34,6 +36,76 @@ function readCurrency() {
 function writeCurrency(ccy) {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(STORAGE_CCY_KEY, safeCurrency(ccy))
+}
+
+/* ================== FX helpers ================== */
+
+function safeNumber(v, fallback) {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+// ✅ supports ALL possible lock formats we used:
+// 1) numeric string: "323.12"
+// 2) JSON: { usdLkr: 323.12, lockedAt: ... }
+// 3) JSON: { rate: 323.12, lockedAt: ... }
+function readFxLockAny() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_FX_LOCK_KEY)
+    if (!raw) return null
+
+    // numeric string lock
+    const asNum = Number(raw)
+    if (Number.isFinite(asNum) && asNum > 0) return asNum
+
+    // json lock
+    const obj = JSON.parse(raw)
+    const rate = obj?.usdLkr ?? obj?.rate ?? null
+    const n = Number(rate)
+    if (Number.isFinite(n) && n > 0) return n
+  } catch {
+    return null
+  }
+  return null
+}
+
+// ✅ write lock in the "usdLkr" JSON shape (compatible with cart + server payloads)
+function writeFxLock(rate) {
+  if (typeof window === 'undefined') return
+  const r = safeNumber(rate, DEFAULT_FX)
+  try {
+    window.localStorage.setItem(
+      STORAGE_FX_LOCK_KEY,
+      JSON.stringify({
+        usdLkr: r,
+        lockedAt: Date.now(),
+      })
+    )
+  } catch {}
+}
+
+async function ensureFxRateLiveOrLocked() {
+  if (typeof window === 'undefined') return DEFAULT_FX
+
+  // use locked if already present
+  const locked = readFxLockAny()
+  if (locked) return locked
+
+  // else fetch live
+  try {
+    const res = await fetch('/api/fx-rate', { cache: 'no-store' })
+    const json = await res.json().catch(() => null)
+    const rate = safeNumber(json?.usdLkr, 0)
+    if (rate > 0) return rate
+  } catch {}
+
+  return DEFAULT_FX
+}
+
+function usdToLkr(usd, rate) {
+  const r = safeNumber(rate, DEFAULT_FX)
+  return Math.round(safeNumber(usd, 0) * r)
 }
 
 function formatPayhereAmount(n) {
@@ -95,6 +167,7 @@ export default function Memberships() {
 
   // ✅ default USD + persisted toggle
   const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
+  const [fxRate, setFxRate] = React.useState(DEFAULT_FX)
 
   // FAQ tabs + accordion
   const tabs = React.useMemo(() => ['General', 'Licensing', 'Billing'], [])
@@ -172,12 +245,47 @@ export default function Memberships() {
     setCurrency(c)
     writeCurrency(c)
 
+    // ✅ init fx: prefer locked, else default then load live
+    const locked = readFxLockAny()
+    if (locked) setFxRate(safeNumber(locked, DEFAULT_FX))
+
+    let alive = true
+    ;(async () => {
+      const rate = await ensureFxRateLiveOrLocked()
+      if (!alive) return
+      setFxRate(safeNumber(rate, DEFAULT_FX))
+    })()
+
+    // keep in sync if currency/fx lock changes in another tab
+    function onStorage(e) {
+      if (!e) return
+      if (e.key === STORAGE_CCY_KEY) setCurrency(readCurrency())
+      if (e.key === STORAGE_FX_LOCK_KEY) {
+        const next = readFxLockAny()
+        if (next) setFxRate(safeNumber(next, DEFAULT_FX))
+      }
+    }
+    window.addEventListener('storage', onStorage)
+
+    return () => {
+      alive = false
+      window.removeEventListener('storage', onStorage)
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   React.useEffect(() => {
     setOpenFaq(-1)
   }, [faqTab])
+
+  function displayPrice(usd) {
+    if (safeCurrency(currency) === 'LKR') {
+      const lkr = usdToLkr(usd, fxRate)
+      return formatMoney('LKR', lkr)
+    }
+    return formatMoney('USD', usd)
+  }
 
   async function startMembershipCheckout(plan) {
     try {
@@ -195,13 +303,27 @@ export default function Memberships() {
 
       setLoadingPlan(plan)
 
+      // 🔒 Lock FX at checkout time (shared key, same as cart)
+      // If it was already locked, keep it.
+      const existing = readFxLockAny()
+      const rateToUse = safeNumber(existing || fxRate, DEFAULT_FX)
+      if (!existing) writeFxLock(rateToUse)
+
+      // Pro is the only purchasable plan right now (mapped to 'monthly')
+      const usdAmount = PRICES_USD.pro
+      const amountLkr = usdToLkr(usdAmount, rateToUse)
+
       // 1) create membership order in DB (server returns hash)
       // NOTE: UI sends plan='monthly' -> server assumes tier='pro' (backward compatible)
       const res = await fetch('/api/membership/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, plan, currency: safeCurrency(currency) }),
-      })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    email: cleanEmail,
+    plan, // 'monthly' → server maps to Pro monthly
+    currency: safeCurrency(currency), // USD or LKR
+  }),
+})
 
       const json = await res.json()
       if (!json.ok) {
@@ -349,6 +471,13 @@ export default function Memberships() {
               </div>
             </div>
 
+            {/* ✅ FX note (only when showing LKR) */}
+            {safeCurrency(currency) === 'LKR' ? (
+              <p className="smallNote" style={{ textAlign: 'center' }}>
+                Pricing converted at {Math.round(fxRate)} LKR / USD
+              </p>
+            ) : null}
+
             {/* Email input */}
             <div className="emailBox">
               <label className="emailLabel">Email (for access + receipts)</label>
@@ -378,7 +507,7 @@ export default function Memberships() {
               <div className="cineCard">
                 <div className="cineTop">
                   <h3 className="cineTitle">Basic</h3>
-                  <p className="cinePrice">{formatMoney('USD', PRICES_USD.basic)} / month</p>
+                  <p className="cinePrice">{displayPrice(PRICES_USD.basic)} / month</p>
                 </div>
 
                 <ul className="cineList">
@@ -400,7 +529,7 @@ export default function Memberships() {
               <div className="cineCard featured">
                 <div className="cineTop">
                   <h3 className="cineTitle">Pro</h3>
-                  <p className="cinePrice">{formatMoney('USD', PRICES_USD.pro)} / month</p>
+                  <p className="cinePrice">{displayPrice(PRICES_USD.pro)} / month</p>
                 </div>
 
                 <ul className="cineList">
@@ -428,7 +557,7 @@ export default function Memberships() {
               <div className="cineCard">
                 <div className="cineTop">
                   <h3 className="cineTitle">Elite</h3>
-                  <p className="cinePrice">{formatMoney('USD', PRICES_USD.elite)} / month</p>
+                  <p className="cinePrice">{displayPrice(PRICES_USD.elite)} / month</p>
                 </div>
 
                 <ul className="cineList">
@@ -549,9 +678,9 @@ export default function Memberships() {
                 <div>Standard</div>
                 <div>High</div>
 
-                <div>Price (USD)</div>
-                <div>{formatMoney('USD', PRICES_USD.basic)}</div>
-                <div>{formatMoney('USD', PRICES_USD.pro)}</div>
+                <div>Price</div>
+                <div>{displayPrice(PRICES_USD.basic)}</div>
+                <div>{displayPrice(PRICES_USD.pro)}</div>
               </div>
             </div>
           </section>
