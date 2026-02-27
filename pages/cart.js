@@ -8,13 +8,11 @@ import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
 import * as CartLib from '../lib/cart'
+import { readFxLock, writeFxLock, clearFxLock as clearFxLockShared, DEFAULT_FX } from '../lib/fx'
 
 // ---------- helpers ----------
 const STORAGE_CART_KEY = 'jc_cart_v1'
 const STORAGE_CCY_KEY = 'jc_currency_v1'
-
-// ✅ FX lock (live rate + lock at checkout)
-const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
 
 // ✅ Default display/checkout currency (you requested USD)
 const DEFAULT_CURRENCY = 'USD'
@@ -48,7 +46,8 @@ function formatMoneySimple(currency, amount) {
 function readLS(key, fallback = null) {
   if (typeof window === 'undefined') return fallback
   try {
-    return window.localStorage.getItem(key)
+    const v = window.localStorage.getItem(key)
+    return v == null ? fallback : v
   } catch {
     return fallback
   }
@@ -61,8 +60,9 @@ function writeLS(key, value) {
   } catch {}
 }
 
+// ✅ FIX: Currency normalization should default to USD unless explicitly LKR
 function normCurrency(v) {
-  return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
+  return String(v || '').trim().toUpperCase() === 'LKR' ? 'LKR' : 'USD'
 }
 function normLicense(v) {
   const x = String(v || '').toLowerCase()
@@ -75,7 +75,7 @@ function normFormat(v) {
 
 // ✅ FX helpers
 // usdLkr = how many LKR for 1 USD
-function normalizeRate(v, fallback = 320) {
+function normalizeRate(v, fallback = DEFAULT_FX) {
   const n = Number(v)
   if (!Number.isFinite(n) || n <= 0) return fallback
   return n
@@ -85,7 +85,7 @@ function convertAmount(amount, from, to, usdLkr) {
   const n = Number(amount || 0)
   const f = normCurrency(from)
   const t = normCurrency(to)
-  const r = normalizeRate(usdLkr, 320)
+  const r = normalizeRate(usdLkr, DEFAULT_FX)
 
   if (f === t) return n
   if (f === 'USD' && t === 'LKR') return n * r
@@ -264,8 +264,8 @@ export default function CartPage() {
   const [busy, setBusy] = React.useState(false)
 
   // ✅ FX state (live + lock at checkout)
-  const [fxLiveUsdLkr, setFxLiveUsdLkr] = React.useState(320)
-  const [fxLockedUsdLkr, setFxLockedUsdLkr] = React.useState(null)
+  const [fxLiveUsdLkr, setFxLiveUsdLkr] = React.useState(DEFAULT_FX)
+  const [fxLockedUsdLkr, setFxLockedUsdLkr] = React.useState(readFxLock())
   const fxRateUsdLkr = fxLockedUsdLkr || fxLiveUsdLkr
 
   // Selector enabled (display/checkout currency)
@@ -310,20 +310,19 @@ export default function CartPage() {
   React.useEffect(() => {
     let alive = true
 
-    // load lock from LS
-    const lockedRaw = readLS(STORAGE_FX_LOCK_KEY, null)
-    if (lockedRaw) {
-      const lockedObj = safeJsonParse(lockedRaw, null)
-      if (lockedObj?.usdLkr) setFxLockedUsdLkr(normalizeRate(lockedObj.usdLkr, 320))
-    }
+    // load lock from shared fx.js (numeric only)
+    const lockedRate = readFxLock()
+    if (lockedRate) setFxLockedUsdLkr(lockedRate)
 
     async function run() {
       try {
-        const r = await fetch('/api/fx', { headers: { 'Cache-Control': 'no-store' } })
+        const r = await fetch('/api/fx-rate', { cache: 'no-store' })
         const data = await r.json().catch(() => null)
         if (!alive) return
-        const usdLkr = data?.usdLkr ?? data?.rate ?? data?.USD_LKR ?? null
-        if (usdLkr != null) setFxLiveUsdLkr(normalizeRate(usdLkr, 320))
+
+        // expects: { ok:true, usdLkr }
+        const usdLkr = data?.ok ? data?.usdLkr : null
+        if (usdLkr != null) setFxLiveUsdLkr(normalizeRate(usdLkr, DEFAULT_FX))
       } catch {}
     }
 
@@ -420,13 +419,7 @@ export default function CartPage() {
   }
 
   function clearFxLock() {
-    try {
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.removeItem(STORAGE_FX_LOCK_KEY)
-        } catch {}
-      }
-    } catch {}
+    clearFxLockShared()
     setFxLockedUsdLkr(null)
     setNote('Rate unlocked (live rate active).')
     setTimeout(() => setNote(''), 1400)
@@ -460,9 +453,8 @@ export default function CartPage() {
     // ✅ Lock FX at checkout time (so totals match server-side)
     let lockRate = fxLockedUsdLkr
     if (!lockRate) {
-      lockRate = normalizeRate(fxLiveUsdLkr, 320)
-      const lockObj = { usdLkr: lockRate, lockedAt: Date.now() }
-      writeLS(STORAGE_FX_LOCK_KEY, JSON.stringify(lockObj))
+      lockRate = normalizeRate(fxLiveUsdLkr, DEFAULT_FX)
+      writeFxLock(lockRate) // ✅ shared numeric lock
       setFxLockedUsdLkr(lockRate)
     }
 
