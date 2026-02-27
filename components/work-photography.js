@@ -88,12 +88,13 @@ const WorkPhotography = (props) => {
           <div className="grid">
             {ITEMS.map((it) => (
               <article key={it.key} className="card">
-                <Link href={it.href} className="media" aria-label={it.title}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="img" src={it.img} alt={it.alt} />
-                  <div className="shade" />
-                  <div className="badge">Photography</div>
-                </Link>
+                <Link href={it.href} legacyBehavior>
+  <a className="media" aria-label={it.title}>
+    <img className="img" src={it.img} alt={it.alt} />
+    <div className="shade" />
+    <div className="badge">Photography</div>
+  </a>
+</Link>
 
                 <div className="body">
                   <div className="top">
@@ -102,12 +103,14 @@ const WorkPhotography = (props) => {
                   </div>
 
                   <div className="actions">
-                    <Link href={it.href} className="btn">
-                      <span className="thq-body-small">{it.cta}</span>
-                      <svg viewBox="0 0 1024 1024" className="icon">
-                        <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                      </svg>
-                    </Link>
+                    <Link href={it.href} legacyBehavior>
+  <a className="btn">
+    <span className="thq-body-small">{it.cta}</span>
+    <svg viewBox="0 0 1024 1024" className="icon">
+      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+    </svg>
+  </a>
+</Link>
                   </div>
                 </div>
               </article>
