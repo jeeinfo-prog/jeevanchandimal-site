@@ -1,246 +1,374 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const WorkPhotographyEditorial = (props) => {
   return (
     <>
-      <div className="work-photography-editorial-thq-layout216-elm thq-section-padding">
-        <div className="work-photography-editorial-thq-max-width-elm thq-section-max-width thq-flex-row">
-          <div className="thq-flex-column">
-            <img
-              alt={props.featureImageAlt}
-              src={props.featureImageSrc}
-              className="thq-img-ratio-4-3 work-photography-editorial-thq-image1-elm"
-            />
-          </div>
-          <div className="thq-flex-column work-photography-editorial-thq-content-elm">
-            <div className="work-photography-editorial-thq-section-title-elm thq-flex-column">
-              <span className="thq-body-small">
+      <section className="wrap thq-section-padding">
+        <div className="shell thq-section-max-width">
+          <div className="card">
+            <div className="media">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt={props.featureImageAlt}
+                src={props.featureImageSrc}
+                className="img"
+                loading="lazy"
+              />
+              <div className="mediaShade" />
+              <div className="mediaTag">Editorial</div>
+            </div>
+
+            <div className="content">
+              <div className="kicker thq-body-small">
                 {props.slogan ?? (
                   <Fragment>
-                    <span className="work-photography-editorial-text3">
-                      Explore our key features
-                    </span>
+                    <span>Photography for story & context</span>
                   </Fragment>
                 )}
-              </span>
-              <h2 className="thq-heading-2">
+              </div>
+
+              <h2 className="title thq-heading-2">
                 {props.sectionTitle ?? (
                   <Fragment>
-                    <span className="work-photography-editorial-text7">
-                      Editorial
-                    </span>
+                    <span>Editorial</span>
                   </Fragment>
                 )}
               </h2>
-              <p className="thq-body-large">
+
+              <p className="desc thq-body-large">
                 {props.featureDescription ?? (
                   <Fragment>
-                    <span className="work-photography-editorial-text5">
-                      Photography created for narrative and contextual use —
-                      images that support stories, publications, and visual
-                      essays. The focus remains on authenticity, environment,
-                      and visual coherence.
+                    <span>
+                      Photography created for narrative and contextual use — images
+                      that support stories, publications, and visual essays. The
+                      focus remains on authenticity, environment, and visual
+                      coherence.
                     </span>
                   </Fragment>
                 )}
               </p>
-            </div>
-            <div className="work-photography-editorial-thq-list-elm thq-flex-row">
-              <div className="work-photography-editorial-thq-list-item-elm1 thq-flex-column">
-                <h3 className="thq-heading-3">
-                  {props.feature1Title ?? (
-                    <Fragment>
-                      <span className="work-photography-editorial-text8">
-                        Customized Solutions
-                      </span>
-                    </Fragment>
-                  )}
-                </h3>
-                <span className="thq-body-small">
-                  {props.feature1Description ?? (
-                    <Fragment>
-                      <span className="work-photography-editorial-text2">
-                        Tailored services to meet your specific needs
-                      </span>
-                    </Fragment>
-                  )}
-                </span>
+
+              <div className="points">
+                <div className="point">
+                  <div className="dot" />
+                  <div className="pointText">
+                    <h3 className="thq-heading-3 pointTitle">
+                      {props.feature1Title ?? (
+                        <Fragment>
+                          <span>Story-led sets</span>
+                        </Fragment>
+                      )}
+                    </h3>
+                    <span className="thq-body-small pointDesc">
+                      {props.feature1Description ?? (
+                        <Fragment>
+                          <span>
+                            Cohesive frames designed to support narrative flow and
+                            visual continuity.
+                          </span>
+                        </Fragment>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="point">
+                  <div className="dot" />
+                  <div className="pointText">
+                    <h3 className="thq-heading-3 pointTitle">
+                      {props.feature2Title ?? (
+                        <Fragment>
+                          <span>Authentic environments</span>
+                        </Fragment>
+                      )}
+                    </h3>
+                    <span className="thq-body-small pointDesc">
+                      {props.feature2Description ?? (
+                        <Fragment>
+                          <span>
+                            Real places, human moments, and grounded light — edited
+                            with restraint.
+                          </span>
+                        </Fragment>
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="work-photography-editorial-thq-list-item-elm2 thq-flex-column">
-                <h3 className="thq-heading-3">
-                  {props.feature2Title ?? (
-                    <Fragment>
-                      <span className="work-photography-editorial-text1">
-                        Powerful Tools
-                      </span>
-                    </Fragment>
-                  )}
-                </h3>
-                <span className="thq-body-small">
-                  {props.feature2Description ?? (
-                    <Fragment>
-                      <span className="work-photography-editorial-text9">
-                        Intuitive design, analytics tools, AI &amp; animations
-                      </span>
-                    </Fragment>
-                  )}
-                </span>
+
+              <div className="actions">
+                <button className="btnPrimary" type="button">
+                  <span className="thq-body-small">
+                    {props.mainAction ?? (
+                      <Fragment>
+                        <span>View Editorial</span>
+                      </Fragment>
+                    )}
+                  </span>
+                  <svg viewBox="0 0 1024 1024" className="icon">
+                    <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                  </svg>
+                </button>
+
+                <button className="btnGhost" type="button">
+                  <span className="thq-body-small">
+                    {props.secondaryAction ?? (
+                      <Fragment>
+                        <span>Licensing Info</span>
+                      </Fragment>
+                    )}
+                  </span>
+                </button>
               </div>
-            </div>
-            <div className="work-photography-editorial-thq-actions-elm thq-flex-row">
-              <button className="thq-button-filled work-photography-editorial-thq-button-elm1">
-                <span className="thq-body-small">
-                  {props.mainAction ?? (
-                    <Fragment>
-                      <span className="work-photography-editorial-text6">
-                        Learn More
-                      </span>
-                    </Fragment>
-                  )}
-                </span>
-              </button>
-              <button className="thq-button-outline work-photography-editorial-thq-button-elm2">
-                <span className="thq-body-small">
-                  {props.secondaryAction ?? (
-                    <Fragment>
-                      <span className="work-photography-editorial-text4">
-                        Get Started
-                      </span>
-                    </Fragment>
-                  )}
-                </span>
-              </button>
             </div>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .work-photography-editorial-thq-layout216-elm {
+      </section>
+
+      <style jsx>{`
+        .wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .shell {
+          width: 100%;
+        }
+
+        /* Glass card */
+        .card {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 1.05fr 1fr;
+          gap: 22px;
+          padding: 18px;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(34, 34, 34, 0.35);
+          backdrop-filter: blur(12px);
+          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+        }
+
+        /* Image */
+        .media {
+          position: relative;
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(0, 0, 0, 0.2);
+          min-height: 340px;
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.35s ease;
+        }
+
+        .card:hover .img {
+          transform: scale(1.06);
+        }
+
+        .mediaShade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.0),
+            rgba(0, 0, 0, 0.55)
+          );
+        }
+
+        .mediaTag {
+          position: absolute;
+          left: 12px;
+          top: 12px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.3px;
+        }
+
+        /* Content */
+        .content {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 12px;
+          padding: 8px 6px;
+        }
+
+        .kicker {
+          opacity: 0.85;
+          letter-spacing: 0.35px;
+        }
+
+        .title {
+          margin: 0;
+        }
+
+        .desc {
+          margin: 0;
+          opacity: 0.9;
+          line-height: 1.65;
+        }
+
+        .points {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 12px;
+          margin-top: 6px;
+        }
+
+        .point {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          padding: 12px;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.08);
+          background: rgba(255, 255, 255, 0.04);
+        }
+
+        .dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          margin-top: 8px;
+          background: rgba(120, 166, 255, 0.85);
+          box-shadow: 0 0 0 6px rgba(120, 166, 255, 0.12);
+          flex: 0 0 auto;
+        }
+
+        .pointTitle {
+          margin: 0;
+        }
+
+        .pointDesc {
+          opacity: 0.85;
+          line-height: 1.55;
+        }
+
+        .actions {
+          display: flex;
+          gap: 10px;
+          margin-top: 10px;
+          flex-wrap: wrap;
+        }
+
+        .btnPrimary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(120, 166, 255, 0.35);
+          background: rgba(120, 166, 255, 0.14);
+          cursor: pointer;
+          transition: transform 0.15s ease, background 0.15s ease,
+            border-color 0.15s ease;
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          background: rgba(120, 166, 255, 0.18);
+          border-color: rgba(120, 166, 255, 0.55);
+        }
+
+        .btnGhost {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.06);
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease,
+            background 0.15s ease;
+        }
+
+        .btnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(120, 166, 255, 0.45);
+          background: rgba(120, 166, 255, 0.1);
+        }
+
+        .icon {
+          width: 18px;
+          height: 18px;
+        }
+
+        /* Responsive */
+        @media (max-width: 991px) {
+          .card {
+            grid-template-columns: 1fr;
+          }
+          .media {
+            min-height: 320px;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .card {
+            padding: 14px;
+            border-radius: 18px;
+          }
+          .point {
+            padding: 10px;
+          }
+          .btnPrimary,
+          .btnGhost {
             width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
             justify-content: center;
           }
-          .work-photography-editorial-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-          }
-          .work-photography-editorial-thq-section-title-elm {
-            align-items: flex-start;
-          }
-          .work-photography-editorial-thq-list-elm {
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .work-photography-editorial-thq-list-item-elm1 {
-            align-items: flex-start;
-          }
-          .work-photography-editorial-thq-list-item-elm2 {
-            align-items: flex-start;
-          }
-          .work-photography-editorial-thq-actions-elm {
-            align-self: flex-start;
-          }
-          .work-photography-editorial-text1 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text2 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text3 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text4 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text5 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text6 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text7 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text8 {
-            display: inline-block;
-          }
-          .work-photography-editorial-text9 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .work-photography-editorial-thq-layout216-elm {
-              width: 100%;
-            }
-            .work-photography-editorial-thq-max-width-elm {
-              flex-direction: column;
-            }
-            .work-photography-editorial-thq-image1-elm {
-              width: 100%;
-            }
-            .work-photography-editorial-thq-content-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 479px) {
-            .work-photography-editorial-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .work-photography-editorial-thq-list-elm {
-              flex-direction: column;
-            }
-            .work-photography-editorial-thq-actions-elm {
-              width: 100%;
-              flex-wrap: wrap;
-              margin-top: var(--dl-layout-space-unit);
-            }
-            .work-photography-editorial-thq-button-elm1 {
-              width: 100%;
-            }
-            .work-photography-editorial-thq-button-elm2 {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 WorkPhotographyEditorial.defaultProps = {
-  feature2Title: undefined,
-  feature1Description: undefined,
-  featureImageSrc: '/Photography/3x2/_jee26873_3x2_2000x1333_u_100-1400w.png',
+  featureImageSrc: '/work/photography/pe-01.jpg',
+  featureImageAlt: 'Editorial preview',
+
   slogan: undefined,
-  secondaryAction: undefined,
-  featureDescription: undefined,
-  mainAction: undefined,
-  featureImageAlt: 'Customized Solutions Image',
   sectionTitle: undefined,
+  featureDescription: undefined,
+
   feature1Title: undefined,
+  feature1Description: undefined,
+  feature2Title: undefined,
   feature2Description: undefined,
+
+  mainAction: undefined,
+  secondaryAction: undefined,
 }
 
 WorkPhotographyEditorial.propTypes = {
-  feature2Title: PropTypes.element,
-  feature1Description: PropTypes.element,
   featureImageSrc: PropTypes.string,
-  slogan: PropTypes.element,
-  secondaryAction: PropTypes.element,
-  featureDescription: PropTypes.element,
-  mainAction: PropTypes.element,
   featureImageAlt: PropTypes.string,
+
+  slogan: PropTypes.element,
   sectionTitle: PropTypes.element,
+  featureDescription: PropTypes.element,
+
   feature1Title: PropTypes.element,
+  feature1Description: PropTypes.element,
+  feature2Title: PropTypes.element,
   feature2Description: PropTypes.element,
+
+  mainAction: PropTypes.element,
+  secondaryAction: PropTypes.element,
 }
 
 export default WorkPhotographyEditorial
