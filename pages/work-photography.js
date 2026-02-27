@@ -45,6 +45,14 @@ export default function WorkPhotography() {
         <JeevanChandimalNavi />
 
         <main className="main">
+          
+          {/* HERO (your existing component) */}
+          <section className="section">
+            <div className="block">
+              <WorkPhotographyHero />
+            </div>
+          </section>
+
           {/* TOP INTRO (adds structure + luxury spacing) */}
           <section className="section topIntro">
             <div className="panel thq-section-max-width">
@@ -75,13 +83,7 @@ export default function WorkPhotography() {
             </div>
           </section>
 
-          {/* HERO (your existing component) */}
-          <section className="section">
-            <div className="block">
-              <WorkPhotographyHero />
-            </div>
-          </section>
-
+          
           {/* SECTION (your fixed section) */}
           <section className="section">
             <div className="block">
