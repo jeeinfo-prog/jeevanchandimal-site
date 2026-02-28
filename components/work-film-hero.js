@@ -96,140 +96,149 @@ const WorkFilmHero = (props) => {
       </section>
 
       <style jsx>{`
-        .hero {
-          position: relative;
-          width: 100%;
-          min-height: 78vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
-          border-bottom: 1px solid rgba(245, 244, 244, 0.08);
-        }
+  .hero {
+    position: relative;
+    width: 100%;
+    min-height: 78vh;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; /* ✅ move content to left */
+    overflow: hidden;
+    border-bottom: 1px solid rgba(245, 244, 244, 0.08);
+  }
 
-        .bgMedia {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          filter: brightness(0.72) contrast(1.05) saturate(0.9);
-        }
+  .bgMedia {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.72) contrast(1.05) saturate(0.9);
+  }
 
-        .overlay {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.35),
-            rgba(0, 0, 0, 0.78)
-          );
-        }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.35),
+      rgba(0, 0, 0, 0.78)
+    );
+  }
 
-        .content {
-          position: relative;
-          z-index: 2;
-          width: 100%;
-        }
+  .content {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    padding-left: 5rem; /* ✅ 5-unit left gap */
+  }
 
-        /* Desktop: left aligned */
-        .col {
-          max-width: 560px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          align-items: flex-start;
-          text-align: left;
-        }
+  /* Desktop: left aligned */
+  .col {
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+    text-align: left;
+  }
 
-        .title {
-          margin: 0;
-          color: #f5f4f4;
-        }
+  .title {
+    margin: 0;
+    color: #f5f4f4;
+  }
 
-        .subtitle {
-          margin: 0;
-          color: rgba(245, 244, 244, 0.78);
-          line-height: 1.65;
-        }
+  .subtitle {
+    margin: 0;
+    color: rgba(245, 244, 244, 0.78);
+    line-height: 1.65;
+  }
 
-        .actions {
-          margin-top: 10px;
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-          align-items: center;
-        }
+  .actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
 
-        /* PRIMARY CTA */
-        .cineBtnPrimary {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 12px 22px;
-          border-radius: 999px;
-          border: 1px solid rgba(37, 195, 226, 0.65);
-          background: rgba(37, 195, 226, 0.18);
-          color: #f5f4f4;
-          font-size: 13px;
-          font-weight: 700;
-          text-decoration: none;
-          transition: all 0.22s ease;
-          backdrop-filter: blur(6px);
-        }
+  /* PRIMARY CTA */
+  .cineBtnPrimary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(37, 195, 226, 0.65);
+    background: rgba(37, 195, 226, 0.18);
+    color: #f5f4f4;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.22s ease;
+    backdrop-filter: blur(6px);
+  }
 
-        .cineBtnPrimary:hover {
-          background: rgba(37, 195, 226, 0.28);
-          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16),
-            0 0 18px rgba(37, 195, 226, 0.25);
-          transform: translateY(-1px);
-        }
+  .cineBtnPrimary:hover {
+    background: rgba(37, 195, 226, 0.28);
+    box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16),
+      0 0 18px rgba(37, 195, 226, 0.25);
+    transform: translateY(-1px);
+  }
 
-        /* OUTLINE CTA */
-        .cineBtnOutline {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 12px 22px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.28);
-          background: rgba(255, 255, 255, 0.04);
-          color: rgba(245, 244, 244, 0.85);
-          font-size: 13px;
-          font-weight: 600;
-          text-decoration: none;
-          transition: all 0.22s ease;
-          backdrop-filter: blur(6px);
-        }
+  /* OUTLINE CTA */
+  .cineBtnOutline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(245, 244, 244, 0.28);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(245, 244, 244, 0.85);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.22s ease;
+    backdrop-filter: blur(6px);
+  }
 
-        .cineBtnOutline:hover {
-          border-color: rgba(37, 195, 226, 0.55);
-          color: #f5f4f4;
-          box-shadow: 0 0 16px rgba(37, 195, 226, 0.18);
-          transform: translateY(-1px);
-        }
+  .cineBtnOutline:hover {
+    border-color: rgba(37, 195, 226, 0.55);
+    color: #f5f4f4;
+    box-shadow: 0 0 16px rgba(37, 195, 226, 0.18);
+    transform: translateY(-1px);
+  }
 
-        @media (max-width: 767px) {
-          /* Mobile: center text */
-          .col {
-            max-width: 100%;
-            align-items: center;
-            text-align: center;
-          }
+  @media (max-width: 767px) {
+    /* Mobile: center text again */
+    .hero {
+      justify-content: center;
+    }
 
-          .actions {
-            width: 100%;
-            flex-direction: column;
-            align-items: stretch;
-          }
+    .content {
+      padding-left: 0; /* remove left offset on mobile */
+    }
 
-          .cineBtnPrimary,
-          .cineBtnOutline {
-            width: 100%;
-          }
-        }
-      `}</style>
+    .col {
+      max-width: 100%;
+      align-items: center;
+      text-align: center;
+    }
+
+    .actions {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .cineBtnPrimary,
+    .cineBtnOutline {
+      width: 100%;
+    }
+  }
+`}</style>
     </>
   )
 }
