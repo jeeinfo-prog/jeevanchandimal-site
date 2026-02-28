@@ -2,18 +2,17 @@ import React, { Fragment, useMemo, useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 
 const FeaturedFramesFilm = (props) => {
-  // ✅ build /film/fc-01.jpg ... fc-12.jpg
+  // ✅ build /work/film/fc-01.jpg ... fc-12.jpg
   const items = useMemo(() => {
     const count = Math.max(1, Math.min(48, Number(props.count || 12)))
     return Array.from({ length: count }, (_, i) => {
       const num = String(i + 1).padStart(2, '0')
-      const src = `${props.basePath || '/film'}/fc-${num}.jpg`
       return {
-        src,
+        src: `/work/film/fc-${num}.jpg`,
         alt: `Featured frame ${i + 1}`,
       }
     })
-  }, [props.basePath, props.count])
+  }, [props.count])
 
   const [activeIdx, setActiveIdx] = useState(-1)
   const active = activeIdx >= 0 ? items[activeIdx] : null
@@ -30,12 +29,12 @@ const FeaturedFramesFilm = (props) => {
       <Fragment>
         <span>
           Selected frames—crafted for mood, restraint, and cinematic clarity.
-          Updated by file name inside <code>/public/film</code>.
+          Updated by file name inside <code>/public/work/film</code>.
         </span>
       </Fragment>
     )
 
-  // keyboard for lightbox
+  // keyboard nav for lightbox
   useEffect(() => {
     function onKey(e) {
       if (activeIdx < 0) return
@@ -59,17 +58,17 @@ const FeaturedFramesFilm = (props) => {
             <p className="desc thq-body-large">{descNode}</p>
 
             <div className="actions">
-              {props.primaryHref ? (
+              {props.primaryHref && (
                 <a className="cineBtnPrimary" href={props.primaryHref}>
                   {props.primaryText || 'View Film Work'}
                 </a>
-              ) : null}
+              )}
 
-              {props.secondaryHref ? (
+              {props.secondaryHref && (
                 <a className="cineBtnOutline" href={props.secondaryHref}>
                   {props.secondaryText || 'Request a Private Selection'}
                 </a>
-              ) : null}
+              )}
             </div>
           </header>
 
@@ -89,7 +88,6 @@ const FeaturedFramesFilm = (props) => {
                   alt={it.alt}
                   loading="lazy"
                   onError={(e) => {
-                    // hide broken images (when file doesn't exist)
                     e.currentTarget.style.display = 'none'
                     e.currentTarget.closest('button')?.classList.add('hideTile')
                   }}
@@ -102,19 +100,17 @@ const FeaturedFramesFilm = (props) => {
       </section>
 
       {/* Lightbox */}
-      {active?.src ? (
-        <div className="lightbox" onClick={() => setActiveIdx(-1)} role="dialog" aria-modal="true">
+      {active?.src && (
+        <div className="lightbox" onClick={() => setActiveIdx(-1)}>
           <div className="lbInner" onClick={(e) => e.stopPropagation()}>
-            <button className="lbClose" type="button" onClick={() => setActiveIdx(-1)}>
+            <button className="lbClose" onClick={() => setActiveIdx(-1)}>
               ✕
             </button>
 
             <button
               className="lbNav"
-              type="button"
               onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
               disabled={activeIdx === 0}
-              aria-label="Previous"
             >
               ‹
             </button>
@@ -124,21 +120,18 @@ const FeaturedFramesFilm = (props) => {
 
             <button
               className="lbNav"
-              type="button"
               onClick={() => setActiveIdx((i) => Math.min(items.length - 1, i + 1))}
               disabled={activeIdx === items.length - 1}
-              aria-label="Next"
             >
               ›
             </button>
           </div>
         </div>
-      ) : null}
+      )}
 
       <style jsx>{`
         .wrap {
           width: 100%;
-          position: relative;
           overflow: hidden;
         }
 
@@ -182,11 +175,8 @@ const FeaturedFramesFilm = (props) => {
           flex-wrap: wrap;
         }
 
-        /* ✅ luxury cinematic buttons */
+        /* Buttons */
         .cineBtnPrimary {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
           padding: 12px 22px;
           border-radius: 999px;
           border: 1px solid rgba(37, 195, 226, 0.65);
@@ -195,19 +185,17 @@ const FeaturedFramesFilm = (props) => {
           font-size: 13px;
           font-weight: 800;
           text-decoration: none;
-          transition: all 0.22s ease;
           backdrop-filter: blur(6px);
+          transition: 0.22s ease;
         }
         .cineBtnPrimary:hover {
           background: rgba(37, 195, 226, 0.28);
-          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16), 0 0 18px rgba(37, 195, 226, 0.25);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16),
+            0 0 18px rgba(37, 195, 226, 0.25);
           transform: translateY(-1px);
         }
 
         .cineBtnOutline {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
           padding: 12px 22px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.24);
@@ -216,8 +204,8 @@ const FeaturedFramesFilm = (props) => {
           font-size: 13px;
           font-weight: 700;
           text-decoration: none;
-          transition: all 0.22s ease;
           backdrop-filter: blur(6px);
+          transition: 0.22s ease;
         }
         .cineBtnOutline:hover {
           border-color: rgba(37, 195, 226, 0.55);
@@ -226,12 +214,11 @@ const FeaturedFramesFilm = (props) => {
           transform: translateY(-1px);
         }
 
-        /* ✅ cinematic grid */
+        /* Grid */
         .grid {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
           gap: 14px;
-          width: 100%;
         }
 
         .tile {
@@ -243,9 +230,7 @@ const FeaturedFramesFilm = (props) => {
           background: rgba(0, 0, 0, 0.25);
           aspect-ratio: 16 / 10;
           box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-          transform: translateZ(0);
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-          padding: 0;
+          transition: 0.18s ease;
           cursor: pointer;
         }
 
@@ -259,9 +244,7 @@ const FeaturedFramesFilm = (props) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          display: block;
-          transform: scale(1.02);
-          transition: transform 0.28s ease, filter 0.28s ease;
+          transition: 0.28s ease;
           filter: brightness(0.92) contrast(1.04) saturate(0.96);
         }
 
@@ -273,8 +256,11 @@ const FeaturedFramesFilm = (props) => {
         .shade {
           position: absolute;
           inset: 0;
-          pointer-events: none;
-          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.0), rgba(0, 0, 0, 0.55));
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0),
+            rgba(0, 0, 0, 0.55)
+          );
         }
 
         .hideTile {
@@ -295,7 +281,6 @@ const FeaturedFramesFilm = (props) => {
           display: flex;
           align-items: center;
           gap: 10px;
-          position: relative;
         }
 
         .lbImg {
@@ -314,12 +299,6 @@ const FeaturedFramesFilm = (props) => {
           padding: 10px;
           cursor: pointer;
           border-radius: 999px;
-          backdrop-filter: blur(8px);
-        }
-
-        .lbNav:disabled {
-          opacity: 0.35;
-          cursor: not-allowed;
         }
 
         @media (max-width: 991px) {
@@ -349,12 +328,9 @@ FeaturedFramesFilm.defaultProps = {
   heading1: undefined,
   content1: undefined,
   rootClassName: '',
-  basePath: '/film',
   count: 12,
-
   primaryHref: '/work-film',
   primaryText: 'View Film Work',
-
   secondaryHref: '/contact',
   secondaryText: 'Request a Private Selection',
 }
@@ -363,10 +339,7 @@ FeaturedFramesFilm.propTypes = {
   heading1: PropTypes.element,
   content1: PropTypes.element,
   rootClassName: PropTypes.string,
-
-  basePath: PropTypes.string,
   count: PropTypes.number,
-
   primaryHref: PropTypes.string,
   primaryText: PropTypes.string,
   secondaryHref: PropTypes.string,
