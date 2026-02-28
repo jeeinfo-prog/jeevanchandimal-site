@@ -1,28 +1,21 @@
 import React, { Fragment, useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
-// ✅ remove useTranslations if you’re not using it (prevents lint warnings)
-// import { useTranslations } from 'next-intl'
+import Link from 'next/link'
 
-const WorkFilmHero = (props) => {
+const WorkPhotographyHero = (props) => {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const scrollToSelected = () => {
-    if (typeof document === 'undefined') return
-    const el = document.getElementById('selected-film-work')
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   return (
     <>
       <section className="hero thq-section-padding">
-        {/* ✅ SSR-safe background (video only after mount) */}
+        {/* ✅ SSR-safe: render video only after mount */}
         {mounted ? (
           <video
-            src={props.videoSrc2}
+            src={props.videoSrc}
             loop
             muted
             autoPlay
@@ -33,8 +26,8 @@ const WorkFilmHero = (props) => {
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            alt="Film background"
-            src="/work/film/wf-01.jpg"
+            src="/work/photography/wp-01.jpg"
+            alt="Photography background"
             className="bgMedia"
             loading="eager"
           />
@@ -43,12 +36,13 @@ const WorkFilmHero = (props) => {
         <div className="overlay" />
 
         <div className="content thq-section-max-width">
+          {/* ✅ keep text block same style/structure as Film hero */}
           <div className="col">
             <h1 className="title thq-heading-2">
               {props.heading1 ?? (
                 <Fragment>
-                  <span className="work-film-hero-text1">
-                    Cinematic work shaped by story, mood, and intention.
+                  <span className="work-photography-hero-text3">
+                    Still imagery guided by light, atmosphere, and emotion.
                   </span>
                 </Fragment>
               )}
@@ -57,33 +51,19 @@ const WorkFilmHero = (props) => {
             <p className="subtitle thq-body-large">
               {props.content1 ?? (
                 <Fragment>
-                  <span className="work-film-hero-text2">
-                    Narrative-driven films where image, motion, and sound come
-                    together.
+                  <span className="work-photography-hero-text2">
+                    A collection of photographs created with cinematic depth and
+                    restraint.
                   </span>
                 </Fragment>
               )}
             </p>
 
-            {/* ✅ Linked + styled buttons like you requested */}
+            {/* ✅ CTA only (same placement as Film hero actions) */}
             <div className="actions">
-              {/* Create together → contact */}
-              <a href="/contact" className="cineBtnOutline">
-                {props.textinputPlaceholder || 'Create together'}
-              </a>
-
-              {/* Explore → scroll */}
-              <button
-                type="button"
-                onClick={scrollToSelected}
-                className="cineBtnPrimary"
-              >
-                {props.action3 ?? (
-                  <Fragment>
-                    <span>Explore Work</span>
-                  </Fragment>
-                )}
-              </button>
+              <Link href="/contact" legacyBehavior>
+                <a className="cineBtnOutline">Create together</a>
+              </Link>
             </div>
           </div>
         </div>
@@ -125,7 +105,7 @@ const WorkFilmHero = (props) => {
           position: relative;
           z-index: 2;
           width: 100%;
-          padding-left: 5rem; /* ✅ 5 unit left gap */
+          padding-left: 5rem; /* ✅ same 5-unit left gap */
         }
 
         .col {
@@ -156,32 +136,12 @@ const WorkFilmHero = (props) => {
           align-items: center;
         }
 
-        /* PRIMARY CTA */
-        .cineBtnPrimary {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 12px 22px;
-          border-radius: 999px;
-          border: 1px solid rgba(37, 195, 226, 0.65);
-          background: rgba(37, 195, 226, 0.18);
-          color: #f5f4f4;
-          font-size: 13px;
-          font-weight: 700;
-          text-decoration: none;
-          transition: all 0.22s ease;
-          backdrop-filter: blur(6px);
-          cursor: pointer;
+        .work-photography-hero-text2,
+        .work-photography-hero-text3 {
+          display: inline-block;
         }
 
-        .cineBtnPrimary:hover {
-          background: rgba(37, 195, 226, 0.28);
-          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16),
-            0 0 18px rgba(37, 195, 226, 0.25);
-          transform: translateY(-1px);
-        }
-
-        /* OUTLINE CTA */
+        /* OUTLINE CTA (same as Film hero) */
         .cineBtnOutline {
           display: inline-flex;
           align-items: center;
@@ -226,7 +186,6 @@ const WorkFilmHero = (props) => {
             align-items: stretch;
           }
 
-          .cineBtnPrimary,
           .cineBtnOutline {
             width: 100%;
           }
@@ -236,20 +195,16 @@ const WorkFilmHero = (props) => {
   )
 }
 
-WorkFilmHero.defaultProps = {
-  heading1: undefined,
+WorkPhotographyHero.defaultProps = {
+  videoSrc: '/Photography/Video/photography%2001.mov',
   content1: undefined,
-  textinputPlaceholder: 'Create together',
-  action3: undefined,
-  videoSrc2: '/Film/film%20production%2002.mov',
+  heading1: undefined,
 }
 
-WorkFilmHero.propTypes = {
-  heading1: PropTypes.element,
+WorkPhotographyHero.propTypes = {
   content1: PropTypes.element,
-  textinputPlaceholder: PropTypes.string,
-  action3: PropTypes.element,
-  videoSrc2: PropTypes.string,
+  videoSrc: PropTypes.string,
+  heading1: PropTypes.element,
 }
 
-export default WorkFilmHero
+export default WorkPhotographyHero
