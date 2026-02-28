@@ -9,11 +9,9 @@ export default async function handler(req, res) {
   try {
     const limit = Math.max(4, Math.min(40, Number(req.query.limit || 12)))
 
-    // 🔹 Adjust this query to match your schema
-    // If you have a "published" or "is_public" column, uncomment the filter
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, delivery_url, public_url, title')
+      .select('id, public_url, title')
       // .eq('is_public', true) // ← use if you have it
       .limit(200)
 
@@ -26,10 +24,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ images: [] })
     }
 
-    // 🔹 pick best URL per row
-    const urls = data
-      .map((r) => r.delivery_url || r.public_url)
-      .filter(Boolean)
+    const urls = data.map((r) => r.public_url).filter(Boolean)
 
     if (urls.length === 0) {
       return res.status(200).json({ images: [] })
