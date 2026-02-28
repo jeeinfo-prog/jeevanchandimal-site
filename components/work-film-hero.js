@@ -11,14 +11,7 @@ const WorkFilmHero = (props) => {
   return (
     <>
       <div className="work-film-hero-container1 thq-section-padding">
-        {/* Background image fallback (kept as you had it) */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          alt="Film background"
-          src="/work/film/wf-01.jpg"
-          className="work-film-hero-image"
-        />
-
+        {/* ✅ Video only (no background image) */}
         <div className="work-film-hero-container2">
           <video
             src={props.videoSrc2}
@@ -28,8 +21,9 @@ const WorkFilmHero = (props) => {
             playsInline
             preload="metadata"
             className="work-film-hero-video"
-          ></video>
+          />
 
+          {/* ✅ Left + vertically centered */}
           <div className="work-film-hero-thq-column-elm">
             <div className="work-film-hero-thq-content-elm">
               <h1 className="thq-heading-2 work-film-hero-thq-text-elm1">
@@ -53,7 +47,6 @@ const WorkFilmHero = (props) => {
                 )}
               </p>
 
-              {/* ✅ New theme buttons (Create together + Explore Work) */}
               <div className="actions">
                 <a href="/contact" className="cineBtnOutline">
                   {props.textinputPlaceholder || 'Create together'}
@@ -82,41 +75,26 @@ const WorkFilmHero = (props) => {
           height: 1015px;
           display: flex;
           position: relative;
-          align-items: center;
-          flex-direction: row;
           overflow: hidden;
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
+          padding-top: 0; /* keep THQ padding class, but don’t push content down */
+          padding-bottom: 0;
         }
 
-        .work-film-hero-image {
-          top: 0px;
-          left: 0px;
-          right: 0px;
-          width: 100%;
-          height: 100%;
-          margin: auto;
-          position: absolute;
-          object-fit: cover;
-          filter: brightness(0.72) contrast(1.05) saturate(0.9);
-        }
-
+        /* Full-height stage */
         .work-film-hero-container2 {
-          flex: 0 0 auto;
+          position: relative;
           width: 100%;
           height: 100%;
           display: flex;
-          flex-direction: column;
-          position: relative;
+          align-items: center; /* ✅ vertically center the text block */
         }
 
         .work-film-hero-video {
-          top: 0px;
-          left: 0px;
-          right: 0px;
+          position: absolute;
+          inset: 0;
           width: 100%;
           height: 100%;
-          margin: auto;
-          position: absolute;
           object-fit: cover;
           filter: brightness(0.72) contrast(1.05) saturate(0.9);
         }
@@ -135,17 +113,15 @@ const WorkFilmHero = (props) => {
           z-index: 0;
         }
 
+        /* ✅ Left-middle: left aligned + vertically centered by parent */
         .work-film-hero-thq-column-elm {
-          gap: 24px;
-          width: auto;
-          display: flex;
+          position: relative;
           z-index: 1;
           max-width: 560px;
-          align-items: flex-start;
-          flex-shrink: 0;
+          display: flex;
           flex-direction: column;
-          position: relative;
-          padding-left: 5rem; /* ✅ keeps your left-aligned look */
+          align-items: flex-start;
+          padding-left: 5rem; /* ✅ left gap */
         }
 
         .work-film-hero-thq-content-elm {
@@ -153,8 +129,8 @@ const WorkFilmHero = (props) => {
           display: flex;
           align-self: stretch;
           align-items: flex-start;
-          animation-name: fadeInLeft;
           flex-direction: column;
+          animation-name: fadeInLeft;
           animation-delay: 0s;
           animation-duration: 500ms;
           animation-direction: normal;
@@ -162,7 +138,6 @@ const WorkFilmHero = (props) => {
           animation-timing-function: ease;
         }
 
-        /* ✅ Actions row */
         .actions {
           margin-top: 10px;
           display: flex;
@@ -227,16 +202,22 @@ const WorkFilmHero = (props) => {
 
         @media (max-width: 991px) {
           .work-film-hero-thq-column-elm {
-            align-self: center;
-            padding-left: 0; /* ✅ center on tablet like before */
+            padding-left: 0;
+            margin: 0 auto; /* ✅ keep it visually nice on tablet */
           }
         }
 
         @media (max-width: 767px) {
+          .work-film-hero-container2 {
+            justify-content: center;
+          }
+
           .work-film-hero-thq-column-elm {
-            width: 100%;
+            max-width: 100%;
             padding-left: 0;
             align-items: center;
+            text-align: center;
+            width: 100%;
           }
 
           .work-film-hero-thq-text-elm1,
