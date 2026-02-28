@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
 
 const WorkCinematicGallery = (props) => {
@@ -7,23 +7,15 @@ const WorkCinematicGallery = (props) => {
     () =>
       Array.from({ length: 12 }, (_, i) => {
         const num = String(i + 1).padStart(2, '0')
-        return `/work/photography/cg-${num}.jpg`
+        return { src: `/work/photography/cg-${num}.jpg`, alt: `Gallery image ${i + 1}` }
       }),
     []
   )
 
-  const [images, setImages] = useState(staticFallback)
+  // ✅ items = [{src, alt?, href?}]
+  const [items, setItems] = useState(staticFallback)
   const [loading, setLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
-
-  // ✅ prevent setState after unmount
-  const mountedRef = useRef(true)
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
 
   const headingNode =
     props.heading1 ?? (
@@ -36,44 +28,54 @@ const WorkCinematicGallery = (props) => {
     props.content1 ?? (
       <Fragment>
         <span>
-          A curated selection of photographs presented as standalone visual
-          studies. These images focus on atmosphere, composition, and tonal
-          depth—allowing each frame to exist without explanation.
+          A curated selection of photographs presented as standalone visual studies.
+          These images focus on atmosphere, composition, and tonal depth—allowing
+          each frame to exist without explanation.
         </span>
       </Fragment>
     )
 
-  // 🔹 Fetch random images from API
+  function setStatic() {
+    setItems(staticFallback)
+  }
+
+  // 🔹 Fetch random images from API (supports strings or objects)
   async function loadRandom() {
     if (!props.apiEndpoint) return
-
     try {
       setLoading(true)
-
-      const res = await fetch(props.apiEndpoint, {
-        headers: { Accept: 'application/json' },
-      })
-
+      const res = await fetch(props.apiEndpoint, { headers: { Accept: 'application/json' } })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data = await res.json()
       const list = Array.isArray(data?.images) ? data.images : []
 
-      if (!mountedRef.current) return
+      const normalized = list
+        .map((x, idx) => {
+          if (typeof x === 'string') {
+            return {
+              src: x,
+              alt: `Gallery image ${idx + 1}`,
+              href: props.storeHref || '',
+            }
+          }
+          return {
+            src: x?.src || x?.url,
+            alt: x?.alt || `Gallery image ${idx + 1}`,
+            href: x?.href || props.storeHref || '',
+          }
+        })
+        .filter((x) => x?.src)
 
-      if (list.length) {
-        // ensure only strings
-        setImages(list.filter((x) => typeof x === 'string' && x))
+      if (normalized.length) {
+        setItems(normalized)
       } else if (props.fallbackToStaticOnEmpty) {
-        setImages(staticFallback)
+        setStatic()
       }
     } catch (e) {
-      if (!mountedRef.current) return
-      if (props.fallbackToStaticOnError) {
-        setImages(staticFallback)
-      }
+      if (props.fallbackToStaticOnError) setStatic()
     } finally {
-      if (mountedRef.current) setLoading(false)
+      setLoading(false)
     }
   }
 
@@ -83,23 +85,10 @@ const WorkCinematicGallery = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.apiEndpoint])
 
-  // ✅ Auto refresh (optional)
-  useEffect(() => {
-    if (!props.apiEndpoint) return
-    if (!props.autoRefreshMs || props.autoRefreshMs < 5000) return
-
-    const t = setInterval(() => {
-      loadRandom()
-    }, props.autoRefreshMs)
-
-    return () => clearInterval(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.apiEndpoint, props.autoRefreshMs])
-
-  // 🔹 shuffle static mode if enabled
+  // 🔹 shuffle mode
   useEffect(() => {
     if (!props.shuffle) return
-    setImages((prev) => [...prev].sort(() => Math.random() - 0.5))
+    setItems((prev) => [...prev].sort(() => Math.random() - 0.5))
   }, [props.shuffle])
 
   // 🔹 keyboard navigation for lightbox
@@ -107,13 +96,15 @@ const WorkCinematicGallery = (props) => {
     function onKey(e) {
       if (activeIdx < 0) return
       if (e.key === 'Escape') setActiveIdx(-1)
-      if (e.key === 'ArrowRight')
-        setActiveIdx((i) => Math.min(images.length - 1, i + 1))
+      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(items.length - 1, i + 1))
       if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
     }
+    if (typeof window === 'undefined') return
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeIdx, images.length])
+  }, [activeIdx, items.length])
+
+  const active = activeIdx >= 0 ? items[activeIdx] : null
 
   return (
     <>
@@ -130,33 +121,38 @@ const WorkCinematicGallery = (props) => {
             )}
           </header>
 
-          <div className="masonry">
-            {images.map((src, idx) => (
-              <button
-                key={`${src}-${idx}`}
-                className="tile"
-                onClick={() => setActiveIdx(idx)}
-                aria-label={`Open image ${idx + 1}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={src}
-                  alt={`Gallery image ${idx + 1}`}
-                  className="img"
-                  loading="lazy"
-                />
-                <span className="glow" />
-              </button>
-            ))}
-          </div>
+          {items.length === 0 ? (
+            <div className="empty">No images found.</div>
+          ) : (
+            <div className="masonry">
+              {items.map((it, idx) => (
+                <button
+                  key={`${it.src}-${idx}`}
+                  className="tile"
+                  onClick={() => setActiveIdx(idx)}
+                  aria-label={`Open image ${idx + 1}`}
+                  type="button"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={it.src}
+                    alt={it.alt || `Gallery image ${idx + 1}`}
+                    className="img"
+                    loading="lazy"
+                  />
+                  <span className="glow" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
       {/* 🔹 Lightbox */}
-      {activeIdx >= 0 && images[activeIdx] && (
+      {active && active.src && (
         <div className="lightbox" onClick={() => setActiveIdx(-1)}>
           <div className="lbInner" onClick={(e) => e.stopPropagation()}>
-            <button className="lbClose" onClick={() => setActiveIdx(-1)}>
+            <button className="lbClose" onClick={() => setActiveIdx(-1)} type="button">
               ✕
             </button>
 
@@ -164,20 +160,29 @@ const WorkCinematicGallery = (props) => {
               className="lbNav"
               onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
               disabled={activeIdx === 0}
+              type="button"
             >
               ‹
             </button>
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="lbImg" src={images[activeIdx]} alt="Preview" />
+            <img className="lbImg" src={active.src} alt={active.alt || 'Preview'} />
 
             <button
               className="lbNav"
-              onClick={() => setActiveIdx((i) => Math.min(images.length - 1, i + 1))}
-              disabled={activeIdx === images.length - 1}
+              onClick={() => setActiveIdx((i) => Math.min(items.length - 1, i + 1))}
+              disabled={activeIdx === items.length - 1}
+              type="button"
             >
               ›
             </button>
+
+            {/* Optional: open store link if API provided href */}
+            {active.href ? (
+              <a className="lbLink" href={active.href}>
+                Open in Store →
+              </a>
+            ) : null}
           </div>
         </div>
       )}
@@ -202,6 +207,14 @@ const WorkCinematicGallery = (props) => {
           cursor: not-allowed;
         }
 
+        .empty {
+          margin-top: 18px;
+          padding: 14px 16px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          border-radius: 14px;
+          opacity: 0.9;
+        }
+
         .masonry {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -213,11 +226,11 @@ const WorkCinematicGallery = (props) => {
           overflow: hidden;
           border-radius: 16px;
           position: relative;
-          border: none;
+          border: 1px solid rgba(245, 244, 244, 0.1);
           padding: 0;
           cursor: pointer;
           box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-          background: transparent;
+          background: rgba(0, 0, 0, 0.25);
         }
 
         .img {
@@ -235,11 +248,7 @@ const WorkCinematicGallery = (props) => {
         .glow {
           position: absolute;
           inset: 0;
-          background: radial-gradient(
-            600px circle at 50% 50%,
-            rgba(120, 166, 255, 0.18),
-            transparent
-          );
+          background: radial-gradient(600px circle at 50% 50%, rgba(120, 166, 255, 0.18), transparent);
           opacity: 0;
           transition: opacity 0.25s ease;
           pointer-events: none;
@@ -263,6 +272,7 @@ const WorkCinematicGallery = (props) => {
           display: flex;
           align-items: center;
           gap: 10px;
+          position: relative;
         }
 
         .lbImg {
@@ -280,6 +290,18 @@ const WorkCinematicGallery = (props) => {
           padding: 10px;
           cursor: pointer;
           border-radius: 999px;
+        }
+
+        .lbLink {
+          position: absolute;
+          bottom: -44px;
+          left: 50%;
+          transform: translateX(-50%);
+          text-decoration: none;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(120, 166, 255, 0.35);
+          background: rgba(120, 166, 255, 0.14);
         }
 
         @media (max-width: 991px) {
@@ -302,13 +324,8 @@ WorkCinematicGallery.defaultProps = {
   heading1: undefined,
   content1: undefined,
   rootClassName: '',
-
-  // ✅ recommended
   apiEndpoint: '/api/gallery/random?limit=12',
-
-  // ✅ auto update every 60s (set 0 to disable)
-  autoRefreshMs: 60000,
-
+  storeHref: '/store',
   shuffle: false,
   fallbackToStaticOnError: true,
   fallbackToStaticOnEmpty: true,
@@ -318,10 +335,8 @@ WorkCinematicGallery.propTypes = {
   heading1: PropTypes.element,
   content1: PropTypes.element,
   rootClassName: PropTypes.string,
-
   apiEndpoint: PropTypes.string,
-  autoRefreshMs: PropTypes.number,
-
+  storeHref: PropTypes.string,
   shuffle: PropTypes.bool,
   fallbackToStaticOnError: PropTypes.bool,
   fallbackToStaticOnEmpty: PropTypes.bool,
