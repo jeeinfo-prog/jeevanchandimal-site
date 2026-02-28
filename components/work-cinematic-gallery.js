@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useState } from 'react'
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 
 const WorkCinematicGallery = (props) => {
@@ -16,6 +16,15 @@ const WorkCinematicGallery = (props) => {
   const [loading, setLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
 
+  // ✅ prevent setState after unmount
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   const headingNode =
     props.heading1 ?? (
       <Fragment>
@@ -27,9 +36,9 @@ const WorkCinematicGallery = (props) => {
     props.content1 ?? (
       <Fragment>
         <span>
-          A curated selection of photographs presented as standalone visual studies.
-          These images focus on atmosphere, composition, and tonal depth—allowing
-          each frame to exist without explanation.
+          A curated selection of photographs presented as standalone visual
+          studies. These images focus on atmosphere, composition, and tonal
+          depth—allowing each frame to exist without explanation.
         </span>
       </Fragment>
     )
@@ -37,33 +46,55 @@ const WorkCinematicGallery = (props) => {
   // 🔹 Fetch random images from API
   async function loadRandom() {
     if (!props.apiEndpoint) return
+
     try {
       setLoading(true)
-      const res = await fetch(props.apiEndpoint)
-      const data = await res.json()
 
+      const res = await fetch(props.apiEndpoint, {
+        headers: { Accept: 'application/json' },
+      })
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const data = await res.json()
       const list = Array.isArray(data?.images) ? data.images : []
+
+      if (!mountedRef.current) return
+
       if (list.length) {
-        setImages(list)
+        // ensure only strings
+        setImages(list.filter((x) => typeof x === 'string' && x))
       } else if (props.fallbackToStaticOnEmpty) {
         setImages(staticFallback)
       }
-    } catch {
+    } catch (e) {
+      if (!mountedRef.current) return
       if (props.fallbackToStaticOnError) {
         setImages(staticFallback)
       }
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }
 
   // 🔹 initial load
   useEffect(() => {
-    if (props.apiEndpoint) {
-      loadRandom()
-    }
+    if (props.apiEndpoint) loadRandom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.apiEndpoint])
+
+  // ✅ Auto refresh (optional)
+  useEffect(() => {
+    if (!props.apiEndpoint) return
+    if (!props.autoRefreshMs || props.autoRefreshMs < 5000) return
+
+    const t = setInterval(() => {
+      loadRandom()
+    }, props.autoRefreshMs)
+
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.apiEndpoint, props.autoRefreshMs])
 
   // 🔹 shuffle static mode if enabled
   useEffect(() => {
@@ -76,7 +107,8 @@ const WorkCinematicGallery = (props) => {
     function onKey(e) {
       if (activeIdx < 0) return
       if (e.key === 'Escape') setActiveIdx(-1)
-      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(images.length - 1, i + 1))
+      if (e.key === 'ArrowRight')
+        setActiveIdx((i) => Math.min(images.length - 1, i + 1))
       if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
     }
     window.addEventListener('keydown', onKey)
@@ -92,11 +124,7 @@ const WorkCinematicGallery = (props) => {
             <p className="desc thq-body-large">{descNode}</p>
 
             {props.apiEndpoint && (
-              <button
-                className="refreshBtn"
-                onClick={loadRandom}
-                disabled={loading}
-              >
+              <button className="refreshBtn" onClick={loadRandom} disabled={loading}>
                 {loading ? 'Loading…' : 'Refresh Images'}
               </button>
             )}
@@ -128,7 +156,9 @@ const WorkCinematicGallery = (props) => {
       {activeIdx >= 0 && images[activeIdx] && (
         <div className="lightbox" onClick={() => setActiveIdx(-1)}>
           <div className="lbInner" onClick={(e) => e.stopPropagation()}>
-            <button className="lbClose" onClick={() => setActiveIdx(-1)}>✕</button>
+            <button className="lbClose" onClick={() => setActiveIdx(-1)}>
+              ✕
+            </button>
 
             <button
               className="lbNav"
@@ -143,9 +173,7 @@ const WorkCinematicGallery = (props) => {
 
             <button
               className="lbNav"
-              onClick={() =>
-                setActiveIdx((i) => Math.min(images.length - 1, i + 1))
-              }
+              onClick={() => setActiveIdx((i) => Math.min(images.length - 1, i + 1))}
               disabled={activeIdx === images.length - 1}
             >
               ›
@@ -169,6 +197,11 @@ const WorkCinematicGallery = (props) => {
           cursor: pointer;
         }
 
+        .refreshBtn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
         .masonry {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -184,6 +217,7 @@ const WorkCinematicGallery = (props) => {
           padding: 0;
           cursor: pointer;
           box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+          background: transparent;
         }
 
         .img {
@@ -191,6 +225,7 @@ const WorkCinematicGallery = (props) => {
           height: 100%;
           object-fit: cover;
           transition: transform 0.25s ease;
+          display: block;
         }
 
         .tile:hover .img {
@@ -207,6 +242,7 @@ const WorkCinematicGallery = (props) => {
           );
           opacity: 0;
           transition: opacity 0.25s ease;
+          pointer-events: none;
         }
 
         .tile:hover .glow {
@@ -266,7 +302,13 @@ WorkCinematicGallery.defaultProps = {
   heading1: undefined,
   content1: undefined,
   rootClassName: '',
-  apiEndpoint: '',
+
+  // ✅ recommended
+  apiEndpoint: '/api/gallery/random?limit=12',
+
+  // ✅ auto update every 60s (set 0 to disable)
+  autoRefreshMs: 60000,
+
   shuffle: false,
   fallbackToStaticOnError: true,
   fallbackToStaticOnEmpty: true,
@@ -276,7 +318,10 @@ WorkCinematicGallery.propTypes = {
   heading1: PropTypes.element,
   content1: PropTypes.element,
   rootClassName: PropTypes.string,
+
   apiEndpoint: PropTypes.string,
+  autoRefreshMs: PropTypes.number,
+
   shuffle: PropTypes.bool,
   fallbackToStaticOnError: PropTypes.bool,
   fallbackToStaticOnEmpty: PropTypes.bool,

@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useMemo, useState } from 'react'
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 
 const WorkStockPreview = (props) => {
@@ -21,6 +21,15 @@ const WorkStockPreview = (props) => {
   )
   const [loading, setLoading] = useState(false)
 
+  // ✅ prevent setState after unmount
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   const headingNode =
     props.heading1 ?? (
       <Fragment>
@@ -40,12 +49,27 @@ const WorkStockPreview = (props) => {
       </Fragment>
     )
 
+  function setStaticItems() {
+    setItems(
+      staticFallback.map((src, i) => ({
+        src,
+        alt: `Stock preview ${i + 1}`,
+        href: props.storeHref || '/store',
+      }))
+    )
+  }
+
   // ✅ Load from store (API)
   async function loadRandom() {
     if (!props.apiEndpoint) return
     try {
       setLoading(true)
-      const res = await fetch(props.apiEndpoint, { headers: { Accept: 'application/json' } })
+
+      const res = await fetch(props.apiEndpoint, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
       const data = await res.json()
 
       // Supports:
@@ -56,7 +80,11 @@ const WorkStockPreview = (props) => {
       const normalized = list
         .map((x, idx) => {
           if (typeof x === 'string') {
-            return { src: x, alt: `Stock preview ${idx + 1}`, href: props.storeHref || '/store' }
+            return {
+              src: x,
+              alt: `Stock preview ${idx + 1}`,
+              href: props.storeHref || '/store',
+            }
           }
           return {
             src: x?.src || x?.url,
@@ -64,31 +92,22 @@ const WorkStockPreview = (props) => {
             href: x?.href || props.storeHref || '/store',
           }
         })
-        .filter((x) => x?.src)
+        .filter((x) => x?.src && typeof x.src === 'string')
+
+      if (!mountedRef.current) return
 
       if (normalized.length) {
         setItems(normalized)
       } else if (props.fallbackToStaticOnEmpty) {
-        setItems(
-          staticFallback.map((src, i) => ({
-            src,
-            alt: `Stock preview ${i + 1}`,
-            href: props.storeHref || '/store',
-          }))
-        )
+        setStaticItems()
       }
-    } catch {
+    } catch (e) {
+      if (!mountedRef.current) return
       if (props.fallbackToStaticOnError) {
-        setItems(
-          staticFallback.map((src, i) => ({
-            src,
-            alt: `Stock preview ${i + 1}`,
-            href: props.storeHref || '/store',
-          }))
-        )
+        setStaticItems()
       }
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }
 
@@ -97,6 +116,19 @@ const WorkStockPreview = (props) => {
     if (props.apiEndpoint) loadRandom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.apiEndpoint])
+
+  // ✅ Auto refresh (optional)
+  useEffect(() => {
+    if (!props.apiEndpoint) return
+    if (!props.autoRefreshMs || props.autoRefreshMs < 5000) return
+
+    const t = setInterval(() => {
+      loadRandom()
+    }, props.autoRefreshMs)
+
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.apiEndpoint, props.autoRefreshMs])
 
   return (
     <>
@@ -108,7 +140,12 @@ const WorkStockPreview = (props) => {
 
             <div className="headActions">
               {props.apiEndpoint && (
-                <button className="refreshBtn" type="button" onClick={loadRandom} disabled={loading}>
+                <button
+                  className="refreshBtn"
+                  type="button"
+                  onClick={loadRandom}
+                  disabled={loading}
+                >
                   {loading ? 'Loading…' : 'Refresh'}
                 </button>
               )}
@@ -124,9 +161,18 @@ const WorkStockPreview = (props) => {
 
           <div className="grid">
             {items.map((it, idx) => (
-              <a key={`${it.src}-${idx}`} className="tile" href={it.href || props.storeHref || '/store'}>
+              <a
+                key={`${it.src}-${idx}`}
+                className="tile"
+                href={it.href || props.storeHref || '/store'}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={it.src} alt={it.alt || `Stock preview ${idx + 1}`} loading="lazy" />
+                <img
+                  className="img"
+                  src={it.src}
+                  alt={it.alt || `Stock preview ${idx + 1}`}
+                  loading="lazy"
+                />
                 <div className="shade" />
                 <div className="chip">License</div>
               </a>
@@ -181,7 +227,8 @@ const WorkStockPreview = (props) => {
           border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(255, 255, 255, 0.06);
           cursor: pointer;
-          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+          transition: transform 0.15s ease, border-color 0.15s ease,
+            background 0.15s ease;
         }
 
         .refreshBtn:hover {
@@ -205,7 +252,8 @@ const WorkStockPreview = (props) => {
           border: 1px solid rgba(120, 166, 255, 0.35);
           background: rgba(120, 166, 255, 0.14);
           text-decoration: none;
-          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+          transition: transform 0.15s ease, border-color 0.15s ease,
+            background 0.15s ease;
         }
 
         .storeBtn:hover {
@@ -219,7 +267,6 @@ const WorkStockPreview = (props) => {
           height: 18px;
         }
 
-        /* ✅ Clean grid (no gaps) */
         .grid {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
@@ -237,7 +284,8 @@ const WorkStockPreview = (props) => {
           aspect-ratio: 16 / 9;
           box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
           transform: translateZ(0);
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+          transition: transform 0.18s ease, border-color 0.18s ease,
+            box-shadow 0.18s ease;
           text-decoration: none;
           display: block;
         }
@@ -267,7 +315,7 @@ const WorkStockPreview = (props) => {
           pointer-events: none;
           background: linear-gradient(
             to bottom,
-            rgba(0, 0, 0, 0.0),
+            rgba(0, 0, 0, 0),
             rgba(0, 0, 0, 0.55)
           );
         }
@@ -296,9 +344,11 @@ const WorkStockPreview = (props) => {
             text-align: left;
             margin: 0;
           }
+
           .headActions {
             justify-content: flex-start;
           }
+
           .tile {
             grid-column: span 12;
           }
@@ -312,11 +362,14 @@ WorkStockPreview.defaultProps = {
   heading1: undefined,
   content1: undefined,
 
-  // ✅ Store auto-load (recommended)
+  // ✅ Store auto-load
   apiEndpoint: '/api/gallery/random?limit=8',
 
   // ✅ where each image should link
   storeHref: '/store',
+
+  // ✅ auto update every 60s (set 0 to disable)
+  autoRefreshMs: 60000,
 
   fallbackToStaticOnError: true,
   fallbackToStaticOnEmpty: true,
@@ -328,6 +381,8 @@ WorkStockPreview.propTypes = {
 
   apiEndpoint: PropTypes.string,
   storeHref: PropTypes.string,
+
+  autoRefreshMs: PropTypes.number,
 
   fallbackToStaticOnError: PropTypes.bool,
   fallbackToStaticOnEmpty: PropTypes.bool,
