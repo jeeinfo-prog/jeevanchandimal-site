@@ -43,6 +43,7 @@ const WorkFilmHero = (props) => {
 
         <div className="overlay" />
 
+        {/* NOTE: keep thq padding, but we override centering in CSS */}
         <div className="content thq-section-max-width thq-section-padding">
           <div className="col">
             <h1 className="title thq-heading-2">
@@ -71,7 +72,11 @@ const WorkFilmHero = (props) => {
               </a>
 
               {/* Explore → scroll */}
-              <button type="button" onClick={scrollToSelected} className="cineBtnPrimary">
+              <button
+                type="button"
+                onClick={scrollToSelected}
+                className="cineBtnPrimary"
+              >
                 {props.action3 ?? (
                   <Fragment>
                     <span>Explore Work</span>
@@ -90,7 +95,7 @@ const WorkFilmHero = (props) => {
           min-height: 78vh;
           display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start; /* ✅ page-left anchor */
           overflow: hidden;
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
@@ -119,9 +124,16 @@ const WorkFilmHero = (props) => {
           position: relative;
           z-index: 2;
           width: 100%;
+
+          /* ✅ break out of thq-section-max-width centering */
+          max-width: 100%;
+          margin: 0;
+
+          /* ✅ 5-unit page-left gap */
+          padding-left: 5rem;
         }
 
-        /* ✅ left aligned by default (desktop) */
+        /* Desktop: left aligned */
         .col {
           max-width: 560px;
           display: flex;
@@ -165,6 +177,7 @@ const WorkFilmHero = (props) => {
           text-decoration: none;
           transition: all 0.22s ease;
           backdrop-filter: blur(6px);
+          cursor: pointer;
         }
 
         .cineBtnPrimary:hover {
@@ -199,7 +212,18 @@ const WorkFilmHero = (props) => {
         }
 
         @media (max-width: 767px) {
-          /* mobile only: center text */
+          /* Mobile: center again */
+          .hero {
+            justify-content: center;
+          }
+
+          /* restore centered container behavior on mobile */
+          .content {
+            padding-left: 0;
+            max-width: var(--dl-layout-size-maxwidth);
+            margin: 0 auto;
+          }
+
           .col {
             max-width: 100%;
             align-items: center;
