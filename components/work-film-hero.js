@@ -1,7 +1,16 @@
-import React, { Fragment } from 'react'
+import React, { Fragment, useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 
 const WorkFilmHero = (props) => {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   const scrollToSelected = () => {
     const el = document.getElementById('selected-film-work')
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -10,15 +19,24 @@ const WorkFilmHero = (props) => {
   return (
     <>
       <div className="hero">
-        {/* Background video */}
-        <video
-          src={props.videoSrc2}
-          loop
-          muted
-          autoPlay
-          playsInline
-          className="bgVideo"
-        />
+        {/* MOBILE → IMAGE */}
+        {isMobile ? (
+          <img
+            src="/work/film/wf-01.jpg"
+            alt="Film background"
+            className="bgMedia"
+          />
+        ) : (
+          /* DESKTOP → VIDEO */
+          <video
+            src={props.videoSrc2}
+            loop
+            muted
+            autoPlay
+            playsInline
+            className="bgMedia"
+          />
+        )}
 
         <div className="overlay" />
 
@@ -45,12 +63,12 @@ const WorkFilmHero = (props) => {
           </p>
 
           <div className="actions">
-            {/* CREATE TOGETHER → CONTACT */}
+            {/* CONTACT */}
             <a href="/contact" className="btnOutline">
               {props.textinputPlaceholder || 'Create together'}
             </a>
 
-            {/* EXPLORE WORK → SCROLL */}
+            {/* SCROLL */}
             <button onClick={scrollToSelected} className="btnPrimary">
               {props.action3 ?? (
                 <Fragment>
@@ -74,7 +92,7 @@ const WorkFilmHero = (props) => {
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
 
-        .bgVideo {
+        .bgMedia {
           position: absolute;
           inset: 0;
           width: 100%;
@@ -88,7 +106,7 @@ const WorkFilmHero = (props) => {
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0.35),
-            rgba(0, 0, 0, 0.75)
+            rgba(0, 0, 0, 0.78)
           );
         }
 
@@ -119,7 +137,6 @@ const WorkFilmHero = (props) => {
           margin-top: 10px;
         }
 
-        /* PRIMARY BUTTON (Explore Work) */
         .btnPrimary {
           padding: 12px 22px;
           border-radius: 999px;
@@ -136,7 +153,6 @@ const WorkFilmHero = (props) => {
           transform: translateY(-1px);
         }
 
-        /* OUTLINE BUTTON (Create together) */
         .btnOutline {
           padding: 12px 22px;
           border-radius: 999px;
