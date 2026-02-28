@@ -12,73 +12,76 @@ const WorkFilmHero = (props) => {
   }, [])
 
   const scrollToSelected = () => {
+    if (typeof document === 'undefined') return
     const el = document.getElementById('selected-film-work')
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   return (
     <>
-      <div className="hero">
-        {/* MOBILE → IMAGE */}
+      <section className="hero">
+        {/* Background media */}
         {isMobile ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src="/work/film/wf-01.jpg"
             alt="Film background"
             className="bgMedia"
+            loading="eager"
           />
         ) : (
-          /* DESKTOP → VIDEO */
           <video
             src={props.videoSrc2}
             loop
             muted
             autoPlay
             playsInline
+            preload="metadata"
             className="bgMedia"
           />
         )}
 
         <div className="overlay" />
 
-        <div className="content">
-          <h1 className="title">
-            {props.heading1 ?? (
-              <Fragment>
-                <span>
-                  Cinematic work shaped by story, mood, and intention.
-                </span>
-              </Fragment>
-            )}
-          </h1>
-
-          <p className="subtitle">
-            {props.content1 ?? (
-              <Fragment>
-                <span>
-                  Narrative-driven films where image, motion, and sound come
-                  together.
-                </span>
-              </Fragment>
-            )}
-          </p>
-
-          <div className="actions">
-            {/* CONTACT */}
-            <a href="/contact" className="btnOutline">
-              {props.textinputPlaceholder || 'Create together'}
-            </a>
-
-            {/* SCROLL */}
-            <button onClick={scrollToSelected} className="btnPrimary">
-              {props.action3 ?? (
+        <div className="content thq-section-max-width thq-section-padding">
+          <div className="col">
+            <h1 className="title thq-heading-2">
+              {props.heading1 ?? (
                 <Fragment>
-                  <span>Explore Work</span>
+                  <span>Cinematic work shaped by story, mood, and intention.</span>
                 </Fragment>
               )}
-            </button>
+            </h1>
+
+            <p className="subtitle thq-body-large">
+              {props.content1 ?? (
+                <Fragment>
+                  <span>
+                    Narrative-driven films where image, motion, and sound come
+                    together.
+                  </span>
+                </Fragment>
+              )}
+            </p>
+
+            <div className="actions">
+              {/* Create together → contact */}
+              <a href="/contact" className="cineBtnOutline">
+                {props.textinputPlaceholder || 'Create together'}
+              </a>
+
+              {/* Explore → scroll */}
+              <button type="button" onClick={scrollToSelected} className="cineBtnPrimary">
+                {props.action3 ?? (
+                  <Fragment>
+                    <span>Explore Work</span>
+                  </Fragment>
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <style jsx>{`
         .hero {
@@ -98,11 +101,13 @@ const WorkFilmHero = (props) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          filter: brightness(0.72) contrast(1.05) saturate(0.9);
         }
 
         .overlay {
           position: absolute;
           inset: 0;
+          pointer-events: none;
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0.35),
@@ -113,69 +118,102 @@ const WorkFilmHero = (props) => {
         .content {
           position: relative;
           z-index: 2;
-          max-width: 760px;
-          text-align: center;
-          padding: 24px;
+          width: 100%;
+        }
+
+        /* ✅ left aligned by default (desktop) */
+        .col {
+          max-width: 560px;
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 16px;
+          align-items: flex-start;
+          text-align: left;
         }
 
         .title {
+          margin: 0;
           color: #f5f4f4;
         }
 
         .subtitle {
+          margin: 0;
           color: rgba(245, 244, 244, 0.78);
+          line-height: 1.65;
         }
 
         .actions {
-          display: flex;
-          gap: 14px;
-          justify-content: center;
-          flex-wrap: wrap;
           margin-top: 10px;
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          align-items: center;
         }
 
-        .btnPrimary {
+        /* 🎯 PRIMARY CTA – cyan glow */
+        .cineBtnPrimary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           padding: 12px 22px;
           border-radius: 999px;
-          border: 1px solid rgba(120, 166, 255, 0.6);
-          background: rgba(120, 166, 255, 0.18);
+          border: 1px solid rgba(37, 195, 226, 0.65);
+          background: rgba(37, 195, 226, 0.18);
           color: #f5f4f4;
+          font-size: 13px;
+          font-weight: 700;
+          text-decoration: none;
+          transition: all 0.22s ease;
           backdrop-filter: blur(6px);
-          transition: all 0.25s ease;
         }
 
-        .btnPrimary:hover {
-          background: rgba(120, 166, 255, 0.32);
-          box-shadow: 0 0 18px rgba(120, 166, 255, 0.35);
+        .cineBtnPrimary:hover {
+          background: rgba(37, 195, 226, 0.28);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16),
+            0 0 18px rgba(37, 195, 226, 0.25);
           transform: translateY(-1px);
         }
 
-        .btnOutline {
+        /* 🎯 OUTLINE CTA – subtle glass */
+        .cineBtnOutline {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           padding: 12px 22px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.28);
+          background: rgba(255, 255, 255, 0.04);
           color: rgba(245, 244, 244, 0.85);
+          font-size: 13px;
+          font-weight: 600;
           text-decoration: none;
-          transition: all 0.25s ease;
+          transition: all 0.22s ease;
+          backdrop-filter: blur(6px);
         }
 
-        .btnOutline:hover {
-          border-color: rgba(120, 166, 255, 0.6);
+        .cineBtnOutline:hover {
+          border-color: rgba(37, 195, 226, 0.55);
           color: #f5f4f4;
-          box-shadow: 0 0 16px rgba(120, 166, 255, 0.25);
+          box-shadow: 0 0 16px rgba(37, 195, 226, 0.18);
           transform: translateY(-1px);
         }
 
         @media (max-width: 767px) {
-          .actions {
-            flex-direction: column;
+          /* mobile only: center text */
+          .col {
+            max-width: 100%;
+            align-items: center;
+            text-align: center;
           }
 
-          .btnPrimary,
-          .btnOutline {
+          .actions {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .cineBtnPrimary,
+          .cineBtnOutline {
             width: 100%;
           }
         }
