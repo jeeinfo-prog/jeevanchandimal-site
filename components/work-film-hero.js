@@ -20,7 +20,6 @@ const WorkFilmHero = (props) => {
   return (
     <>
       <section className="hero">
-        {/* Background media */}
         {isMobile ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -43,15 +42,12 @@ const WorkFilmHero = (props) => {
 
         <div className="overlay" />
 
-        {/* ✅ Centered container like homepage */}
         <div className="content thq-section-max-width thq-section-padding">
           <div className="col">
             <h1 className="title thq-heading-2">
               {props.heading1 ?? (
                 <Fragment>
-                  <span>
-                    Cinematic work shaped by story, mood, and intention.
-                  </span>
+                  <span>Cinematic work shaped by story, mood, and intention.</span>
                 </Fragment>
               )}
             </h1>
@@ -68,12 +64,10 @@ const WorkFilmHero = (props) => {
             </p>
 
             <div className="actions">
-              {/* Create together → contact */}
               <a href="/contact" className="cineBtnOutline">
                 {props.textinputPlaceholder || 'Create together'}
               </a>
 
-              {/* Explore → scroll */}
               <button
                 type="button"
                 onClick={scrollToSelected}
@@ -97,7 +91,7 @@ const WorkFilmHero = (props) => {
           min-height: 78vh;
           display: flex;
           align-items: center;
-          justify-content: center; /* ✅ centered grid container */
+          justify-content: center; /* ✅ hero stays centered */
           overflow: hidden;
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
@@ -126,9 +120,10 @@ const WorkFilmHero = (props) => {
           position: relative;
           z-index: 2;
           width: 100%;
+          display: flex;               /* ✅ override THQ centering */
+          justify-content: flex-start; /* ✅ left-align block in container */
         }
 
-        /* Text block left-aligned inside centered container */
         .col {
           max-width: 560px;
           display: flex;
@@ -157,7 +152,6 @@ const WorkFilmHero = (props) => {
           align-items: center;
         }
 
-        /* PRIMARY CTA */
         .cineBtnPrimary {
           display: inline-flex;
           align-items: center;
@@ -182,7 +176,6 @@ const WorkFilmHero = (props) => {
           transform: translateY(-1px);
         }
 
-        /* OUTLINE CTA */
         .cineBtnOutline {
           display: inline-flex;
           align-items: center;
@@ -207,6 +200,10 @@ const WorkFilmHero = (props) => {
         }
 
         @media (max-width: 767px) {
+          .content {
+            justify-content: center; /* ✅ mobile back to centered */
+          }
+
           .col {
             max-width: 100%;
             align-items: center;
