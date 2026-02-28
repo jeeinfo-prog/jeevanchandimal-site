@@ -11,8 +11,8 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, public_url, title')
-      // .eq('is_public', true) // ← use if you have it
+      .select('id, title, status, thumb_url, preview_url')
+      .eq('status', 'published')
       .limit(200)
 
     if (error) {
@@ -24,13 +24,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ images: [] })
     }
 
-    const urls = data.map((r) => r.public_url).filter(Boolean)
+    // Prefer thumb for speed, fallback to preview
+    const urls = data
+      .map((r) => r.thumb_url || r.preview_url)
+      .filter(Boolean)
 
     if (urls.length === 0) {
       return res.status(200).json({ images: [] })
     }
 
-    // 🔹 Fisher–Yates shuffle
+    // Fisher–Yates shuffle
     for (let i = urls.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[urls[i], urls[j]] = [urls[j], urls[i]]
@@ -38,7 +41,6 @@ export default async function handler(req, res) {
 
     const picked = urls.slice(0, limit)
 
-    // 🔹 Cache for 60s on Vercel edge/CDN
     res.setHeader(
       'Cache-Control',
       'public, s-maxage=60, stale-while-revalidate=300'
