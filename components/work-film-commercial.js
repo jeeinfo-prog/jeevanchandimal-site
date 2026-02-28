@@ -1,501 +1,503 @@
+// components/work-film-commercial.js
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const WorkFilmCommercial = (props) => {
   return (
     <>
-      <div className="work-film-commercial-thq-layout301-elm thq-section-padding">
-        <div className="work-film-commercial-thq-max-width-elm thq-section-max-width">
-          <h2 className="work-film-commercial-thq-text-elm thq-heading-2">
-            {props.sectionTitle ?? (
-              <Fragment>
-                <span className="work-film-commercial-text20">Commercial</span>
-              </Fragment>
-            )}
-          </h2>
-          <span className="work-film-commercial-text10">
-            {props.text ?? (
-              <Fragment>
-                <span className="work-film-commercial-text16">
+      <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="shell thq-section-max-width">
+          {/* top line */}
+          <div className="kickerRow">
+            <span className="kicker">WORK</span>
+            <span className="dot" aria-hidden="true" />
+            <span className="kickerSub">Commercial · Mood-first storytelling</span>
+          </div>
+
+          <header className="head">
+            <h2 className="title thq-heading-2">
+              {props.sectionTitle ?? (
+                <Fragment>
+                  <span>Commercial</span>
+                </Fragment>
+              )}
+            </h2>
+
+            <p className="desc thq-body-large">
+              {props.text ?? (
+                <Fragment>
                   <span>
-                    Brand-led films created with cinematic language rather than
-                    advertising conventions. These projects focus on mood,
-                    clarity, and narrative presence, translating brand identity
-                    into visual stories that feel natural and considered.
+                    Brand-led films created with cinematic language rather than advertising
+                    conventions. These projects focus on mood, clarity, and narrative presence —
+                    translating identity into visual stories that feel natural and considered.
+                    <br />
+                    <br />
+                    Each commercial is crafted to connect emotionally while maintaining visual
+                    integrity across platforms.
                   </span>
-                  <br></br>
-                  <span>
-                    Each commercial is crafted to connect emotionally while
-                    maintaining visual integrity across platforms.
-                  </span>
-                </span>
-              </Fragment>
-            )}
-          </span>
-          <div className="work-film-commercial-thq-row-elm thq-grid-auto-300">
-            <div className="work-film-commercial-thq-feature1-elm">
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="work-film-commercial-thq-content-elm1 thq-flex-column">
-                <div className="work-film-commercial-thq-section-title-elm1 thq-flex-column">
-                  <h3 className="work-film-commercial-thq-title1-elm thq-heading-3">
-                    {props.feature1Title ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text12">
-                          Commercial 01
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="work-film-commercial-thq-description1-elm thq-body-small">
-                    {props.feature1Description ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text26">
-                          Professional film production services tailored to your
-                          needs.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="work-film-commercial-thq-action-elm1 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature1Button ?? (
-                        <Fragment>
-                          <span className="work-film-commercial-text25">
-                            Learn More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="work-film-commercial-thq-feature2-elm">
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="work-film-commercial-thq-content-elm2 thq-flex-column">
-                <div className="work-film-commercial-thq-section-title-elm2 thq-flex-column">
-                  <strong className="work-film-commercial-thq-title2-elm thq-heading-3">
-                    {props.feature2Title ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text22">
-                          Commercial 02
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="work-film-commercial-thq-description2-elm thq-body-small">
-                    {props.feature2Description ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text23">
-                          High-quality audio production services for your
-                          projects.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="work-film-commercial-thq-action-elm2 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature2Button ?? (
-                        <Fragment>
-                          <span className="work-film-commercial-text14">
-                            Learn More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="work-film-commercial-thq-feature3-elm">
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="work-film-commercial-thq-content-elm3 thq-flex-column">
-                <div className="work-film-commercial-thq-section-title-elm3 thq-flex-column">
-                  <strong className="work-film-commercial-thq-title3-elm thq-heading-3">
-                    {props.feature3Title ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text24">
-                          Commercial 03
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="work-film-commercial-thq-description3-elm thq-body-small">
-                    {props.feature3Description ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text21">
-                          Creative animation and graphics solutions to enhance
-                          your content.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="work-film-commercial-thq-action-elm3 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature3Button ?? (
-                        <Fragment>
-                          <span className="work-film-commercial-text13">
-                            Learn More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="work-film-commercial-thq-feature4-elm">
-              <img
-                alt={props.feature4ImageAlt}
-                src={props.feature4ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="work-film-commercial-thq-content-elm4 thq-flex-column">
-                <div className="work-film-commercial-thq-section-title-elm4 thq-flex-column">
-                  <strong className="work-film-commercial-thq-title4-elm thq-heading-3">
-                    {props.feature4Title ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text15">
-                          Commercial 04
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="work-film-commercial-thq-description4-elm thq-body-small">
-                    {props.feature4Description ?? (
-                      <Fragment>
-                        <span className="work-film-commercial-text11">
-                          Professional photography services to capture your
-                          special moments.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="work-film-commercial-thq-action-elm4 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature4Button ?? (
-                        <Fragment>
-                          <span className="work-film-commercial-text27">
-                            Learn More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
+                </Fragment>
+              )}
+            </p>
+          </header>
+
+          <div className="grid">
+            <Card
+              href={props.feature1Href}
+              img={props.feature1ImageSrc}
+              imgAlt={props.feature1ImageAlt}
+              over={props.feature1Slogan}
+              title={props.feature1Title}
+              desc={props.feature1Description}
+              cta={props.feature1Button}
+              fallbackTitle="Commercial 01"
+              fallbackDesc="Cinematic brand film with mood-forward pacing and quiet detail."
+            />
+            <Card
+              href={props.feature2Href}
+              img={props.feature2ImageSrc}
+              imgAlt={props.feature2ImageAlt}
+              over={props.feature2Slogan}
+              title={props.feature2Title}
+              desc={props.feature2Description}
+              cta={props.feature2Button}
+              fallbackTitle="Commercial 02"
+              fallbackDesc="Story-led visual language designed for clarity across platforms."
+            />
+            <Card
+              href={props.feature3Href}
+              img={props.feature3ImageSrc}
+              imgAlt={props.feature3ImageAlt}
+              over={props.feature3Slogan}
+              title={props.feature3Title}
+              desc={props.feature3Description}
+              cta={props.feature3Button}
+              fallbackTitle="Commercial 03"
+              fallbackDesc="A restrained approach — rhythm, lighting, and emotional presence."
+            />
+            <Card
+              href={props.feature4Href}
+              img={props.feature4ImageSrc}
+              imgAlt={props.feature4ImageAlt}
+              over={props.feature4Slogan}
+              title={props.feature4Title}
+              desc={props.feature4Description}
+              cta={props.feature4Button}
+              fallbackTitle="Commercial 04"
+              fallbackDesc="Designed to feel premium, grounded, and visually consistent."
+            />
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .work-film-commercial-thq-layout301-elm {
-            gap: var(--dl-layout-space-fiveunits);
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
+      </section>
+
+      <style jsx>{`
+        .wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        /* subtle luxury glass */
+        .wrap::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              70% 60% at 50% 0%,
+              rgba(37, 195, 226, 0.06),
+              rgba(0, 0, 0, 0)
+            ),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+          opacity: 0.9;
+        }
+
+        .shell {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .kickerRow {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          opacity: 0.9;
+          flex-wrap: wrap;
+          text-align: center;
+        }
+
+        .kicker {
+          letter-spacing: 0.28em;
+          font-size: 11px;
+          font-weight: 800;
+          color: rgba(245, 244, 244, 0.82);
+        }
+
+        .dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 999px;
+          background: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.1);
+        }
+
+        .kickerSub {
+          font-size: 12px;
+          color: rgba(245, 244, 244, 0.7);
+          letter-spacing: 0.08em;
+        }
+
+        .head {
+          max-width: 920px;
+          margin: 0 auto 8px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .title {
+          margin: 0;
+          color: #f5f4f4;
+          text-shadow: 0 14px 38px rgba(0, 0, 0, 0.35);
+        }
+
+        .desc {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.82);
+          line-height: 1.75;
+        }
+
+        .grid {
+          width: 100%;
+          display: grid;
+          grid-template-columns: repeat(12, 1fr);
+          gap: 16px;
+        }
+
+        @media (max-width: 991px) {
+          .grid {
+            gap: 14px;
           }
-          .work-film-commercial-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
-            align-items: center;
-            flex-direction: column;
+        }
+
+        @media (max-width: 767px) {
+          .kickerRow {
+            justify-content: flex-start;
+            text-align: left;
           }
-          .work-film-commercial-thq-text-elm {
-            text-align: center;
+          .head {
+            text-align: left;
+            margin: 0;
           }
-          .work-film-commercial-text10 {
-            text-align: center;
+        }
+      `}</style>
+    </>
+  )
+}
+
+function Card({
+  href,
+  img,
+  imgAlt,
+  over,
+  title,
+  desc,
+  cta,
+  fallbackTitle,
+  fallbackDesc,
+}) {
+  const Wrapper = href ? 'a' : 'div'
+  const wrapperProps = href
+    ? { href, className: 'card', rel: 'noreferrer', 'aria-label': fallbackTitle }
+    : { className: 'card' }
+
+  return (
+    <>
+      <Wrapper {...wrapperProps}>
+        <div className="media">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="img" src={img} alt={imgAlt || fallbackTitle} loading="lazy" />
+          <div className="shade" aria-hidden="true" />
+          <div className="topLine">
+            <span className="pill">
+              {over ?? (
+                <Fragment>
+                  <span>Commercial</span>
+                </Fragment>
+              )}
+            </span>
+          </div>
+        </div>
+
+        <div className="body">
+          <h3 className="h thq-heading-3">
+            {title ?? (
+              <Fragment>
+                <span>{fallbackTitle}</span>
+              </Fragment>
+            )}
+          </h3>
+
+          <p className="p thq-body-small">
+            {desc ?? (
+              <Fragment>
+                <span>{fallbackDesc}</span>
+              </Fragment>
+            )}
+          </p>
+
+          <div className="actions">
+            <span className="cta">
+              {cta ?? (
+                <Fragment>
+                  <span>Learn more</span>
+                </Fragment>
+              )}
+            </span>
+            <svg viewBox="0 0 1024 1024" className="icon" aria-hidden="true">
+              <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+            </svg>
+          </div>
+        </div>
+      </Wrapper>
+
+      <style jsx>{`
+        .card {
+          grid-column: span 3;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.52);
+          backdrop-filter: blur(12px);
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          text-decoration: none;
+          color: inherit;
+          transform: translateZ(0);
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+          min-height: 100%;
+        }
+
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(37, 195, 226, 0.28);
+          box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
+        }
+
+        .media {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          background: rgba(255, 255, 255, 0.03);
+          overflow: hidden;
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.35s ease;
+          filter: brightness(0.78) contrast(1.05) saturate(0.9);
+        }
+
+        .card:hover .img {
+          transform: scale(1.08);
+        }
+
+        .shade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.12),
+            rgba(0, 0, 0, 0.62)
+          );
+        }
+
+        .topLine {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          right: 12px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .pill {
+          font-size: 11px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.1);
+          color: #25c3e2;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .body {
+          padding: 14px 14px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .h {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.92);
+          letter-spacing: 0.02em;
+        }
+
+        .p {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.76);
+          line-height: 1.65;
+        }
+
+        .actions {
+          margin-top: 6px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          align-self: flex-start;
+          padding: 9px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.04);
+          transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .card:hover .actions {
+          border-color: rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.08);
+          transform: translateY(-1px);
+        }
+
+        .cta {
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.9);
+        }
+
+        .icon {
+          width: 18px;
+          height: 18px;
+          opacity: 0.9;
+        }
+
+        @media (max-width: 991px) {
+          .card {
+            grid-column: span 6;
           }
-          .work-film-commercial-thq-row-elm {
-            width: 100%;
+        }
+
+        @media (max-width: 520px) {
+          .card {
+            grid-column: span 12;
           }
-          .work-film-commercial-thq-feature1-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-film-commercial-thq-content-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-section-title-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-title1-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-description1-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-action-elm1 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .work-film-commercial-thq-feature2-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-film-commercial-thq-content-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-section-title-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-title2-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-description2-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-action-elm2 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .work-film-commercial-thq-feature3-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-film-commercial-thq-content-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-section-title-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-title3-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-description3-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-action-elm3 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .work-film-commercial-thq-feature4-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-film-commercial-thq-content-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-section-title-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .work-film-commercial-thq-title4-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-description4-elm {
-            text-align: center;
-          }
-          .work-film-commercial-thq-action-elm4 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .work-film-commercial-text11 {
-            display: inline-block;
-          }
-          .work-film-commercial-text12 {
-            display: inline-block;
-          }
-          .work-film-commercial-text13 {
-            display: inline-block;
-          }
-          .work-film-commercial-text14 {
-            display: inline-block;
-          }
-          .work-film-commercial-text15 {
-            display: inline-block;
-          }
-          .work-film-commercial-text16 {
-            display: inline-block;
-          }
-          .work-film-commercial-text20 {
-            display: inline-block;
-          }
-          .work-film-commercial-text21 {
-            display: inline-block;
-          }
-          .work-film-commercial-text22 {
-            display: inline-block;
-          }
-          .work-film-commercial-text23 {
-            display: inline-block;
-          }
-          .work-film-commercial-text24 {
-            display: inline-block;
-          }
-          .work-film-commercial-text25 {
-            display: inline-block;
-          }
-          .work-film-commercial-text26 {
-            display: inline-block;
-          }
-          .work-film-commercial-text27 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .work-film-commercial-thq-row-elm {
-              width: auto;
-              align-items: center;
-              flex-direction: column;
-            }
-            .work-film-commercial-thq-feature1-elm {
-              width: 100%;
-            }
-            .work-film-commercial-thq-feature2-elm {
-              width: 100%;
-            }
-            .work-film-commercial-thq-feature3-elm {
-              width: 100%;
-            }
-            .work-film-commercial-thq-feature4-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 767px) {
-            .work-film-commercial-thq-text-elm {
-              text-align: center;
-            }
-          }
-          @media (max-width: 479px) {
-            .work-film-commercial-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 WorkFilmCommercial.defaultProps = {
-  feature2ImageAlt: 'Audio Production Image',
-  feature4Description: undefined,
-  feature1Title: undefined,
-  feature3ImageAlt: 'Animation & Graphics Image',
-  feature3Button: undefined,
-  feature2Button: undefined,
-  feature4Title: undefined,
-  feature2ImageSrc: '/Film/Commercial/everyuth-600w.jpg',
-  text: undefined,
+  rootClassName: '',
+
   sectionTitle: undefined,
-  feature3Description: undefined,
-  feature4ImageSrc: '/Film/Commercial/61350_107829159277327_1262027_n-600w.jpg',
-  feature1ImageAlt: 'Film Production Image',
+  text: undefined,
+
+  // ✅ update to your new local images
+  feature1ImageSrc: '/work/film/wfc-01.jpg',
+  feature2ImageSrc: '/work/film/wfc-02.jpg',
+  feature3ImageSrc: '/work/film/wfc-03.jpg',
+  feature4ImageSrc: '/work/film/wfc-04.jpg',
+
+  feature1ImageAlt: 'Commercial 01',
+  feature2ImageAlt: 'Commercial 02',
+  feature3ImageAlt: 'Commercial 03',
+  feature4ImageAlt: 'Commercial 04',
+
+  feature1Title: undefined,
   feature2Title: undefined,
-  feature2Description: undefined,
-  feature4ImageAlt: 'Photography Image',
-  feature3ImageSrc: '/Film/Commercial/tips%20%26%20toes-600w.jpg',
   feature3Title: undefined,
-  feature1Button: undefined,
+  feature4Title: undefined,
+
   feature1Description: undefined,
+  feature2Description: undefined,
+  feature3Description: undefined,
+  feature4Description: undefined,
+
+  feature1Button: undefined,
+  feature2Button: undefined,
+  feature3Button: undefined,
   feature4Button: undefined,
-  feature1ImageSrc: '/Film/Commercial/everyouth-600w.jpg',
+
+  // optional links
+  feature1Href: '',
+  feature2Href: '',
+  feature3Href: '',
+  feature4Href: '',
+
+  // optional pill text on each card
+  feature1Slogan: undefined,
+  feature2Slogan: undefined,
+  feature3Slogan: undefined,
+  feature4Slogan: undefined,
 }
 
 WorkFilmCommercial.propTypes = {
-  feature2ImageAlt: PropTypes.string,
-  feature4Description: PropTypes.element,
-  feature1Title: PropTypes.element,
-  feature3ImageAlt: PropTypes.string,
-  feature3Button: PropTypes.element,
-  feature2Button: PropTypes.element,
-  feature4Title: PropTypes.element,
-  feature2ImageSrc: PropTypes.string,
-  text: PropTypes.element,
+  rootClassName: PropTypes.string,
+
   sectionTitle: PropTypes.element,
-  feature3Description: PropTypes.element,
-  feature4ImageSrc: PropTypes.string,
-  feature1ImageAlt: PropTypes.string,
-  feature2Title: PropTypes.element,
-  feature2Description: PropTypes.element,
-  feature4ImageAlt: PropTypes.string,
-  feature3ImageSrc: PropTypes.string,
-  feature3Title: PropTypes.element,
-  feature1Button: PropTypes.element,
-  feature1Description: PropTypes.element,
-  feature4Button: PropTypes.element,
+  text: PropTypes.element,
+
   feature1ImageSrc: PropTypes.string,
+  feature2ImageSrc: PropTypes.string,
+  feature3ImageSrc: PropTypes.string,
+  feature4ImageSrc: PropTypes.string,
+
+  feature1ImageAlt: PropTypes.string,
+  feature2ImageAlt: PropTypes.string,
+  feature3ImageAlt: PropTypes.string,
+  feature4ImageAlt: PropTypes.string,
+
+  feature1Title: PropTypes.element,
+  feature2Title: PropTypes.element,
+  feature3Title: PropTypes.element,
+  feature4Title: PropTypes.element,
+
+  feature1Description: PropTypes.element,
+  feature2Description: PropTypes.element,
+  feature3Description: PropTypes.element,
+  feature4Description: PropTypes.element,
+
+  feature1Button: PropTypes.element,
+  feature2Button: PropTypes.element,
+  feature3Button: PropTypes.element,
+  feature4Button: PropTypes.element,
+
+  feature1Href: PropTypes.string,
+  feature2Href: PropTypes.string,
+  feature3Href: PropTypes.string,
+  feature4Href: PropTypes.string,
+
+  feature1Slogan: PropTypes.element,
+  feature2Slogan: PropTypes.element,
+  feature3Slogan: PropTypes.element,
+  feature4Slogan: PropTypes.element,
 }
 
 export default WorkFilmCommercial
