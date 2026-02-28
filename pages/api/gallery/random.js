@@ -24,29 +24,41 @@ export default async function handler(req, res) {
       return res.status(200).json({ images: [] })
     }
 
-    // Prefer thumb for speed, fallback to preview
-    const urls = data
-      .map((r) => r.thumb_url || r.preview_url)
-      .filter(Boolean)
+    // ✅ Keep rows (so we can return href/id), but only rows with an image URL
+    const rows = data
+      .map((r) => ({
+        id: r.id,
+        title: r.title || '',
+        src: r.thumb_url || r.preview_url || '',
+      }))
+      .filter((r) => Boolean(r.src) && Boolean(r.id))
 
-    if (urls.length === 0) {
+    if (rows.length === 0) {
       return res.status(200).json({ images: [] })
     }
 
-    // Fisher–Yates shuffle
-    for (let i = urls.length - 1; i > 0; i--) {
+    // ✅ Fisher–Yates shuffle (rows)
+    for (let i = rows.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
-      ;[urls[i], urls[j]] = [urls[j], urls[i]]
+      ;[rows[i], rows[j]] = [rows[j], rows[i]]
     }
 
-    const picked = urls.slice(0, limit)
+    const picked = rows.slice(0, limit)
 
+    // ✅ Cache for 60s on Vercel edge/CDN
     res.setHeader(
       'Cache-Control',
       'public, s-maxage=60, stale-while-revalidate=300'
     )
 
-    return res.status(200).json({ images: picked })
+    // ✅ Return objects so frontend can link to /store/[id]
+    return res.status(200).json({
+      images: picked.map((r, idx) => ({
+        src: r.src,
+        href: `/store/${r.id}`,
+        alt: r.title || `Photo ${idx + 1}`,
+      })),
+    })
   } catch (e) {
     console.error('Gallery random API error:', e)
     return res.status(500).json({ images: [] })
