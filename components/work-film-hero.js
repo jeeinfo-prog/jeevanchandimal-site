@@ -1,73 +1,66 @@
-import React, { Fragment, useEffect, useState } from 'react'
+import React, { Fragment } from 'react'
 import PropTypes from 'prop-types'
-import Link from 'next/link'
 
-const WorkPhotographyHero = (props) => {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+const WorkFilmHero = (props) => {
+  const scrollToSelected = () => {
+    const el = document.getElementById('selected-film-work')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <>
-      <section className="hero thq-section-padding">
-        {/* ✅ SSR-safe: render video only after mount */}
-        {mounted ? (
-          <video
-            src={props.videoSrc}
-            loop
-            muted
-            autoPlay
-            playsInline
-            preload="metadata"
-            className="bgMedia"
-          />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src="/work/photography/wp-01.jpg"
-            alt="Photography background"
-            className="bgMedia"
-            loading="eager"
-          />
-        )}
+      <div className="hero">
+        {/* Background video */}
+        <video
+          src={props.videoSrc2}
+          loop
+          muted
+          autoPlay
+          playsInline
+          className="bgVideo"
+        />
 
         <div className="overlay" />
 
-        <div className="content thq-section-max-width">
-          {/* ✅ keep text block same style/structure as Film hero */}
-          <div className="col">
-            <h1 className="title thq-heading-2">
-              {props.heading1 ?? (
+        <div className="content">
+          <h1 className="title">
+            {props.heading1 ?? (
+              <Fragment>
+                <span>
+                  Cinematic work shaped by story, mood, and intention.
+                </span>
+              </Fragment>
+            )}
+          </h1>
+
+          <p className="subtitle">
+            {props.content1 ?? (
+              <Fragment>
+                <span>
+                  Narrative-driven films where image, motion, and sound come
+                  together.
+                </span>
+              </Fragment>
+            )}
+          </p>
+
+          <div className="actions">
+            {/* CREATE TOGETHER → CONTACT */}
+            <a href="/contact" className="btnOutline">
+              {props.textinputPlaceholder || 'Create together'}
+            </a>
+
+            {/* EXPLORE WORK → SCROLL */}
+            <button onClick={scrollToSelected} className="btnPrimary">
+              {props.action3 ?? (
                 <Fragment>
-                  <span className="work-photography-hero-text3">
-                    Still imagery guided by light, atmosphere, and emotion.
-                  </span>
+                  <span>Explore Work</span>
                 </Fragment>
               )}
-            </h1>
-
-            <p className="subtitle thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="work-photography-hero-text2">
-                    A collection of photographs created with cinematic depth and
-                    restraint.
-                  </span>
-                </Fragment>
-              )}
-            </p>
-
-            {/* ✅ CTA only (same placement as Film hero actions) */}
-            <div className="actions">
-              <Link href="/contact" legacyBehavior>
-                <a className="cineBtnOutline">Create together</a>
-              </Link>
-            </div>
+            </button>
           </div>
         </div>
-      </section>
+      </div>
 
       <style jsx>{`
         .hero {
@@ -76,117 +69,97 @@ const WorkPhotographyHero = (props) => {
           min-height: 78vh;
           display: flex;
           align-items: center;
-          justify-content: flex-start;
+          justify-content: center;
           overflow: hidden;
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
 
-        .bgMedia {
+        .bgVideo {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
           object-fit: cover;
-          filter: brightness(0.72) contrast(1.05) saturate(0.9);
         }
 
         .overlay {
           position: absolute;
           inset: 0;
-          pointer-events: none;
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0.35),
-            rgba(0, 0, 0, 0.78)
+            rgba(0, 0, 0, 0.75)
           );
         }
 
         .content {
           position: relative;
           z-index: 2;
-          width: 100%;
-          padding-left: 5rem; /* ✅ same 5-unit left gap */
-        }
-
-        .col {
-          max-width: 560px;
+          max-width: 760px;
+          text-align: center;
+          padding: 24px;
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          align-items: flex-start;
-          text-align: left;
+          gap: 18px;
         }
 
         .title {
-          margin: 0;
           color: #f5f4f4;
         }
 
         .subtitle {
-          margin: 0;
           color: rgba(245, 244, 244, 0.78);
-          line-height: 1.65;
         }
 
         .actions {
-          margin-top: 10px;
           display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-
-        .work-photography-hero-text2,
-        .work-photography-hero-text3 {
-          display: inline-block;
-        }
-
-        /* OUTLINE CTA (same as Film hero) */
-        .cineBtnOutline {
-          display: inline-flex;
-          align-items: center;
+          gap: 14px;
           justify-content: center;
+          flex-wrap: wrap;
+          margin-top: 10px;
+        }
+
+        /* PRIMARY BUTTON (Explore Work) */
+        .btnPrimary {
+          padding: 12px 22px;
+          border-radius: 999px;
+          border: 1px solid rgba(120, 166, 255, 0.6);
+          background: rgba(120, 166, 255, 0.18);
+          color: #f5f4f4;
+          backdrop-filter: blur(6px);
+          transition: all 0.25s ease;
+        }
+
+        .btnPrimary:hover {
+          background: rgba(120, 166, 255, 0.32);
+          box-shadow: 0 0 18px rgba(120, 166, 255, 0.35);
+          transform: translateY(-1px);
+        }
+
+        /* OUTLINE BUTTON (Create together) */
+        .btnOutline {
           padding: 12px 22px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.28);
-          background: rgba(255, 255, 255, 0.04);
           color: rgba(245, 244, 244, 0.85);
-          font-size: 13px;
-          font-weight: 600;
           text-decoration: none;
-          transition: all 0.22s ease;
-          backdrop-filter: blur(6px);
+          transition: all 0.25s ease;
         }
 
-        .cineBtnOutline:hover {
-          border-color: rgba(37, 195, 226, 0.55);
+        .btnOutline:hover {
+          border-color: rgba(120, 166, 255, 0.6);
           color: #f5f4f4;
-          box-shadow: 0 0 16px rgba(37, 195, 226, 0.18);
+          box-shadow: 0 0 16px rgba(120, 166, 255, 0.25);
           transform: translateY(-1px);
         }
 
         @media (max-width: 767px) {
-          .hero {
-            justify-content: center;
-          }
-
-          .content {
-            padding-left: 0;
-          }
-
-          .col {
-            max-width: 100%;
-            align-items: center;
-            text-align: center;
-          }
-
           .actions {
-            width: 100%;
             flex-direction: column;
-            align-items: stretch;
           }
 
-          .cineBtnOutline {
+          .btnPrimary,
+          .btnOutline {
             width: 100%;
           }
         }
@@ -195,16 +168,20 @@ const WorkPhotographyHero = (props) => {
   )
 }
 
-WorkPhotographyHero.defaultProps = {
-  videoSrc: '/Photography/Video/photography%2001.mov',
-  content1: undefined,
+WorkFilmHero.defaultProps = {
   heading1: undefined,
+  content1: undefined,
+  textinputPlaceholder: 'Create together',
+  action3: undefined,
+  videoSrc2: '/Film/film production 02.mov',
 }
 
-WorkPhotographyHero.propTypes = {
-  content1: PropTypes.element,
-  videoSrc: PropTypes.string,
+WorkFilmHero.propTypes = {
   heading1: PropTypes.element,
+  content1: PropTypes.element,
+  textinputPlaceholder: PropTypes.string,
+  action3: PropTypes.element,
+  videoSrc2: PropTypes.string,
 }
 
-export default WorkPhotographyHero
+export default WorkFilmHero
