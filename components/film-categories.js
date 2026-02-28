@@ -1,456 +1,376 @@
-import React, { Fragment } from 'react'
-
+import React, { Fragment, useMemo, useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
-const FilmCategories = (props) => {
+const FeaturedFramesFilm = (props) => {
+  // ✅ build /film/fc-01.jpg ... fc-12.jpg
+  const items = useMemo(() => {
+    const count = Math.max(1, Math.min(48, Number(props.count || 12)))
+    return Array.from({ length: count }, (_, i) => {
+      const num = String(i + 1).padStart(2, '0')
+      const src = `${props.basePath || '/film'}/fc-${num}.jpg`
+      return {
+        src,
+        alt: `Featured frame ${i + 1}`,
+      }
+    })
+  }, [props.basePath, props.count])
+
+  const [activeIdx, setActiveIdx] = useState(-1)
+  const active = activeIdx >= 0 ? items[activeIdx] : null
+
+  const headingNode =
+    props.heading1 ?? (
+      <Fragment>
+        <span>Featured Frames</span>
+      </Fragment>
+    )
+
+  const descNode =
+    props.content1 ?? (
+      <Fragment>
+        <span>
+          Selected frames—crafted for mood, restraint, and cinematic clarity.
+          Updated by file name inside <code>/public/film</code>.
+        </span>
+      </Fragment>
+    )
+
+  // keyboard for lightbox
+  useEffect(() => {
+    function onKey(e) {
+      if (activeIdx < 0) return
+      if (e.key === 'Escape') setActiveIdx(-1)
+      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(items.length - 1, i + 1))
+      if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
+    }
+    if (typeof window === 'undefined') return
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [activeIdx, items.length])
+
   return (
     <>
-      <div className="film-categories-thq-layout301-elm thq-section-padding">
-        <div className="film-categories-thq-max-width-elm thq-section-max-width">
-          <div className="film-categories-thq-row-elm thq-grid-auto-300">
-            <div className="film-categories-thq-feature1-elm">
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="film-categories-thq-content-elm1 thq-flex-column">
-                <div className="film-categories-thq-section-title-elm1 thq-flex-column">
-                  <h3 className="film-categories-thq-title1-elm thq-heading-3">
-                    {props.feature1Title ?? (
-                      <Fragment>
-                        <span className="film-categories-text19">
-                          <span>Commercial</span>
-                          <br></br>
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="film-categories-thq-description1-elm thq-body-small">
-                    {props.feature1Description ?? (
-                      <Fragment>
-                        <span className="film-categories-text15">
-                          Professional film production services tailored to your
-                          needs.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="film-categories-thq-action-elm1 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature1Button ?? (
-                        <Fragment>
-                          <span className="film-categories-text14">
-                            Learn More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+      <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="shell thq-section-max-width">
+          <header className="head">
+            <div className="kicker">SELECTED FRAMES</div>
+
+            <h2 className="title thq-heading-2">{headingNode}</h2>
+            <p className="desc thq-body-large">{descNode}</p>
+
+            <div className="actions">
+              {props.primaryHref ? (
+                <a className="cineBtnPrimary" href={props.primaryHref}>
+                  {props.primaryText || 'View Film Work'}
+                </a>
+              ) : null}
+
+              {props.secondaryHref ? (
+                <a className="cineBtnOutline" href={props.secondaryHref}>
+                  {props.secondaryText || 'Request a Private Selection'}
+                </a>
+              ) : null}
             </div>
-            <div className="film-categories-thq-feature2-elm">
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="film-categories-thq-content-elm2 thq-flex-column">
-                <div className="film-categories-thq-section-title-elm2 thq-flex-column">
-                  <strong className="film-categories-thq-title2-elm thq-heading-3">
-                    {props.feature2Title ?? (
-                      <Fragment>
-                        <span className="film-categories-text12">
-                          Documentary
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="film-categories-thq-description2-elm thq-body-small">
-                    {props.feature2Description ?? (
-                      <Fragment>
-                        <span className="film-categories-text17">
-                          Customized audio production solutions for your
-                          projects.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="film-categories-thq-action-elm2 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature2Button ?? (
-                        <Fragment>
-                          <span className="film-categories-text10">
-                            Discover More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="film-categories-thq-feature3-elm">
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="film-categories-thq-content-elm3 thq-flex-column">
-                <div className="film-categories-thq-section-title-elm3 thq-flex-column">
-                  <strong className="film-categories-thq-title3-elm thq-heading-3">
-                    {props.feature3Title ?? (
-                      <Fragment>
-                        <span className="film-categories-text11">
-                          Music Videos
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="film-categories-thq-description3-elm thq-body-small">
-                    {props.feature3Description ?? (
-                      <Fragment>
-                        <span className="film-categories-text13">
-                          Expertise in character animation and stunning graphics
-                          for your content.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="film-categories-thq-action-elm3 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature3Button ?? (
-                        <Fragment>
-                          <span className="film-categories-text22">
-                            Explore Now
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="film-categories-thq-feature4-elm">
-              <img
-                alt={props.feature4ImageAlt}
-                src={props.feature4ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="film-categories-thq-content-elm4 thq-flex-column">
-                <div className="film-categories-thq-section-title-elm4 thq-flex-column">
-                  <strong className="film-categories-thq-title4-elm thq-heading-3">
-                    {props.feature4Title ?? (
-                      <Fragment>
-                        <span className="film-categories-text16">
-                          Short Films
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="film-categories-thq-description4-elm thq-body-small">
-                    {props.feature4Description ?? (
-                      <Fragment>
-                        <span className="film-categories-text18">
-                          Professional photography services to capture your
-                          moments beautifully.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="film-categories-thq-action-elm4 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature4Button ?? (
-                        <Fragment>
-                          <span className="film-categories-text23">
-                            See Portfolio
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
+          </header>
+
+          <div className="grid">
+            {items.map((it, idx) => (
+              <button
+                key={`${it.src}-${idx}`}
+                className="tile"
+                type="button"
+                onClick={() => setActiveIdx(idx)}
+                aria-label={`Open frame ${idx + 1}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="img"
+                  src={it.src}
+                  alt={it.alt}
+                  loading="lazy"
+                  onError={(e) => {
+                    // hide broken images (when file doesn't exist)
+                    e.currentTarget.style.display = 'none'
+                    e.currentTarget.closest('button')?.classList.add('hideTile')
+                  }}
+                />
+                <div className="shade" />
+              </button>
+            ))}
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .film-categories-thq-layout301-elm {
-            gap: var(--dl-layout-space-fiveunits);
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
+      </section>
+
+      {/* Lightbox */}
+      {active?.src ? (
+        <div className="lightbox" onClick={() => setActiveIdx(-1)} role="dialog" aria-modal="true">
+          <div className="lbInner" onClick={(e) => e.stopPropagation()}>
+            <button className="lbClose" type="button" onClick={() => setActiveIdx(-1)}>
+              ✕
+            </button>
+
+            <button
+              className="lbNav"
+              type="button"
+              onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
+              disabled={activeIdx === 0}
+              aria-label="Previous"
+            >
+              ‹
+            </button>
+
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="lbImg" src={active.src} alt={active.alt || 'Preview'} />
+
+            <button
+              className="lbNav"
+              type="button"
+              onClick={() => setActiveIdx((i) => Math.min(items.length - 1, i + 1))}
+              disabled={activeIdx === items.length - 1}
+              aria-label="Next"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <style jsx>{`
+        .wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .shell {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .head {
+          max-width: 980px;
+          margin: 0 auto 6px;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .kicker {
+          font-size: 11px;
+          letter-spacing: 0.28em;
+          text-transform: uppercase;
+          opacity: 0.72;
+        }
+
+        .title {
+          margin: 0;
+        }
+
+        .desc {
+          margin: 0;
+          opacity: 0.86;
+          line-height: 1.7;
+        }
+
+        .actions {
+          margin-top: 8px;
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        /* ✅ luxury cinematic buttons */
+        .cineBtnPrimary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 12px 22px;
+          border-radius: 999px;
+          border: 1px solid rgba(37, 195, 226, 0.65);
+          background: rgba(37, 195, 226, 0.18);
+          color: #f5f4f4;
+          font-size: 13px;
+          font-weight: 800;
+          text-decoration: none;
+          transition: all 0.22s ease;
+          backdrop-filter: blur(6px);
+        }
+        .cineBtnPrimary:hover {
+          background: rgba(37, 195, 226, 0.28);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16), 0 0 18px rgba(37, 195, 226, 0.25);
+          transform: translateY(-1px);
+        }
+
+        .cineBtnOutline {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 12px 22px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.24);
+          background: rgba(255, 255, 255, 0.04);
+          color: rgba(245, 244, 244, 0.88);
+          font-size: 13px;
+          font-weight: 700;
+          text-decoration: none;
+          transition: all 0.22s ease;
+          backdrop-filter: blur(6px);
+        }
+        .cineBtnOutline:hover {
+          border-color: rgba(37, 195, 226, 0.55);
+          color: #f5f4f4;
+          box-shadow: 0 0 16px rgba(37, 195, 226, 0.18);
+          transform: translateY(-1px);
+        }
+
+        /* ✅ cinematic grid */
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(12, 1fr);
+          gap: 14px;
+          width: 100%;
+        }
+
+        .tile {
+          grid-column: span 3;
+          position: relative;
+          overflow: hidden;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(0, 0, 0, 0.25);
+          aspect-ratio: 16 / 10;
+          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+          transform: translateZ(0);
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+          padding: 0;
+          cursor: pointer;
+        }
+
+        .tile:hover {
+          transform: translateY(-3px);
+          border-color: rgba(37, 195, 226, 0.32);
+          box-shadow: 0 24px 62px rgba(0, 0, 0, 0.5);
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.28s ease, filter 0.28s ease;
+          filter: brightness(0.92) contrast(1.04) saturate(0.96);
+        }
+
+        .tile:hover .img {
+          transform: scale(1.07);
+          filter: brightness(0.98) contrast(1.06) saturate(1.02);
+        }
+
+        .shade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0.0), rgba(0, 0, 0, 0.55));
+        }
+
+        .hideTile {
+          display: none;
+        }
+
+        /* Lightbox */
+        .lightbox {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.82);
+          display: grid;
+          place-items: center;
+          z-index: 9999;
+        }
+
+        .lbInner {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          position: relative;
+        }
+
+        .lbImg {
+          max-width: 82vw;
+          max-height: 82vh;
+          border-radius: 14px;
+          box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7);
+        }
+
+        .lbNav,
+        .lbClose {
+          background: rgba(0, 0, 0, 0.55);
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          color: white;
+          font-size: 28px;
+          padding: 10px;
+          cursor: pointer;
+          border-radius: 999px;
+          backdrop-filter: blur(8px);
+        }
+
+        .lbNav:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 991px) {
+          .tile {
+            grid-column: span 6;
           }
-          .film-categories-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
-            align-items: center;
-            flex-direction: column;
+        }
+
+        @media (max-width: 767px) {
+          .head {
+            text-align: left;
+            margin: 0;
           }
-          .film-categories-thq-row-elm {
-            width: 100%;
+          .actions {
+            justify-content: flex-start;
           }
-          .film-categories-thq-feature1-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
+          .tile {
+            grid-column: span 12;
           }
-          .film-categories-thq-content-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-section-title-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-title1-elm {
-            text-align: center;
-          }
-          .film-categories-thq-description1-elm {
-            text-align: center;
-          }
-          .film-categories-thq-action-elm1 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .film-categories-thq-feature2-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .film-categories-thq-content-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-section-title-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-title2-elm {
-            text-align: center;
-          }
-          .film-categories-thq-description2-elm {
-            text-align: center;
-          }
-          .film-categories-thq-action-elm2 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .film-categories-thq-feature3-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .film-categories-thq-content-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-section-title-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-title3-elm {
-            text-align: center;
-          }
-          .film-categories-thq-description3-elm {
-            text-align: center;
-          }
-          .film-categories-thq-action-elm3 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .film-categories-thq-feature4-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .film-categories-thq-content-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-section-title-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .film-categories-thq-title4-elm {
-            text-align: center;
-          }
-          .film-categories-thq-description4-elm {
-            text-align: center;
-          }
-          .film-categories-thq-action-elm4 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .film-categories-text10 {
-            display: inline-block;
-          }
-          .film-categories-text11 {
-            display: inline-block;
-          }
-          .film-categories-text12 {
-            display: inline-block;
-          }
-          .film-categories-text13 {
-            display: inline-block;
-          }
-          .film-categories-text14 {
-            display: inline-block;
-          }
-          .film-categories-text15 {
-            display: inline-block;
-          }
-          .film-categories-text16 {
-            display: inline-block;
-          }
-          .film-categories-text17 {
-            display: inline-block;
-          }
-          .film-categories-text18 {
-            display: inline-block;
-          }
-          .film-categories-text19 {
-            display: inline-block;
-          }
-          .film-categories-text22 {
-            display: inline-block;
-          }
-          .film-categories-text23 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .film-categories-thq-row-elm {
-              width: auto;
-              align-items: center;
-              flex-direction: column;
-            }
-            .film-categories-thq-feature1-elm {
-              width: 100%;
-            }
-            .film-categories-thq-feature2-elm {
-              width: 100%;
-            }
-            .film-categories-thq-feature3-elm {
-              width: 100%;
-            }
-            .film-categories-thq-feature4-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 479px) {
-            .film-categories-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
-FilmCategories.defaultProps = {
-  feature1ImageSrc: '/Film/Commercial/everyuth-600w.jpg',
-  feature4ImageSrc: '/Film/Short Film/img_7122-600w.jpg',
-  feature3ImageAlt: 'Animation & Graphics Image',
-  feature2ImageSrc: '/BTS/978028_520051914721714_1589376154_o-600w.jpg',
-  feature2Button: undefined,
-  feature3Title: undefined,
-  feature2Title: undefined,
-  feature2ImageAlt: 'Audio Production Image',
-  feature3Description: undefined,
-  feature1Button: undefined,
-  feature1Description: undefined,
-  feature4Title: undefined,
-  feature2Description: undefined,
-  feature4Description: undefined,
-  feature1Title: undefined,
-  feature1ImageAlt: 'Film Production Image',
-  feature4ImageAlt: 'Photography Services Image',
-  feature3Button: undefined,
-  feature4Button: undefined,
-  feature3ImageSrc:
-    '/BTS/16903322_1391526320907598_6223719616267141958_o-600w.jpg',
+FeaturedFramesFilm.defaultProps = {
+  heading1: undefined,
+  content1: undefined,
+  rootClassName: '',
+  basePath: '/film',
+  count: 12,
+
+  primaryHref: '/work-film',
+  primaryText: 'View Film Work',
+
+  secondaryHref: '/contact',
+  secondaryText: 'Request a Private Selection',
 }
 
-FilmCategories.propTypes = {
-  feature1ImageSrc: PropTypes.string,
-  feature4ImageSrc: PropTypes.string,
-  feature3ImageAlt: PropTypes.string,
-  feature2ImageSrc: PropTypes.string,
-  feature2Button: PropTypes.element,
-  feature3Title: PropTypes.element,
-  feature2Title: PropTypes.element,
-  feature2ImageAlt: PropTypes.string,
-  feature3Description: PropTypes.element,
-  feature1Button: PropTypes.element,
-  feature1Description: PropTypes.element,
-  feature4Title: PropTypes.element,
-  feature2Description: PropTypes.element,
-  feature4Description: PropTypes.element,
-  feature1Title: PropTypes.element,
-  feature1ImageAlt: PropTypes.string,
-  feature4ImageAlt: PropTypes.string,
-  feature3Button: PropTypes.element,
-  feature4Button: PropTypes.element,
-  feature3ImageSrc: PropTypes.string,
+FeaturedFramesFilm.propTypes = {
+  heading1: PropTypes.element,
+  content1: PropTypes.element,
+  rootClassName: PropTypes.string,
+
+  basePath: PropTypes.string,
+  count: PropTypes.number,
+
+  primaryHref: PropTypes.string,
+  primaryText: PropTypes.string,
+  secondaryHref: PropTypes.string,
+  secondaryText: PropTypes.string,
 }
 
-export default FilmCategories
+export default FeaturedFramesFilm
