@@ -4,7 +4,6 @@ import Head from 'next/head'
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import WorkFilmHero from '../components/work-film-hero'
 import FilmCategories from '../components/film-categories'
-import FilmProductionText from '../components/film-production-text'
 import WorkFilmProduction from '../components/work-film-production'
 import WorkFilmCommercial from '../components/work-film-commercial'
 import WorkFilmDocumentries from '../components/work-film-documentries'
@@ -69,10 +68,6 @@ const WorkFilm = () => {
         {/* Categories + intro stay clean (no heavy backgrounds) */}
         <div className="cleanSection">
           <FilmCategories />
-        </div>
-
-        <div className="cleanSection">
-          <FilmProductionText />
         </div>
 
         <div className="cleanSection">
