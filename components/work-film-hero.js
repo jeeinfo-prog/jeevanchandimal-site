@@ -43,13 +43,15 @@ const WorkFilmHero = (props) => {
 
         <div className="overlay" />
 
-        {/* NOTE: keep thq padding, but we override centering in CSS */}
+        {/* ✅ Centered container like homepage */}
         <div className="content thq-section-max-width thq-section-padding">
           <div className="col">
             <h1 className="title thq-heading-2">
               {props.heading1 ?? (
                 <Fragment>
-                  <span>Cinematic work shaped by story, mood, and intention.</span>
+                  <span>
+                    Cinematic work shaped by story, mood, and intention.
+                  </span>
                 </Fragment>
               )}
             </h1>
@@ -95,7 +97,7 @@ const WorkFilmHero = (props) => {
           min-height: 78vh;
           display: flex;
           align-items: center;
-          justify-content: flex-start; /* ✅ page-left anchor */
+          justify-content: center; /* ✅ centered grid container */
           overflow: hidden;
           border-bottom: 1px solid rgba(245, 244, 244, 0.08);
         }
@@ -124,16 +126,9 @@ const WorkFilmHero = (props) => {
           position: relative;
           z-index: 2;
           width: 100%;
-
-          /* ✅ break out of thq-section-max-width centering */
-          max-width: 100%;
-          margin: 0;
-
-          /* ✅ 5-unit page-left gap */
-          padding-left: 5rem;
         }
 
-        /* Desktop: left aligned */
+        /* Text block left-aligned inside centered container */
         .col {
           max-width: 560px;
           display: flex;
@@ -162,7 +157,7 @@ const WorkFilmHero = (props) => {
           align-items: center;
         }
 
-        /* 🎯 PRIMARY CTA – cyan glow */
+        /* PRIMARY CTA */
         .cineBtnPrimary {
           display: inline-flex;
           align-items: center;
@@ -187,7 +182,7 @@ const WorkFilmHero = (props) => {
           transform: translateY(-1px);
         }
 
-        /* 🎯 OUTLINE CTA – subtle glass */
+        /* OUTLINE CTA */
         .cineBtnOutline {
           display: inline-flex;
           align-items: center;
@@ -212,18 +207,6 @@ const WorkFilmHero = (props) => {
         }
 
         @media (max-width: 767px) {
-          /* Mobile: center again */
-          .hero {
-            justify-content: center;
-          }
-
-          /* restore centered container behavior on mobile */
-          .content {
-            padding-left: 0;
-            max-width: var(--dl-layout-size-maxwidth);
-            margin: 0 auto;
-          }
-
           .col {
             max-width: 100%;
             align-items: center;
