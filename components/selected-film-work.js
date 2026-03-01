@@ -1,3 +1,4 @@
+// components/selected-film-work.js
 import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
 
@@ -33,17 +34,20 @@ const SelectedFilmWork = (props) => {
 
   const [activeIdx, setActiveIdx] = useState(-1)
 
+  const hero =
+    props.heroImageSrc || frames?.[0]?.src || '/work/film/sfm-01.jpg'
+
   const headingNode =
     props.heading1 ?? (
       <Fragment>
-        <span className="t1">Selected Film Work</span>
+        <span className="titleText">Selected Film Work</span>
       </Fragment>
     )
 
   const descNode =
     props.content1 ?? (
       <Fragment>
-        <span className="t2">
+        <span>
           A distilled set of frames — atmosphere first. If you need a full deck,
           request a private selection.
         </span>
@@ -70,86 +74,100 @@ const SelectedFilmWork = (props) => {
         className={`wrap thq-section-padding ${props.rootClassName || ''}`}
       >
         <div className="shell thq-section-max-width">
-          {/* Luxury header */}
-          <header className="head">
-            <div className="kickerRow">
-              <span className="kicker">SELECTED FRAMES</span>
-              <span className="dot" aria-hidden="true" />
-              <span className="kickerSub">Film · Commercial · Documentary</span>
+          {/* ===== CINEMATIC HERO (title + prop text) ===== */}
+          <div className="heroCard">
+            <div className="heroBg" aria-hidden="true">
+              <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
+              <div className="heroVignette" />
+              <div className="heroGlow" />
+              <div className="heroGrain" />
             </div>
 
-            <h2 className="title thq-heading-2">{headingNode}</h2>
-            <p className="desc thq-body-large">{descNode}</p>
-          </header>
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">SELECTED FRAMES</span>
+                <span className="dot" aria-hidden="true" />
+                <span className="kickerSub">Film · Commercial · Documentary</span>
+              </div>
 
-          {/* Gallery */}
+              <h2 className="thq-heading-2 heroTitle">{headingNode}</h2>
+              <p className="thq-body-large heroDesc">{descNode}</p>
+
+              <div className="micro thq-body-small">
+                Atmosphere first • Cinematic restraint • Premium finish
+              </div>
+            </div>
+          </div>
+
+          {/* ===== GALLERY ===== */}
           <div className="grid">
             {/* Column 1 */}
             <div className="col">
-              <button className="tile sq" type="button" onClick={() => setActiveIdx(0)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={props.image1Src} alt={props.image1Alt} loading="lazy" />
-                <span className="shade" />
-                <span className="frame" />
-              </button>
-
-              <button className="tile sq" type="button" onClick={() => setActiveIdx(1)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={props.image2Src} alt={props.image2Alt} loading="lazy" />
-                <span className="shade" />
-                <span className="frame" />
-              </button>
+              <Tile
+                aspect="sq"
+                src={props.image1Src}
+                alt={props.image1Alt}
+                onOpen={() => setActiveIdx(0)}
+              />
+              <Tile
+                aspect="sq"
+                src={props.image2Src}
+                alt={props.image2Alt}
+                onOpen={() => setActiveIdx(1)}
+              />
             </div>
 
             {/* Column 2 */}
             <div className="col">
-              <button className="tile w43" type="button" onClick={() => setActiveIdx(2)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={props.image3Src} alt={props.image3Alt} loading="lazy" />
-                <span className="shade" />
-                <span className="frame" />
-              </button>
-
-              <button className="tile sq" type="button" onClick={() => setActiveIdx(3)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={props.image4Src} alt={props.image4Alt} loading="lazy" />
-                <span className="shade" />
-                <span className="frame" />
-              </button>
-
-              <button className="tile w43" type="button" onClick={() => setActiveIdx(4)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={props.image5Src} alt={props.image5Alt} loading="lazy" />
-                <span className="shade" />
-                <span className="frame" />
-              </button>
+              <Tile
+                aspect="w43"
+                src={props.image3Src}
+                alt={props.image3Alt}
+                onOpen={() => setActiveIdx(2)}
+              />
+              <Tile
+                aspect="sq"
+                src={props.image4Src}
+                alt={props.image4Alt}
+                onOpen={() => setActiveIdx(3)}
+              />
+              <Tile
+                aspect="w43"
+                src={props.image5Src}
+                alt={props.image5Alt}
+                onOpen={() => setActiveIdx(4)}
+              />
             </div>
 
             {/* Column 3 */}
             <div className="col">
-              <button className="tile sq" type="button" onClick={() => setActiveIdx(5)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={props.image6Src} alt={props.image6Alt} loading="lazy" />
-                <span className="shade" />
-                <span className="frame" />
-              </button>
-
-              <button className="tile sq" type="button" onClick={() => setActiveIdx(6)}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="img" src={props.image7Src} alt={props.image7Alt} loading="lazy" />
-                <span className="shade" />
-                <span className="frame" />
-              </button>
+              <Tile
+                aspect="sq"
+                src={props.image6Src}
+                alt={props.image6Alt}
+                onOpen={() => setActiveIdx(5)}
+              />
+              <Tile
+                aspect="sq"
+                src={props.image7Src}
+                alt={props.image7Alt}
+                onOpen={() => setActiveIdx(6)}
+              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Lightbox */}
+      {/* ===== LIGHTBOX ===== */}
       {activeIdx >= 0 && frames[activeIdx] && (
         <div className="lb" onClick={() => setActiveIdx(-1)}>
           <div className="lbInner" onClick={(e) => e.stopPropagation()}>
-            <button className="lbClose" type="button" onClick={() => setActiveIdx(-1)} aria-label="Close">
+            <button
+              className="lbClose"
+              type="button"
+              onClick={() => setActiveIdx(-1)}
+              aria-label="Close"
+            >
               ✕
             </button>
 
@@ -164,7 +182,11 @@ const SelectedFilmWork = (props) => {
             </button>
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="lbImg" src={frames[activeIdx].src} alt={frames[activeIdx].alt || 'Preview'} />
+            <img
+              className="lbImg"
+              src={frames[activeIdx].src}
+              alt={frames[activeIdx].alt || 'Preview'}
+            />
 
             <button
               className="lbNav"
@@ -213,13 +235,80 @@ const SelectedFilmWork = (props) => {
           z-index: 1;
           display: flex;
           flex-direction: column;
-          gap: 22px;
+          gap: 18px;
         }
 
-        .head {
-          max-width: 900px;
-          margin: 0 auto;
-          text-align: center;
+        /* ================= HERO CARD ================= */
+        .heroCard {
+          position: relative;
+          width: 100%;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .heroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .heroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.94) contrast(1.1) brightness(0.66);
+        }
+
+        .heroVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              90% 70% at 50% 18%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.78)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.85) 0%,
+              rgba(0, 0, 0, 0.42) 55%,
+              rgba(0, 0, 0, 0.85) 100%
+            );
+        }
+
+        .heroGlow {
+          position: absolute;
+          inset: -40px -60px auto -60px;
+          height: 180px;
+          background: radial-gradient(
+            60% 70% at 50% 50%,
+            rgba(37, 195, 226, 0.12),
+            rgba(37, 195, 226, 0)
+          );
+          opacity: 0.9;
+          filter: blur(2px);
+        }
+
+        .heroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.085;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .heroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 24px 20px;
+          max-width: 980px;
           display: flex;
           flex-direction: column;
           gap: 12px;
@@ -228,10 +317,9 @@ const SelectedFilmWork = (props) => {
         .kickerRow {
           display: flex;
           align-items: center;
-          justify-content: center;
           gap: 10px;
           flex-wrap: wrap;
-          opacity: 0.9;
+          opacity: 0.92;
         }
 
         .kicker {
@@ -239,6 +327,10 @@ const SelectedFilmWork = (props) => {
           font-size: 11px;
           font-weight: 900;
           color: rgba(245, 244, 244, 0.82);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
         }
 
         .dot {
@@ -255,93 +347,45 @@ const SelectedFilmWork = (props) => {
           letter-spacing: 0.08em;
         }
 
-        .title {
+        .titleText {
+          display: inline-block;
+          letter-spacing: 0.2px;
+        }
+
+        .heroTitle {
           margin: 0;
+          line-height: 1.08;
           color: #f5f4f4;
-          text-shadow: 0 14px 38px rgba(0, 0, 0, 0.35);
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
         }
 
-        .desc {
+        .heroDesc {
           margin: 0;
-          opacity: 0.85;
-          line-height: 1.65;
+          opacity: 0.88;
+          line-height: 1.7;
+          color: rgba(245, 244, 244, 0.84);
+          max-width: 72ch;
         }
 
+        .micro {
+          margin-top: 4px;
+          color: rgba(245, 244, 244, 0.62);
+        }
+
+        /* ================= GALLERY GRID ================= */
         .grid {
           width: 100%;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 16px;
           align-items: start;
+          margin-top: 6px;
         }
 
         .col {
           display: flex;
           flex-direction: column;
           gap: 16px;
-        }
-
-        .tile {
-          position: relative;
-          border: none;
-          padding: 0;
-          width: 100%;
-          cursor: pointer;
-          border-radius: 18px;
-          overflow: hidden;
-          background: rgba(0, 0, 0, 0.28);
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-          transform: translateZ(0);
-          transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .tile:hover {
-          transform: translateY(-3px);
-          border-color: rgba(37, 195, 226, 0.25);
-          box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
-        }
-
-        .sq {
-          aspect-ratio: 1 / 1;
-        }
-        .w43 {
-          aspect-ratio: 4 / 3;
-        }
-
-        .img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-          transform: scale(1.02);
-          transition: transform 0.35s ease;
-        }
-
-        .tile:hover .img {
-          transform: scale(1.07);
-        }
-
-        .shade {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.0),
-            rgba(0, 0, 0, 0.55)
-          );
-          opacity: 0.9;
-        }
-
-        .frame {
-          position: absolute;
-          inset: 10px;
-          border-radius: 14px;
-          pointer-events: none;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
-          opacity: 0.85;
         }
 
         /* Lightbox */
@@ -437,9 +481,8 @@ const SelectedFilmWork = (props) => {
           .grid {
             grid-template-columns: 1fr;
           }
-          .head {
-            text-align: left;
-            margin: 0;
+          .heroInner {
+            padding: 20px 16px 16px;
           }
           .kickerRow {
             justify-content: flex-start;
@@ -450,10 +493,104 @@ const SelectedFilmWork = (props) => {
   )
 }
 
+function Tile({ aspect, src, alt, onOpen }) {
+  return (
+    <>
+      <button className={`tile ${aspect}`} type="button" onClick={onOpen}>
+        {/* ✅ Curved inner image box */}
+        <span className="frameWrap" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="img" src={src} alt={alt} loading="lazy" />
+          <span className="shade" />
+          <span className="innerStroke" />
+        </span>
+      </button>
+
+      <style jsx>{`
+        .tile {
+          position: relative;
+          border: none;
+          padding: 0;
+          width: 100%;
+          cursor: pointer;
+          border-radius: 18px;
+          overflow: hidden;
+          background: rgba(12, 12, 12, 0.42);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+          transform: translateZ(0);
+          transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .tile:hover {
+          transform: translateY(-3px);
+          border-color: rgba(37, 195, 226, 0.25);
+          box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
+        }
+
+        .sq {
+          aspect-ratio: 1 / 1;
+        }
+        .w43 {
+          aspect-ratio: 4 / 3;
+        }
+
+        .frameWrap {
+          position: absolute;
+          inset: 10px; /* ✅ inner curved box spacing */
+          border-radius: 14px;
+          overflow: hidden;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.35s ease, filter 0.35s ease;
+          filter: brightness(0.82) contrast(1.05) saturate(0.92);
+        }
+
+        .tile:hover .img {
+          transform: scale(1.07);
+          filter: brightness(0.9) contrast(1.08) saturate(0.98);
+        }
+
+        .shade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.0),
+            rgba(0, 0, 0, 0.55)
+          );
+          opacity: 0.9;
+        }
+
+        .innerStroke {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border-radius: 14px;
+          box-shadow: inset 0 0 0 1px rgba(245, 244, 244, 0.08);
+        }
+      `}</style>
+    </>
+  )
+}
+
 SelectedFilmWork.defaultProps = {
   heading1: undefined,
   content1: undefined,
   rootClassName: '',
+
+  // ✅ optional hero override
+  heroImageSrc: '/work/film/sfm-01.jpg',
 
   // 🔁 Updated filenames → /public/work/film/sfm-xx.jpg
   image1Src: '/work/film/sfm-01.jpg',
@@ -477,6 +614,8 @@ SelectedFilmWork.propTypes = {
   heading1: PropTypes.element,
   content1: PropTypes.element,
   rootClassName: PropTypes.string,
+
+  heroImageSrc: PropTypes.string,
 
   image1Src: PropTypes.string,
   image2Src: PropTypes.string,
