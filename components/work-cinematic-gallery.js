@@ -136,7 +136,7 @@ const WorkCinematicGallery = (props) => {
     <>
       <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          {/* ===== CINEMATIC HEADER CARD (UPDATED DESIGN ONLY) ===== */}
+          {/* ===== CINEMATIC HEADER CARD (bit different) ===== */}
           <header className="hero">
             <div className="heroBg" aria-hidden="true">
               <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
@@ -144,45 +144,39 @@ const WorkCinematicGallery = (props) => {
               <div className="heroGrain" />
             </div>
 
-            {/* ✅ NEW: glass panel like 2nd screenshot */}
-            <div className="heroOverlay">
-              <div className="heroPanel">
-                <div className="kickerRow">
-                  <span className="kicker">PHOTOGRAPHY / GALLERY</span>
-                  <span className="kickerLine" />
-                </div>
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">PHOTOGRAPHY / GALLERY</span>
+                <span className="kickerLine" />
+              </div>
 
-                <h2 className="title thq-heading-2">{headingNode}</h2>
-                <p className="desc thq-body-large">{descNode}</p>
+              <h2 className="title thq-heading-2">{headingNode}</h2>
+              <p className="desc thq-body-large">{descNode}</p>
 
-                <div className="heroActions">
-                  {props.apiEndpoint && (
-                    <button
-                      className="btnGhost"
-                      type="button"
-                      onClick={loadRandom}
-                      disabled={loading}
-                    >
-                      {loading ? 'Loading…' : 'Refresh Images'}
-                    </button>
-                  )}
+              <div className="heroActions">
+                {props.apiEndpoint && (
+                  <button
+                    className="btnGhost"
+                    type="button"
+                    onClick={loadRandom}
+                    disabled={loading}
+                  >
+                    {loading ? 'Loading…' : 'Refresh Images'}
+                  </button>
+                )}
 
-                  {!!(props.storeHref || active?.href) && (
-                    <a
-                      className="btnPrimary"
-                      href={props.storeHref || active?.href || '/store'}
-                    >
-                      <span className="thq-body-small">Open Store</span>
-                      <svg viewBox="0 0 1024 1024" className="icon">
-                        <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                      </svg>
-                    </a>
-                  )}
-                </div>
+                {!!(props.storeHref || active?.href) && (
+                  <a className="btnPrimary" href={props.storeHref || active?.href || '/store'}>
+                    <span className="thq-body-small">Open Store</span>
+                    <svg viewBox="0 0 1024 1024" className="icon">
+                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                    </svg>
+                  </a>
+                )}
+              </div>
 
-                <div className="micro thq-body-small">
-                  Tap any frame to preview · Arrow keys to navigate · Esc to close
-                </div>
+              <div className="micro thq-body-small">
+                Tap any frame to preview · Arrow keys to navigate · Esc to close
               </div>
             </div>
           </header>
@@ -291,7 +285,6 @@ const WorkCinematicGallery = (props) => {
           background: rgba(12, 12, 12, 0.55);
           box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(10px);
-          min-height: 360px; /* ✅ gives hero height like 2nd screenshot */
         }
 
         .heroBg {
@@ -307,22 +300,22 @@ const WorkCinematicGallery = (props) => {
           background-position: center;
           background-repeat: no-repeat;
           transform: scale(1.03);
-          filter: saturate(0.92) contrast(1.08) brightness(0.62); /* ✅ darker bg */
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
         }
 
         .heroVignette {
           position: absolute;
           inset: 0;
           background: radial-gradient(
-              90% 70% at 40% 30%,
-              rgba(0, 0, 0, 0.12),
-              rgba(0, 0, 0, 0.78)
+              80% 60% at 50% 22%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.72)
             ),
             linear-gradient(
               90deg,
-              rgba(0, 0, 0, 0.88) 0%,
-              rgba(0, 0, 0, 0.5) 55%,
-              rgba(0, 0, 0, 0.84) 100%
+              rgba(0, 0, 0, 0.8) 0%,
+              rgba(0, 0, 0, 0.45) 55%,
+              rgba(0, 0, 0, 0.82) 100%
             );
         }
 
@@ -335,51 +328,20 @@ const WorkCinematicGallery = (props) => {
           background-size: 240px 240px;
         }
 
-        /* ✅ NEW overlay container */
-        .heroOverlay {
+        .heroInner {
           position: relative;
           z-index: 1;
-          height: 100%;
-          display: flex;
-          align-items: flex-start;
-          padding: 22px;
-        }
-
-        /* ✅ glass panel (this is the main change) */
-        .heroPanel {
-          width: min(920px, 100%);
-          border-radius: 22px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(12, 12, 12, 0.42);
-          box-shadow: 0 18px 70px rgba(0, 0, 0, 0.38);
-          backdrop-filter: blur(12px);
           padding: 24px 22px 18px;
+          max-width: 980px;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .heroPanel:before {
-          content: '';
-          position: absolute;
-          inset: -2px;
-          background: radial-gradient(
-            900px circle at 25% 20%,
-            rgba(120, 166, 255, 0.14),
-            transparent 55%
-          );
-          opacity: 0.65;
-          pointer-events: none;
         }
 
         .kickerRow {
           display: flex;
           align-items: center;
           gap: 10px;
-          position: relative;
-          z-index: 1;
         }
 
         .kicker {
@@ -407,8 +369,6 @@ const WorkCinematicGallery = (props) => {
           margin: 0;
           line-height: 1.08;
           text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
-          position: relative;
-          z-index: 1;
         }
 
         .desc {
@@ -417,8 +377,6 @@ const WorkCinematicGallery = (props) => {
           opacity: 0.92;
           line-height: 1.7;
           max-width: 72ch;
-          position: relative;
-          z-index: 1;
         }
 
         .heroActions {
@@ -426,8 +384,6 @@ const WorkCinematicGallery = (props) => {
           gap: 10px;
           flex-wrap: wrap;
           margin-top: 4px;
-          position: relative;
-          z-index: 1;
         }
 
         .btnPrimary {
@@ -479,8 +435,6 @@ const WorkCinematicGallery = (props) => {
         .micro {
           margin-top: 6px;
           color: rgba(245, 244, 244, 0.62);
-          position: relative;
-          z-index: 1;
         }
 
         /* ================= EMPTY ================= */
@@ -534,9 +488,9 @@ const WorkCinematicGallery = (props) => {
         }
 
         .tile:hover .img {
-          transform: scale(1.07);
-          filter: saturate(1.02) contrast(1.05) brightness(1);
-        }
+  transform: scale(1.07);
+  filter: saturate(1.02) contrast(1.05) brightness(1);
+}
 
         .shade {
           position: absolute;
@@ -707,15 +661,12 @@ const WorkCinematicGallery = (props) => {
           .tile {
             grid-column: span 6;
           }
-          .heroOverlay {
-            padding: 16px;
-          }
-          .heroPanel {
-            padding: 18px 16px 14px;
-          }
         }
 
         @media (max-width: 767px) {
+          .heroInner {
+            padding: 18px 14px 14px;
+          }
           .masonry {
             gap: 12px;
           }
@@ -747,7 +698,9 @@ WorkCinematicGallery.defaultProps = {
   content1: undefined,
   rootClassName: '',
 
+  // ✅ optional hero background image for header
   heroImageSrc: '/work/photography/cg-01.jpg',
+
   apiEndpoint: '/api/gallery/random?limit=12',
   storeHref: '/store',
 
