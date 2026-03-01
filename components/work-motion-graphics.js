@@ -393,17 +393,17 @@ WorkMotionGraphics.defaultProps = {
   feature1Title: undefined,
   feature1Description: undefined,
   feature1ImageAlt: 'Titles & Type',
-  feature1ImageSrc: '/work/animation/wamg-01.jpg',
+  feature1ImageSrc: '/work/animation/wamg-01.png',
 
   feature2Title: undefined,
   feature2Description: undefined,
   feature2ImageAlt: 'Rhythm & Cut',
-  feature2ImageSrc: '/work/animation/wamg-02.jpg',
+  feature2ImageSrc: '/work/animation/wamg-02.png',
 
   feature3Title: undefined,
   feature3Description: undefined,
   feature3ImageAlt: 'Clarity & Restraint',
-  feature3ImageSrc: '/work/animation/wamg-03.jpg',
+  feature3ImageSrc: '/work/animation/wamg-03.png',
 
   mainAction: undefined,
   secondaryAction: undefined,
