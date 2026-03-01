@@ -1,339 +1,441 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const WorkPresentationNote = (props) => {
   return (
     <>
-      <div
-        className={`work-presentation-note-thq-layout251-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="work-presentation-note-thq-max-width-elm thq-section-max-width">
-          <div className="thq-flex-row work-presentation-note-thq-section-title-elm">
-            <div className="work-presentation-note-thq-column-elm thq-flex-column">
-              <h2 className="thq-heading-2 work-presentation-note-thq-text-elm1">
+      <section className={`wapnSection thq-section-padding ${props.rootClassName || ''}`}>
+        {/* cinematic layers */}
+        <div className="panel" aria-hidden="true" />
+        <div className="grain" aria-hidden="true" />
+
+        <div className="wrap thq-section-max-width">
+          <div className="noteCard">
+            {/* left: image */}
+            <div className="media" aria-hidden="true">
+              <div
+                className="mediaImg"
+                style={{ backgroundImage: `url(${props.imageSrc})` }}
+              />
+              <div className="mediaOverlay" />
+            </div>
+
+            {/* right: content */}
+            <div className="content">
+              <div className="kickerRow">
+                <div className="kicker">NOTE</div>
+                <div className="rule" />
+              </div>
+
+              <h2 className="thq-heading-2 title">
                 {props.sectionTitle ?? (
                   <Fragment>
-                    <span className="work-presentation-note-text18">
-                      Presentation Note
-                    </span>
+                    <span>Presentation Note</span>
                   </Fragment>
                 )}
               </h2>
-            </div>
-            <span className="thq-body-small">
-              {props.sectionDescription ?? (
-                <Fragment>
-                  <span className="work-presentation-note-text14">
-                    Projects are shown as short looping previews, allowing
-                    motion to be experienced naturally without interruption.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="work-presentation-note-thq-content-elm1">
-            <div className="work-presentation-note-thq-row-elm thq-flex-row">
-              <div className="work-presentation-note-thq-feature1-elm thq-flex-column">
-                <img
-                  alt={props.feature1ImageAlt}
-                  src={props.feature1ImageSrc}
-                  className="thq-img-ratio-4-3 work-presentation-note-thq-feature1-image-elm"
-                />
-                <div className="work-presentation-note-thq-content-elm2 thq-flex-column">
-                  <h3 className="thq-heading-3">
-                    {props.feature1Title ?? (
-                      <Fragment>
-                        <span className="work-presentation-note-text17">
-                          Film Production
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature1Description ?? (
-                      <Fragment>
-                        <span className="work-presentation-note-text11">
-                          Professional film production services tailored to
-                          bring your stories to life.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-              </div>
-              <div className="work-presentation-note-thq-feature2-elm thq-flex-column">
-                <img
-                  alt={props.feature2ImageAlt}
-                  src={props.feature2ImageSrc}
-                  className="thq-img-ratio-4-3 work-presentation-note-thq-feature2-image-elm"
-                />
-                <div className="work-presentation-note-thq-content-elm3 thq-flex-column">
-                  <h3 className="thq-heading-3">
-                    {props.feature2Title ?? (
-                      <Fragment>
-                        <span className="work-presentation-note-text19">
-                          Audio Production
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature2Description ?? (
-                      <Fragment>
-                        <span className="work-presentation-note-text15">
-                          High-quality audio production for a captivating
-                          auditory experience.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-              </div>
-              <div className="work-presentation-note-thq-feature3-elm thq-flex-column">
-                <img
-                  alt={props.feature3ImageAlt}
-                  src={props.feature3ImageSrc}
-                  className="thq-img-ratio-4-3 work-presentation-note-thq-feature3-image-elm"
-                />
-                <div className="work-presentation-note-thq-content-elm4 thq-flex-column">
-                  <h3 className="thq-heading-3">
-                    {props.feature3Title ?? (
-                      <Fragment>
-                        <span className="work-presentation-note-text13">
-                          Animation &amp; Graphics
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature3Description ?? (
-                      <Fragment>
-                        <span className="work-presentation-note-text10">
-                          Innovative animation and graphics solutions to enhance
-                          visual storytelling.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="work-presentation-note-thq-actions-elm">
-            <button className="thq-button-filled work-presentation-note-thq-button-elm1">
-              <span className="thq-body-small">
-                {props.mainAction ?? (
-                  <Fragment>
-                    <span className="work-presentation-note-text12">
-                      Customized Solutions
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </button>
-            <button className="thq-button-outline work-presentation-note-thq-button-elm2">
-              <span className="thq-body-small">
-                {props.secondaryAction ?? (
-                  <Fragment>
-                    <span className="work-presentation-note-text16">
-                      Dedicated Customer Support
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-      <style jsx>
-        {`
-          .work-presentation-note-thq-layout251-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-presentation-note-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .work-presentation-note-thq-column-elm {
-            gap: var(--dl-layout-space-halfunit);
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .work-presentation-note-thq-content-elm1 {
-            gap: 48px;
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .work-presentation-note-thq-row-elm {
-            align-items: flex-start;
-          }
-          .work-presentation-note-thq-feature1-elm {
-            flex: 1;
-          }
-          .work-presentation-note-thq-content-elm2 {
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .work-presentation-note-thq-feature2-elm {
-            flex: 1;
-          }
-          .work-presentation-note-thq-content-elm3 {
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .work-presentation-note-thq-feature3-elm {
-            flex: 1;
-          }
-          .work-presentation-note-thq-content-elm4 {
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .work-presentation-note-thq-actions-elm {
-            gap: var(--dl-layout-space-unit);
-            display: flex;
-            align-items: flex-start;
-          }
-          .work-presentation-note-text10 {
-            display: inline-block;
-          }
-          .work-presentation-note-text11 {
-            display: inline-block;
-          }
-          .work-presentation-note-text12 {
-            display: inline-block;
-          }
-          .work-presentation-note-text13 {
-            display: inline-block;
-          }
-          .work-presentation-note-text14 {
-            display: inline-block;
-          }
-          .work-presentation-note-text15 {
-            display: inline-block;
-          }
-          .work-presentation-note-text16 {
-            display: inline-block;
-          }
-          .work-presentation-note-text17 {
-            display: inline-block;
-          }
-          .work-presentation-note-text18 {
-            display: inline-block;
-          }
-          .work-presentation-note-text19 {
-            display: inline-block;
-          }
 
-          @media (max-width: 991px) {
-            .work-presentation-note-thq-section-title-elm {
-              align-items: flex-start;
-              flex-direction: column;
-            }
-            .work-presentation-note-thq-feature1-image-elm {
-              height: 260px;
-            }
-            .work-presentation-note-thq-feature2-image-elm {
-              height: 260px;
-            }
-            .work-presentation-note-thq-feature3-image-elm {
-              height: 260px;
-            }
+              <p className="thq-body-large desc">
+                {props.sectionDescription ?? (
+                  <Fragment>
+                    <span>
+                      Projects are shown as short looping previews, allowing motion to be
+                      experienced naturally—without interruption.
+                    </span>
+                  </Fragment>
+                )}
+              </p>
+
+              {/* compact “principles” list (replaces the old 3 feature cards) */}
+              <div className="bullets">
+                <div className="bullet">
+                  <div className="dot" />
+                  <div className="bulletText">
+                    <div className="bulletTitle">
+                      {props.feature1Title ?? (
+                        <Fragment>
+                          <span>Looped Previews</span>
+                        </Fragment>
+                      )}
+                    </div>
+                    <div className="thq-body-small muted">
+                      {props.feature1Description ?? (
+                        <Fragment>
+                          <span>Short loops highlight timing, rhythm, and intent.</span>
+                        </Fragment>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bullet">
+                  <div className="dot" />
+                  <div className="bulletText">
+                    <div className="bulletTitle">
+                      {props.feature2Title ?? (
+                        <Fragment>
+                          <span>Context First</span>
+                        </Fragment>
+                      )}
+                    </div>
+                    <div className="thq-body-small muted">
+                      {props.feature2Description ?? (
+                        <Fragment>
+                          <span>Motion is framed with supporting visuals and pacing.</span>
+                        </Fragment>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bullet">
+                  <div className="dot" />
+                  <div className="bulletText">
+                    <div className="bulletTitle">
+                      {props.feature3Title ?? (
+                        <Fragment>
+                          <span>Quiet Control</span>
+                        </Fragment>
+                      )}
+                    </div>
+                    <div className="thq-body-small muted">
+                      {props.feature3Description ?? (
+                        <Fragment>
+                          <span>Clarity and restraint keep attention on the story.</span>
+                        </Fragment>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* actions */}
+              <div className="actions">
+                <button className="btnPrimary thq-button-filled" type="button">
+                  <span className="thq-body-small">
+                    {props.mainAction ?? (
+                      <Fragment>
+                        <span>Customized Solutions</span>
+                      </Fragment>
+                    )}
+                  </span>
+                </button>
+
+                <button className="btnGhost thq-button-outline" type="button">
+                  <span className="thq-body-small">
+                    {props.secondaryAction ?? (
+                      <Fragment>
+                        <span>Dedicated Customer Support</span>
+                      </Fragment>
+                    )}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* subtle footer line under card (cinematic separation) */}
+          <div className="divider" aria-hidden="true" />
+        </div>
+      </section>
+
+      <style jsx>{`
+        .wapnSection {
+          width: 100%;
+          position: relative;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .panel {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              85% 65% at 50% 0%,
+              rgba(255, 255, 255, 0.05),
+              rgba(0, 0, 0, 0) 55%
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.12) 0%,
+              rgba(0, 0, 0, 0) 46%,
+              rgba(0, 0, 0, 0.42) 100%
+            );
+        }
+
+        .grain {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .wrap {
+          width: 100%;
+          position: relative;
+          z-index: 1;
+        }
+
+        .noteCard {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 0.9fr 1.1fr;
+          border-radius: 22px;
+          overflow: hidden;
+          background: rgba(15, 15, 15, 0.58);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: 0 22px 70px rgba(0, 0, 0, 0.48);
+          backdrop-filter: blur(10px);
+        }
+
+        .media {
+          position: relative;
+          min-height: 360px;
+          background: rgba(0, 0, 0, 0.35);
+        }
+
+        .mediaImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.02);
+          filter: saturate(0.92) contrast(1.06) brightness(0.74);
+        }
+
+        .mediaOverlay {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              90% 70% at 50% 25%,
+              rgba(0, 0, 0, 0.1),
+              rgba(0, 0, 0, 0.66)
+            ),
+            linear-gradient(90deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.7));
+        }
+
+        .content {
+          padding: 22px 22px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .kickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .kicker {
+          width: fit-content;
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.68);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+        }
+
+        .rule {
+          height: 1px;
+          flex: 1;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.14),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .title {
+          margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+        }
+
+        .desc {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.84);
+          line-height: 1.7;
+          max-width: 56ch;
+        }
+
+        .bullets {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-top: 4px;
+        }
+
+        .bullet {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          padding: 12px 12px;
+          border-radius: 16px;
+          background: rgba(0, 0, 0, 0.2);
+          border: 1px solid rgba(245, 244, 244, 0.08);
+        }
+
+        .dot {
+          width: 9px;
+          height: 9px;
+          border-radius: 999px;
+          margin-top: 6px;
+          background: rgba(160, 196, 255, 0.9);
+          box-shadow: 0 0 0 6px rgba(160, 196, 255, 0.12);
+        }
+
+        .bulletText {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .bulletTitle {
+          font-weight: 600;
+          letter-spacing: 0.01em;
+          color: rgba(245, 244, 244, 0.92);
+        }
+
+        .muted {
+          color: rgba(245, 244, 244, 0.74);
+          line-height: 1.6;
+        }
+
+        .actions {
+          display: flex;
+          gap: 12px;
+          margin-top: 4px;
+          flex-wrap: wrap;
+        }
+
+        .btnPrimary {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: linear-gradient(
+            180deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0.06)
+          );
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(160, 196, 255, 0.25);
+        }
+
+        .btnGhost {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: rgba(0, 0, 0, 0.18);
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(245, 244, 244, 0.22);
+        }
+
+        .divider {
+          width: 100%;
+          height: 1px;
+          margin-top: 16px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0),
+            rgba(245, 244, 244, 0.14),
+            rgba(245, 244, 244, 0)
+          );
+          opacity: 0.55;
+        }
+
+        @media (max-width: 991px) {
+          .noteCard {
+            grid-template-columns: 1fr;
           }
-          @media (max-width: 767px) {
-            .work-presentation-note-thq-column-elm {
-              width: 100%;
-            }
-            .work-presentation-note-thq-text-elm1 {
-              text-align: center;
-            }
-            .work-presentation-note-thq-row-elm {
-              flex-direction: column;
-            }
-            .work-presentation-note-thq-feature1-image-elm {
-              width: 100%;
-            }
-            .work-presentation-note-thq-feature2-elm {
-              width: auto;
-            }
-            .work-presentation-note-thq-feature2-image-elm {
-              width: 100%;
-            }
-            .work-presentation-note-thq-feature3-elm {
-              width: auto;
-            }
-            .work-presentation-note-thq-actions-elm {
-              flex-wrap: wrap;
-            }
+          .media {
+            min-height: 300px;
           }
-          @media (max-width: 479px) {
-            .work-presentation-note-thq-actions-elm {
-              width: 100%;
-              flex-direction: column;
-            }
-            .work-presentation-note-thq-button-elm1 {
-              width: 100%;
-            }
-            .work-presentation-note-thq-button-elm2 {
-              width: 100%;
-            }
+          .desc {
+            max-width: none;
           }
-        `}
-      </style>
+        }
+
+        @media (max-width: 479px) {
+          .content {
+            padding: 18px 16px 16px;
+          }
+          .actions {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .btnPrimary,
+          .btnGhost {
+            width: 100%;
+          }
+        }
+      `}</style>
     </>
   )
 }
 
 WorkPresentationNote.defaultProps = {
-  feature3Description: undefined,
-  feature1ImageAlt: 'Film Production Image',
-  feature2ImageAlt: 'Audio Production Image',
-  feature1Description: undefined,
-  feature3ImageSrc: '/unknown-300h.jpg',
-  mainAction: undefined,
-  feature2ImageSrc: '/flag_view-300h.jpg',
-  feature3Title: undefined,
   rootClassName: '',
-  feature3ImageAlt: 'Animation & Graphics Image',
-  sectionDescription: undefined,
-  feature2Description: undefined,
-  secondaryAction: undefined,
-  feature1Title: undefined,
+
   sectionTitle: undefined,
+  sectionDescription: undefined,
+
+  // ✅ one cinematic image for the note (requested)
+  imageSrc: '/work/animation/wapn-01.jpg',
+
+  // keep these as text “principles” (not image cards)
+  feature1Title: undefined,
+  feature1Description: undefined,
   feature2Title: undefined,
-  feature1ImageSrc: '/colombo-engineering-300x223-1400w.jpg',
+  feature2Description: undefined,
+  feature3Title: undefined,
+  feature3Description: undefined,
+
+  mainAction: undefined,
+  secondaryAction: undefined,
 }
 
 WorkPresentationNote.propTypes = {
-  feature3Description: PropTypes.element,
-  feature1ImageAlt: PropTypes.string,
-  feature2ImageAlt: PropTypes.string,
-  feature1Description: PropTypes.element,
-  feature3ImageSrc: PropTypes.string,
-  mainAction: PropTypes.element,
-  feature2ImageSrc: PropTypes.string,
-  feature3Title: PropTypes.element,
   rootClassName: PropTypes.string,
-  feature3ImageAlt: PropTypes.string,
-  sectionDescription: PropTypes.element,
-  feature2Description: PropTypes.element,
-  secondaryAction: PropTypes.element,
-  feature1Title: PropTypes.element,
+
   sectionTitle: PropTypes.element,
+  sectionDescription: PropTypes.element,
+
+  // ✅ single image
+  imageSrc: PropTypes.string,
+
+  // text blocks
+  feature1Title: PropTypes.element,
+  feature1Description: PropTypes.element,
   feature2Title: PropTypes.element,
-  feature1ImageSrc: PropTypes.string,
+  feature2Description: PropTypes.element,
+  feature3Title: PropTypes.element,
+  feature3Description: PropTypes.element,
+
+  mainAction: PropTypes.element,
+  secondaryAction: PropTypes.element,
 }
 
 export default WorkPresentationNote
