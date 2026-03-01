@@ -1,292 +1,421 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const Music = (props) => {
   return (
     <>
-      <div className="music-thq-layout300-elm thq-section-padding">
-        <div className="music-thq-max-width-elm thq-section-max-width thq-flex-column">
-          <div className="music-thq-section-title-elm thq-flex-column">
-            <h2 className="thq-heading-2 music-thq-text-elm1">
+      <section className="musicSection thq-section-padding">
+        {/* cinematic glass layer */}
+        <div className="panel" aria-hidden="true" />
+        <div className="grain" aria-hidden="true" />
+
+        <div className="wrap thq-section-max-width thq-flex-column">
+          {/* header */}
+          <header className="titleBlock thq-flex-column">
+            <div className="kicker">Music</div>
+
+            <h2 className="thq-heading-2 title">
               {props.sectionTitle ?? (
                 <Fragment>
-                  <span className="music-text10">Music</span>
+                  <span>Music</span>
                 </Fragment>
               )}
             </h2>
-            <p className="music-thq-text-elm2 thq-body-large">
+
+            <p className="thq-body-large desc">
               {props.sectionDescription ?? (
                 <Fragment>
-                  <span className="music-text19">
-                    Original musical compositions developed around mood and
-                    pacing. These works are created to support narrative flow,
-                    whether as subtle background elements or more present
-                    emotional drivers.
+                  <span>
+                    Original musical compositions developed around mood and pacing. These works are
+                    created to support narrative flow, whether as subtle background elements or
+                    more present emotional drivers.
                   </span>
                 </Fragment>
               )}
             </p>
+          </header>
+
+          {/* premium cards */}
+          <div className="grid thq-grid-auto-300">
+            {/* 1 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature1ImageAlt}
+                  src={props.feature1ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature1Title ?? (
+                    <Fragment>
+                      <span>Mood & Pacing</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature1Description ?? (
+                    <Fragment>
+                      <span>Compositions shaped to move with the edit and the scene’s breath.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 2 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature2ImageAlt}
+                  src={props.feature2ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature2Title ?? (
+                    <Fragment>
+                      <span>Minimal, Cinematic</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature2Description ?? (
+                    <Fragment>
+                      <span>Elegant themes that leave space for dialogue, texture, and silence.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 3 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature3ImageAlt}
+                  src={props.feature3ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature3Title ?? (
+                    <Fragment>
+                      <span>Story First</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature3Description ?? (
+                    <Fragment>
+                      <span>Music that supports emotion without overpowering the frame.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
           </div>
-          <div className="music-thq-content-elm thq-grid-auto-300">
-            <div className="music-thq-feature1-elm thq-flex-column">
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="music-thq-feature1-title-elm thq-heading-3">
-                {props.feature1Title ?? (
-                  <Fragment>
-                    <span className="music-text12">Customized Solutions</span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature1Description ?? (
-                  <Fragment>
-                    <span className="music-text15">
-                      Tailored services to meet your unique needs and
-                      requirements.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-            <div className="music-thq-feature2-elm thq-flex-column">
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="thq-heading-3">
-                {props.feature2Title ?? (
-                  <Fragment>
-                    <span className="music-text11">Intuitive Design</span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature2Description ?? (
-                  <Fragment>
-                    <span className="music-text14">
-                      User-friendly interfaces and designs for seamless user
-                      experience.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-            <div className="music-thq-feature3-elm thq-flex-column">
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="thq-heading-3">
-                {props.feature3Title ?? (
-                  <Fragment>
-                    <span className="music-text16">
-                      Powerful Analytics Tools
-                    </span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature3Description ?? (
-                  <Fragment>
-                    <span className="music-text18">
-                      Gain valuable insights and data-driven decisions with our
-                      advanced analytics tools.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-          </div>
-          <div className="music-thq-actions-elm thq-flex-row">
-            <button className="music-thq-button-elm1 thq-button-filled">
+
+          {/* actions */}
+          <div className="actions thq-flex-row">
+            <button className="btnPrimary thq-button-filled" type="button">
               <span className="thq-body-small">
                 {props.mainAction ?? (
                   <Fragment>
-                    <span className="music-text17">Get Started</span>
+                    <span>Get Started</span>
                   </Fragment>
                 )}
               </span>
             </button>
-            <button className="music-thq-button-elm2 thq-button-outline">
+
+            <button className="btnGhost thq-button-outline" type="button">
               <span className="thq-body-small">
                 {props.secondaryAction ?? (
                   <Fragment>
-                    <span className="music-text13">Learn More</span>
+                    <span>Learn More</span>
                   </Fragment>
                 )}
               </span>
             </button>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .music-thq-layout300-elm {
+      </section>
+
+      <style jsx>{`
+        .musicSection {
+          width: 100%;
+          position: relative;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .panel {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              80% 65% at 50% 0%,
+              rgba(255, 255, 255, 0.06),
+              rgba(0, 0, 0, 0) 55%
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.12) 0%,
+              rgba(0, 0, 0, 0) 46%,
+              rgba(0, 0, 0, 0.38) 100%
+            );
+        }
+
+        .grain {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .wrap {
+          width: 100%;
+          gap: var(--dl-layout-space-threeunits);
+          align-items: center;
+          position: relative;
+          z-index: 1;
+        }
+
+        .titleBlock {
+          align-items: center;
+          text-align: center;
+          max-width: 920px;
+          gap: 10px;
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.68);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          backdrop-filter: blur(10px);
+        }
+
+        .title {
+          margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+        }
+
+        .desc {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.82);
+          line-height: 1.7;
+        }
+
+        .grid {
+          width: 100%;
+          align-self: stretch;
+          align-items: stretch;
+          gap: 18px;
+        }
+
+        .card {
+          position: relative;
+          border-radius: 20px;
+          overflow: hidden;
+          background: rgba(15, 15, 15, 0.55);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+          transform: translateY(0);
+          transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+        }
+
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(160, 196, 255, 0.22);
+          box-shadow: 0 28px 75px rgba(0, 0, 0, 0.55);
+        }
+
+        .media {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          overflow: hidden;
+          background: rgba(0, 0, 0, 0.35);
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.05) brightness(0.78);
+          transition: transform 420ms ease, filter 420ms ease;
+          display: block;
+        }
+
+        .card:hover .img {
+          transform: scale(1.08);
+          filter: saturate(0.98) contrast(1.08) brightness(0.82);
+        }
+
+        .mediaOverlay {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              85% 65% at 50% 20%,
+              rgba(0, 0, 0, 0.08),
+              rgba(0, 0, 0, 0.62)
+            ),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.75));
+        }
+
+        .cardBody {
+          padding: 16px 16px 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .cardTitle {
+          margin: 0;
+          line-height: 1.2;
+        }
+
+        .cardText {
+          color: rgba(245, 244, 244, 0.78);
+          line-height: 1.6;
+        }
+
+        .actions {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+        }
+
+        .btnPrimary {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: linear-gradient(
+            180deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0.06)
+          );
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(160, 196, 255, 0.25);
+        }
+
+        .btnGhost {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: rgba(0, 0, 0, 0.18);
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(245, 244, 244, 0.22);
+        }
+
+        @media (max-width: 991px) {
+          .titleBlock {
             width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .wrap {
+            gap: var(--dl-layout-space-oneandhalfunits);
+          }
+          .actions {
             flex-direction: column;
+            align-items: stretch;
           }
-          .music-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            align-items: center;
+          .btnPrimary,
+          .btnGhost {
+            width: 100%;
           }
-          .music-thq-section-title-elm {
-            align-items: center;
-          }
-          .music-thq-text-elm2 {
-            text-align: center;
-          }
-          .music-thq-content-elm {
-            align-self: stretch;
-            align-items: center;
-          }
-          .music-thq-feature1-elm {
-            align-items: flex-start;
-          }
-          .music-thq-feature1-title-elm {
-            text-align: center;
-          }
-          .music-thq-feature2-elm {
-            align-items: flex-start;
-          }
-          .music-thq-feature3-elm {
-            align-items: flex-start;
-          }
-          .music-thq-actions-elm {
-            align-items: flex-start;
-          }
-          .music-thq-button-elm1 {
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-oneandhalfunits);
-            padding-right: var(--dl-layout-space-oneandhalfunits);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .music-thq-button-elm2 {
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-oneandhalfunits);
-            padding-right: var(--dl-layout-space-oneandhalfunits);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .music-text10 {
-            display: inline-block;
-          }
-          .music-text11 {
-            display: inline-block;
-          }
-          .music-text12 {
-            display: inline-block;
-          }
-          .music-text13 {
-            display: inline-block;
-          }
-          .music-text14 {
-            display: inline-block;
-          }
-          .music-text15 {
-            display: inline-block;
-          }
-          .music-text16 {
-            display: inline-block;
-          }
-          .music-text17 {
-            display: inline-block;
-          }
-          .music-text18 {
-            display: inline-block;
-          }
-          .music-text19 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .music-thq-section-title-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 767px) {
-            .music-thq-section-title-elm {
-              width: auto;
-            }
-            .music-thq-text-elm1 {
-              text-align: center;
-            }
-            .music-thq-feature2-elm {
-              width: auto;
-            }
-            .music-thq-feature3-elm {
-              width: auto;
-            }
-          }
-          @media (max-width: 479px) {
-            .music-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .music-thq-actions-elm {
-              width: 100%;
-              flex-direction: column;
-            }
-            .music-thq-button-elm1 {
-              width: 100%;
-            }
-            .music-thq-button-elm2 {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 Music.defaultProps = {
   sectionTitle: undefined,
-  feature2Title: undefined,
-  feature3ImageAlt: 'Powerful Analytics Tools Image',
-  feature3ImageSrc: '/Audio/Studio/46761_107423282651248_1487833_n-200h.jpg',
-  feature1Title: undefined,
-  secondaryAction: undefined,
-  feature1ImageAlt: 'Customized Solutions Image',
-  feature2Description: undefined,
-  feature1Description: undefined,
-  feature3Title: undefined,
-  mainAction: undefined,
-  feature1ImageSrc:
-    '/Audio/Studio/291692_381818428545064_937224267_o-1400w.jpg',
-  feature3Description: undefined,
   sectionDescription: undefined,
-  feature2ImageSrc: '/Audio/Studio/46761_107423315984578_6037668_n-200h.jpg',
-  feature2ImageAlt: 'Intuitive Design Image',
+
+  feature1Title: undefined,
+  feature1Description: undefined,
+  feature1ImageAlt: 'Mood & Pacing',
+  feature1ImageSrc: '/work/audio/wam-01.jpg',
+
+  feature2Title: undefined,
+  feature2Description: undefined,
+  feature2ImageAlt: 'Minimal, Cinematic',
+  feature2ImageSrc: '/work/audio/wam-02.jpg',
+
+  feature3Title: undefined,
+  feature3Description: undefined,
+  feature3ImageAlt: 'Story First',
+  feature3ImageSrc: '/work/audio/wam-03.jpg',
+
+  mainAction: undefined,
+  secondaryAction: undefined,
 }
 
 Music.propTypes = {
   sectionTitle: PropTypes.element,
+  sectionDescription: PropTypes.element,
+
+  feature1Title: PropTypes.element,
+  feature1Description: PropTypes.element,
+  feature1ImageAlt: PropTypes.string,
+  feature1ImageSrc: PropTypes.string,
+
   feature2Title: PropTypes.element,
+  feature2Description: PropTypes.element,
+  feature2ImageAlt: PropTypes.string,
+  feature2ImageSrc: PropTypes.string,
+
+  feature3Title: PropTypes.element,
+  feature3Description: PropTypes.element,
   feature3ImageAlt: PropTypes.string,
   feature3ImageSrc: PropTypes.string,
-  feature1Title: PropTypes.element,
-  secondaryAction: PropTypes.element,
-  feature1ImageAlt: PropTypes.string,
-  feature2Description: PropTypes.element,
-  feature1Description: PropTypes.element,
-  feature3Title: PropTypes.element,
+
   mainAction: PropTypes.element,
-  feature1ImageSrc: PropTypes.string,
-  feature3Description: PropTypes.element,
-  sectionDescription: PropTypes.element,
-  feature2ImageSrc: PropTypes.string,
-  feature2ImageAlt: PropTypes.string,
+  secondaryAction: PropTypes.element,
 }
 
 export default Music
