@@ -4,24 +4,18 @@ import PropTypes from 'prop-types'
 import Link from 'next/link'
 
 const FeaturedFramesFilm = (props) => {
-  // ✅ build /work/film/fc-01.jpg ... fc-48.jpg
   const items = useMemo(() => {
     const count = Math.max(1, Math.min(48, Number(props.count || 12)))
     return Array.from({ length: count }, (_, i) => {
       const num = String(i + 1).padStart(2, '0')
-      return {
-        src: `/work/film/fc-${num}.jpg`,
-        alt: `Featured frame ${i + 1}`,
-        num,
-      }
+      return { src: `/work/film/fc-${num}.jpg`, alt: `Featured frame ${i + 1}`, num }
     })
   }, [props.count])
 
   const [activeIdx, setActiveIdx] = useState(-1)
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
-  const hero =
-    props.heroImageSrc || items?.[0]?.src || '/work/film/fc-01.jpg'
+  const hero = props.heroImageSrc || items?.[0]?.src || '/work/film/fc-01.jpg'
 
   const headingNode =
     props.heading1 ?? (
@@ -34,19 +28,17 @@ const FeaturedFramesFilm = (props) => {
     props.content1 ?? (
       <Fragment>
         <span>
-          Selected frames—crafted for mood, restraint, and cinematic clarity.
-          Updated by file name inside <code>/public/work/film</code>.
+          Selected frames—crafted for mood, restraint, and cinematic clarity. Updated by file
+          name inside <code>/public/work/film</code>.
         </span>
       </Fragment>
     )
 
-  // keyboard nav for lightbox
   useEffect(() => {
     function onKey(e) {
       if (activeIdx < 0) return
       if (e.key === 'Escape') setActiveIdx(-1)
-      if (e.key === 'ArrowRight')
-        setActiveIdx((i) => Math.min(items.length - 1, i + 1))
+      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(items.length - 1, i + 1))
       if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
     }
     if (typeof window === 'undefined') return
@@ -60,7 +52,7 @@ const FeaturedFramesFilm = (props) => {
     <>
       <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          {/* ===== CINEMATIC HERO (title + prop text) ===== */}
+          {/* ===== CINEMATIC HERO ===== */}
           <div className="heroCard">
             <div className="heroBg" aria-hidden="true">
               <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
@@ -123,7 +115,6 @@ const FeaturedFramesFilm = (props) => {
                 onClick={() => setActiveIdx(idx)}
                 aria-label={`Open frame ${idx + 1}`}
               >
-                {/* ✅ Curved inner image box */}
                 <span className="frameWrap" aria-hidden="true">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -154,7 +145,12 @@ const FeaturedFramesFilm = (props) => {
       {active?.src && (
         <div className="lightbox" onClick={() => setActiveIdx(-1)}>
           <div className="lbInner" onClick={(e) => e.stopPropagation()}>
-            <button className="lbClose" type="button" onClick={() => setActiveIdx(-1)} aria-label="Close">
+            <button
+              className="lbClose"
+              type="button"
+              onClick={() => setActiveIdx(-1)}
+              aria-label="Close"
+            >
               ✕
             </button>
 
@@ -198,7 +194,6 @@ const FeaturedFramesFilm = (props) => {
           overflow: hidden;
         }
 
-        /* subtle luxury glow */
         .wrap::before {
           content: '';
           position: absolute;
@@ -364,22 +359,26 @@ const FeaturedFramesFilm = (props) => {
         }
 
         /* Buttons */
-        .cineBtnPrimary {
+        .cineBtnPrimary,
+        .cineBtnOutline {
           display: inline-flex;
           align-items: center;
           justify-content: center;
           padding: 12px 22px;
           border-radius: 999px;
-          border: 1px solid rgba(37, 195, 226, 0.65);
-          background: rgba(37, 195, 226, 0.18);
-          color: #f5f4f4;
-          font-size: 13px;
-          font-weight: 800;
           text-decoration: none;
           backdrop-filter: blur(6px);
           transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease,
             box-shadow 0.18s ease;
           white-space: nowrap;
+        }
+
+        .cineBtnPrimary {
+          border: 1px solid rgba(37, 195, 226, 0.65);
+          background: rgba(37, 195, 226, 0.18);
+          color: #f5f4f4;
+          font-size: 13px;
+          font-weight: 800;
         }
 
         .cineBtnPrimary:hover {
@@ -390,21 +389,11 @@ const FeaturedFramesFilm = (props) => {
         }
 
         .cineBtnOutline {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 12px 22px;
-          border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.24);
           background: rgba(255, 255, 255, 0.04);
           color: rgba(245, 244, 244, 0.88);
           font-size: 13px;
           font-weight: 700;
-          text-decoration: none;
-          backdrop-filter: blur(6px);
-          transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease,
-            box-shadow 0.18s ease;
-          white-space: nowrap;
         }
 
         .cineBtnOutline:hover {
@@ -433,6 +422,9 @@ const FeaturedFramesFilm = (props) => {
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
           cursor: pointer;
           padding: 0;
+          /* ✅ THIS IS THE FIX (gives height) */
+          aspect-ratio: 16 / 10;
+          border: 1px solid rgba(245, 244, 244, 0.1);
         }
 
         .tile:hover {
@@ -441,7 +433,6 @@ const FeaturedFramesFilm = (props) => {
           box-shadow: 0 24px 62px rgba(0, 0, 0, 0.5);
         }
 
-        /* ✅ inner curved box */
         .frameWrap {
           position: absolute;
           inset: 10px;
@@ -566,20 +557,11 @@ const FeaturedFramesFilm = (props) => {
           display: grid;
           place-items: center;
           font-size: 28px;
-          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-        }
-
-        .lbNav:hover,
-        .lbClose:hover {
-          transform: translateY(-1px);
-          border-color: rgba(37, 195, 226, 0.35);
-          background: rgba(37, 195, 226, 0.12);
         }
 
         .lbNav:disabled {
           opacity: 0.45;
           cursor: not-allowed;
-          transform: none;
         }
 
         .lbClose {
@@ -609,11 +591,6 @@ const FeaturedFramesFilm = (props) => {
           background: rgba(255, 255, 255, 0.03);
         }
 
-        .lbAlt {
-          opacity: 0.9;
-        }
-
-        /* ================= RESPONSIVE ================= */
         @media (max-width: 991px) {
           .tile {
             grid-column: span 6;
@@ -653,7 +630,6 @@ FeaturedFramesFilm.defaultProps = {
   rootClassName: '',
   count: 12,
 
-  // ✅ optional hero override
   heroImageSrc: '/work/film/fc-01.jpg',
 
   primaryHref: '/work-film',
