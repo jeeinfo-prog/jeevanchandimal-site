@@ -2,33 +2,61 @@ import React, { Fragment } from 'react'
 import PropTypes from 'prop-types'
 
 const WorkPhotographyPersonalProjects = (props) => {
+  const headingNode =
+    props.heading1 ?? (
+      <Fragment>
+        <span>Personal Projects</span>
+      </Fragment>
+    )
+
+  const descNode =
+    props.content1 ?? (
+      <Fragment>
+        <span>
+          Independent photographic work developed through exploration and
+          long-form observation. These projects reflect ongoing personal
+          interests in nature, landscape, and human presence within space.
+        </span>
+      </Fragment>
+    )
+
   return (
     <>
-      <section className="wrap thq-section-padding">
+      <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          <header className="head">
-            <h2 className="title thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span>Personal projects</span>
-                </Fragment>
-              )}
-            </h2>
+          {/* ===== CINEMATIC HEADER CARD (same style) ===== */}
+          <header className="hero">
+            <div className="heroBg" aria-hidden="true">
+              <div
+                className="heroImg"
+                style={{
+                  backgroundImage: `url(${
+                    props.heroImageSrc ||
+                    props.feature1ImageSrc ||
+                    '/work/photography/wpp-01.jpg'
+                  })`,
+                }}
+              />
+              <div className="heroVignette" />
+              <div className="heroGrain" />
+            </div>
 
-            <p className="subtitle thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span>
-                    Independent photographic work developed through exploration
-                    and long-form observation. These projects reflect ongoing
-                    personal interests in nature, landscape, and human presence
-                    within space.
-                  </span>
-                </Fragment>
-              )}
-            </p>
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">PHOTOGRAPHY / PERSONAL</span>
+                <span className="kickerLine" />
+              </div>
+
+              <h2 className="title thq-heading-2">{headingNode}</h2>
+              <p className="subtitle thq-body-large">{descNode}</p>
+
+              <div className="micro thq-body-small">
+                Mood-first studies · Slow observation · Cinematic restraint
+              </div>
+            </div>
           </header>
 
+          {/* ===== CARDS ===== */}
           <div className="grid">
             {/* Card 1 */}
             <article className="card">
@@ -41,13 +69,14 @@ const WorkPhotographyPersonalProjects = (props) => {
                   loading="lazy"
                 />
                 <div className="shade" />
+                <div className="chip">Series 01</div>
               </div>
 
               <div className="body">
                 <h3 className="cardTitle thq-heading-3">
                   {props.feature1Title ?? (
                     <Fragment>
-                      <span>Nature & Atmosphere</span>
+                      <span>Nature &amp; Atmosphere</span>
                     </Fragment>
                   )}
                 </h3>
@@ -56,8 +85,8 @@ const WorkPhotographyPersonalProjects = (props) => {
                   {props.feature1Description ?? (
                     <Fragment>
                       <span>
-                        Studies of weather, light, and quiet rhythm — built around
-                        mood and texture.
+                        Studies of weather, light, and quiet rhythm — built
+                        around mood and texture.
                       </span>
                     </Fragment>
                   )}
@@ -76,13 +105,14 @@ const WorkPhotographyPersonalProjects = (props) => {
                   loading="lazy"
                 />
                 <div className="shade" />
+                <div className="chip">Series 02</div>
               </div>
 
               <div className="body">
                 <h3 className="cardTitle thq-heading-3">
                   {props.feature2Title ?? (
                     <Fragment>
-                      <span>Landscape observations</span>
+                      <span>Landscape Observations</span>
                     </Fragment>
                   )}
                 </h3>
@@ -111,13 +141,14 @@ const WorkPhotographyPersonalProjects = (props) => {
                   loading="lazy"
                 />
                 <div className="shade" />
+                <div className="chip">Series 03</div>
               </div>
 
               <div className="body">
                 <h3 className="cardTitle thq-heading-3">
                   {props.feature3Title ?? (
                     <Fragment>
-                      <span>Human presence</span>
+                      <span>Human Presence</span>
                     </Fragment>
                   )}
                 </h3>
@@ -126,8 +157,8 @@ const WorkPhotographyPersonalProjects = (props) => {
                   {props.feature3Description ?? (
                     <Fragment>
                       <span>
-                        Small moments inside larger worlds — scenes that feel lived-in
-                        and honest.
+                        Small moments inside larger worlds — scenes that feel
+                        lived-in and honest.
                       </span>
                     </Fragment>
                   )}
@@ -148,32 +179,124 @@ const WorkPhotographyPersonalProjects = (props) => {
         .shell {
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 18px;
         }
 
-        .head {
-          max-width: 860px;
-          margin: 0 auto;
-          text-align: center;
+        /* ================= HERO (cinematic card) ================= */
+        .hero {
+          position: relative;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .heroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .heroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+        }
+
+        .heroVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              80% 60% at 50% 22%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.72)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.8) 0%,
+              rgba(0, 0, 0, 0.45) 55%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+        }
+
+        .heroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.08;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .heroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 22px 18px;
+          max-width: 920px;
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
 
+        .kickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+        }
+
+        .kickerLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.16),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
         .title {
           margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
         }
 
         .subtitle {
           margin: 0;
           opacity: 0.9;
           line-height: 1.65;
+          color: rgba(245, 244, 244, 0.84);
+          max-width: 70ch;
         }
 
+        .micro {
+          margin-top: 6px;
+          color: rgba(245, 244, 244, 0.62);
+        }
+
+        /* ================= GRID ================= */
         .grid {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
           gap: 16px;
+          width: 100%;
+          margin-top: 12px;
         }
 
         .card {
@@ -222,8 +345,21 @@ const WorkPhotographyPersonalProjects = (props) => {
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0),
-            rgba(0, 0, 0, 0.55)
+            rgba(0, 0, 0, 0.6)
           );
+        }
+
+        .chip {
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.3px;
         }
 
         .body {
@@ -252,9 +388,8 @@ const WorkPhotographyPersonalProjects = (props) => {
         }
 
         @media (max-width: 767px) {
-          .head {
-            text-align: left;
-            margin: 0;
+          .heroInner {
+            padding: 18px 14px 14px;
           }
           .card {
             grid-column: span 12;
@@ -266,8 +401,13 @@ const WorkPhotographyPersonalProjects = (props) => {
 }
 
 WorkPhotographyPersonalProjects.defaultProps = {
+  rootClassName: '',
+
   heading1: undefined,
   content1: undefined,
+
+  // ✅ optional hero background image for header
+  heroImageSrc: '/work/photography/wpp-01.jpg',
 
   // ✅ New file naming system
   feature1ImageSrc: '/work/photography/wpp-01.jpg',
@@ -288,8 +428,12 @@ WorkPhotographyPersonalProjects.defaultProps = {
 }
 
 WorkPhotographyPersonalProjects.propTypes = {
+  rootClassName: PropTypes.string,
+
   heading1: PropTypes.element,
   content1: PropTypes.element,
+
+  heroImageSrc: PropTypes.string,
 
   feature1ImageSrc: PropTypes.string,
   feature2ImageSrc: PropTypes.string,
