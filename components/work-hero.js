@@ -230,7 +230,7 @@ WorkHero.defaultProps = {
   rootClassName: '',
   image1Alt: 'Professional film production equipment',
   image1Src:
-    'https://images.pexels.com/photos/2883160/pexels-photo-2883160.jpeg?auto=compress&cs=tinysrgb&w=1500',
+    '/work/herowrok.jpg',
   action3: undefined,
   content1: undefined,
   textinputPlaceholder: 'Create Together',
