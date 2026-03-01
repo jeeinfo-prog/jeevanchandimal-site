@@ -138,48 +138,51 @@ const WorkCinematicGallery = (props) => {
         <div className="shell thq-section-max-width">
           {/* ===== CINEMATIC HEADER CARD (bit different) ===== */}
           <header className="hero">
-            <div className="heroBg" aria-hidden="true">
-              <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
-              <div className="heroVignette" />
-              <div className="heroGrain" />
-            </div>
+  <div className="heroBg" aria-hidden="true">
+    <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
+    <div className="heroVignette" />
+    <div className="heroGrain" />
+  </div>
 
-            <div className="heroInner">
-              <div className="kickerRow">
-                <span className="kicker">PHOTOGRAPHY / GALLERY</span>
-                <span className="kickerLine" />
-              </div>
+  {/* ✅ only change: add a luxury glass panel like WorkPhotography */}
+  <div className="heroInner">
+    <div className="heroPanel">
+      <div className="kickerRow">
+        <span className="kicker">PHOTOGRAPHY / GALLERY</span>
+        <span className="kickerLine" />
+      </div>
 
-              <h2 className="title thq-heading-2">{headingNode}</h2>
-              <p className="desc thq-body-large">{descNode}</p>
+      <h2 className="title thq-heading-2">{headingNode}</h2>
+      <p className="desc thq-body-large">{descNode}</p>
 
-              <div className="heroActions">
-                {props.apiEndpoint && (
-                  <button
-                    className="btnGhost"
-                    type="button"
-                    onClick={loadRandom}
-                    disabled={loading}
-                  >
-                    {loading ? 'Loading…' : 'Refresh Images'}
-                  </button>
-                )}
+      <div className="heroActions">
+        {props.apiEndpoint && (
+          <button
+            className="btnGhost"
+            type="button"
+            onClick={loadRandom}
+            disabled={loading}
+          >
+            {loading ? 'Loading…' : 'Refresh Images'}
+          </button>
+        )}
 
-                {!!(props.storeHref || active?.href) && (
-                  <a className="btnPrimary" href={props.storeHref || active?.href || '/store'}>
-                    <span className="thq-body-small">Open Store</span>
-                    <svg viewBox="0 0 1024 1024" className="icon">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                    </svg>
-                  </a>
-                )}
-              </div>
+        {!!(props.storeHref || active?.href) && (
+          <a className="btnPrimary" href={props.storeHref || active?.href || '/store'}>
+            <span className="thq-body-small">Open Store</span>
+            <svg viewBox="0 0 1024 1024" className="icon">
+              <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+            </svg>
+          </a>
+        )}
+      </div>
 
-              <div className="micro thq-body-small">
-                Tap any frame to preview · Arrow keys to navigate · Esc to close
-              </div>
-            </div>
-          </header>
+      <div className="micro thq-body-small">
+        Tap any frame to preview · Arrow keys to navigate · Esc to close
+      </div>
+    </div>
+  </div>
+</header>
 
           {/* ===== GRID (masonry-ish but cleaner) ===== */}
           {items.length === 0 ? (
@@ -277,72 +280,105 @@ const WorkCinematicGallery = (props) => {
         }
 
         /* ================= HERO ================= */
-        .hero {
-          position: relative;
-          border-radius: 22px;
-          overflow: hidden;
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          background: rgba(12, 12, 12, 0.55);
-          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(10px);
-        }
+        /* ================= HERO (panel style like WorkPhotography) ================= */
+.hero {
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(245, 244, 244, 0.1);
+  background: rgba(12, 12, 12, 0.55);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  min-height: 360px; /* gives the hero breathing room like the 2nd image */
+}
 
-        .heroBg {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-        }
+.heroBg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 
-        .heroImg {
-          position: absolute;
-          inset: 0;
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          transform: scale(1.03);
-          filter: saturate(0.92) contrast(1.08) brightness(0.72);
-        }
+.heroImg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform: scale(1.03);
+  filter: saturate(0.92) contrast(1.08) brightness(0.64);
+}
 
-        .heroVignette {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(
-              80% 60% at 50% 22%,
-              rgba(0, 0, 0, 0.06),
-              rgba(0, 0, 0, 0.72)
-            ),
-            linear-gradient(
-              90deg,
-              rgba(0, 0, 0, 0.8) 0%,
-              rgba(0, 0, 0, 0.45) 55%,
-              rgba(0, 0, 0, 0.82) 100%
-            );
-        }
+.heroVignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+      80% 60% at 50% 22%,
+      rgba(0, 0, 0, 0.06),
+      rgba(0, 0, 0, 0.72)
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.82) 0%,
+      rgba(0, 0, 0, 0.46) 55%,
+      rgba(0, 0, 0, 0.84) 100%
+    );
+}
 
-        .heroGrain {
-          position: absolute;
-          inset: 0;
-          opacity: 0.08;
-          mix-blend-mode: overlay;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-          background-size: 240px 240px;
-        }
+.heroGrain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
 
-        .heroInner {
-          position: relative;
-          z-index: 1;
-          padding: 24px 22px 18px;
-          max-width: 980px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
+/* ✅ important: heroInner becomes a positioning wrapper */
+.heroInner {
+  position: relative;
+  z-index: 1;
+  padding: 22px;
+  width: 100%;
+}
 
-        .kickerRow {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
+/* ✅ the “photography-like” glass panel */
+.heroPanel {
+  width: min(980px, 100%);
+  border-radius: 22px;
+  border: 1px solid rgba(245, 244, 244, 0.12);
+  background: rgba(12, 12, 12, 0.42);
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(12px);
+  padding: 24px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroPanel:before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: radial-gradient(
+    900px circle at 25% 20%,
+    rgba(120, 166, 255, 0.14),
+    transparent 55%
+  );
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.kickerRow,
+.title,
+.desc,
+.heroActions,
+.micro {
+  position: relative;
+  z-index: 1; /* keeps text above the panel glow */
+}
+
 
         .kicker {
           font-size: 12px;
@@ -662,6 +698,15 @@ const WorkCinematicGallery = (props) => {
             grid-column: span 6;
           }
         }
+
+@media (max-width: 991px) {
+  .heroInner {
+    padding: 16px;
+  }
+  .heroPanel {
+    padding: 18px 16px 14px;
+  }
+}
 
         @media (max-width: 767px) {
           .heroInner {
