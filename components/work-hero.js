@@ -85,8 +85,7 @@ const WorkHero = (props) => {
           z-index: 0;
         }
 
-        /* ===== CINEMATIC OVERLAYS ===== */
-
+        /* overlays */
         .vignette {
           position: absolute;
           inset: 0;
@@ -131,3 +130,112 @@ const WorkHero = (props) => {
         }
 
         .work-hero-thq-text-elm1 {
+          margin: 0;
+          font-size: clamp(32px, 5vw, 44px);
+          letter-spacing: -0.02em;
+          color: #f5f4f4;
+          text-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+        }
+
+        .work-hero-thq-text-elm2 {
+          margin: 0;
+          margin-top: var(--dl-layout-space-twounits);
+          font-size: 16px;
+          line-height: 1.7;
+          color: rgba(245, 244, 244, 0.82);
+          max-width: 48ch;
+        }
+
+        .work-hero-container2 {
+          margin-top: var(--dl-layout-space-twounits);
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .work-hero-textinput {
+          width: 70%;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(245, 244, 244, 0.18);
+        }
+
+        .work-hero-container3 {
+          flex: 1;
+          display: flex;
+        }
+
+        .work-hero-thq-button-elm {
+          height: 36px;
+          padding: 0 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(37, 195, 226, 0.45);
+          background: linear-gradient(
+            180deg,
+            rgba(37, 195, 226, 0.22),
+            rgba(37, 195, 226, 0.08)
+          );
+          color: #f5f4f4;
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          font-weight: 900;
+          transition: all 180ms ease;
+        }
+
+        .work-hero-thq-button-elm:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.7);
+        }
+
+        .work-hero-text1,
+        .work-hero-text2,
+        .work-hero-text3 {
+          display: inline-block;
+        }
+
+        @media (max-width: 767px) {
+          .work-hero-thq-column-elm {
+            width: 100%;
+            margin-left: 0;
+            text-align: center;
+            align-items: center;
+          }
+
+          .work-hero-textinput {
+            width: 100%;
+          }
+
+          .work-hero-container3 {
+            width: 100%;
+          }
+
+          .work-hero-thq-button-elm {
+            width: 100%;
+          }
+        }
+      `}</style>
+    </>
+  )
+}
+
+WorkHero.defaultProps = {
+  heading1: undefined,
+  rootClassName: '',
+  image1Alt: 'Work hero background',
+  image1Src: '/work/herowrok.jpg',
+  action3: undefined,
+  content1: undefined,
+  textinputPlaceholder: 'Create Together',
+}
+
+WorkHero.propTypes = {
+  heading1: PropTypes.element,
+  rootClassName: PropTypes.string,
+  image1Alt: PropTypes.string,
+  image1Src: PropTypes.string,
+  action3: PropTypes.element,
+  content1: PropTypes.element,
+  textinputPlaceholder: PropTypes.string,
+}
+
+export default WorkHero
