@@ -8,7 +8,11 @@ const FeaturedFramesFilm = (props) => {
     const count = Math.max(1, Math.min(48, Number(props.count || 12)))
     return Array.from({ length: count }, (_, i) => {
       const num = String(i + 1).padStart(2, '0')
-      return { src: `/work/film/fc-${num}.jpg`, alt: `Featured frame ${i + 1}`, num }
+      return {
+        src: `/work/film/fc-${num}.jpg`,
+        alt: `Featured frame ${i + 1}`,
+        num,
+      }
     })
   }, [props.count])
 
@@ -34,11 +38,13 @@ const FeaturedFramesFilm = (props) => {
       </Fragment>
     )
 
+  // keyboard nav for lightbox
   useEffect(() => {
     function onKey(e) {
       if (activeIdx < 0) return
       if (e.key === 'Escape') setActiveIdx(-1)
-      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(items.length - 1, i + 1))
+      if (e.key === 'ArrowRight')
+        setActiveIdx((i) => Math.min(items.length - 1, i + 1))
       if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
     }
     if (typeof window === 'undefined') return
@@ -123,8 +129,10 @@ const FeaturedFramesFilm = (props) => {
                     alt={it.alt}
                     loading="lazy"
                     onError={(e) => {
+                      // ✅ DON'T HIDE THE TILE — show a visible placeholder instead
                       e.currentTarget.style.display = 'none'
-                      e.currentTarget.closest('button')?.classList.add('hideTile')
+                      const btn = e.currentTarget.closest('button')
+                      if (btn) btn.classList.add('broken')
                     }}
                   />
                   <span className="shade" />
@@ -194,6 +202,7 @@ const FeaturedFramesFilm = (props) => {
           overflow: hidden;
         }
 
+        /* subtle luxury glow */
         .wrap::before {
           content: '';
           position: absolute;
@@ -422,9 +431,8 @@ const FeaturedFramesFilm = (props) => {
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
           cursor: pointer;
           padding: 0;
-          /* ✅ THIS IS THE FIX (gives height) */
+          /* ✅ IMPORTANT: gives height so tiles show */
           aspect-ratio: 16 / 10;
-          border: 1px solid rgba(245, 244, 244, 0.1);
         }
 
         .tile:hover {
@@ -433,6 +441,7 @@ const FeaturedFramesFilm = (props) => {
           box-shadow: 0 24px 62px rgba(0, 0, 0, 0.5);
         }
 
+        /* ✅ inner curved box */
         .frameWrap {
           position: absolute;
           inset: 10px;
@@ -511,8 +520,18 @@ const FeaturedFramesFilm = (props) => {
           opacity: 0.95;
         }
 
-        .hideTile {
-          display: none;
+        /* ✅ visible placeholder if something fails */
+        .broken .frameWrap::after {
+          content: 'Image not found';
+          position: absolute;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          background: rgba(0, 0, 0, 0.55);
+          color: rgba(245, 244, 244, 0.85);
+          font-size: 12px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
         }
 
         /* ================= LIGHTBOX ================= */
@@ -557,11 +576,20 @@ const FeaturedFramesFilm = (props) => {
           display: grid;
           place-items: center;
           font-size: 28px;
+          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .lbNav:hover,
+        .lbClose:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.12);
         }
 
         .lbNav:disabled {
           opacity: 0.45;
           cursor: not-allowed;
+          transform: none;
         }
 
         .lbClose {
@@ -589,6 +617,10 @@ const FeaturedFramesFilm = (props) => {
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.12);
           background: rgba(255, 255, 255, 0.03);
+        }
+
+        .lbAlt {
+          opacity: 0.9;
         }
 
         @media (max-width: 991px) {
@@ -629,9 +661,7 @@ FeaturedFramesFilm.defaultProps = {
   content1: undefined,
   rootClassName: '',
   count: 12,
-
   heroImageSrc: '/work/film/fc-01.jpg',
-
   primaryHref: '/work-film',
   primaryText: 'View Film Work',
   secondaryHref: '/contact',
