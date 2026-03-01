@@ -1,8 +1,10 @@
+// components/featured-frames-film.js
 import React, { Fragment, useMemo, useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
+import Link from 'next/link'
 
 const FeaturedFramesFilm = (props) => {
-  // ✅ build /work/film/fc-01.jpg ... fc-12.jpg
+  // ✅ build /work/film/fc-01.jpg ... fc-48.jpg
   const items = useMemo(() => {
     const count = Math.max(1, Math.min(48, Number(props.count || 12)))
     return Array.from({ length: count }, (_, i) => {
@@ -10,6 +12,7 @@ const FeaturedFramesFilm = (props) => {
       return {
         src: `/work/film/fc-${num}.jpg`,
         alt: `Featured frame ${i + 1}`,
+        num,
       }
     })
   }, [props.count])
@@ -17,10 +20,13 @@ const FeaturedFramesFilm = (props) => {
   const [activeIdx, setActiveIdx] = useState(-1)
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
+  const hero =
+    props.heroImageSrc || items?.[0]?.src || '/work/film/fc-01.jpg'
+
   const headingNode =
     props.heading1 ?? (
       <Fragment>
-        <span>Featured Frames</span>
+        <span className="titleText">Featured Frames</span>
       </Fragment>
     )
 
@@ -39,7 +45,8 @@ const FeaturedFramesFilm = (props) => {
     function onKey(e) {
       if (activeIdx < 0) return
       if (e.key === 'Escape') setActiveIdx(-1)
-      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(items.length - 1, i + 1))
+      if (e.key === 'ArrowRight')
+        setActiveIdx((i) => Math.min(items.length - 1, i + 1))
       if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
     }
     if (typeof window === 'undefined') return
@@ -47,31 +54,66 @@ const FeaturedFramesFilm = (props) => {
     return () => window.removeEventListener('keydown', onKey)
   }, [activeIdx, items.length])
 
+  const isInternal = (href) => typeof href === 'string' && href.startsWith('/')
+
   return (
     <>
       <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          <header className="head">
-            <div className="kicker">SELECTED FRAMES</div>
-
-            <h2 className="title thq-heading-2">{headingNode}</h2>
-            <p className="desc thq-body-large">{descNode}</p>
-
-            <div className="actions">
-              {props.primaryHref && (
-                <a className="cineBtnPrimary" href={props.primaryHref}>
-                  {props.primaryText || 'View Film Work'}
-                </a>
-              )}
-
-              {props.secondaryHref && (
-                <a className="cineBtnOutline" href={props.secondaryHref}>
-                  {props.secondaryText || 'Request a Private Selection'}
-                </a>
-              )}
+          {/* ===== CINEMATIC HERO (title + prop text) ===== */}
+          <div className="heroCard">
+            <div className="heroBg" aria-hidden="true">
+              <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
+              <div className="heroVignette" />
+              <div className="heroGlow" />
+              <div className="heroGrain" />
             </div>
-          </header>
 
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">SELECTED FRAMES</span>
+                <span className="dot" aria-hidden="true" />
+                <span className="kickerSub">Mood · Restraint · Cinematic clarity</span>
+              </div>
+
+              <h2 className="thq-heading-2 heroTitle">{headingNode}</h2>
+              <p className="thq-body-large heroDesc">{descNode}</p>
+
+              <div className="actions">
+                {props.primaryHref ? (
+                  isInternal(props.primaryHref) ? (
+                    <Link href={props.primaryHref} legacyBehavior>
+                      <a className="cineBtnPrimary">{props.primaryText || 'View Film Work'}</a>
+                    </Link>
+                  ) : (
+                    <a className="cineBtnPrimary" href={props.primaryHref} rel="noreferrer">
+                      {props.primaryText || 'View Film Work'}
+                    </a>
+                  )
+                ) : null}
+
+                {props.secondaryHref ? (
+                  isInternal(props.secondaryHref) ? (
+                    <Link href={props.secondaryHref} legacyBehavior>
+                      <a className="cineBtnOutline">
+                        {props.secondaryText || 'Request a Private Selection'}
+                      </a>
+                    </Link>
+                  ) : (
+                    <a className="cineBtnOutline" href={props.secondaryHref} rel="noreferrer">
+                      {props.secondaryText || 'Request a Private Selection'}
+                    </a>
+                  )
+                ) : null}
+              </div>
+
+              <div className="micro thq-body-small">
+                Tap any frame to preview • Arrow keys to navigate • Esc to close
+              </div>
+            </div>
+          </div>
+
+          {/* ===== GRID ===== */}
           <div className="grid">
             {items.map((it, idx) => (
               <button
@@ -81,36 +123,47 @@ const FeaturedFramesFilm = (props) => {
                 onClick={() => setActiveIdx(idx)}
                 aria-label={`Open frame ${idx + 1}`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className="img"
-                  src={it.src}
-                  alt={it.alt}
-                  loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                    e.currentTarget.closest('button')?.classList.add('hideTile')
-                  }}
-                />
-                <div className="shade" />
+                {/* ✅ Curved inner image box */}
+                <span className="frameWrap" aria-hidden="true">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    className="img"
+                    src={it.src}
+                    alt={it.alt}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                      e.currentTarget.closest('button')?.classList.add('hideTile')
+                    }}
+                  />
+                  <span className="shade" />
+                  <span className="innerStroke" />
+                  <span className="tag">
+                    <span className="tagText">Frame</span>
+                    <span className="tagDot" aria-hidden="true" />
+                    <span className="tagNum">{it.num}</span>
+                  </span>
+                </span>
               </button>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Lightbox */}
+      {/* ===== LIGHTBOX ===== */}
       {active?.src && (
         <div className="lightbox" onClick={() => setActiveIdx(-1)}>
           <div className="lbInner" onClick={(e) => e.stopPropagation()}>
-            <button className="lbClose" onClick={() => setActiveIdx(-1)}>
+            <button className="lbClose" type="button" onClick={() => setActiveIdx(-1)} aria-label="Close">
               ✕
             </button>
 
             <button
               className="lbNav"
+              type="button"
               onClick={() => setActiveIdx((i) => Math.max(0, i - 1))}
               disabled={activeIdx === 0}
+              aria-label="Previous"
             >
               ‹
             </button>
@@ -120,11 +173,20 @@ const FeaturedFramesFilm = (props) => {
 
             <button
               className="lbNav"
+              type="button"
               onClick={() => setActiveIdx((i) => Math.min(items.length - 1, i + 1))}
               disabled={activeIdx === items.length - 1}
+              aria-label="Next"
             >
               ›
             </button>
+
+            <div className="lbMeta">
+              <span className="lbCount">
+                {activeIdx + 1} / {items.length}
+              </span>
+              <span className="lbAlt">{active.alt || 'Featured frame'}</span>
+            </div>
           </div>
         </div>
       )}
@@ -132,51 +194,180 @@ const FeaturedFramesFilm = (props) => {
       <style jsx>{`
         .wrap {
           width: 100%;
+          position: relative;
           overflow: hidden;
         }
 
+        /* subtle luxury glow */
+        .wrap::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              70% 60% at 50% 0%,
+              rgba(37, 195, 226, 0.06),
+              rgba(0, 0, 0, 0)
+            ),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+          opacity: 0.95;
+        }
+
         .shell {
+          position: relative;
+          z-index: 1;
           display: flex;
           flex-direction: column;
           gap: 18px;
         }
 
-        .head {
+        /* ================= HERO CARD ================= */
+        .heroCard {
+          position: relative;
+          width: 100%;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .heroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .heroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.94) contrast(1.1) brightness(0.66);
+        }
+
+        .heroVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              90% 70% at 50% 18%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.78)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.85) 0%,
+              rgba(0, 0, 0, 0.42) 55%,
+              rgba(0, 0, 0, 0.85) 100%
+            );
+        }
+
+        .heroGlow {
+          position: absolute;
+          inset: -40px -60px auto -60px;
+          height: 180px;
+          background: radial-gradient(
+            60% 70% at 50% 50%,
+            rgba(37, 195, 226, 0.12),
+            rgba(37, 195, 226, 0)
+          );
+          opacity: 0.9;
+          filter: blur(2px);
+        }
+
+        .heroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.085;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .heroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 24px 20px;
           max-width: 980px;
-          margin: 0 auto 6px;
-          text-align: center;
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
 
+        .kickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          opacity: 0.92;
+        }
+
         .kicker {
-          font-size: 11px;
           letter-spacing: 0.28em;
-          text-transform: uppercase;
-          opacity: 0.72;
+          font-size: 11px;
+          font-weight: 900;
+          color: rgba(245, 244, 244, 0.82);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
         }
 
-        .title {
-          margin: 0;
+        .dot {
+          width: 5px;
+          height: 5px;
+          border-radius: 999px;
+          background: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.1);
         }
 
-        .desc {
+        .kickerSub {
+          font-size: 12px;
+          color: rgba(245, 244, 244, 0.7);
+          letter-spacing: 0.08em;
+        }
+
+        .titleText {
+          display: inline-block;
+          letter-spacing: 0.2px;
+        }
+
+        .heroTitle {
           margin: 0;
-          opacity: 0.86;
-          line-height: 1.7;
+          line-height: 1.08;
+          color: #f5f4f4;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+        }
+
+        .heroDesc {
+          margin: 0;
+          opacity: 0.88;
+          line-height: 1.75;
+          color: rgba(245, 244, 244, 0.84);
+          max-width: 78ch;
         }
 
         .actions {
-          margin-top: 8px;
+          margin-top: 6px;
           display: flex;
           gap: 10px;
-          justify-content: center;
           flex-wrap: wrap;
+          align-items: center;
+        }
+
+        .micro {
+          margin-top: 2px;
+          color: rgba(245, 244, 244, 0.62);
         }
 
         /* Buttons */
         .cineBtnPrimary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           padding: 12px 22px;
           border-radius: 999px;
           border: 1px solid rgba(37, 195, 226, 0.65);
@@ -186,8 +377,11 @@ const FeaturedFramesFilm = (props) => {
           font-weight: 800;
           text-decoration: none;
           backdrop-filter: blur(6px);
-          transition: 0.22s ease;
+          transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease,
+            box-shadow 0.18s ease;
+          white-space: nowrap;
         }
+
         .cineBtnPrimary:hover {
           background: rgba(37, 195, 226, 0.28);
           box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.16),
@@ -196,6 +390,9 @@ const FeaturedFramesFilm = (props) => {
         }
 
         .cineBtnOutline {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           padding: 12px 22px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.24);
@@ -205,8 +402,11 @@ const FeaturedFramesFilm = (props) => {
           font-weight: 700;
           text-decoration: none;
           backdrop-filter: blur(6px);
-          transition: 0.22s ease;
+          transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease,
+            box-shadow 0.18s ease;
+          white-space: nowrap;
         }
+
         .cineBtnOutline:hover {
           border-color: rgba(37, 195, 226, 0.55);
           color: #f5f4f4;
@@ -214,11 +414,12 @@ const FeaturedFramesFilm = (props) => {
           transform: translateY(-1px);
         }
 
-        /* Grid */
+        /* ================= GRID ================= */
         .grid {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
           gap: 14px;
+          margin-top: 6px;
         }
 
         .tile {
@@ -227,11 +428,11 @@ const FeaturedFramesFilm = (props) => {
           overflow: hidden;
           border-radius: 18px;
           border: 1px solid rgba(245, 244, 244, 0.1);
-          background: rgba(0, 0, 0, 0.25);
-          aspect-ratio: 16 / 10;
+          background: rgba(12, 12, 12, 0.42);
           box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
-          transition: 0.18s ease;
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
           cursor: pointer;
+          padding: 0;
         }
 
         .tile:hover {
@@ -240,11 +441,24 @@ const FeaturedFramesFilm = (props) => {
           box-shadow: 0 24px 62px rgba(0, 0, 0, 0.5);
         }
 
+        /* ✅ inner curved box */
+        .frameWrap {
+          position: absolute;
+          inset: 10px;
+          border-radius: 14px;
+          overflow: hidden;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+        }
+
         .img {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          transition: 0.28s ease;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 0.28s ease, filter 0.28s ease;
           filter: brightness(0.92) contrast(1.04) saturate(0.96);
         }
 
@@ -259,15 +473,58 @@ const FeaturedFramesFilm = (props) => {
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0),
-            rgba(0, 0, 0, 0.55)
+            rgba(0, 0, 0, 0.6)
           );
+          pointer-events: none;
+        }
+
+        .innerStroke {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border-radius: 14px;
+          box-shadow: inset 0 0 0 1px rgba(245, 244, 244, 0.08);
+        }
+
+        .tag {
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          color: rgba(245, 244, 244, 0.88);
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .tagText {
+          font-weight: 900;
+        }
+
+        .tagDot {
+          width: 4px;
+          height: 4px;
+          border-radius: 999px;
+          background: rgba(37, 195, 226, 0.7);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12);
+        }
+
+        .tagNum {
+          opacity: 0.95;
         }
 
         .hideTile {
           display: none;
         }
 
-        /* Lightbox */
+        /* ================= LIGHTBOX ================= */
         .lightbox {
           position: fixed;
           inset: 0;
@@ -275,48 +532,114 @@ const FeaturedFramesFilm = (props) => {
           display: grid;
           place-items: center;
           z-index: 9999;
+          padding: 18px;
         }
 
         .lbInner {
-          display: flex;
+          position: relative;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
           align-items: center;
           gap: 10px;
+          width: min(1100px, 100%);
         }
 
         .lbImg {
-          max-width: 82vw;
-          max-height: 82vh;
-          border-radius: 14px;
-          box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7);
+          width: 100%;
+          max-height: 78vh;
+          object-fit: contain;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          box-shadow: 0 28px 70px rgba(0, 0, 0, 0.6);
+          background: rgba(12, 12, 12, 0.45);
         }
 
         .lbNav,
         .lbClose {
-          background: rgba(0, 0, 0, 0.55);
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          color: white;
-          font-size: 28px;
-          padding: 10px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.45);
+          color: #fff;
           cursor: pointer;
           border-radius: 999px;
+          width: 46px;
+          height: 46px;
+          display: grid;
+          place-items: center;
+          font-size: 28px;
+          transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
         }
 
+        .lbNav:hover,
+        .lbClose:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.35);
+          background: rgba(37, 195, 226, 0.12);
+        }
+
+        .lbNav:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .lbClose {
+          position: absolute;
+          top: -10px;
+          right: -10px;
+          font-size: 18px;
+          width: 40px;
+          height: 40px;
+        }
+
+        .lbMeta {
+          grid-column: 1 / -1;
+          margin-top: 10px;
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          color: rgba(245, 244, 244, 0.72);
+          font-size: 12px;
+          letter-spacing: 0.06em;
+        }
+
+        .lbCount {
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(255, 255, 255, 0.03);
+        }
+
+        .lbAlt {
+          opacity: 0.9;
+        }
+
+        /* ================= RESPONSIVE ================= */
         @media (max-width: 991px) {
           .tile {
             grid-column: span 6;
           }
+          .heroInner {
+            padding: 20px 16px 16px;
+          }
         }
 
         @media (max-width: 767px) {
-          .head {
-            text-align: left;
-            margin: 0;
+          .tile {
+            grid-column: span 12;
           }
           .actions {
             justify-content: flex-start;
           }
-          .tile {
-            grid-column: span 12;
+        }
+
+        @media (max-width: 479px) {
+          .actions {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .cineBtnPrimary,
+          .cineBtnOutline {
+            width: 100%;
           }
         }
       `}</style>
@@ -329,6 +652,10 @@ FeaturedFramesFilm.defaultProps = {
   content1: undefined,
   rootClassName: '',
   count: 12,
+
+  // ✅ optional hero override
+  heroImageSrc: '/work/film/fc-01.jpg',
+
   primaryHref: '/work-film',
   primaryText: 'View Film Work',
   secondaryHref: '/contact',
@@ -340,6 +667,9 @@ FeaturedFramesFilm.propTypes = {
   content1: PropTypes.element,
   rootClassName: PropTypes.string,
   count: PropTypes.number,
+
+  heroImageSrc: PropTypes.string,
+
   primaryHref: PropTypes.string,
   primaryText: PropTypes.string,
   secondaryHref: PropTypes.string,
