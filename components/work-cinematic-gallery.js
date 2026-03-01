@@ -541,7 +541,7 @@ const WorkCinematicGallery = (props) => {
           display: grid;
           place-items: center;
           z-index: 9999;
-          background: rgba(0, 0, 0, 0.82);
+          background: rgba(0, 0, 0, 0.40);
           backdrop-filter: blur(6px);
         }
 
