@@ -1,7 +1,5 @@
-// components/work-cinematic-gallery.js
 import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
-import Link from 'next/link'
 
 const WorkCinematicGallery = (props) => {
   // 🔹 Static fallback (public/work/photography/cg-01.jpg → cg-12.jpg)
@@ -43,9 +41,9 @@ const WorkCinematicGallery = (props) => {
     props.content1 ?? (
       <Fragment>
         <span>
-          A curated selection of photographs presented as standalone visual studies. These images
-          focus on atmosphere, composition, and tonal depth—allowing each frame to exist without
-          explanation.
+          A curated selection of photographs presented as standalone visual
+          studies. These images focus on atmosphere, composition, and tonal
+          depth—allowing each frame to exist without explanation.
         </span>
       </Fragment>
     )
@@ -116,7 +114,8 @@ const WorkCinematicGallery = (props) => {
     function onKey(e) {
       if (activeIdx < 0) return
       if (e.key === 'Escape') setActiveIdx(-1)
-      if (e.key === 'ArrowRight') setActiveIdx((i) => Math.min(items.length - 1, i + 1))
+      if (e.key === 'ArrowRight')
+        setActiveIdx((i) => Math.min(items.length - 1, i + 1))
       if (e.key === 'ArrowLeft') setActiveIdx((i) => Math.max(0, i - 1))
     }
     if (typeof window === 'undefined') return
@@ -126,95 +125,63 @@ const WorkCinematicGallery = (props) => {
 
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
-  // ✅ HERO / PROP IMAGE (for header card only)
+  // ✅ cinematic header hero image
   const hero =
     props.heroImageSrc ||
     items?.[0]?.src ||
     staticFallback?.[0]?.src ||
     '/work/photography/cg-01.jpg'
 
-  const isInternal = (href) => typeof href === 'string' && href.startsWith('/')
-
   return (
     <>
       <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          {/* ===== HEADER: Title + Prop Text + Prop Image INSIDE curved box ===== */}
-          <header className="heroCard">
+          {/* ===== CINEMATIC HEADER CARD (bit different) ===== */}
+          <header className="hero">
             <div className="heroBg" aria-hidden="true">
-              <div className="heroGlow" />
+              <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
+              <div className="heroVignette" />
               <div className="heroGrain" />
             </div>
 
-            <div className="heroGrid">
-              {/* LEFT: Title + text */}
-              <div className="heroLeft">
-                <div className="kickerRow">
-                  <span className="kicker">PHOTOGRAPHY / GALLERY</span>
-                  <span className="dot" aria-hidden="true" />
-                  <span className="kickerSub">Light · Texture · Quiet narrative</span>
-                </div>
-
-                <h2 className="heroTitle thq-heading-2">{headingNode}</h2>
-                <p className="heroDesc thq-body-large">{descNode}</p>
-
-                <div className="heroActions">
-                  {props.apiEndpoint ? (
-                    <button
-                      className="cineBtnOutline"
-                      type="button"
-                      onClick={loadRandom}
-                      disabled={loading}
-                    >
-                      {loading ? 'Loading…' : 'Refresh Images'}
-                    </button>
-                  ) : null}
-
-                  {props.storeHref ? (
-                    isInternal(props.storeHref) ? (
-                      <Link href={props.storeHref} legacyBehavior>
-                        <a className="cineBtnPrimary" aria-label="Open Store">
-                          <span className="thq-body-small">Open Store</span>
-                          <svg viewBox="0 0 1024 1024" className="icon" aria-hidden="true">
-                            <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                          </svg>
-                        </a>
-                      </Link>
-                    ) : (
-                      <a className="cineBtnPrimary" href={props.storeHref} rel="noreferrer">
-                        <span className="thq-body-small">Open Store</span>
-                        <svg viewBox="0 0 1024 1024" className="icon" aria-hidden="true">
-                          <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                        </svg>
-                      </a>
-                    )
-                  ) : null}
-                </div>
-
-                <div className="micro thq-body-small">
-                  Tap any frame to preview • Arrow keys to navigate • Esc to close
-                </div>
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">PHOTOGRAPHY / GALLERY</span>
+                <span className="kickerLine" />
               </div>
 
-              {/* RIGHT: Prop image inside curved frame */}
-              <div className="heroRight" aria-hidden="true">
-                <div className="propOuter">
-                  <div className="propInner">
-                    <div className="propImg" style={{ backgroundImage: `url(${hero})` }} />
-                    <div className="propShade" />
-                    <div className="propStroke" />
-                    <div className="propPill">
-                      <span className="propPillTxt">Featured</span>
-                      <span className="propPillDot" />
-                      <span className="propPillTxt2">Gallery</span>
-                    </div>
-                  </div>
-                </div>
+              <h2 className="title thq-heading-2">{headingNode}</h2>
+              <p className="desc thq-body-large">{descNode}</p>
+
+              <div className="heroActions">
+                {props.apiEndpoint && (
+                  <button
+                    className="btnGhost"
+                    type="button"
+                    onClick={loadRandom}
+                    disabled={loading}
+                  >
+                    {loading ? 'Loading…' : 'Refresh Images'}
+                  </button>
+                )}
+
+                {!!(props.storeHref || active?.href) && (
+                  <a className="btnPrimary" href={props.storeHref || active?.href || '/store'}>
+                    <span className="thq-body-small">Open Store</span>
+                    <svg viewBox="0 0 1024 1024" className="icon">
+                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                    </svg>
+                  </a>
+                )}
+              </div>
+
+              <div className="micro thq-body-small">
+                Tap any frame to preview · Arrow keys to navigate · Esc to close
               </div>
             </div>
           </header>
 
-          {/* ===== GRID (unchanged) ===== */}
+          {/* ===== GRID (masonry-ish but cleaner) ===== */}
           {items.length === 0 ? (
             <div className="empty">No images found.</div>
           ) : (
@@ -244,7 +211,7 @@ const WorkCinematicGallery = (props) => {
         </div>
       </section>
 
-      {/* ===== LIGHTBOX (unchanged) ===== */}
+      {/* ===== LIGHTBOX (cinematic) ===== */}
       {active && active.src && (
         <div className="lightbox" onClick={() => setActiveIdx(-1)}>
           <div className="lbInner" onClick={(e) => e.stopPropagation()}>
@@ -304,17 +271,14 @@ const WorkCinematicGallery = (props) => {
         }
 
         .shell {
-          position: relative;
-          z-index: 1;
           display: flex;
           flex-direction: column;
           gap: 16px;
         }
 
-        /* ================= HERO CARD (NEW) ================= */
-        .heroCard {
+        /* ================= HERO ================= */
+        .hero {
           position: relative;
-          width: 100%;
           border-radius: 22px;
           overflow: hidden;
           border: 1px solid rgba(245, 244, 244, 0.1);
@@ -329,17 +293,30 @@ const WorkCinematicGallery = (props) => {
           pointer-events: none;
         }
 
-        .heroGlow {
+        .heroImg {
           position: absolute;
-          inset: -60px -80px auto -80px;
-          height: 220px;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+        }
+
+        .heroVignette {
+          position: absolute;
+          inset: 0;
           background: radial-gradient(
-            60% 70% at 50% 50%,
-            rgba(120, 166, 255, 0.14),
-            rgba(120, 166, 255, 0)
-          );
-          opacity: 0.9;
-          filter: blur(2px);
+              80% 60% at 50% 22%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.72)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.8) 0%,
+              rgba(0, 0, 0, 0.45) 55%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
         }
 
         .heroGrain {
@@ -351,29 +328,20 @@ const WorkCinematicGallery = (props) => {
           background-size: 240px 240px;
         }
 
-        .heroGrid {
+        .heroInner {
           position: relative;
           z-index: 1;
-          display: grid;
-          grid-template-columns: 1.2fr 0.8fr;
-          gap: 18px;
-          padding: 22px;
-          align-items: center;
-        }
-
-        .heroLeft {
+          padding: 24px 22px 18px;
+          max-width: 980px;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          min-width: 0;
         }
 
         .kickerRow {
           display: flex;
           align-items: center;
           gap: 10px;
-          flex-wrap: wrap;
-          opacity: 0.92;
         }
 
         .kicker {
@@ -387,193 +355,89 @@ const WorkCinematicGallery = (props) => {
           background: rgba(0, 0, 0, 0.25);
         }
 
-        .dot {
-          width: 5px;
-          height: 5px;
-          border-radius: 999px;
-          background: rgba(120, 166, 255, 0.7);
-          box-shadow: 0 0 0 4px rgba(120, 166, 255, 0.12);
+        .kickerLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.16),
+            rgba(245, 244, 244, 0)
+          );
         }
 
-        .kickerSub {
-          font-size: 12px;
-          color: rgba(245, 244, 244, 0.7);
-          letter-spacing: 0.08em;
-        }
-
-        .titleText {
-          display: inline-block;
-          letter-spacing: 0.2px;
-        }
-
-        .heroTitle {
+        .title {
           margin: 0;
           line-height: 1.08;
-          color: #f5f4f4;
           text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
         }
 
-        .heroDesc {
+        .desc {
           margin: 0;
-          opacity: 0.88;
-          line-height: 1.75;
           color: rgba(245, 244, 244, 0.84);
-          max-width: 78ch;
+          opacity: 0.92;
+          line-height: 1.7;
+          max-width: 72ch;
         }
 
         .heroActions {
-          margin-top: 6px;
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
-          align-items: center;
+          margin-top: 4px;
         }
 
-        .micro {
-          margin-top: 2px;
-          color: rgba(245, 244, 244, 0.62);
-        }
-
-        .cineBtnPrimary,
-        .cineBtnOutline {
+        .btnPrimary {
           display: inline-flex;
           align-items: center;
-          justify-content: center;
           gap: 8px;
-          padding: 12px 22px;
+          padding: 10px 16px;
           border-radius: 999px;
+          border: 1px solid rgba(120, 166, 255, 0.35);
+          background: rgba(120, 166, 255, 0.14);
           text-decoration: none;
-          backdrop-filter: blur(6px);
-          transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease,
-            box-shadow 0.18s ease;
-          white-space: nowrap;
+          transition: transform 0.15s ease, border-color 0.15s ease,
+            background 0.15s ease;
         }
 
-        .cineBtnPrimary {
-          border: 1px solid rgba(120, 166, 255, 0.55);
-          background: rgba(120, 166, 255, 0.16);
-          color: #f5f4f4;
-          font-size: 13px;
-          font-weight: 800;
-        }
-
-        .cineBtnPrimary:hover {
-          background: rgba(120, 166, 255, 0.22);
-          box-shadow: 0 0 0 4px rgba(120, 166, 255, 0.14),
-            0 0 18px rgba(120, 166, 255, 0.22);
+        .btnPrimary:hover {
           transform: translateY(-1px);
-        }
-
-        .cineBtnOutline {
-          border: 1px solid rgba(245, 244, 244, 0.24);
-          background: rgba(255, 255, 255, 0.04);
-          color: rgba(245, 244, 244, 0.88);
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .cineBtnOutline:hover {
           border-color: rgba(120, 166, 255, 0.55);
-          color: #f5f4f4;
-          box-shadow: 0 0 16px rgba(120, 166, 255, 0.16);
-          transform: translateY(-1px);
+          background: rgba(120, 166, 255, 0.18);
         }
 
-        .cineBtnOutline:disabled {
+        .btnGhost {
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.06);
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease,
+            background 0.15s ease;
+        }
+
+        .btnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(245, 244, 244, 0.22);
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        .btnGhost:disabled {
           opacity: 0.6;
           cursor: not-allowed;
           transform: none;
-          box-shadow: none;
         }
 
         .icon {
           width: 18px;
           height: 18px;
-          opacity: 0.95;
         }
 
-        /* RIGHT: PROP IMAGE IN CURVED BOX */
-        .heroRight {
-          display: flex;
-          justify-content: flex-end;
-          min-width: 0;
+        .micro {
+          margin-top: 6px;
+          color: rgba(245, 244, 244, 0.62);
         }
 
-        .propOuter {
-          width: 100%;
-          max-width: 420px;
-          border-radius: 20px;
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          background: rgba(0, 0, 0, 0.22);
-          box-shadow: 0 20px 55px rgba(0, 0, 0, 0.45);
-          padding: 10px;
-        }
-
-        .propInner {
-          position: relative;
-          border-radius: 16px;
-          overflow: hidden;
-          aspect-ratio: 4 / 3;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(245, 244, 244, 0.08);
-          transform: translateZ(0);
-        }
-
-        .propImg {
-          position: absolute;
-          inset: 0;
-          background-size: cover;
-          background-position: center;
-          transform: scale(1.03);
-          filter: saturate(0.95) contrast(1.06) brightness(0.78);
-        }
-
-        .propShade {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.12),
-            rgba(0, 0, 0, 0.72)
-          );
-        }
-
-        .propStroke {
-          position: absolute;
-          inset: 0;
-          border-radius: 16px;
-          pointer-events: none;
-          box-shadow: inset 0 0 0 1px rgba(245, 244, 244, 0.1);
-        }
-
-        .propPill {
-          position: absolute;
-          left: 10px;
-          top: 10px;
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          padding: 7px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.14);
-          background: rgba(0, 0, 0, 0.35);
-          backdrop-filter: blur(10px);
-          color: rgba(245, 244, 244, 0.88);
-          font-size: 11px;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-
-        .propPillDot {
-          width: 4px;
-          height: 4px;
-          border-radius: 999px;
-          background: rgba(120, 166, 255, 0.75);
-          box-shadow: 0 0 0 4px rgba(120, 166, 255, 0.12);
-        }
-
-        /* ================= BELOW HERE: your existing grid/lightbox styles can remain ================= */
+        /* ================= EMPTY ================= */
         .empty {
           margin-top: 14px;
           padding: 14px 16px;
@@ -582,6 +446,7 @@ const WorkCinematicGallery = (props) => {
           opacity: 0.9;
         }
 
+        /* ================= MASONRY GRID ================= */
         .masonry {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
@@ -623,9 +488,9 @@ const WorkCinematicGallery = (props) => {
         }
 
         .tile:hover .img {
-          transform: scale(1.07);
-          filter: saturate(1.02) contrast(1.05) brightness(1);
-        }
+  transform: scale(1.07);
+  filter: saturate(1.02) contrast(1.05) brightness(1);
+}
 
         .shade {
           position: absolute;
@@ -670,28 +535,157 @@ const WorkCinematicGallery = (props) => {
           color: rgba(245, 244, 244, 0.78);
         }
 
-        /* Responsive */
+        /* ================= LIGHTBOX ================= */
+        .lightbox {
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          z-index: 9999;
+          background: rgba(0, 0, 0, 0.82);
+          backdrop-filter: blur(6px);
+        }
+
+        .lbInner {
+          width: min(1100px, 92vw);
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(12, 12, 12, 0.65);
+          box-shadow: 0 30px 120px rgba(0, 0, 0, 0.6);
+          position: relative;
+        }
+
+        .lbTop {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 12px;
+          border-bottom: 1px solid rgba(245, 244, 244, 0.08);
+        }
+
+        .lbMeta {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .lbPill {
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          color: rgba(245, 244, 244, 0.72);
+        }
+
+        .lbSep {
+          width: 1px;
+          height: 16px;
+          background: rgba(245, 244, 244, 0.14);
+        }
+
+        .lbCount {
+          font-size: 12px;
+          color: rgba(245, 244, 244, 0.68);
+        }
+
+        .lbClose {
+          width: 38px;
+          height: 38px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          color: rgba(245, 244, 244, 0.9);
+          cursor: pointer;
+        }
+
+        .lbStage {
+          display: grid;
+          grid-template-columns: 52px 1fr 52px;
+          align-items: center;
+          gap: 10px;
+          padding: 14px;
+        }
+
+        .lbImg {
+          width: 100%;
+          height: auto;
+          max-height: 72vh;
+          object-fit: contain;
+          border-radius: 14px;
+          border: 1px solid rgba(245, 244, 244, 0.08);
+          background: rgba(0, 0, 0, 0.25);
+        }
+
+        .lbNav {
+          width: 44px;
+          height: 44px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          color: rgba(245, 244, 244, 0.9);
+          font-size: 28px;
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .lbNav:hover {
+          transform: translateY(-1px);
+          border-color: rgba(120, 166, 255, 0.35);
+        }
+
+        .lbNav:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .lbLink {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin: 0 auto 14px;
+          width: fit-content;
+          padding: 10px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(120, 166, 255, 0.35);
+          background: rgba(120, 166, 255, 0.14);
+          text-decoration: none;
+        }
+
         @media (max-width: 991px) {
-          .heroGrid {
-            grid-template-columns: 1fr;
-          }
-          .heroRight {
-            justify-content: flex-start;
-          }
-          .propOuter {
-            max-width: 520px;
-          }
           .tile {
             grid-column: span 6;
           }
         }
 
         @media (max-width: 767px) {
-          .heroGrid {
-            padding: 16px 14px;
+          .heroInner {
+            padding: 18px 14px 14px;
+          }
+          .masonry {
+            gap: 12px;
           }
           .tile {
             grid-column: span 12;
+          }
+          .lbStage {
+            grid-template-columns: 44px 1fr 44px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .tile,
+          .img,
+          .glow,
+          .btnPrimary,
+          .btnGhost,
+          .lbNav {
+            transition: none;
           }
         }
       `}</style>
@@ -704,7 +698,7 @@ WorkCinematicGallery.defaultProps = {
   content1: undefined,
   rootClassName: '',
 
-  // ✅ optional hero / prop image for header
+  // ✅ optional hero background image for header
   heroImageSrc: '/work/photography/cg-01.jpg',
 
   apiEndpoint: '/api/gallery/random?limit=12',
