@@ -2,6 +2,15 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 
 const WorkCinematicGallery = (props) => {
+  // ✅ local items (for hero fallback pattern like WorkPhotography)
+  const ITEMS = useMemo(
+    () => [
+      { img: '/work/photography/cg-01.jpg' },
+      { img: '/work/photography/cg-02.jpg' },
+    ],
+    []
+  )
+
   // 🔹 Static fallback (public/work/photography/cg-01.jpg → cg-12.jpg)
   const staticFallback = useMemo(
     () =>
@@ -30,20 +39,26 @@ const WorkCinematicGallery = (props) => {
     }
   }, [])
 
-  const headingNode =
-    props.heading1 ?? (
+  // ✅ WorkPhotography-style prop API
+  const sectionTitleNode =
+    props.sectionTitle ?? (
       <Fragment>
         <span className="titleText">Cinematic Gallery</span>
       </Fragment>
     )
 
-  const descNode =
-    props.content1 ?? (
+  const descriptionNode =
+    props.text ?? (
       <Fragment>
         <span>
           A curated selection of photographs presented as standalone visual
-          studies. These images focus on atmosphere, composition, and tonal
-          depth—allowing each frame to exist without explanation.
+          studies. Each frame is built around atmosphere, composition, and tonal
+          depth — allowing the image to carry its own narrative weight.
+          <br />
+          <br />
+          The gallery moves between personal observation and cinematic
+          abstraction, focusing on light, texture, and the emotional stillness
+          of a moment.
         </span>
       </Fragment>
     )
@@ -125,15 +140,14 @@ const WorkCinematicGallery = (props) => {
 
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
-  // ✅ cinematic header hero image (used for bg + framed image)
+  // ✅ cinematic header hero image (WorkPhotography-like fallback)
   const hero =
-    props.heroImageSrc ||
-    items?.[0]?.src ||
-    staticFallback?.[0]?.src ||
-    '/work/photography/cg-01.jpg'
+    props.heroImageSrc || ITEMS?.[0]?.img || '/work/photography/cg-01.jpg'
 
+  // ✅ framed header image inside curved box
   const framed =
     props.headerImageSrc ||
+    ITEMS?.[1]?.img ||
     items?.[1]?.src ||
     items?.[0]?.src ||
     '/work/photography/cg-02.jpg'
@@ -159,8 +173,8 @@ const WorkCinematicGallery = (props) => {
                     <span className="kickerLine" />
                   </div>
 
-                  <h2 className="title thq-heading-2">{headingNode}</h2>
-                  <p className="desc thq-body-large">{descNode}</p>
+                  <h2 className="title thq-heading-2">{sectionTitleNode}</h2>
+                  <p className="desc thq-body-large">{descriptionNode}</p>
 
                   <div className="heroActions">
                     {props.apiEndpoint && (
@@ -192,7 +206,7 @@ const WorkCinematicGallery = (props) => {
                   </div>
                 </div>
 
-                {/* RIGHT: Prop image inside curved box (like your WorkPhotography cards) */}
+                {/* RIGHT: Prop image inside curved box */}
                 <div className="heroMedia">
                   <div className="frame">
                     <div className="frameBg" aria-hidden="true" />
@@ -423,6 +437,11 @@ const WorkCinematicGallery = (props) => {
           );
         }
 
+        .titleText {
+          display: inline-block;
+          letter-spacing: 0.2px;
+        }
+
         .title {
           margin: 0;
           line-height: 1.08;
@@ -588,7 +607,7 @@ const WorkCinematicGallery = (props) => {
           grid-template-columns: repeat(12, 1fr);
           gap: 14px;
           width: 100%;
-          margin-top: 6px;
+          margin-top: 12px;
         }
 
         .tile {
@@ -840,14 +859,11 @@ const WorkCinematicGallery = (props) => {
 }
 
 WorkCinematicGallery.defaultProps = {
-  heading1: undefined,
-  content1: undefined,
+  sectionTitle: undefined,
+  text: undefined,
   rootClassName: '',
 
-  // ✅ optional hero background image for header
   heroImageSrc: '/work/photography/cg-01.jpg',
-
-  // ✅ optional framed image inside curved box (if not set, uses items[1] / items[0])
   headerImageSrc: '',
 
   apiEndpoint: '/api/gallery/random?limit=12',
@@ -859,8 +875,8 @@ WorkCinematicGallery.defaultProps = {
 }
 
 WorkCinematicGallery.propTypes = {
-  heading1: PropTypes.element,
-  content1: PropTypes.element,
+  sectionTitle: PropTypes.element,
+  text: PropTypes.element,
   rootClassName: PropTypes.string,
 
   heroImageSrc: PropTypes.string,
