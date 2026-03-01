@@ -484,12 +484,13 @@ const WorkCinematicGallery = (props) => {
           transition: transform 0.25s ease;
           display: block;
           transform: scale(1.02);
-          filter: saturate(0.92) contrast(1.06) brightness(0.78);
+          filter: saturate(0.98) contrast(1.04) brightness(0.92);
         }
 
         .tile:hover .img {
-          transform: scale(1.07);
-        }
+  transform: scale(1.07);
+  filter: saturate(1.02) contrast(1.05) brightness(1);
+}
 
         .shade {
           position: absolute;
@@ -500,7 +501,7 @@ const WorkCinematicGallery = (props) => {
             rgba(0, 0, 0, 0),
             rgba(0, 0, 0, 0.55)
           );
-          opacity: 0.95;
+          opacity: 0.55;
         }
 
         .glow {
@@ -541,7 +542,7 @@ const WorkCinematicGallery = (props) => {
           display: grid;
           place-items: center;
           z-index: 9999;
-          background: rgba(0, 0, 0, 0.40);
+          background: rgba(0, 0, 0, 0.82);
           backdrop-filter: blur(6px);
         }
 
