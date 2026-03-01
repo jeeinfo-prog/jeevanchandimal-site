@@ -1,338 +1,433 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const Work2DAnimation = (props) => {
   return (
     <>
-      <div className="work-2d-animation-thq-layout251-elm thq-section-padding">
-        <div className="work-2d-animation-thq-max-width-elm thq-section-max-width">
-          <div className="thq-flex-row work-2d-animation-thq-section-title-elm">
-            <div className="work-2d-animation-thq-column-elm thq-flex-column">
-              <h2 className="thq-heading-2 work-2d-animation-thq-text-elm1">
+      <section className="wa2dSection thq-section-padding">
+        {/* cinematic glass layer */}
+        <div className="panel" aria-hidden="true" />
+        <div className="grain" aria-hidden="true" />
+
+        <div className="wrap thq-section-max-width thq-flex-column">
+          {/* header */}
+          <header className="titleRow">
+            <div className="titleCol">
+              <div className="kicker">2D</div>
+              <h2 className="thq-heading-2 title">
                 {props.sectionTitle ?? (
                   <Fragment>
-                    <span className="work-2d-animation-text10">
-                      2D Animation
-                    </span>
+                    <span>2D Animation</span>
                   </Fragment>
                 )}
               </h2>
             </div>
-            <span className="thq-body-small">
+
+            <p className="thq-body-large desc">
               {props.sectionDescription ?? (
                 <Fragment>
-                  <span className="work-2d-animation-text12">
-                    Flat and illustrative animation developed with structure and
-                    pacing in mind. Movement is clean, purposeful, and aligned
-                    with narrative flow.
+                  <span>
+                    Flat and illustrative animation developed with structure and pacing in mind.
+                    Movement is clean, purposeful, and aligned with narrative flow.
                   </span>
                 </Fragment>
               )}
-            </span>
-          </div>
-          <div className="work-2d-animation-thq-content-elm1">
-            <div className="work-2d-animation-thq-row-elm thq-flex-row">
-              <div className="work-2d-animation-thq-feature1-elm thq-flex-column">
+            </p>
+          </header>
+
+          {/* cards */}
+          <div className="grid">
+            {/* 1 */}
+            <article className="card">
+              <div className="media">
                 <img
                   alt={props.feature1ImageAlt}
                   src={props.feature1ImageSrc}
-                  className="thq-img-ratio-4-3 work-2d-animation-thq-feature1-image-elm"
+                  className="img"
+                  loading="lazy"
                 />
-                <div className="work-2d-animation-thq-content-elm2 thq-flex-column">
-                  <h3 className="thq-heading-3">
-                    {props.feature1Title ?? (
-                      <Fragment>
-                        <span className="work-2d-animation-text13">
-                          Film Production
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature1Description ?? (
-                      <Fragment>
-                        <span className="work-2d-animation-text17">
-                          Professional film production services tailored to
-                          bring your stories to life.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
+                <div className="mediaOverlay" aria-hidden="true" />
               </div>
-              <div className="work-2d-animation-thq-feature2-elm thq-flex-column">
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature1Title ?? (
+                    <Fragment>
+                      <span>Concept & Story</span>
+                    </Fragment>
+                  )}
+                </h3>
+                <span className="thq-body-small cardText">
+                  {props.feature1Description ?? (
+                    <Fragment>
+                      <span>Movement designed around meaning—clear beats, clean intention.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 2 */}
+            <article className="card">
+              <div className="media">
                 <img
                   alt={props.feature2ImageAlt}
                   src={props.feature2ImageSrc}
-                  className="thq-img-ratio-4-3 work-2d-animation-thq-feature2-image-elm"
+                  className="img"
+                  loading="lazy"
                 />
-                <div className="work-2d-animation-thq-content-elm3 thq-flex-column">
-                  <h3 className="thq-heading-3">
-                    {props.feature2Title ?? (
-                      <Fragment>
-                        <span className="work-2d-animation-text16">
-                          Audio Production
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature2Description ?? (
-                      <Fragment>
-                        <span className="work-2d-animation-text14">
-                          High-quality audio production for a captivating
-                          auditory experience.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
+                <div className="mediaOverlay" aria-hidden="true" />
               </div>
-              <div className="work-2d-animation-thq-feature3-elm thq-flex-column">
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature2Title ?? (
+                    <Fragment>
+                      <span>Timing & Rhythm</span>
+                    </Fragment>
+                  )}
+                </h3>
+                <span className="thq-body-small cardText">
+                  {props.feature2Description ?? (
+                    <Fragment>
+                      <span>Controlled pacing that supports edit, tone, and emotion.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 3 */}
+            <article className="card">
+              <div className="media">
                 <img
                   alt={props.feature3ImageAlt}
                   src={props.feature3ImageSrc}
-                  className="thq-img-ratio-4-3 work-2d-animation-thq-feature3-image-elm"
+                  className="img"
+                  loading="lazy"
                 />
-                <div className="work-2d-animation-thq-content-elm4 thq-flex-column">
-                  <h3 className="thq-heading-3">
-                    {props.feature3Title ?? (
-                      <Fragment>
-                        <span className="work-2d-animation-text15">
-                          Animation &amp; Graphics
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="thq-body-small">
-                    {props.feature3Description ?? (
-                      <Fragment>
-                        <span className="work-2d-animation-text19">
-                          Innovative animation and graphics solutions to enhance
-                          visual storytelling.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
+                <div className="mediaOverlay" aria-hidden="true" />
               </div>
-            </div>
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature3Title ?? (
+                    <Fragment>
+                      <span>Visual Cohesion</span>
+                    </Fragment>
+                  )}
+                </h3>
+                <span className="thq-body-small cardText">
+                  {props.feature3Description ?? (
+                    <Fragment>
+                      <span>Design that integrates with film and photography—never distracts.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
           </div>
-          <div className="work-2d-animation-thq-actions-elm">
-            <button className="thq-button-filled work-2d-animation-thq-button-elm1">
+
+          {/* actions */}
+          <div className="actions">
+            <button className="btnPrimary thq-button-filled" type="button">
               <span className="thq-body-small">
                 {props.mainAction ?? (
                   <Fragment>
-                    <span className="work-2d-animation-text11">
-                      Customized Solutions
-                    </span>
+                    <span>Customized Solutions</span>
                   </Fragment>
                 )}
               </span>
             </button>
-            <button className="thq-button-outline work-2d-animation-thq-button-elm2">
+
+            <button className="btnGhost thq-button-outline" type="button">
               <span className="thq-body-small">
                 {props.secondaryAction ?? (
                   <Fragment>
-                    <span className="work-2d-animation-text18">
-                      Dedicated Customer Support
-                    </span>
+                    <span>Dedicated Customer Support</span>
                   </Fragment>
                 )}
               </span>
             </button>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .work-2d-animation-thq-layout251-elm {
+      </section>
+
+      <style jsx>{`
+        .wa2dSection {
+          width: 100%;
+          position: relative;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .panel {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              80% 65% at 50% 0%,
+              rgba(255, 255, 255, 0.06),
+              rgba(0, 0, 0, 0) 55%
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.12) 0%,
+              rgba(0, 0, 0, 0) 46%,
+              rgba(0, 0, 0, 0.38) 100%
+            );
+        }
+
+        .grain {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .wrap {
+          width: 100%;
+          position: relative;
+          z-index: 1;
+          gap: var(--dl-layout-space-threeunits);
+          align-items: center;
+        }
+
+        .titleRow {
+          width: 100%;
+          max-width: 980px;
+          display: grid;
+          grid-template-columns: 1fr 1.2fr;
+          gap: 18px;
+          align-items: end;
+        }
+
+        .titleCol {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .kicker {
+          width: fit-content;
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.68);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          backdrop-filter: blur(10px);
+        }
+
+        .title {
+          margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+        }
+
+        .desc {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.82);
+          line-height: 1.7;
+        }
+
+        .grid {
+          width: 100%;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+          align-items: stretch;
+        }
+
+        .card {
+          border-radius: 20px;
+          overflow: hidden;
+          background: rgba(15, 15, 15, 0.55);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+          transform: translateY(0);
+          transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+        }
+
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(160, 196, 255, 0.22);
+          box-shadow: 0 28px 75px rgba(0, 0, 0, 0.55);
+        }
+
+        .media {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          overflow: hidden;
+          background: rgba(0, 0, 0, 0.35);
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.05) brightness(0.78);
+          transition: transform 420ms ease, filter 420ms ease;
+          display: block;
+        }
+
+        .card:hover .img {
+          transform: scale(1.08);
+          filter: saturate(0.98) contrast(1.08) brightness(0.82);
+        }
+
+        .mediaOverlay {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              85% 65% at 50% 20%,
+              rgba(0, 0, 0, 0.08),
+              rgba(0, 0, 0, 0.62)
+            ),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.75));
+        }
+
+        .cardBody {
+          padding: 16px 16px 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .cardTitle {
+          margin: 0;
+          line-height: 1.2;
+        }
+
+        .cardText {
+          color: rgba(245, 244, 244, 0.78);
+          line-height: 1.6;
+        }
+
+        .actions {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+        }
+
+        .btnPrimary {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: linear-gradient(
+            180deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0.06)
+          );
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(160, 196, 255, 0.25);
+        }
+
+        .btnGhost {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: rgba(0, 0, 0, 0.18);
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(245, 244, 244, 0.22);
+        }
+
+        @media (max-width: 991px) {
+          .titleRow {
+            grid-template-columns: 1fr;
+            align-items: start;
+            max-width: 920px;
+          }
+        }
+
+        @media (max-width: 767px) {
+          .grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .wrap {
+            gap: var(--dl-layout-space-oneandhalfunits);
+          }
+          .actions {
             width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
             flex-direction: column;
+            align-items: stretch;
           }
-          .work-2d-animation-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
+          .btnPrimary,
+          .btnGhost {
+            width: 100%;
           }
-          .work-2d-animation-thq-column-elm {
-            gap: var(--dl-layout-space-halfunit);
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .work-2d-animation-thq-content-elm1 {
-            gap: 48px;
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .work-2d-animation-thq-row-elm {
-            align-items: flex-start;
-          }
-          .work-2d-animation-thq-feature1-elm {
-            flex: 1;
-          }
-          .work-2d-animation-thq-content-elm2 {
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .work-2d-animation-thq-feature2-elm {
-            flex: 1;
-          }
-          .work-2d-animation-thq-content-elm3 {
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .work-2d-animation-thq-feature3-elm {
-            flex: 1;
-          }
-          .work-2d-animation-thq-content-elm4 {
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .work-2d-animation-thq-actions-elm {
-            gap: var(--dl-layout-space-unit);
-            display: flex;
-            align-items: flex-start;
-          }
-          .work-2d-animation-text10 {
-            display: inline-block;
-          }
-          .work-2d-animation-text11 {
-            display: inline-block;
-          }
-          .work-2d-animation-text12 {
-            display: inline-block;
-          }
-          .work-2d-animation-text13 {
-            display: inline-block;
-          }
-          .work-2d-animation-text14 {
-            display: inline-block;
-          }
-          .work-2d-animation-text15 {
-            display: inline-block;
-          }
-          .work-2d-animation-text16 {
-            display: inline-block;
-          }
-          .work-2d-animation-text17 {
-            display: inline-block;
-          }
-          .work-2d-animation-text18 {
-            display: inline-block;
-          }
-          .work-2d-animation-text19 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .work-2d-animation-thq-section-title-elm {
-              align-items: flex-start;
-              flex-direction: column;
-            }
-            .work-2d-animation-thq-feature1-image-elm {
-              height: 260px;
-            }
-            .work-2d-animation-thq-feature2-image-elm {
-              height: 260px;
-            }
-            .work-2d-animation-thq-feature3-image-elm {
-              height: 260px;
-            }
-          }
-          @media (max-width: 767px) {
-            .work-2d-animation-thq-column-elm {
-              width: 100%;
-            }
-            .work-2d-animation-thq-text-elm1 {
-              text-align: center;
-            }
-            .work-2d-animation-thq-row-elm {
-              flex-direction: column;
-            }
-            .work-2d-animation-thq-feature1-image-elm {
-              width: 100%;
-            }
-            .work-2d-animation-thq-feature2-elm {
-              width: auto;
-            }
-            .work-2d-animation-thq-feature2-image-elm {
-              width: 100%;
-            }
-            .work-2d-animation-thq-feature3-elm {
-              width: auto;
-            }
-            .work-2d-animation-thq-actions-elm {
-              flex-wrap: wrap;
-            }
-          }
-          @media (max-width: 479px) {
-            .work-2d-animation-thq-actions-elm {
-              width: 100%;
-              flex-direction: column;
-            }
-            .work-2d-animation-thq-button-elm1 {
-              width: 100%;
-            }
-            .work-2d-animation-thq-button-elm2 {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 Work2DAnimation.defaultProps = {
-  feature3ImageAlt: 'Animation & Graphics Image',
-  feature1ImageSrc:
-    '/Animation/New Animation Pic/a899ba28-4f7b-402b-a72f-74b78a94bafc_3x2_2000x1333_u_100-2-1400w.jpg',
   sectionTitle: undefined,
-  feature1ImageAlt: 'Film Production Image',
-  mainAction: undefined,
-  feature3ImageSrc:
-    '/Animation/New Animation Pic/the%20river%20that%20climbed%20the%20sky%2002_3x2_2000x1333_u_100-2-300h.jpg',
-  feature2ImageAlt: 'Audio Production Image',
   sectionDescription: undefined,
+
   feature1Title: undefined,
-  feature2Description: undefined,
-  feature3Title: undefined,
-  feature2Title: undefined,
   feature1Description: undefined,
-  secondaryAction: undefined,
-  feature2ImageSrc:
-    '/Animation/New Animation Pic/the%20bridege%20that%20wakes%2004_3x2_2000x1333_u_100-300h.jpg',
+  feature1ImageAlt: 'Concept & Story',
+  feature1ImageSrc: '/work/animation/wa2d-01.jpg',
+
+  feature2Title: undefined,
+  feature2Description: undefined,
+  feature2ImageAlt: 'Timing & Rhythm',
+  feature2ImageSrc: '/work/animation/wa2d-02.jpg',
+
+  feature3Title: undefined,
   feature3Description: undefined,
+  feature3ImageAlt: 'Visual Cohesion',
+  feature3ImageSrc: '/work/animation/wa2d-03.jpg',
+
+  mainAction: undefined,
+  secondaryAction: undefined,
 }
 
 Work2DAnimation.propTypes = {
-  feature3ImageAlt: PropTypes.string,
-  feature1ImageSrc: PropTypes.string,
   sectionTitle: PropTypes.element,
-  feature1ImageAlt: PropTypes.string,
-  mainAction: PropTypes.element,
-  feature3ImageSrc: PropTypes.string,
-  feature2ImageAlt: PropTypes.string,
   sectionDescription: PropTypes.element,
+
   feature1Title: PropTypes.element,
-  feature2Description: PropTypes.element,
-  feature3Title: PropTypes.element,
-  feature2Title: PropTypes.element,
   feature1Description: PropTypes.element,
-  secondaryAction: PropTypes.element,
+  feature1ImageAlt: PropTypes.string,
+  feature1ImageSrc: PropTypes.string,
+
+  feature2Title: PropTypes.element,
+  feature2Description: PropTypes.element,
+  feature2ImageAlt: PropTypes.string,
   feature2ImageSrc: PropTypes.string,
+
+  feature3Title: PropTypes.element,
   feature3Description: PropTypes.element,
+  feature3ImageAlt: PropTypes.string,
+  feature3ImageSrc: PropTypes.string,
+
+  mainAction: PropTypes.element,
+  secondaryAction: PropTypes.element,
 }
 
 export default Work2DAnimation
