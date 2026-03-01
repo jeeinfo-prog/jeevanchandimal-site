@@ -379,6 +379,14 @@ const WorkCinematicGallery = (props) => {
   z-index: 1; /* keeps text above the panel glow */
 }
 
+@media (max-width: 991px) {
+  .heroInner {
+    padding: 16px;
+  }
+  .heroPanel {
+    padding: 18px 16px 14px;
+  }
+}
 
         .kicker {
           font-size: 12px;
@@ -699,7 +707,7 @@ const WorkCinematicGallery = (props) => {
           }
         }
 
-@media (max-width: 991px) {
+        @media (max-width: 991px) {
   .heroInner {
     padding: 16px;
   }
@@ -707,11 +715,6 @@ const WorkCinematicGallery = (props) => {
     padding: 18px 16px 14px;
   }
 }
-
-        @media (max-width: 767px) {
-          .heroInner {
-            padding: 18px 14px 14px;
-          }
           .masonry {
             gap: 12px;
           }
