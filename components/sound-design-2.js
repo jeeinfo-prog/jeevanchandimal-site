@@ -1,296 +1,423 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const SoundDesign2 = (props) => {
   return (
     <>
-      <div className="sound-design-2-thq-layout300-elm thq-section-padding">
-        <div className="sound-design-2-thq-max-width-elm thq-section-max-width thq-flex-column">
-          <div className="sound-design-2-thq-section-title-elm thq-flex-column">
-            <h2 className="thq-heading-2 sound-design-2-thq-text-elm1">
+      <section className="sdSection thq-section-padding">
+        {/* cinematic glass layer */}
+        <div className="panel" aria-hidden="true" />
+        <div className="grain" aria-hidden="true" />
+
+        <div className="wrap thq-section-max-width thq-flex-column">
+          {/* header */}
+          <header className="titleBlock thq-flex-column">
+            <div className="kicker">Sound</div>
+
+            <h2 className="thq-heading-2 title">
               {props.sectionTitle ?? (
                 <Fragment>
-                  <span className="sound-design-2-text15">Sound design</span>
+                  <span>Sound design</span>
                 </Fragment>
               )}
             </h2>
-            <p className="sound-design-2-thq-text-elm2 thq-body-large">
+
+            <p className="thq-body-large desc">
               {props.sectionDescription ?? (
                 <Fragment>
-                  <span className="sound-design-2-text10">
-                    Atmospheric soundscapes and environmental design created to
-                    add depth and realism to visual narratives. Each piece is
-                    built with attention to space, layering, and emotional tone.
+                  <span>
+                    Atmospheric soundscapes and environmental design created to add depth and
+                    realism to visual narratives. Each piece is built with attention to space,
+                    layering, and emotional tone.
                   </span>
                 </Fragment>
               )}
             </p>
+          </header>
+
+          {/* premium cards */}
+          <div className="grid thq-grid-auto-300">
+            {/* 1 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature1ImageAlt}
+                  src={props.feature1ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature1Title ?? (
+                    <Fragment>
+                      <span>Atmosphere & Space</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature1Description ?? (
+                    <Fragment>
+                      <span>Environmental depth, believable spaces, and cinematic presence.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 2 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature2ImageAlt}
+                  src={props.feature2ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature2Title ?? (
+                    <Fragment>
+                      <span>Layering & Texture</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature2Description ?? (
+                    <Fragment>
+                      <span>Detail-rich design with clean separation and controlled dynamics.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 3 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature3ImageAlt}
+                  src={props.feature3ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature3Title ?? (
+                    <Fragment>
+                      <span>Story-Driven Restraint</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature3Description ?? (
+                    <Fragment>
+                      <span>Sound that supports emotion without overwhelming the frame.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
           </div>
-          <div className="sound-design-2-thq-content-elm thq-grid-auto-300">
-            <div className="sound-design-2-thq-feature1-elm thq-flex-column">
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="sound-design-2-thq-feature1-title-elm thq-heading-3">
-                {props.feature1Title ?? (
-                  <Fragment>
-                    <span className="sound-design-2-text13">
-                      Customized Solutions
-                    </span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature1Description ?? (
-                  <Fragment>
-                    <span className="sound-design-2-text14">
-                      Tailored services to meet your unique needs and exceed
-                      expectations.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-            <div className="sound-design-2-thq-feature2-elm thq-flex-column">
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="thq-heading-3">
-                {props.feature2Title ?? (
-                  <Fragment>
-                    <span className="sound-design-2-text16">
-                      Intuitive Design
-                    </span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature2Description ?? (
-                  <Fragment>
-                    <span className="sound-design-2-text18">
-                      User-friendly interfaces that enhance user experience and
-                      engagement.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-            <div className="sound-design-2-thq-feature3-elm thq-flex-column">
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="thq-heading-3">
-                {props.feature3Title ?? (
-                  <Fragment>
-                    <span className="sound-design-2-text17">
-                      Powerful Analytics Tools
-                    </span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature3Description ?? (
-                  <Fragment>
-                    <span className="sound-design-2-text12">
-                      Gain valuable insights and make informed decisions with
-                      our advanced analytics.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-          </div>
-          <div className="sound-design-2-thq-actions-elm thq-flex-row">
-            <button className="sound-design-2-thq-button-elm1 thq-button-filled">
+
+          {/* actions */}
+          <div className="actions thq-flex-row">
+            <button className="btnPrimary thq-button-filled" type="button">
               <span className="thq-body-small">
                 {props.mainAction ?? (
                   <Fragment>
-                    <span className="sound-design-2-text19">Get Started</span>
+                    <span>Get Started</span>
                   </Fragment>
                 )}
               </span>
             </button>
-            <button className="sound-design-2-thq-button-elm2 thq-button-outline">
+
+            <button className="btnGhost thq-button-outline" type="button">
               <span className="thq-body-small">
                 {props.secondaryAction ?? (
                   <Fragment>
-                    <span className="sound-design-2-text11">Learn More</span>
+                    <span>Learn More</span>
                   </Fragment>
                 )}
               </span>
             </button>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .sound-design-2-thq-layout300-elm {
+      </section>
+
+      <style jsx>{`
+        .sdSection {
+          width: 100%;
+          position: relative;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        /* glass panel + vignette */
+        .panel {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              80% 65% at 50% 0%,
+              rgba(255, 255, 255, 0.06),
+              rgba(0, 0, 0, 0) 55%
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.15) 0%,
+              rgba(0, 0, 0, 0) 46%,
+              rgba(0, 0, 0, 0.38) 100%
+            );
+        }
+
+        /* subtle film grain (section-local) */
+        .grain {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .wrap {
+          width: 100%;
+          gap: var(--dl-layout-space-threeunits);
+          align-items: center;
+          position: relative;
+          z-index: 1;
+        }
+
+        .titleBlock {
+          align-items: center;
+          text-align: center;
+          max-width: 920px;
+          gap: 10px;
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.68);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          backdrop-filter: blur(10px);
+        }
+
+        .title {
+          margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+        }
+
+        .desc {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.82);
+          line-height: 1.7;
+        }
+
+        .grid {
+          width: 100%;
+          align-self: stretch;
+          align-items: stretch;
+          gap: 18px;
+        }
+
+        .card {
+          position: relative;
+          border-radius: 20px;
+          overflow: hidden;
+          background: rgba(15, 15, 15, 0.55);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+          transform: translateY(0);
+          transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+        }
+
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(160, 196, 255, 0.22);
+          box-shadow: 0 28px 75px rgba(0, 0, 0, 0.55);
+        }
+
+        .media {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          overflow: hidden;
+          background: rgba(0, 0, 0, 0.35);
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.05) brightness(0.78);
+          transition: transform 420ms ease, filter 420ms ease;
+          display: block;
+        }
+
+        .card:hover .img {
+          transform: scale(1.08);
+          filter: saturate(0.98) contrast(1.08) brightness(0.82);
+        }
+
+        .mediaOverlay {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              85% 65% at 50% 20%,
+              rgba(0, 0, 0, 0.08),
+              rgba(0, 0, 0, 0.62)
+            ),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.75));
+        }
+
+        .cardBody {
+          padding: 16px 16px 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .cardTitle {
+          margin: 0;
+          line-height: 1.2;
+        }
+
+        .cardText {
+          color: rgba(245, 244, 244, 0.78);
+          line-height: 1.6;
+        }
+
+        .actions {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+        }
+
+        .btnPrimary {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: linear-gradient(
+            180deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0.06)
+          );
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(160, 196, 255, 0.25);
+        }
+
+        .btnGhost {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: rgba(0, 0, 0, 0.18);
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(245, 244, 244, 0.22);
+        }
+
+        @media (max-width: 991px) {
+          .titleBlock {
             width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .wrap {
+            gap: var(--dl-layout-space-oneandhalfunits);
+          }
+          .actions {
             flex-direction: column;
+            align-items: stretch;
           }
-          .sound-design-2-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            align-items: center;
+          .btnPrimary,
+          .btnGhost {
+            width: 100%;
           }
-          .sound-design-2-thq-section-title-elm {
-            align-items: center;
-          }
-          .sound-design-2-thq-text-elm2 {
-            text-align: center;
-          }
-          .sound-design-2-thq-content-elm {
-            align-self: stretch;
-            align-items: center;
-          }
-          .sound-design-2-thq-feature1-elm {
-            align-items: flex-start;
-          }
-          .sound-design-2-thq-feature1-title-elm {
-            text-align: center;
-          }
-          .sound-design-2-thq-feature2-elm {
-            align-items: flex-start;
-          }
-          .sound-design-2-thq-feature3-elm {
-            align-items: flex-start;
-          }
-          .sound-design-2-thq-actions-elm {
-            align-items: flex-start;
-          }
-          .sound-design-2-thq-button-elm1 {
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-oneandhalfunits);
-            padding-right: var(--dl-layout-space-oneandhalfunits);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .sound-design-2-thq-button-elm2 {
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-oneandhalfunits);
-            padding-right: var(--dl-layout-space-oneandhalfunits);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .sound-design-2-text10 {
-            display: inline-block;
-          }
-          .sound-design-2-text11 {
-            display: inline-block;
-          }
-          .sound-design-2-text12 {
-            display: inline-block;
-          }
-          .sound-design-2-text13 {
-            display: inline-block;
-          }
-          .sound-design-2-text14 {
-            display: inline-block;
-          }
-          .sound-design-2-text15 {
-            display: inline-block;
-          }
-          .sound-design-2-text16 {
-            display: inline-block;
-          }
-          .sound-design-2-text17 {
-            display: inline-block;
-          }
-          .sound-design-2-text18 {
-            display: inline-block;
-          }
-          .sound-design-2-text19 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .sound-design-2-thq-section-title-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 767px) {
-            .sound-design-2-thq-section-title-elm {
-              width: auto;
-            }
-            .sound-design-2-thq-text-elm1 {
-              text-align: center;
-            }
-            .sound-design-2-thq-feature2-elm {
-              width: auto;
-            }
-            .sound-design-2-thq-feature3-elm {
-              width: auto;
-            }
-          }
-          @media (max-width: 479px) {
-            .sound-design-2-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .sound-design-2-thq-actions-elm {
-              width: 100%;
-              flex-direction: column;
-            }
-            .sound-design-2-thq-button-elm1 {
-              width: 100%;
-            }
-            .sound-design-2-thq-button-elm2 {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 SoundDesign2.defaultProps = {
-  sectionDescription: undefined,
-  secondaryAction: undefined,
-  feature3Description: undefined,
-  feature3ImageAlt: 'Powerful Analytics Tools Image',
-  feature2ImageSrc: '/Audio/Studio/jeevan%20chandimal_0003_layer%2019-200h.jpg',
-  feature1Title: undefined,
-  feature2ImageAlt: 'Intuitive Design Image',
-  feature1Description: undefined,
   sectionTitle: undefined,
+  sectionDescription: undefined,
+
+  feature1Title: undefined,
+  feature1Description: undefined,
+  feature1ImageAlt: 'Atmosphere & Space',
+  feature1ImageSrc: '/work/audio/wasd-01.jpg',
+
   feature2Title: undefined,
-  feature3ImageSrc:
-    '/Audio/Studio/194813_381818151878425_1300551683_o-200h.jpg',
-  feature3Title: undefined,
   feature2Description: undefined,
-  feature1ImageAlt: 'Customized Solutions Image',
-  feature1ImageSrc:
-    '/Audio/Studio/jeevan%20chandimal_0002_layer%2020-1400w.jpg',
+  feature2ImageAlt: 'Layering & Texture',
+  feature2ImageSrc: '/work/audio/wasd-02.jpg',
+
+  feature3Title: undefined,
+  feature3Description: undefined,
+  feature3ImageAlt: 'Story-Driven Restraint',
+  feature3ImageSrc: '/work/audio/wasd-03.jpg',
+
   mainAction: undefined,
+  secondaryAction: undefined,
 }
 
 SoundDesign2.propTypes = {
-  sectionDescription: PropTypes.element,
-  secondaryAction: PropTypes.element,
-  feature3Description: PropTypes.element,
-  feature3ImageAlt: PropTypes.string,
-  feature2ImageSrc: PropTypes.string,
-  feature1Title: PropTypes.element,
-  feature2ImageAlt: PropTypes.string,
-  feature1Description: PropTypes.element,
   sectionTitle: PropTypes.element,
-  feature2Title: PropTypes.element,
-  feature3ImageSrc: PropTypes.string,
-  feature3Title: PropTypes.element,
-  feature2Description: PropTypes.element,
+  sectionDescription: PropTypes.element,
+
+  feature1Title: PropTypes.element,
+  feature1Description: PropTypes.element,
   feature1ImageAlt: PropTypes.string,
   feature1ImageSrc: PropTypes.string,
+
+  feature2Title: PropTypes.element,
+  feature2Description: PropTypes.element,
+  feature2ImageAlt: PropTypes.string,
+  feature2ImageSrc: PropTypes.string,
+
+  feature3Title: PropTypes.element,
+  feature3Description: PropTypes.element,
+  feature3ImageAlt: PropTypes.string,
+  feature3ImageSrc: PropTypes.string,
+
   mainAction: PropTypes.element,
+  secondaryAction: PropTypes.element,
 }
 
 export default SoundDesign2
