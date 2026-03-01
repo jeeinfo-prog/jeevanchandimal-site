@@ -41,10 +41,10 @@ const WorkStockPreview = (props) => {
     props.content1 ?? (
       <Fragment>
         <span>
-          A selection of images available for licensing, presented as visual
-          previews rather than a commercial catalog. Each image links to the
-          store for usage details, while maintaining consistency with the
-          overall photographic language.
+          A curated selection available for licensing — presented as visual
+          previews, not a loud catalog. Each frame links to the store for usage
+          details while staying consistent with the cinematic photographic
+          language.
         </span>
       </Fragment>
     )
@@ -132,33 +132,57 @@ const WorkStockPreview = (props) => {
 
   return (
     <>
-      <section className="wrap thq-section-padding">
+      <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          <header className="head">
-            <h2 className="title thq-heading-2">{headingNode}</h2>
-            <p className="desc thq-body-large">{descNode}</p>
+          {/* ===== CINEMATIC HEADER CARD (like AI block) ===== */}
+          <header className="hero">
+            <div className="heroBg" aria-hidden="true">
+              <div
+                className="heroImg"
+                style={{ backgroundImage: `url(${props.heroImageSrc || items?.[0]?.src || staticFallback[0]})` }}
+              />
+              <div className="heroVignette" />
+              <div className="heroGrain" />
+            </div>
 
-            <div className="headActions">
-              {props.apiEndpoint && (
-                <button
-                  className="refreshBtn"
-                  type="button"
-                  onClick={loadRandom}
-                  disabled={loading}
-                >
-                  {loading ? 'Loading…' : 'Refresh'}
-                </button>
-              )}
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">PHOTOGRAPHY / STOCK</span>
+                <span className="kickerLine" />
+              </div>
 
-              <a className="storeBtn" href={props.storeHref || '/store'}>
-                <span className="thq-body-small">Open Store</span>
-                <svg viewBox="0 0 1024 1024" className="icon">
-                  <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                </svg>
-              </a>
+              <h2 className="title thq-heading-2">{headingNode}</h2>
+              <p className="desc thq-body-large">{descNode}</p>
+
+              <div className="headActions">
+                {props.apiEndpoint && (
+                  <button
+                    className="btnGhost"
+                    type="button"
+                    onClick={loadRandom}
+                    disabled={loading}
+                  >
+                    <span className="thq-body-small">
+                      {loading ? 'Refreshing…' : 'Refresh'}
+                    </span>
+                  </button>
+                )}
+
+                <a className="btnPrimary" href={props.storeHref || '/store'}>
+                  <span className="thq-body-small">Open Store</span>
+                  <svg viewBox="0 0 1024 1024" className="icon" aria-hidden="true">
+                    <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                  </svg>
+                </a>
+              </div>
+
+              <div className="micro thq-body-small">
+                Curated previews · Licensing-ready · Consistent visual language
+              </div>
             </div>
           </header>
 
+          {/* ===== GRID ===== */}
           <div className="grid">
             {items.map((it, idx) => (
               <a
@@ -175,6 +199,7 @@ const WorkStockPreview = (props) => {
                 />
                 <div className="shade" />
                 <div className="chip">License</div>
+                <div className="count">{String(idx + 1).padStart(2, '0')}</div>
               </a>
             ))}
           </div>
@@ -194,72 +219,167 @@ const WorkStockPreview = (props) => {
           gap: 18px;
         }
 
-        .head {
-          max-width: 900px;
-          margin: 0 auto;
-          text-align: center;
+        /* ================= HERO (cinematic card) ================= */
+        .hero {
+          position: relative;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .heroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .heroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+        }
+
+        .heroVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              80% 60% at 50% 22%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.72)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.8) 0%,
+              rgba(0, 0, 0, 0.45) 55%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+        }
+
+        .heroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.08;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .heroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 22px 18px;
+          max-width: 920px;
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
 
+        .kickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+        }
+
+        .kickerLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.16),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
         .title {
           margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
         }
 
         .desc {
           margin: 0;
           opacity: 0.9;
           line-height: 1.65;
+          color: rgba(245, 244, 244, 0.84);
+          max-width: 70ch;
         }
 
         .headActions {
-          margin-top: 8px;
+          margin-top: 6px;
           display: flex;
           gap: 10px;
-          justify-content: center;
+          justify-content: flex-start;
           flex-wrap: wrap;
         }
 
-        .refreshBtn {
-          padding: 9px 14px;
+        .btnPrimary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: linear-gradient(
+            180deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0.06)
+          );
+          text-decoration: none;
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(160, 196, 255, 0.26);
+        }
+
+        .btnGhost {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 16px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.14);
-          background: rgba(255, 255, 255, 0.06);
+          background: rgba(0, 0, 0, 0.18);
           cursor: pointer;
-          transition: transform 0.15s ease, border-color 0.15s ease,
-            background 0.15s ease;
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
         }
 
-        .refreshBtn:hover {
+        .btnGhost:hover {
           transform: translateY(-1px);
-          border-color: rgba(120, 166, 255, 0.45);
-          background: rgba(120, 166, 255, 0.1);
+          border-color: rgba(245, 244, 244, 0.22);
         }
 
-        .refreshBtn:disabled {
+        .btnGhost:disabled {
           opacity: 0.6;
           cursor: not-allowed;
           transform: none;
         }
 
-        .storeBtn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 9px 14px;
-          border-radius: 999px;
-          border: 1px solid rgba(120, 166, 255, 0.35);
-          background: rgba(120, 166, 255, 0.14);
-          text-decoration: none;
-          transition: transform 0.15s ease, border-color 0.15s ease,
-            background 0.15s ease;
-        }
-
-        .storeBtn:hover {
-          transform: translateY(-1px);
-          border-color: rgba(120, 166, 255, 0.55);
-          background: rgba(120, 166, 255, 0.18);
+        .micro {
+          margin-top: 6px;
+          color: rgba(245, 244, 244, 0.62);
         }
 
         .icon {
@@ -267,11 +387,13 @@ const WorkStockPreview = (props) => {
           height: 18px;
         }
 
+        /* ================= GRID ================= */
         .grid {
           display: grid;
           grid-template-columns: repeat(12, 1fr);
           gap: 14px;
           width: 100%;
+          margin-top: 14px;
         }
 
         .tile {
@@ -316,7 +438,7 @@ const WorkStockPreview = (props) => {
           background: linear-gradient(
             to bottom,
             rgba(0, 0, 0, 0),
-            rgba(0, 0, 0, 0.55)
+            rgba(0, 0, 0, 0.62)
           );
         }
 
@@ -333,6 +455,20 @@ const WorkStockPreview = (props) => {
           letter-spacing: 0.3px;
         }
 
+        .count {
+          position: absolute;
+          right: 10px;
+          top: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.28em;
+          opacity: 0.85;
+        }
+
         @media (max-width: 991px) {
           .tile {
             grid-column: span 6;
@@ -340,15 +476,9 @@ const WorkStockPreview = (props) => {
         }
 
         @media (max-width: 767px) {
-          .head {
-            text-align: left;
-            margin: 0;
+          .heroInner {
+            padding: 18px 14px 14px;
           }
-
-          .headActions {
-            justify-content: flex-start;
-          }
-
           .tile {
             grid-column: span 12;
           }
@@ -359,8 +489,13 @@ const WorkStockPreview = (props) => {
 }
 
 WorkStockPreview.defaultProps = {
+  rootClassName: '',
+
   heading1: undefined,
   content1: undefined,
+
+  // ✅ cinematic header background (set to any strong frame)
+  heroImageSrc: '/work/photography/wsp-01.jpg',
 
   // ✅ Store auto-load
   apiEndpoint: '/api/gallery/random?limit=8',
@@ -376,8 +511,12 @@ WorkStockPreview.defaultProps = {
 }
 
 WorkStockPreview.propTypes = {
+  rootClassName: PropTypes.string,
+
   heading1: PropTypes.element,
   content1: PropTypes.element,
+
+  heroImageSrc: PropTypes.string,
 
   apiEndpoint: PropTypes.string,
   storeHref: PropTypes.string,

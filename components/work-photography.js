@@ -51,7 +51,9 @@ const WorkPhotography = (props) => {
     []
   )
 
-  // Optional: allow props override (if you still want to control from outside)
+  // ✅ Cinematic hero background
+  const hero = props.heroImageSrc || ITEMS?.[0]?.img || '/work/photography/wp-01.jpg'
+
   const sectionTitleNode =
     props.sectionTitle ?? (
       <Fragment>
@@ -80,21 +82,41 @@ const WorkPhotography = (props) => {
     <>
       <section className="wrap thq-section-padding">
         <div className="shell thq-section-max-width">
-          <header className="head">
-            <h2 className="title thq-heading-2">{sectionTitleNode}</h2>
-            <p className="desc thq-body-small">{descriptionNode}</p>
-          </header>
+          {/* ===== CINEMATIC HERO CARD (like AIAnimation) ===== */}
+          <div className="heroCard">
+            <div className="heroBg" aria-hidden="true">
+              <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
+              <div className="heroVignette" />
+              <div className="heroGrain" />
+            </div>
 
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">WORK / PHOTOGRAPHY</span>
+                <span className="kickerLine" />
+              </div>
+
+              <h2 className="thq-heading-2 heroTitle">{sectionTitleNode}</h2>
+
+              <p className="thq-body-large heroDesc">{descriptionNode}</p>
+
+              <div className="micro thq-body-small">
+                Mood-first imagery • Cinematic restraint • Premium finish
+              </div>
+            </div>
+          </div>
+
+          {/* ===== GRID ===== */}
           <div className="grid">
             {ITEMS.map((it) => (
               <article key={it.key} className="card">
                 <Link href={it.href} legacyBehavior>
-  <a className="media" aria-label={it.title}>
-    <img className="img" src={it.img} alt={it.alt} />
-    <div className="shade" />
-    <div className="badge">Photography</div>
-  </a>
-</Link>
+                  <a className="media" aria-label={it.title}>
+                    <img className="img" src={it.img} alt={it.alt} />
+                    <div className="shade" />
+                    <div className="badge">Photography</div>
+                  </a>
+                </Link>
 
                 <div className="body">
                   <div className="top">
@@ -104,13 +126,13 @@ const WorkPhotography = (props) => {
 
                   <div className="actions">
                     <Link href={it.href} legacyBehavior>
-  <a className="btn">
-    <span className="thq-body-small">{it.cta}</span>
-    <svg viewBox="0 0 1024 1024" className="icon">
-      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-    </svg>
-  </a>
-</Link>
+                      <a className="btn">
+                        <span className="thq-body-small">{it.cta}</span>
+                        <svg viewBox="0 0 1024 1024" className="icon">
+                          <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                        </svg>
+                      </a>
+                    </Link>
                   </div>
                 </div>
               </article>
@@ -129,16 +151,97 @@ const WorkPhotography = (props) => {
         .shell {
           display: flex;
           flex-direction: column;
-          gap: 26px;
+          gap: 18px;
         }
 
-        .head {
-          text-align: center;
-          max-width: 860px;
-          margin: 0 auto;
+        /* ================= HERO CARD ================= */
+        .heroCard {
+          position: relative;
+          width: 100%;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .heroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .heroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+        }
+
+        .heroVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              80% 60% at 50% 22%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.72)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.78) 0%,
+              rgba(0, 0, 0, 0.4) 55%,
+              rgba(0, 0, 0, 0.78) 100%
+            );
+        }
+
+        .heroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.08;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .heroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 24px 20px;
+          max-width: 980px;
           display: flex;
           flex-direction: column;
           gap: 12px;
+        }
+
+        .kickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+        }
+
+        .kickerLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.16),
+            rgba(245, 244, 244, 0)
+          );
         }
 
         .titleText {
@@ -146,21 +249,31 @@ const WorkPhotography = (props) => {
           letter-spacing: 0.2px;
         }
 
-        .title {
+        .heroTitle {
           margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
         }
 
-        .desc {
+        .heroDesc {
           margin: 0;
-          opacity: 0.88;
-          line-height: 1.65;
+          color: rgba(245, 244, 244, 0.84);
+          line-height: 1.7;
+          max-width: 70ch;
         }
 
+        .micro {
+          margin-top: 4px;
+          color: rgba(245, 244, 244, 0.62);
+        }
+
+        /* ================= GRID ================= */
         .grid {
           width: 100%;
           display: grid;
           grid-template-columns: repeat(12, 1fr);
           gap: 18px;
+          margin-top: 10px;
         }
 
         .card {
@@ -292,14 +405,14 @@ const WorkPhotography = (props) => {
         }
 
         @media (max-width: 767px) {
+          .heroInner {
+            padding: 20px 16px 16px;
+          }
           .grid {
             gap: 14px;
           }
           .card {
             grid-column: span 12;
-          }
-          .head {
-            text-align: left;
           }
         }
       `}</style>
@@ -310,11 +423,13 @@ const WorkPhotography = (props) => {
 WorkPhotography.defaultProps = {
   sectionTitle: undefined,
   text: undefined,
+  heroImageSrc: '/work/photography/wp-01.jpg',
 }
 
 WorkPhotography.propTypes = {
   sectionTitle: PropTypes.element,
   text: PropTypes.element,
+  heroImageSrc: PropTypes.string,
 }
 
 export default WorkPhotography
