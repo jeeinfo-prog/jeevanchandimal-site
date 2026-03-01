@@ -1,19 +1,23 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const WorkHero = (props) => {
   return (
     <>
       <div
-        className={`work-hero-container1 thq-section-padding ${props.rootClassName} `}
+        className={`work-hero-container1 thq-section-padding ${props.rootClassName}`}
       >
+        {/* background image */}
         <img
           alt={props.image1Alt}
           src={props.image1Src}
           className="work-hero-image"
         />
+
+        {/* cinematic overlays */}
+        <div className="vignette" />
+        <div className="grain" />
+
         <div className="work-hero-thq-column-elm">
           <div className="work-hero-thq-content-elm">
             <h1 className="thq-heading-2 work-hero-thq-text-elm1">
@@ -25,6 +29,7 @@ const WorkHero = (props) => {
                 </Fragment>
               )}
             </h1>
+
             <p className="thq-body-large work-hero-thq-text-elm2">
               {props.content1 ?? (
                 <Fragment>
@@ -34,18 +39,22 @@ const WorkHero = (props) => {
                 </Fragment>
               )}
             </p>
+
             <div className="work-hero-container2">
               <input
                 type="email"
                 placeholder={props.textinputPlaceholder}
                 className="work-hero-textinput thq-input"
               />
+
               <div className="work-hero-container3">
-                <button className="work-hero-thq-button-elm thq-button-filled">
+                <button className="work-hero-thq-button-elm">
                   <span className="thq-body-small">
                     {props.action3 ?? (
                       <Fragment>
-                        <span className="work-hero-text2">Explore Work</span>
+                        <span className="work-hero-text2">
+                          Explore Work
+                        </span>
                       </Fragment>
                     )}
                   </span>
@@ -55,150 +64,70 @@ const WorkHero = (props) => {
           </div>
         </div>
       </div>
-      <style jsx>
-        {`
-          .work-hero-container1 {
-            width: 100%;
-            height: 1015px;
-            display: flex;
-            position: relative;
-            align-items: center;
-            flex-direction: row;
-          }
-          .work-hero-image {
-            top: 0px;
-            left: 0px;
-            right: 0px;
-            width: 100%;
-            height: 100%;
-            margin: auto;
-            position: absolute;
-            object-fit: cover;
-          }
-          .work-hero-thq-column-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            z-index: 1;
-            max-width: 560px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .work-hero-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            animation-name: fadeInLeft;
-            flex-direction: column;
-            animation-delay: 0s;
-            animation-duration: 500ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .work-hero-container2 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 0 0 auto;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-direction: row;
-            justify-content: flex-start;
-          }
-          .work-hero-textinput {
-            width: 70%;
-            background-color: transparent;
-          }
-          .work-hero-container3 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-          }
-          .work-hero-thq-button-elm {
-            gap: var(--dl-layout-space-halfunit);
-            flex: 1;
-            display: flex;
-            box-sizing: content-box;
-            align-items: center;
-            border-color: var(--dl-color-theme-primary1);
-            border-style: solid;
-            border-width: 1px;
-            justify-content: center;
-            background-color: var(--dl-color-theme-primary1);
-          }
-          .work-hero-text1 {
-            display: inline-block;
-          }
-          .work-hero-text2 {
-            display: inline-block;
-          }
-          .work-hero-text3 {
-            display: inline-block;
-          }
 
-          @media (max-width: 991px) {
-            .work-hero-thq-column-elm {
-              align-self: center;
-            }
-          }
-          @media (max-width: 767px) {
-            .work-hero-thq-column-elm {
-              width: 100%;
-            }
-            .work-hero-thq-text-elm1 {
-              text-align: center;
-            }
-            .work-hero-thq-text-elm2 {
-              text-align: center;
-            }
-            .work-hero-container2 {
-              flex-direction: column;
-            }
-            .work-hero-textinput {
-              width: 100%;
-            }
-            .work-hero-container3 {
-              width: 100%;
-            }
-            .work-hero-thq-button-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 479px) {
-            .work-hero-container3 {
-              width: 100%;
-            }
-            .work-hero-thq-button-elm {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
-    </>
-  )
-}
+      <style jsx>{`
+        .work-hero-container1 {
+          width: 100%;
+          min-height: 72vh;
+          display: flex;
+          align-items: center;
+          position: relative;
+          overflow: hidden;
+        }
 
-WorkHero.defaultProps = {
-  heading1: undefined,
-  rootClassName: '',
-  image1Alt: 'Professional film production equipment',
-  image1Src:
-    'https://images.pexels.com/photos/2883160/pexels-photo-2883160.jpeg?auto=compress&cs=tinysrgb&w=1500',
-  action3: undefined,
-  content1: undefined,
-  textinputPlaceholder: 'Create Together',
-}
+        .work-hero-image {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          filter: brightness(0.68) contrast(1.06);
+          z-index: 0;
+        }
 
-WorkHero.propTypes = {
-  heading1: PropTypes.element,
-  rootClassName: PropTypes.string,
-  image1Alt: PropTypes.string,
-  image1Src: PropTypes.string,
-  action3: PropTypes.element,
-  content1: PropTypes.element,
-  textinputPlaceholder: PropTypes.string,
-}
+        /* ===== CINEMATIC OVERLAYS ===== */
 
-export default WorkHero
+        .vignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              70% 55% at 50% 28%,
+              rgba(0, 0, 0, 0.1),
+              rgba(0, 0, 0, 0.7)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.78) 0%,
+              rgba(0, 0, 0, 0.45) 55%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+          z-index: 1;
+        }
+
+        .grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.05;
+          mix-blend-mode: overlay;
+          z-index: 1;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .work-hero-thq-column-elm {
+          position: relative;
+          z-index: 2;
+          max-width: 560px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-left: var(--dl-layout-space-fiveunits);
+        }
+
+        .work-hero-thq-content-elm {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .work-hero-thq-text-elm1 {
