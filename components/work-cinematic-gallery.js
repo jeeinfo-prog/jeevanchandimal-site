@@ -2,15 +2,6 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 
 const WorkCinematicGallery = (props) => {
-  // ✅ local items (for hero fallback pattern like WorkPhotography)
-  const ITEMS = useMemo(
-    () => [
-      { img: '/work/photography/cg-01.jpg' },
-      { img: '/work/photography/cg-02.jpg' },
-    ],
-    []
-  )
-
   // 🔹 Static fallback (public/work/photography/cg-01.jpg → cg-12.jpg)
   const staticFallback = useMemo(
     () =>
@@ -39,26 +30,20 @@ const WorkCinematicGallery = (props) => {
     }
   }, [])
 
-  // ✅ WorkPhotography-style prop API
-  const sectionTitleNode =
-    props.sectionTitle ?? (
+  const headingNode =
+    props.heading1 ?? (
       <Fragment>
         <span className="titleText">Cinematic Gallery</span>
       </Fragment>
     )
 
-  const descriptionNode =
-    props.text ?? (
+  const descNode =
+    props.content1 ?? (
       <Fragment>
         <span>
           A curated selection of photographs presented as standalone visual
-          studies. Each frame is built around atmosphere, composition, and tonal
-          depth — allowing the image to carry its own narrative weight.
-          <br />
-          <br />
-          The gallery moves between personal observation and cinematic
-          abstraction, focusing on light, texture, and the emotional stillness
-          of a moment.
+          studies. These images focus on atmosphere, composition, and tonal
+          depth—allowing each frame to exist without explanation.
         </span>
       </Fragment>
     )
@@ -140,23 +125,18 @@ const WorkCinematicGallery = (props) => {
 
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
-  // ✅ cinematic header hero image (WorkPhotography-like fallback)
+  // ✅ cinematic header hero image
   const hero =
-    props.heroImageSrc || ITEMS?.[0]?.img || '/work/photography/cg-01.jpg'
-
-  // ✅ framed header image inside curved box
-  const framed =
-    props.headerImageSrc ||
-    ITEMS?.[1]?.img ||
-    items?.[1]?.src ||
+    props.heroImageSrc ||
     items?.[0]?.src ||
-    '/work/photography/cg-02.jpg'
+    staticFallback?.[0]?.src ||
+    '/work/photography/cg-01.jpg'
 
   return (
     <>
       <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          {/* ===== LUXURY CINEMATIC HEADER (split: text + framed image) ===== */}
+          {/* ===== CINEMATIC HEADER CARD (UPDATED DESIGN ONLY) ===== */}
           <header className="hero">
             <div className="heroBg" aria-hidden="true">
               <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
@@ -164,57 +144,44 @@ const WorkCinematicGallery = (props) => {
               <div className="heroGrain" />
             </div>
 
-            <div className="heroInner">
-              <div className="heroGrid">
-                {/* LEFT: Title + prop text inside curved luxury box */}
-                <div className="heroTextBox">
-                  <div className="kickerRow">
-                    <span className="kicker">PHOTOGRAPHY / GALLERY</span>
-                    <span className="kickerLine" />
-                  </div>
-
-                  <h2 className="title thq-heading-2">{sectionTitleNode}</h2>
-                  <p className="desc thq-body-large">{descriptionNode}</p>
-
-                  <div className="heroActions">
-                    {props.apiEndpoint && (
-                      <button
-                        className="btnGhost"
-                        type="button"
-                        onClick={loadRandom}
-                        disabled={loading}
-                      >
-                        {loading ? 'Loading…' : 'Refresh Images'}
-                      </button>
-                    )}
-
-                    {!!(props.storeHref || active?.href) && (
-                      <a
-                        className="btnPrimary"
-                        href={props.storeHref || active?.href || '/store'}
-                      >
-                        <span className="thq-body-small">Open Store</span>
-                        <svg viewBox="0 0 1024 1024" className="icon">
-                          <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                        </svg>
-                      </a>
-                    )}
-                  </div>
-
-                  <div className="micro thq-body-small">
-                    Tap any frame to preview · Arrow keys to navigate · Esc to close
-                  </div>
+            {/* ✅ NEW: glass panel like 2nd screenshot */}
+            <div className="heroOverlay">
+              <div className="heroPanel">
+                <div className="kickerRow">
+                  <span className="kicker">PHOTOGRAPHY / GALLERY</span>
+                  <span className="kickerLine" />
                 </div>
 
-                {/* RIGHT: Prop image inside curved box */}
-                <div className="heroMedia">
-                  <div className="frame">
-                    <div className="frameBg" aria-hidden="true" />
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="frameImg" src={framed} alt="Featured frame" />
-                    <div className="frameShade" />
-                    <div className="frameBadge">Featured frame</div>
-                  </div>
+                <h2 className="title thq-heading-2">{headingNode}</h2>
+                <p className="desc thq-body-large">{descNode}</p>
+
+                <div className="heroActions">
+                  {props.apiEndpoint && (
+                    <button
+                      className="btnGhost"
+                      type="button"
+                      onClick={loadRandom}
+                      disabled={loading}
+                    >
+                      {loading ? 'Loading…' : 'Refresh Images'}
+                    </button>
+                  )}
+
+                  {!!(props.storeHref || active?.href) && (
+                    <a
+                      className="btnPrimary"
+                      href={props.storeHref || active?.href || '/store'}
+                    >
+                      <span className="thq-body-small">Open Store</span>
+                      <svg viewBox="0 0 1024 1024" className="icon">
+                        <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
+
+                <div className="micro thq-body-small">
+                  Tap any frame to preview · Arrow keys to navigate · Esc to close
                 </div>
               </div>
             </div>
@@ -324,6 +291,7 @@ const WorkCinematicGallery = (props) => {
           background: rgba(12, 12, 12, 0.55);
           box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(10px);
+          min-height: 360px; /* ✅ gives hero height like 2nd screenshot */
         }
 
         .heroBg {
@@ -339,22 +307,22 @@ const WorkCinematicGallery = (props) => {
           background-position: center;
           background-repeat: no-repeat;
           transform: scale(1.03);
-          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+          filter: saturate(0.92) contrast(1.08) brightness(0.62); /* ✅ darker bg */
         }
 
         .heroVignette {
           position: absolute;
           inset: 0;
           background: radial-gradient(
-              80% 60% at 50% 22%,
-              rgba(0, 0, 0, 0.06),
-              rgba(0, 0, 0, 0.72)
+              90% 70% at 40% 30%,
+              rgba(0, 0, 0, 0.12),
+              rgba(0, 0, 0, 0.78)
             ),
             linear-gradient(
               90deg,
-              rgba(0, 0, 0, 0.8) 0%,
-              rgba(0, 0, 0, 0.45) 55%,
-              rgba(0, 0, 0, 0.82) 100%
+              rgba(0, 0, 0, 0.88) 0%,
+              rgba(0, 0, 0, 0.5) 55%,
+              rgba(0, 0, 0, 0.84) 100%
             );
         }
 
@@ -367,27 +335,25 @@ const WorkCinematicGallery = (props) => {
           background-size: 240px 240px;
         }
 
-        .heroInner {
+        /* ✅ NEW overlay container */
+        .heroOverlay {
           position: relative;
           z-index: 1;
+          height: 100%;
+          display: flex;
+          align-items: flex-start;
           padding: 22px;
         }
 
-        .heroGrid {
-          display: grid;
-          grid-template-columns: 1.15fr 0.85fr;
-          gap: 16px;
-          align-items: stretch;
-        }
-
-        /* LEFT luxury curved box */
-        .heroTextBox {
-          border-radius: 20px;
+        /* ✅ glass panel (this is the main change) */
+        .heroPanel {
+          width: min(920px, 100%);
+          border-radius: 22px;
           border: 1px solid rgba(245, 244, 244, 0.12);
           background: rgba(12, 12, 12, 0.42);
-          box-shadow: 0 18px 70px rgba(0, 0, 0, 0.35);
+          box-shadow: 0 18px 70px rgba(0, 0, 0, 0.38);
           backdrop-filter: blur(12px);
-          padding: 22px 22px 18px;
+          padding: 24px 22px 18px;
           display: flex;
           flex-direction: column;
           gap: 12px;
@@ -395,16 +361,16 @@ const WorkCinematicGallery = (props) => {
           overflow: hidden;
         }
 
-        .heroTextBox:before {
+        .heroPanel:before {
           content: '';
           position: absolute;
           inset: -2px;
           background: radial-gradient(
-            900px circle at 20% 20%,
-            rgba(120, 166, 255, 0.16),
+            900px circle at 25% 20%,
+            rgba(120, 166, 255, 0.14),
             transparent 55%
           );
-          opacity: 0.55;
+          opacity: 0.65;
           pointer-events: none;
         }
 
@@ -435,11 +401,6 @@ const WorkCinematicGallery = (props) => {
             rgba(245, 244, 244, 0.16),
             rgba(245, 244, 244, 0)
           );
-        }
-
-        .titleText {
-          display: inline-block;
-          letter-spacing: 0.2px;
         }
 
         .title {
@@ -522,76 +483,6 @@ const WorkCinematicGallery = (props) => {
           z-index: 1;
         }
 
-        /* RIGHT framed image */
-        .heroMedia {
-          display: flex;
-          align-items: stretch;
-        }
-
-        .frame {
-          width: 100%;
-          border-radius: 20px;
-          overflow: hidden;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(0, 0, 0, 0.22);
-          box-shadow: 0 18px 70px rgba(0, 0, 0, 0.35);
-          position: relative;
-          min-height: 240px;
-        }
-
-        .frameBg {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(
-            800px circle at 70% 20%,
-            rgba(120, 166, 255, 0.12),
-            transparent 55%
-          );
-          pointer-events: none;
-        }
-
-        .frameImg {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-          transform: scale(1.02);
-          filter: saturate(0.98) contrast(1.06) brightness(0.86);
-          transition: transform 0.28s ease, filter 0.28s ease;
-        }
-
-        .hero:hover .frameImg {
-          transform: scale(1.06);
-          filter: saturate(1.02) contrast(1.06) brightness(0.92);
-        }
-
-        .frameShade {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            to bottom,
-            rgba(0, 0, 0, 0.0),
-            rgba(0, 0, 0, 0.62)
-          );
-          pointer-events: none;
-          opacity: 0.8;
-        }
-
-        .frameBadge {
-          position: absolute;
-          left: 12px;
-          top: 12px;
-          font-size: 12px;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          padding: 7px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(0, 0, 0, 0.35);
-          backdrop-filter: blur(8px);
-          color: rgba(245, 244, 244, 0.72);
-        }
-
         /* ================= EMPTY ================= */
         .empty {
           margin-top: 14px;
@@ -607,7 +498,7 @@ const WorkCinematicGallery = (props) => {
           grid-template-columns: repeat(12, 1fr);
           gap: 14px;
           width: 100%;
-          margin-top: 12px;
+          margin-top: 6px;
         }
 
         .tile {
@@ -636,7 +527,7 @@ const WorkCinematicGallery = (props) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          transition: transform 0.25s ease, filter 0.25s ease;
+          transition: transform 0.25s ease;
           display: block;
           transform: scale(1.02);
           filter: saturate(0.98) contrast(1.04) brightness(0.92);
@@ -813,24 +704,18 @@ const WorkCinematicGallery = (props) => {
         }
 
         @media (max-width: 991px) {
-          .heroGrid {
-            grid-template-columns: 1fr;
-          }
           .tile {
             grid-column: span 6;
           }
-          .frame {
-            min-height: 220px;
+          .heroOverlay {
+            padding: 16px;
+          }
+          .heroPanel {
+            padding: 18px 16px 14px;
           }
         }
 
         @media (max-width: 767px) {
-          .heroInner {
-            padding: 16px 14px 14px;
-          }
-          .heroTextBox {
-            padding: 18px 14px 14px;
-          }
           .masonry {
             gap: 12px;
           }
@@ -848,8 +733,7 @@ const WorkCinematicGallery = (props) => {
           .glow,
           .btnPrimary,
           .btnGhost,
-          .lbNav,
-          .frameImg {
+          .lbNav {
             transition: none;
           }
         }
@@ -859,13 +743,11 @@ const WorkCinematicGallery = (props) => {
 }
 
 WorkCinematicGallery.defaultProps = {
-  sectionTitle: undefined,
-  text: undefined,
+  heading1: undefined,
+  content1: undefined,
   rootClassName: '',
 
   heroImageSrc: '/work/photography/cg-01.jpg',
-  headerImageSrc: '',
-
   apiEndpoint: '/api/gallery/random?limit=12',
   storeHref: '/store',
 
@@ -875,12 +757,11 @@ WorkCinematicGallery.defaultProps = {
 }
 
 WorkCinematicGallery.propTypes = {
-  sectionTitle: PropTypes.element,
-  text: PropTypes.element,
+  heading1: PropTypes.element,
+  content1: PropTypes.element,
   rootClassName: PropTypes.string,
 
   heroImageSrc: PropTypes.string,
-  headerImageSrc: PropTypes.string,
 
   apiEndpoint: PropTypes.string,
   storeHref: PropTypes.string,
