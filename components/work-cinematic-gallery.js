@@ -125,18 +125,24 @@ const WorkCinematicGallery = (props) => {
 
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
-  // ✅ cinematic header hero image
+  // ✅ cinematic header hero image (used for bg + framed image)
   const hero =
     props.heroImageSrc ||
     items?.[0]?.src ||
     staticFallback?.[0]?.src ||
     '/work/photography/cg-01.jpg'
 
+  const framed =
+    props.headerImageSrc ||
+    items?.[1]?.src ||
+    items?.[0]?.src ||
+    '/work/photography/cg-02.jpg'
+
   return (
     <>
       <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="shell thq-section-max-width">
-          {/* ===== CINEMATIC HEADER CARD (bit different) ===== */}
+          {/* ===== LUXURY CINEMATIC HEADER (split: text + framed image) ===== */}
           <header className="hero">
             <div className="heroBg" aria-hidden="true">
               <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
@@ -145,38 +151,57 @@ const WorkCinematicGallery = (props) => {
             </div>
 
             <div className="heroInner">
-              <div className="kickerRow">
-                <span className="kicker">PHOTOGRAPHY / GALLERY</span>
-                <span className="kickerLine" />
-              </div>
+              <div className="heroGrid">
+                {/* LEFT: Title + prop text inside curved luxury box */}
+                <div className="heroTextBox">
+                  <div className="kickerRow">
+                    <span className="kicker">PHOTOGRAPHY / GALLERY</span>
+                    <span className="kickerLine" />
+                  </div>
 
-              <h2 className="title thq-heading-2">{headingNode}</h2>
-              <p className="desc thq-body-large">{descNode}</p>
+                  <h2 className="title thq-heading-2">{headingNode}</h2>
+                  <p className="desc thq-body-large">{descNode}</p>
 
-              <div className="heroActions">
-                {props.apiEndpoint && (
-                  <button
-                    className="btnGhost"
-                    type="button"
-                    onClick={loadRandom}
-                    disabled={loading}
-                  >
-                    {loading ? 'Loading…' : 'Refresh Images'}
-                  </button>
-                )}
+                  <div className="heroActions">
+                    {props.apiEndpoint && (
+                      <button
+                        className="btnGhost"
+                        type="button"
+                        onClick={loadRandom}
+                        disabled={loading}
+                      >
+                        {loading ? 'Loading…' : 'Refresh Images'}
+                      </button>
+                    )}
 
-                {!!(props.storeHref || active?.href) && (
-                  <a className="btnPrimary" href={props.storeHref || active?.href || '/store'}>
-                    <span className="thq-body-small">Open Store</span>
-                    <svg viewBox="0 0 1024 1024" className="icon">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
-                    </svg>
-                  </a>
-                )}
-              </div>
+                    {!!(props.storeHref || active?.href) && (
+                      <a
+                        className="btnPrimary"
+                        href={props.storeHref || active?.href || '/store'}
+                      >
+                        <span className="thq-body-small">Open Store</span>
+                        <svg viewBox="0 0 1024 1024" className="icon">
+                          <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
 
-              <div className="micro thq-body-small">
-                Tap any frame to preview · Arrow keys to navigate · Esc to close
+                  <div className="micro thq-body-small">
+                    Tap any frame to preview · Arrow keys to navigate · Esc to close
+                  </div>
+                </div>
+
+                {/* RIGHT: Prop image inside curved box (like your WorkPhotography cards) */}
+                <div className="heroMedia">
+                  <div className="frame">
+                    <div className="frameBg" aria-hidden="true" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="frameImg" src={framed} alt="Featured frame" />
+                    <div className="frameShade" />
+                    <div className="frameBadge">Featured frame</div>
+                  </div>
+                </div>
               </div>
             </div>
           </header>
@@ -331,17 +356,50 @@ const WorkCinematicGallery = (props) => {
         .heroInner {
           position: relative;
           z-index: 1;
-          padding: 24px 22px 18px;
-          max-width: 980px;
+          padding: 22px;
+        }
+
+        .heroGrid {
+          display: grid;
+          grid-template-columns: 1.15fr 0.85fr;
+          gap: 16px;
+          align-items: stretch;
+        }
+
+        /* LEFT luxury curved box */
+        .heroTextBox {
+          border-radius: 20px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(12, 12, 12, 0.42);
+          box-shadow: 0 18px 70px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(12px);
+          padding: 22px 22px 18px;
           display: flex;
           flex-direction: column;
           gap: 12px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .heroTextBox:before {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          background: radial-gradient(
+            900px circle at 20% 20%,
+            rgba(120, 166, 255, 0.16),
+            transparent 55%
+          );
+          opacity: 0.55;
+          pointer-events: none;
         }
 
         .kickerRow {
           display: flex;
           align-items: center;
           gap: 10px;
+          position: relative;
+          z-index: 1;
         }
 
         .kicker {
@@ -369,6 +427,8 @@ const WorkCinematicGallery = (props) => {
           margin: 0;
           line-height: 1.08;
           text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+          position: relative;
+          z-index: 1;
         }
 
         .desc {
@@ -377,6 +437,8 @@ const WorkCinematicGallery = (props) => {
           opacity: 0.92;
           line-height: 1.7;
           max-width: 72ch;
+          position: relative;
+          z-index: 1;
         }
 
         .heroActions {
@@ -384,6 +446,8 @@ const WorkCinematicGallery = (props) => {
           gap: 10px;
           flex-wrap: wrap;
           margin-top: 4px;
+          position: relative;
+          z-index: 1;
         }
 
         .btnPrimary {
@@ -435,6 +499,78 @@ const WorkCinematicGallery = (props) => {
         .micro {
           margin-top: 6px;
           color: rgba(245, 244, 244, 0.62);
+          position: relative;
+          z-index: 1;
+        }
+
+        /* RIGHT framed image */
+        .heroMedia {
+          display: flex;
+          align-items: stretch;
+        }
+
+        .frame {
+          width: 100%;
+          border-radius: 20px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+          box-shadow: 0 18px 70px rgba(0, 0, 0, 0.35);
+          position: relative;
+          min-height: 240px;
+        }
+
+        .frameBg {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+            800px circle at 70% 20%,
+            rgba(120, 166, 255, 0.12),
+            transparent 55%
+          );
+          pointer-events: none;
+        }
+
+        .frameImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          filter: saturate(0.98) contrast(1.06) brightness(0.86);
+          transition: transform 0.28s ease, filter 0.28s ease;
+        }
+
+        .hero:hover .frameImg {
+          transform: scale(1.06);
+          filter: saturate(1.02) contrast(1.06) brightness(0.92);
+        }
+
+        .frameShade {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.0),
+            rgba(0, 0, 0, 0.62)
+          );
+          pointer-events: none;
+          opacity: 0.8;
+        }
+
+        .frameBadge {
+          position: absolute;
+          left: 12px;
+          top: 12px;
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(8px);
+          color: rgba(245, 244, 244, 0.72);
         }
 
         /* ================= EMPTY ================= */
@@ -481,16 +617,16 @@ const WorkCinematicGallery = (props) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          transition: transform 0.25s ease;
+          transition: transform 0.25s ease, filter 0.25s ease;
           display: block;
           transform: scale(1.02);
           filter: saturate(0.98) contrast(1.04) brightness(0.92);
         }
 
         .tile:hover .img {
-  transform: scale(1.07);
-  filter: saturate(1.02) contrast(1.05) brightness(1);
-}
+          transform: scale(1.07);
+          filter: saturate(1.02) contrast(1.05) brightness(1);
+        }
 
         .shade {
           position: absolute;
@@ -658,13 +794,22 @@ const WorkCinematicGallery = (props) => {
         }
 
         @media (max-width: 991px) {
+          .heroGrid {
+            grid-template-columns: 1fr;
+          }
           .tile {
             grid-column: span 6;
+          }
+          .frame {
+            min-height: 220px;
           }
         }
 
         @media (max-width: 767px) {
           .heroInner {
+            padding: 16px 14px 14px;
+          }
+          .heroTextBox {
             padding: 18px 14px 14px;
           }
           .masonry {
@@ -684,7 +829,8 @@ const WorkCinematicGallery = (props) => {
           .glow,
           .btnPrimary,
           .btnGhost,
-          .lbNav {
+          .lbNav,
+          .frameImg {
             transition: none;
           }
         }
@@ -701,6 +847,9 @@ WorkCinematicGallery.defaultProps = {
   // ✅ optional hero background image for header
   heroImageSrc: '/work/photography/cg-01.jpg',
 
+  // ✅ optional framed image inside curved box (if not set, uses items[1] / items[0])
+  headerImageSrc: '',
+
   apiEndpoint: '/api/gallery/random?limit=12',
   storeHref: '/store',
 
@@ -715,6 +864,7 @@ WorkCinematicGallery.propTypes = {
   rootClassName: PropTypes.string,
 
   heroImageSrc: PropTypes.string,
+  headerImageSrc: PropTypes.string,
 
   apiEndpoint: PropTypes.string,
   storeHref: PropTypes.string,
