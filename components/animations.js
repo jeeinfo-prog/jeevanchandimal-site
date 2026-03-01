@@ -1,302 +1,431 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const Animations = (props) => {
   return (
     <>
-      <div className="animations-thq-layout300-elm thq-section-padding">
-        <div className="animations-thq-max-width-elm thq-section-max-width thq-flex-column">
-          <div className="animations-thq-section-title-elm thq-flex-column">
-            <h2 className="thq-heading-2 animations-thq-text-elm1">
+      <section className="anSection thq-section-padding">
+        {/* cinematic glass layer */}
+        <div className="panel" aria-hidden="true" />
+        <div className="grain" aria-hidden="true" />
+
+        <div className="wrap thq-section-max-width thq-flex-column">
+          {/* header */}
+          <header className="titleBlock thq-flex-column">
+            <div className="kicker">Motion</div>
+
+            <h2 className="thq-heading-2 title">
               {props.sectionTitle ?? (
                 <Fragment>
-                  <span className="animations-text18">
-                    Animation &amp; Motion
-                  </span>
+                  <span>Animation &amp; Motion</span>
                 </Fragment>
               )}
             </h2>
-            <p className="animations-thq-text-elm2 thq-body-large">
+
+            <p className="thq-body-large desc">
               {props.sectionDescription ?? (
                 <Fragment>
-                  <span className="animations-text11">
+                  <span>
                     <span>
-                      This archive explores motion as a storytelling tool —
-                      where movement is guided by rhythm, clarity, and
-                      intention. Animation is treated as a visual language, used
-                      to enhance narrative rather than decorate it.
+                      This archive explores motion as a storytelling tool — where movement is
+                      guided by rhythm, clarity, and intention. Animation is treated as a visual
+                      language, used to enhance narrative rather than decorate it.
                     </span>
-                    <br></br>
+                    <br />
                     <span>
-                      The work includes 2D, 3D, and motion graphic projects
-                      designed to integrate seamlessly with film and
-                      photographic elements.
+                      The work includes 2D, 3D, and motion graphic projects designed to integrate
+                      seamlessly with film and photographic elements.
                     </span>
                   </span>
                 </Fragment>
               )}
             </p>
+          </header>
+
+          {/* premium cards */}
+          <div className="grid thq-grid-auto-300">
+            {/* 1 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature1ImageAlt}
+                  src={props.feature1ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature1Title ?? (
+                    <Fragment>
+                      <span>2D Animations</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature1Description ?? (
+                    <Fragment>
+                      <span>Clean illustrative motion—timing, rhythm, and narrative clarity.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 2 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature2ImageAlt}
+                  src={props.feature2ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature2Title ?? (
+                    <Fragment>
+                      <span>3D Animations</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature2Description ?? (
+                    <Fragment>
+                      <span>Spatially coherent 3D—form, light, and controlled movement.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
+
+            {/* 3 */}
+            <article className="card">
+              <div className="media">
+                <img
+                  alt={props.feature3ImageAlt}
+                  src={props.feature3ImageSrc}
+                  className="img"
+                  loading="lazy"
+                />
+                <div className="mediaOverlay" aria-hidden="true" />
+              </div>
+
+              <div className="cardBody">
+                <h3 className="thq-heading-3 cardTitle">
+                  {props.feature3Title ?? (
+                    <Fragment>
+                      <span>Motion graphics</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <span className="thq-body-small cardText">
+                  {props.feature3Description ?? (
+                    <Fragment>
+                      <span>Typography and graphic motion built for clarity, rhythm, and tone.</span>
+                    </Fragment>
+                  )}
+                </span>
+              </div>
+            </article>
           </div>
-          <div className="animations-thq-content-elm thq-grid-auto-300">
-            <div className="animations-thq-feature1-elm thq-flex-column">
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="animations-thq-feature1-title-elm thq-heading-3">
-                {props.feature1Title ?? (
-                  <Fragment>
-                    <span className="animations-text16">2D Animations</span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature1Description ?? (
-                  <Fragment>
-                    <span className="animations-text20">
-                      Utilize cutting-edge AI technology and captivating
-                      animations to enhance your projects.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-            <div className="animations-thq-feature2-elm thq-flex-column">
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="thq-heading-3">
-                {props.feature2Title ?? (
-                  <Fragment>
-                    <span className="animations-text22">3D Animations</span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature2Description ?? (
-                  <Fragment>
-                    <span className="animations-text15">
-                      Gain valuable insights and track performance with our
-                      advanced analytics tools.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-            <div className="animations-thq-feature3-elm thq-flex-column">
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <h3 className="thq-heading-3">
-                {props.feature3Title ?? (
-                  <Fragment>
-                    <span className="animations-text10">Motion graphics</span>
-                  </Fragment>
-                )}
-              </h3>
-              <span className="thq-body-small">
-                {props.feature3Description ?? (
-                  <Fragment>
-                    <span className="animations-text19">
-                      Receive personalized assistance and support from our team
-                      every step of the way.
-                    </span>
-                  </Fragment>
-                )}
-              </span>
-            </div>
-          </div>
-          <div className="animations-thq-actions-elm thq-flex-row">
-            <button className="animations-thq-button-elm1 thq-button-filled">
+
+          {/* actions */}
+          <div className="actions thq-flex-row">
+            <button className="btnPrimary thq-button-filled" type="button">
               <span className="thq-body-small">
                 {props.mainAction ?? (
                   <Fragment>
-                    <span className="animations-text17">Get Started</span>
+                    <span>Get Started</span>
                   </Fragment>
                 )}
               </span>
             </button>
-            <button className="animations-thq-button-elm2 thq-button-outline">
+
+            <button className="btnGhost thq-button-outline" type="button">
               <span className="thq-body-small">
                 {props.secondaryAction ?? (
                   <Fragment>
-                    <span className="animations-text21">Learn More</span>
+                    <span>Learn More</span>
                   </Fragment>
                 )}
               </span>
             </button>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .animations-thq-layout300-elm {
+      </section>
+
+      <style jsx>{`
+        .anSection {
+          width: 100%;
+          position: relative;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        /* glass panel + vignette */
+        .panel {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              80% 65% at 50% 0%,
+              rgba(255, 255, 255, 0.06),
+              rgba(0, 0, 0, 0) 55%
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.12) 0%,
+              rgba(0, 0, 0, 0) 46%,
+              rgba(0, 0, 0, 0.38) 100%
+            );
+        }
+
+        /* subtle grain */
+        .grain {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .wrap {
+          width: 100%;
+          gap: var(--dl-layout-space-threeunits);
+          align-items: center;
+          position: relative;
+          z-index: 1;
+        }
+
+        .titleBlock {
+          align-items: center;
+          text-align: center;
+          max-width: 920px;
+          gap: 10px;
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.68);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          backdrop-filter: blur(10px);
+        }
+
+        .title {
+          margin: 0;
+          line-height: 1.08;
+          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+        }
+
+        .desc {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.82);
+          line-height: 1.7;
+        }
+
+        .grid {
+          width: 100%;
+          align-self: stretch;
+          align-items: stretch;
+          gap: 18px;
+        }
+
+        .card {
+          position: relative;
+          border-radius: 20px;
+          overflow: hidden;
+          background: rgba(15, 15, 15, 0.55);
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
+          transform: translateY(0);
+          transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+        }
+
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(160, 196, 255, 0.22);
+          box-shadow: 0 28px 75px rgba(0, 0, 0, 0.55);
+        }
+
+        .media {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          overflow: hidden;
+          background: rgba(0, 0, 0, 0.35);
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.05) brightness(0.78);
+          transition: transform 420ms ease, filter 420ms ease;
+          display: block;
+        }
+
+        .card:hover .img {
+          transform: scale(1.08);
+          filter: saturate(0.98) contrast(1.08) brightness(0.82);
+        }
+
+        .mediaOverlay {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(
+              85% 65% at 50% 20%,
+              rgba(0, 0, 0, 0.08),
+              rgba(0, 0, 0, 0.62)
+            ),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.75));
+        }
+
+        .cardBody {
+          padding: 16px 16px 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .cardTitle {
+          margin: 0;
+          line-height: 1.2;
+        }
+
+        .cardText {
+          color: rgba(245, 244, 244, 0.78);
+          line-height: 1.6;
+        }
+
+        .actions {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          gap: 12px;
+        }
+
+        .btnPrimary {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: linear-gradient(
+            180deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0.06)
+          );
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(160, 196, 255, 0.25);
+        }
+
+        .btnGhost {
+          border-radius: 999px;
+          padding: 10px 18px;
+          background: rgba(0, 0, 0, 0.18);
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .btnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(245, 244, 244, 0.22);
+        }
+
+        @media (max-width: 991px) {
+          .titleBlock {
             width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .wrap {
+            gap: var(--dl-layout-space-oneandhalfunits);
+          }
+          .actions {
+            width: 100%;
             flex-direction: column;
+            align-items: stretch;
           }
-          .animations-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            align-items: center;
+          .btnPrimary,
+          .btnGhost {
+            width: 100%;
           }
-          .animations-thq-section-title-elm {
-            align-items: center;
-          }
-          .animations-thq-text-elm2 {
-            text-align: center;
-          }
-          .animations-thq-content-elm {
-            align-self: stretch;
-            align-items: center;
-          }
-          .animations-thq-feature1-elm {
-            align-items: flex-start;
-          }
-          .animations-thq-feature1-title-elm {
-            text-align: center;
-          }
-          .animations-thq-feature2-elm {
-            align-items: flex-start;
-          }
-          .animations-thq-feature3-elm {
-            align-items: flex-start;
-          }
-          .animations-thq-actions-elm {
-            align-items: flex-start;
-          }
-          .animations-thq-button-elm1 {
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-oneandhalfunits);
-            padding-right: var(--dl-layout-space-oneandhalfunits);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .animations-thq-button-elm2 {
-            padding-top: var(--dl-layout-space-halfunit);
-            padding-left: var(--dl-layout-space-oneandhalfunits);
-            padding-right: var(--dl-layout-space-oneandhalfunits);
-            padding-bottom: var(--dl-layout-space-halfunit);
-          }
-          .animations-text10 {
-            display: inline-block;
-          }
-          .animations-text11 {
-            display: inline-block;
-          }
-          .animations-text15 {
-            display: inline-block;
-          }
-          .animations-text16 {
-            display: inline-block;
-          }
-          .animations-text17 {
-            display: inline-block;
-          }
-          .animations-text18 {
-            display: inline-block;
-          }
-          .animations-text19 {
-            display: inline-block;
-          }
-          .animations-text20 {
-            display: inline-block;
-          }
-          .animations-text21 {
-            display: inline-block;
-          }
-          .animations-text22 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .animations-thq-section-title-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 767px) {
-            .animations-thq-section-title-elm {
-              width: auto;
-            }
-            .animations-thq-text-elm1 {
-              text-align: center;
-            }
-            .animations-thq-feature2-elm {
-              width: auto;
-            }
-            .animations-thq-feature3-elm {
-              width: auto;
-            }
-          }
-          @media (max-width: 479px) {
-            .animations-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .animations-thq-actions-elm {
-              width: 100%;
-              flex-direction: column;
-            }
-            .animations-thq-button-elm1 {
-              width: 100%;
-            }
-            .animations-thq-button-elm2 {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 Animations.defaultProps = {
-  feature2ImageSrc:
-    '/Animation/New Animation Pic/the%20clockwork%20mountain%2013_3x2_2000x1333_u_100-200h.jpg',
-  feature3Title: undefined,
-  sectionDescription: undefined,
-  feature2ImageAlt: 'Analytics Tools Image',
-  feature2Description: undefined,
-  feature3ImageSrc:
-    '/Animation/New Animation Pic/hf_20260119_201908_b183ab80-964a-4339-873f-55cdf707938e_3x2_2000x1333_u_100-200h.jpg',
-  feature1Title: undefined,
-  mainAction: undefined,
-  feature3ImageAlt: 'Customer Support Image',
   sectionTitle: undefined,
-  feature3Description: undefined,
-  feature1ImageSrc:
-    '/Animation/New Animation Pic/the%20bridege%20that%20wakes%2004_3x2_2000x1333_u_100-1400w.jpg',
+  sectionDescription: undefined,
+
+  feature1Title: undefined,
   feature1Description: undefined,
-  secondaryAction: undefined,
+  feature1ImageAlt: '2D Animations',
+  feature1ImageSrc: '/work/animation/waam-01.jpg',
+
   feature2Title: undefined,
-  feature1ImageAlt: 'AI & Animations Image',
+  feature2Description: undefined,
+  feature2ImageAlt: '3D Animations',
+  feature2ImageSrc: '/work/animation/waam-02.jpg',
+
+  feature3Title: undefined,
+  feature3Description: undefined,
+  feature3ImageAlt: 'Motion graphics',
+  feature3ImageSrc: '/work/animation/waam-03.jpg',
+
+  mainAction: undefined,
+  secondaryAction: undefined,
 }
 
 Animations.propTypes = {
-  feature2ImageSrc: PropTypes.string,
-  feature3Title: PropTypes.element,
-  sectionDescription: PropTypes.element,
-  feature2ImageAlt: PropTypes.string,
-  feature2Description: PropTypes.element,
-  feature3ImageSrc: PropTypes.string,
-  feature1Title: PropTypes.element,
-  mainAction: PropTypes.element,
-  feature3ImageAlt: PropTypes.string,
   sectionTitle: PropTypes.element,
-  feature3Description: PropTypes.element,
-  feature1ImageSrc: PropTypes.string,
+  sectionDescription: PropTypes.element,
+
+  feature1Title: PropTypes.element,
   feature1Description: PropTypes.element,
-  secondaryAction: PropTypes.element,
-  feature2Title: PropTypes.element,
   feature1ImageAlt: PropTypes.string,
+  feature1ImageSrc: PropTypes.string,
+
+  feature2Title: PropTypes.element,
+  feature2Description: PropTypes.element,
+  feature2ImageAlt: PropTypes.string,
+  feature2ImageSrc: PropTypes.string,
+
+  feature3Title: PropTypes.element,
+  feature3Description: PropTypes.element,
+  feature3ImageAlt: PropTypes.string,
+  feature3ImageSrc: PropTypes.string,
+
+  mainAction: PropTypes.element,
+  secondaryAction: PropTypes.element,
 }
 
 export default Animations
