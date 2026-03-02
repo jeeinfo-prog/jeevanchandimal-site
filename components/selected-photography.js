@@ -1,271 +1,273 @@
-import React, { Fragment } from 'react'
-
+import React, { Fragment, useMemo } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const SelectedPhotography = (props) => {
+  // 🔥 auto load from /public/services/photography/
+  const images = useMemo(() => {
+    if (props.images?.length) return props.images
+
+    const total = props.imageCount || 12
+    return Array.from({ length: total }, (_, i) => {
+      const n = String(i + 1).padStart(2, '0')
+      return `/services/photography/serphoto-${n}.jpg`
+    })
+  }, [props.images, props.imageCount])
+
   return (
     <>
-      <div
-        className={`selected-photography-thq-gallery3-elm thq-section-padding ${props.rootClassName} `}
+      <section
+        className={`sp-wrap thq-section-padding ${props.rootClassName || ''}`}
       >
-        <div className="selected-photography-thq-max-width-elm">
-          <div className="selected-photography-thq-section-title-elm">
-            <h2 className="selected-photography-thq-text-elm1 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="selected-photography-text1">
-                    Selected Photography
-                  </span>
-                </Fragment>
-              )}
-            </h2>
-            <span className="selected-photography-thq-text-elm2 thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="selected-photography-text2">
-                    A curated selection of editorial, cinematic, and fine-art
-                    photography — focused on atmosphere, texture, and detail.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="selected-photography-container1">
-            <div className="selected-photography-thq-content-elm">
-              <div className="selected-photography-container2">
-                <img
-                  alt={props.image1Alt}
-                  src={props.image1Src}
-                  className="selected-photography-thq-image1-elm thq-img-ratio-1-1"
-                />
-                <img
-                  alt={props.image2Alt}
-                  src={props.image2Src}
-                  className="selected-photography-thq-image2-elm thq-img-ratio-1-1"
-                />
+        <div className="sp-max thq-section-max-width">
+          <div className="sp-card">
+            {/* overlays */}
+            <div className="sp-bg" aria-hidden="true">
+              <div className="sp-vignette" />
+              <div className="sp-grain" />
+              <div className="sp-glow" />
+            </div>
+
+            <div className="sp-inner">
+              {/* title block */}
+              <div className="sp-titleBlock">
+                <div className="sp-kickerRow">
+                  <span className="sp-kicker">GALLERY</span>
+                  <span className="sp-line" />
+                </div>
+
+                <h2 className="thq-heading-2 sp-title">
+                  {props.heading1 ?? (
+                    <Fragment>
+                      <span className="selected-photography-text1">
+                        Selected Photography
+                      </span>
+                    </Fragment>
+                  )}
+                </h2>
+
+                <p className="thq-body-large sp-copy">
+                  {props.content1 ?? (
+                    <Fragment>
+                      <span className="selected-photography-text2">
+                        A curated selection of editorial, cinematic, and fine-art
+                        photography — focused on atmosphere, texture, and detail.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+
+                <div className="sp-divider" />
               </div>
-              <div className="selected-photography-container3">
-                <img
-                  alt={props.image3Alt}
-                  src={props.image3Src}
-                  className="selected-photography-thq-image3-elm thq-img-ratio-4-3"
-                />
-                <img
-                  alt={props.image4Alt}
-                  src={props.image4Src}
-                  className="selected-photography-thq-image4-elm thq-img-ratio-1-1"
-                />
-                <img
-                  alt={props.image5Alt}
-                  src={props.image5Src}
-                  className="selected-photography-thq-image5-elm thq-img-ratio-4-3"
-                />
-              </div>
-              <div className="selected-photography-container4">
-                <img
-                  alt={props.image6Alt}
-                  src={props.image6Src}
-                  className="selected-photography-thq-image6-elm thq-img-ratio-1-1"
-                />
-                <img
-                  alt={props.image7Alt}
-                  src={props.image7Src}
-                  className="selected-photography-thq-image7-elm thq-img-ratio-1-1"
-                />
+
+              {/* grid */}
+              <div className="sp-grid">
+                {images.map((src, i) => (
+                  <div key={i} className="sp-item">
+                    <img src={src} alt={`Selected photography ${i + 1}`} />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .selected-photography-thq-gallery3-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
+      </section>
+
+      <style jsx>{`
+        .sp-wrap {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+        }
+
+        .sp-card {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 30px 110px rgba(0, 0, 0, 0.6);
+          backdrop-filter: blur(10px);
+        }
+
+        .sp-bg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .sp-vignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              80% 65% at 50% 18%,
+              rgba(255, 255, 255, 0.04),
+              rgba(0, 0, 0, 0.82)
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.3) 0%,
+              rgba(0, 0, 0, 0.78) 70%,
+              rgba(0, 0, 0, 0.92) 100%
+            );
+        }
+
+        .sp-glow {
+          position: absolute;
+          inset: -22%;
+          background: radial-gradient(
+            40% 32% at 20% 30%,
+            rgba(37, 195, 226, 0.14),
+            rgba(37, 195, 226, 0) 62%
+          );
+          filter: blur(14px);
+        }
+
+        .sp-grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .sp-inner {
+          position: relative;
+          z-index: 1;
+          padding: 32px 26px 28px;
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+        }
+
+        .sp-titleBlock {
+          max-width: 720px;
+        }
+
+        .sp-kickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .sp-kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+        }
+
+        .sp-line {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .sp-title {
+          margin: 0;
+          line-height: 1.2;
+          text-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+        }
+
+        .sp-copy {
+          margin: 0;
+          line-height: 1.75;
+          color: rgba(245, 244, 244, 0.84);
+        }
+
+        .sp-divider {
+          width: 100%;
+          height: 1px;
+          margin-top: 6px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.12),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0.12)
+          );
+        }
+
+        /* ===== grid ===== */
+        .sp-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+        }
+
+        .sp-item {
+          position: relative;
+          overflow: hidden;
+          border-radius: 14px;
+        }
+
+        .sp-item img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          aspect-ratio: 4 / 3;
+          transition: transform 1200ms ease;
+          filter: brightness(0.95) contrast(1.05);
+        }
+
+        .sp-item:hover img {
+          transform: scale(1.06);
+        }
+
+        @media (max-width: 991px) {
+          .sp-grid {
+            grid-template-columns: repeat(2, 1fr);
           }
-          .selected-photography-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .selected-photography-thq-section-title-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .selected-photography-thq-text-elm1 {
+        }
+
+        @media (max-width: 767px) {
+          .sp-inner {
+            padding: 22px 16px 20px;
             text-align: center;
-          }
-          .selected-photography-thq-text-elm2 {
-            text-align: center;
-          }
-          .selected-photography-container1 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: 100%;
-            display: flex;
             align-items: center;
-            flex-direction: row;
           }
-          .selected-photography-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-shrink: 0;
+          .sp-kickerRow {
             justify-content: center;
           }
-          .selected-photography-container2 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
+          .sp-line {
+            display: none;
           }
-          .selected-photography-thq-image1-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
+          .sp-grid {
+            grid-template-columns: 1fr;
           }
-          .selected-photography-thq-image2-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-photography-container3 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: auto;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .selected-photography-thq-image3-elm {
-            width: 100%;
-            height: 240px;
-            object-fit: cover;
-          }
-          .selected-photography-thq-image4-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-photography-thq-image5-elm {
-            width: 100%;
-            height: 240px;
-            object-fit: cover;
-          }
-          .selected-photography-container4 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: auto;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .selected-photography-thq-image6-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-photography-thq-image7-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-photography-text1 {
-            display: inline-block;
-          }
-          .selected-photography-text2 {
-            display: inline-block;
-          }
+        }
 
-          @media (max-width: 991px) {
-            .selected-photography-thq-content-elm {
-              align-items: center;
-              flex-direction: column;
-            }
-            .selected-photography-container2 {
-              width: 100%;
-            }
-            .selected-photography-thq-image1-elm {
-              flex: 0 0 auto;
-              width: 100%;
-            }
-            .selected-photography-container3 {
-              width: 100%;
-            }
-            .selected-photography-container4 {
-              width: 100%;
-            }
-          }
-          @media (max-width: 767px) {
-            .selected-photography-thq-section-title-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-          }
-        `}
-      </style>
+        .selected-photography-text1,
+        .selected-photography-text2 {
+          display: inline-block;
+        }
+      `}</style>
     </>
   )
 }
 
 SelectedPhotography.defaultProps = {
+  rootClassName: '',
   heading1: undefined,
   content1: undefined,
-  image2Alt: 'High-Quality Audio Production',
-  image3Src: '/Photography/3x2/_jee1691_3x2_2000x1333_u_100-1500w.jpg',
-  image2Src: '/Photography/3x2/_jee1604_3x2_2000x1333_u_100-1500w.jpg',
-  image4Src: '/Photography/3x2/_jee26873_3x2_2000x1333_u_100-1500w.png',
-  image7Alt: 'Dedicated Customer Support',
-  image5Src:
-    '/Photography/1x1/wild%20elephant%20-%20senanayake%20samudraya%20ampara%2C%20sri%20lanka._1x1_2000x2000_u_100-1500w.png',
-  image6Alt: 'Intuitive Design Services',
-  rootClassName: '',
-  image1Alt: 'Professional Film Production',
-  image4Alt: 'Stunning Photography Services',
-  image6Src: '/Photography/3x2/_dsc5544_3x2_2000x1333_u_100-1500w.png',
-  image7Src: '/Photography/3x2/_dsc8124_3x2_2000x1333_u_100-1500w.png',
-  image5Alt: 'Customized Solutions for Clients',
-  image1Src: '/Photography/3x2/_jee8856_3x2_2000x1333_u_100-1500w.png',
-  image3Alt: 'Creative Animation & Graphics',
+  images: undefined,
+  imageCount: 12,
 }
 
 SelectedPhotography.propTypes = {
+  rootClassName: PropTypes.string,
   heading1: PropTypes.element,
   content1: PropTypes.element,
-  image2Alt: PropTypes.string,
-  image3Src: PropTypes.string,
-  image2Src: PropTypes.string,
-  image4Src: PropTypes.string,
-  image7Alt: PropTypes.string,
-  image5Src: PropTypes.string,
-  image6Alt: PropTypes.string,
-  rootClassName: PropTypes.string,
-  image1Alt: PropTypes.string,
-  image4Alt: PropTypes.string,
-  image6Src: PropTypes.string,
-  image7Src: PropTypes.string,
-  image5Alt: PropTypes.string,
-  image1Src: PropTypes.string,
-  image3Alt: PropTypes.string,
+  images: PropTypes.arrayOf(PropTypes.string),
+  imageCount: PropTypes.number,
 }
 
 export default SelectedPhotography
