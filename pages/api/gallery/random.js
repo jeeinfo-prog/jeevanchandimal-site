@@ -1,43 +1,45 @@
 // pages/api/gallery/random.js
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
+function clampInt(v, min, max, fallback) {
+  const n = Number.parseInt(String(v ?? ''), 10)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, n))
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ images: [] })
   }
 
   try {
-    const limit = Math.max(4, Math.min(40, Number(req.query.limit || 12)))
+    const limit = clampInt(req.query?.limit, 4, 40, 12)
 
     const { data, error } = await supabaseAdmin
       .from('photos')
-      .select('id, title, status, thumb_url, preview_url')
+      .select('id, title, status, thumb_url, preview_url, created_at')
       .eq('status', 'published')
-      .limit(200)
+      .not('thumb_url', 'is', null)
+      .not('preview_url', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(400)
 
     if (error) {
-      console.error('Supabase error:', error)
+      console.error('Gallery random supabase error:', error.message)
       return res.status(500).json({ images: [] })
     }
 
-    if (!Array.isArray(data) || data.length === 0) {
-      return res.status(200).json({ images: [] })
-    }
-
-    // ✅ Keep rows (so we can return href/id), but only rows with an image URL
-    const rows = data
+    const rows = (data || [])
       .map((r) => ({
         id: r.id,
         title: r.title || '',
-        src: r.thumb_url || r.preview_url || '',
+        src: String(r.thumb_url || r.preview_url || '').trim(),
       }))
-      .filter((r) => Boolean(r.src) && Boolean(r.id))
+      .filter((r) => r.id && r.src)
 
-    if (rows.length === 0) {
-      return res.status(200).json({ images: [] })
-    }
+    if (rows.length === 0) return res.status(200).json({ images: [] })
 
-    // ✅ Fisher–Yates shuffle (rows)
+    // ✅ Fisher–Yates shuffle
     for (let i = rows.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[rows[i], rows[j]] = [rows[j], rows[i]]
@@ -45,13 +47,8 @@ export default async function handler(req, res) {
 
     const picked = rows.slice(0, limit)
 
-    // ✅ Cache for 60s on Vercel edge/CDN
-    res.setHeader(
-      'Cache-Control',
-      'public, s-maxage=60, stale-while-revalidate=300'
-    )
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300')
 
-    // ✅ Return objects so frontend can link to /store/[id]
     return res.status(200).json({
       images: picked.map((r, idx) => ({
         src: r.src,
@@ -60,7 +57,7 @@ export default async function handler(req, res) {
       })),
     })
   } catch (e) {
-    console.error('Gallery random API error:', e)
+    console.error('Gallery random API fatal:', e)
     return res.status(500).json({ images: [] })
   }
 }
