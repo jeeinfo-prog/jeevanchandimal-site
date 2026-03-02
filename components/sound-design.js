@@ -136,7 +136,7 @@ const SoundDesign = (props) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          filter: brightness(0.7) contrast(1.06) saturate(0.95);
+          filter: brightness(1) contrast(1.05) saturate(1.05);
           transform: scale(1.02);
         }
 
