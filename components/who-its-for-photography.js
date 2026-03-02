@@ -1,384 +1,683 @@
-import React, { Fragment } from 'react'
-
+// components/who-its-for-photography.js
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const WhoItsForPhotography = (props) => {
+  // ✅ Local fallback: public/services/photography/wif-01.jpg ... wif-06.jpg
+  const staticFallback = useMemo(() => {
+    const total = Number(props.fallbackCount || 6)
+    return Array.from({ length: total }, (_, i) => {
+      const n = String(i + 1).padStart(2, '0')
+      return {
+        id: `wif-${n}`,
+        title: `Who it’s for ${i + 1}`,
+        thumb: `/services/photography/wif-${n}.jpg`,
+        preview: `/services/photography/wif-${n}.jpg`,
+        href: props.storeHref || '/store',
+      }
+    })
+  }, [props.fallbackCount, props.storeHref])
+
+  const [items, setItems] = useState(staticFallback)
+  const [page, setPage] = useState(0) // each page shows 2 images
+  const [loading, setLoading] = useState(false)
+
+  const mountedRef = useRef(true)
+  const hoverRef = useRef(false)
+  const timerRef = useRef(null)
+
+  const perPage = 2
+  const pages = Math.max(1, Math.ceil(items.length / perPage))
+  const intervalMs = Math.max(2500, Number(props.intervalMs || 5200))
+
+  // prefers-reduced-motion
+  const [reduceMotion, setReduceMotion] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const apply = () => setReduceMotion(!!mq.matches)
+    apply()
+    mq.addEventListener?.('change', apply)
+    return () => mq.removeEventListener?.('change', apply)
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
+
+  function setStaticItems() {
+    setItems(staticFallback)
+    setPage(0)
+  }
+
+  // ✅ Load from /api/store/photos (your endpoint returns { ok, photos })
+  async function loadFromStore() {
+    if (!props.apiEndpoint) return
+    try {
+      setLoading(true)
+
+      const res = await fetch(`${props.apiEndpoint}?limit=${props.apiLimit || 24}`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const data = await res.json()
+      const list = Array.isArray(data?.photos) ? data.photos : []
+
+      const normalized = list
+        .map((p, idx) => {
+          const id = p?.id
+          const thumb = p?.thumb_url || p?.preview_url
+          const preview = p?.preview_url || p?.thumb_url
+
+          if (!thumb && !preview) return null
+
+          const href =
+            (props.itemHrefBase && id ? `${props.itemHrefBase}/${id}` : null) ||
+            (id ? `/store/${id}` : null) ||
+            props.storeHref ||
+            '/store'
+
+          return {
+            id: id || `store-${idx + 1}`,
+            title: p?.title || `Photo ${idx + 1}`,
+            thumb: thumb,
+            preview: preview,
+            href,
+          }
+        })
+        .filter(Boolean)
+
+      if (!mountedRef.current) return
+
+      if (normalized.length) {
+        setItems(normalized)
+        setPage(0)
+      } else if (props.fallbackToStaticOnEmpty) {
+        setStaticItems()
+      }
+    } catch (e) {
+      if (!mountedRef.current) return
+      if (props.fallbackToStaticOnError) setStaticItems()
+    } finally {
+      if (mountedRef.current) setLoading(false)
+    }
+  }
+
+  // initial load
+  useEffect(() => {
+    if (props.apiEndpoint) loadFromStore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.apiEndpoint, props.apiLimit])
+
+  // optional refresh
+  useEffect(() => {
+    if (!props.apiEndpoint) return
+    if (!props.autoRefreshMs || props.autoRefreshMs < 5000) return
+    const t = setInterval(() => loadFromStore(), props.autoRefreshMs)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.apiEndpoint, props.autoRefreshMs, props.apiLimit])
+
+  // ✅ Auto slide pages
+  useEffect(() => {
+    if (reduceMotion) return
+    if (pages <= 1) return
+
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => {
+      if (hoverRef.current) return
+      setPage((p) => (p + 1) % pages)
+    }, intervalMs)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }, [pages, intervalMs, reduceMotion])
+
+  const headingNode =
+    props.heading1 ?? (
+      <Fragment>
+        <span className="t">Who It’s For</span>
+      </Fragment>
+    )
+
+  const descNode =
+    props.content1 ?? (
+      <Fragment>
+        <span className="t">
+          I work with brands, agencies, filmmakers, and individuals who value craft, atmosphere, and intentional
+          storytelling — and who see photography as more than just content.
+        </span>
+      </Fragment>
+    )
+
+  const start = page * perPage
+  const visible = items.slice(start, start + perPage)
+
+  // hero background prefers preview, falls back to thumb
+  const heroImg =
+    props.heroImageSrc ||
+    visible?.[0]?.preview ||
+    visible?.[0]?.thumb ||
+    items?.[0]?.preview ||
+    items?.[0]?.thumb ||
+    staticFallback?.[0]?.preview
+
+  function prev() {
+    setPage((p) => (p - 1 + pages) % pages)
+  }
+  function next() {
+    setPage((p) => (p + 1) % pages)
+  }
+
   return (
     <>
-      <div
-        className={`who-its-for-photography-thq-gallery3-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="who-its-for-photography-thq-max-width-elm thq-section-max-width">
-          <div className="who-its-for-photography-thq-section-title-elm">
-            <h2 className="who-its-for-photography-thq-text-elm1 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="who-its-for-photography-text1">
-                    Who It’s For
-                  </span>
-                </Fragment>
-              )}
-            </h2>
-            <span className="who-its-for-photography-thq-text-elm2 thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="who-its-for-photography-text2">
-                    I work with brands, agencies, filmmakers, and individuals
-                    who value craft, atmosphere, and intentional storytelling —
-                    and who see film as more than just content.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="who-its-for-photography-container1">
-            <div className="who-its-for-photography-thq-content-elm">
-              <div
-                data-thq="slider"
-                data-navigation="true"
-                data-pagination="true"
-                className="who-its-for-photography-thq-slider-elm swiper"
-              >
-                <div
-                  data-thq="slider-wrapper"
-                  className="who-its-for-photography-thq-slider-wrapper-elm swiper-wrapper"
-                >
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-photography-thq-slider-slide-elm1 swiper-slide"
-                  >
-                    <div className="who-its-for-photography-container2">
-                      <img
-                        alt={props.image1Alt}
-                        src={props.image1Src}
-                        className="who-its-for-photography-thq-image1-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-photography-container3">
-                      <img
-                        alt={props.image2Alt}
-                        src={props.image2Src}
-                        className="who-its-for-photography-thq-image2-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-photography-thq-slider-slide-elm2 swiper-slide"
-                  >
-                    <div className="who-its-for-photography-container4">
-                      <img
-                        alt={props.image3Alt}
-                        src={props.image3Src}
-                        className="who-its-for-photography-thq-image3-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-photography-container5">
-                      <img
-                        alt={props.image4Alt}
-                        src={props.image4Src}
-                        className="who-its-for-photography-thq-image4-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-photography-thq-slider-slide-elm3 swiper-slide"
-                  >
-                    <div className="who-its-for-photography-container6">
-                      <img
-                        alt={props.image5Alt}
-                        src={props.image5Src}
-                        className="who-its-for-photography-thq-image5-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-photography-container7">
-                      <img
-                        alt={props.image6Alt}
-                        src={props.image6Src}
-                        className="who-its-for-photography-thq-image6-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div
-                  data-thq="slider-button-prev"
-                  className="swiper-button-prev"
-                ></div>
-                <div
-                  data-thq="slider-button-next"
-                  className="swiper-button-next"
-                ></div>
-                <div
-                  data-thq="slider-pagination"
-                  className="who-its-for-photography-thq-slider-pagination-elm swiper-pagination swiper-pagination-bullets swiper-pagination-horizontal"
-                >
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet swiper-pagination-bullet-active"
-                  ></div>
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet"
-                  ></div>
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet"
-                  ></div>
+      <section className={`wifWrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="wifShell thq-section-max-width">
+          {/* ===== cinematic header card ===== */}
+          <header className="wifHero">
+            <div className="wifHeroBg" aria-hidden="true">
+              <div className="wifHeroImg" style={{ backgroundImage: `url(${heroImg})` }} />
+              <div className="wifHeroVignette" />
+              <div className="wifHeroGrain" />
+              <div className="wifHeroGlow" />
+            </div>
+
+            <div className="wifHeroInner">
+              <div className="wifKickerRow">
+                <span className="wifKicker">PHOTOGRAPHY</span>
+                <span className="wifLine" />
+              </div>
+
+              <h2 className="wifTitle thq-heading-2">{headingNode}</h2>
+              <p className="wifDesc thq-body-large">{descNode}</p>
+
+              <div className="wifActions">
+                {props.apiEndpoint && (
+                  <button className="wifBtnGhost" type="button" onClick={loadFromStore} disabled={loading}>
+                    <span className="thq-body-small">{loading ? 'Refreshing…' : 'Refresh'}</span>
+                  </button>
+                )}
+
+                <Link href={props.storeHref || '/store'} legacyBehavior>
+                  <a className="wifBtnPrimary">
+                    <span className="thq-body-small">Open Store</span>
+                    <svg viewBox="0 0 1024 1024" className="wifIcon" aria-hidden="true">
+                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                    </svg>
+                  </a>
+                </Link>
+
+                <div className="wifNav">
+                  <button className="wifNavBtn" type="button" onClick={prev} aria-label="Previous">
+                    ←
+                  </button>
+                  <button className="wifNavBtn" type="button" onClick={next} aria-label="Next">
+                    →
+                  </button>
                 </div>
               </div>
+
+              <div className="wifMicro thq-body-small">
+                Auto sliding · Two-frame story beats · Cinematic continuity
+              </div>
+            </div>
+          </header>
+
+          {/* ===== double-frame slider ===== */}
+          <div
+            className="wifStage"
+            onMouseEnter={() => (hoverRef.current = true)}
+            onMouseLeave={() => (hoverRef.current = false)}
+          >
+            <div className="wifGrid">
+              {visible.map((it, idx) => {
+                const num = start + idx + 1
+                const href = it.href || props.storeHref || '/store'
+                const imgSrc = it.thumb || it.preview
+
+                return (
+                  <Link href={href} legacyBehavior key={`${it.id}-${num}`}>
+                    <a className="wifTile" aria-label={`Open image ${num}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img className="wifImg" src={imgSrc} alt={it.title || `Who it’s for ${num}`} loading="lazy" />
+                      <div className="wifShade" />
+                      <div className="wifChip">{String(num).padStart(2, '0')}</div>
+                      <div className="wifHint">View</div>
+                    </a>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* pagination */}
+            <div className="wifDots" aria-label="Slider indicators">
+              {Array.from({ length: pages }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`wifDot ${i === page ? 'on' : ''}`}
+                  onClick={() => setPage(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
             </div>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .who-its-for-photography-thq-gallery3-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .who-its-for-photography-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-section-title-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-text-elm1 {
-            text-align: center;
-          }
-          .who-its-for-photography-thq-text-elm2 {
-            text-align: center;
-          }
-          .who-its-for-photography-container1 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: row;
-          }
-          .who-its-for-photography-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-shrink: 0;
-            justify-content: center;
-          }
-          .who-its-for-photography-thq-slider-elm {
-            width: 100%;
-            height: 600px;
-            display: inline-block;
-          }
-          .who-its-for-photography-thq-slider-wrapper-elm {
-            width: 100%;
-          }
-          .who-its-for-photography-thq-slider-slide-elm1 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-photography-container2 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-image1-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-photography-container3 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-image2-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-photography-thq-slider-slide-elm2 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-photography-container4 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-image3-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-photography-container5 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-image4-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-photography-thq-slider-slide-elm3 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-photography-container6 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-image5-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-photography-container7 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-photography-thq-image6-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-photography-thq-slider-pagination-elm {
-            display: block;
-          }
-          .who-its-for-photography-text1 {
-            display: inline-block;
-          }
-          .who-its-for-photography-text2 {
-            display: inline-block;
-          }
+      </section>
 
-          @media (max-width: 991px) {
-            .who-its-for-photography-thq-content-elm {
-              align-items: center;
-              flex-direction: column;
-            }
+      <style jsx>{`
+        .wifWrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .wifShell {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        /* ================= HERO ================= */
+        .wifHero {
+          position: relative;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .wifHeroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .wifHeroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+        }
+
+        .wifHeroVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              80% 60% at 50% 22%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.72)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.78) 0%,
+              rgba(0, 0, 0, 0.45) 55%,
+              rgba(0, 0, 0, 0.84) 100%
+            );
+        }
+
+        .wifHeroGlow {
+          position: absolute;
+          inset: -18%;
+          background: radial-gradient(
+            40% 32% at 22% 28%,
+            rgba(37, 195, 226, 0.12),
+            rgba(37, 195, 226, 0) 62%
+          );
+          filter: blur(14px);
+          opacity: 0.9;
+        }
+
+        .wifHeroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.08;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .wifHeroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 22px 18px;
+          max-width: 920px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .wifKickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .wifKicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          white-space: nowrap;
+        }
+
+        .wifLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.16),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .wifTitle {
+          margin: 0;
+          line-height: 1.1;
+          text-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+        }
+
+        .wifDesc {
+          margin: 0;
+          opacity: 0.9;
+          line-height: 1.65;
+          color: rgba(245, 244, 244, 0.84);
+          max-width: 70ch;
+        }
+
+        .wifActions {
+          margin-top: 6px;
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+
+        .wifBtnPrimary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: linear-gradient(
+            180deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0.06)
+          );
+          text-decoration: none;
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .wifBtnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.35);
+        }
+
+        .wifBtnGhost {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.18);
+          cursor: pointer;
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .wifBtnGhost:hover {
+          transform: translateY(-1px);
+          border-color: rgba(245, 244, 244, 0.22);
+        }
+
+        .wifBtnGhost:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .wifNav {
+          margin-left: auto;
+          display: inline-flex;
+          gap: 8px;
+        }
+
+        .wifNavBtn {
+          height: 36px;
+          min-width: 44px;
+          padding: 0 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.18);
+          color: rgba(245, 244, 244, 0.92);
+          cursor: pointer;
+          transition: transform 180ms ease, border-color 180ms ease;
+        }
+
+        .wifNavBtn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.35);
+        }
+
+        .wifMicro {
+          margin-top: 6px;
+          color: rgba(245, 244, 244, 0.62);
+        }
+
+        .wifIcon {
+          width: 18px;
+          height: 18px;
+        }
+
+        /* ================= STAGE ================= */
+        .wifStage {
+          width: 100%;
+          position: relative;
+        }
+
+        .wifGrid {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+
+        .wifTile {
+          position: relative;
+          overflow: hidden;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(0, 0, 0, 0.25);
+          aspect-ratio: 4 / 3;
+          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+          text-decoration: none;
+          display: block;
+          transform: translateZ(0);
+          transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+        }
+
+        .wifTile:hover {
+          transform: translateY(-2px);
+          border-color: rgba(37, 195, 226, 0.28);
+          box-shadow: 0 26px 70px rgba(0, 0, 0, 0.45);
+        }
+
+        .wifImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 650ms ease;
+          filter: brightness(0.95) contrast(1.05) saturate(1.02);
+        }
+
+        .wifTile:hover .wifImg {
+          transform: scale(1.06);
+        }
+
+        .wifShade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.58));
+        }
+
+        .wifChip {
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.28em;
+          color: rgba(245, 244, 244, 0.92);
+        }
+
+        .wifHint {
+          position: absolute;
+          right: 10px;
+          top: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.28);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.82);
+        }
+
+        .wifDots {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 10px;
+        }
+
+        .wifDot {
+          width: 26px;
+          height: 3px;
+          border: 0;
+          border-radius: 99px;
+          background: rgba(245, 244, 244, 0.18);
+          cursor: pointer;
+          padding: 0;
+          transition: background 180ms ease, box-shadow 180ms ease;
+        }
+
+        .wifDot.on {
+          background: rgba(37, 195, 226, 0.7);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.18);
+        }
+
+        .t {
+          display: inline-block;
+        }
+
+        @media (max-width: 767px) {
+          .wifHeroInner {
+            padding: 18px 14px 14px;
+            text-align: center;
+            align-items: center;
           }
-          @media (max-width: 767px) {
-            .who-its-for-photography-thq-section-title-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .who-its-for-photography-thq-slider-slide-elm1 {
-              flex-direction: column;
-            }
-            .who-its-for-photography-container2 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-photography-container3 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-photography-thq-slider-slide-elm2 {
-              flex-direction: column;
-            }
-            .who-its-for-photography-container4 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-photography-container5 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-photography-thq-slider-slide-elm3 {
-              flex-direction: column;
-            }
-            .who-its-for-photography-container6 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-photography-container7 {
-              height: calc(50% - 8px);
-            }
+          .wifKickerRow {
+            justify-content: center;
           }
-          @media (max-width: 479px) {
-            .who-its-for-photography-thq-slider-elm {
-              height: 440px;
-            }
+          .wifLine {
+            display: none;
           }
-        `}
-      </style>
+          .wifNav {
+            margin-left: 0;
+            width: 100%;
+            justify-content: center;
+          }
+          .wifActions {
+            width: 100%;
+            justify-content: center;
+          }
+          .wifGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </>
   )
 }
 
 WhoItsForPhotography.defaultProps = {
-  image6Src:
-    '/Photography/1x1/tea%20piucking%20%20hatton%2C%20sri%20lanka._1x1_2000x2000_u_100-1400w.png',
-  image2Alt: 'Audio Production',
-  image4Src:
-    '/Photography/1x1/gangarama%20perahera%2007_1x1_2000x2000_u_100-1400w.png',
-  image1Src:
-    '/Photography/1x1/maruthanamadam%20anjaneya%20kovil%20%20jaffna%2C%20sri%20lanka._1x1_2000x2000_u_100-1400w.png',
-  image5Src:
-    '/Photography/1x1/kovil%20%20hatton%2C%20sri%20lanka._1x1_2000x2000_u_100-1400w.png',
-  image3Alt: 'Animation & Graphics',
-  image1Alt: 'Film Production',
+  rootClassName: '',
+
   heading1: undefined,
   content1: undefined,
-  image3Src:
-    '/Photography/1x1/elephant%20senanayaka%20samudraya%2C%20ampara_1x1_2000x2000_u_100-1400w.png',
-  image5Alt: 'AI & Animations Services',
-  image2Src:
-    '/Photography/1x1/batticaloa%20-%20%20sri%20lanka._1x1_2000x2000_u_100-1400w.png',
-  image6Alt: 'Sound Design',
-  image4Alt: 'Photography',
-  rootClassName: '',
+
+  // ✅ if empty, uses first visible image
+  heroImageSrc: '',
+
+  // ✅ your endpoint
+  apiEndpoint: '/api/store/photos',
+  apiLimit: 24,
+
+  // where tiles link (fallback)
+  storeHref: '/store',
+
+  // optional: if you have store detail route base
+  // will become `${itemHrefBase}/${id}`
+  itemHrefBase: '/store',
+
+  intervalMs: 5200,
+  autoRefreshMs: 0,
+
+  fallbackCount: 6,
+  fallbackToStaticOnError: true,
+  fallbackToStaticOnEmpty: true,
 }
 
 WhoItsForPhotography.propTypes = {
-  image6Src: PropTypes.string,
-  image2Alt: PropTypes.string,
-  image4Src: PropTypes.string,
-  image1Src: PropTypes.string,
-  image5Src: PropTypes.string,
-  image3Alt: PropTypes.string,
-  image1Alt: PropTypes.string,
+  rootClassName: PropTypes.string,
   heading1: PropTypes.element,
   content1: PropTypes.element,
-  image3Src: PropTypes.string,
-  image5Alt: PropTypes.string,
-  image2Src: PropTypes.string,
-  image6Alt: PropTypes.string,
-  image4Alt: PropTypes.string,
-  rootClassName: PropTypes.string,
+
+  heroImageSrc: PropTypes.string,
+
+  apiEndpoint: PropTypes.string,
+  apiLimit: PropTypes.number,
+
+  storeHref: PropTypes.string,
+  itemHrefBase: PropTypes.string,
+
+  intervalMs: PropTypes.number,
+  autoRefreshMs: PropTypes.number,
+
+  fallbackCount: PropTypes.number,
+  fallbackToStaticOnError: PropTypes.bool,
+  fallbackToStaticOnEmpty: PropTypes.bool,
 }
 
 export default WhoItsForPhotography
