@@ -3,17 +3,29 @@ import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import PropTypes from 'prop-types'
 
+function clampInt(v, min, max, fallback) {
+  const n = Number.parseInt(String(v ?? ''), 10)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, n))
+}
+
+function cleanUrl(u) {
+  const s = String(u || '').trim()
+  if (!s) return ''
+  return s.replace(/\s+/g, '')
+}
+
 const WhoItsForPhotography = (props) => {
   // ✅ Local fallback: public/services/photography/wif-01.jpg ... wif-06.jpg
   const staticFallback = useMemo(() => {
-    const total = Number(props.fallbackCount || 6)
+    const total = clampInt(props.fallbackCount, 2, 24, 6)
     return Array.from({ length: total }, (_, i) => {
       const n = String(i + 1).padStart(2, '0')
+      const src = `/services/photography/wif-${n}.jpg`
       return {
         id: `wif-${n}`,
         title: `Who it’s for ${i + 1}`,
-        thumb: `/services/photography/wif-${n}.jpg`,
-        preview: `/services/photography/wif-${n}.jpg`,
+        src,
         href: props.storeHref || '/store',
       }
     })
@@ -55,39 +67,81 @@ const WhoItsForPhotography = (props) => {
     setPage(0)
   }
 
-  // ✅ Load from /api/store/photos (your endpoint returns { ok, photos })
-  async function loadFromStore() {
-    if (!props.apiEndpoint) return
+  // ✅ Best endpoint for sliders (returns { images: [{src, href, alt}] })
+  async function loadFromGalleryRandom() {
+    if (!props.randomEndpoint) return
     try {
       setLoading(true)
 
-      const res = await fetch(`${props.apiEndpoint}?limit=${props.apiLimit || 24}`, {
+      const limit = clampInt(props.randomLimit, 4, 40, 12)
+      const res = await fetch(`${props.randomEndpoint}?limit=${limit}`, {
         headers: { Accept: 'application/json' },
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
-      const data = await res.json()
+      const data = await res.json().catch(() => null)
+      const list = Array.isArray(data?.images) ? data.images : []
+
+      const normalized = list
+        .map((x, idx) => {
+          const src = cleanUrl(x?.src || x?.url || '')
+          if (!src) return null
+          return {
+            id: `rand-${idx + 1}-${src.slice(-14)}`,
+            title: x?.alt || `Photo ${idx + 1}`,
+            src,
+            href: x?.href || props.storeHref || '/store',
+          }
+        })
+        .filter(Boolean)
+
+      if (!mountedRef.current) return
+
+      if (normalized.length) {
+        setItems(normalized)
+        setPage(0)
+      } else if (props.fallbackToStaticOnEmpty) {
+        setStaticItems()
+      }
+    } catch (e) {
+      if (!mountedRef.current) return
+      if (props.fallbackToStaticOnError) setStaticItems()
+    } finally {
+      if (mountedRef.current) setLoading(false)
+    }
+  }
+
+  // ✅ Alternative endpoint (your /api/store/photos returns { ok, photos })
+  async function loadFromStorePhotos() {
+    if (!props.apiEndpoint) return
+    try {
+      setLoading(true)
+
+      const limit = clampInt(props.apiLimit, 6, 2000, 24)
+      const res = await fetch(`${props.apiEndpoint}?limit=${limit}`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const data = await res.json().catch(() => null)
       const list = Array.isArray(data?.photos) ? data.photos : []
 
       const normalized = list
         .map((p, idx) => {
           const id = p?.id
-          const thumb = p?.thumb_url || p?.preview_url
-          const preview = p?.preview_url || p?.thumb_url
-
-          if (!thumb && !preview) return null
+          const src = cleanUrl(p?.thumb_url || p?.preview_url || '')
+          if (!src) return null
 
           const href =
-            (props.itemHrefBase && id ? `${props.itemHrefBase}/${id}` : null) ||
-            (id ? `/store/${id}` : null) ||
+            (props.itemHrefBase && id ? `${props.itemHrefBase}/${id}` : '') ||
+            (id ? `/store/${id}` : '') ||
             props.storeHref ||
             '/store'
 
           return {
             id: id || `store-${idx + 1}`,
             title: p?.title || `Photo ${idx + 1}`,
-            thumb: thumb,
-            preview: preview,
+            src,
             href,
           }
         })
@@ -109,20 +163,30 @@ const WhoItsForPhotography = (props) => {
     }
   }
 
-  // initial load
+  // ✅ initial load preference: randomEndpoint → store/photos → fallback
   useEffect(() => {
-    if (props.apiEndpoint) loadFromStore()
+    if (props.randomEndpoint) {
+      loadFromGalleryRandom()
+      return
+    }
+    if (props.apiEndpoint) {
+      loadFromStorePhotos()
+      return
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.apiEndpoint, props.apiLimit])
+  }, [props.randomEndpoint, props.randomLimit, props.apiEndpoint, props.apiLimit])
 
-  // optional refresh
+  // optional refresh (random preferred)
   useEffect(() => {
-    if (!props.apiEndpoint) return
-    if (!props.autoRefreshMs || props.autoRefreshMs < 5000) return
-    const t = setInterval(() => loadFromStore(), props.autoRefreshMs)
+    const ms = Number(props.autoRefreshMs || 0)
+    if (ms < 5000) return
+    const t = setInterval(() => {
+      if (props.randomEndpoint) loadFromGalleryRandom()
+      else if (props.apiEndpoint) loadFromStorePhotos()
+    }, ms)
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.apiEndpoint, props.autoRefreshMs, props.apiLimit])
+  }, [props.autoRefreshMs, props.randomEndpoint, props.randomLimit, props.apiEndpoint, props.apiLimit])
 
   // ✅ Auto slide pages
   useEffect(() => {
@@ -161,20 +225,22 @@ const WhoItsForPhotography = (props) => {
   const start = page * perPage
   const visible = items.slice(start, start + perPage)
 
-  // hero background prefers preview, falls back to thumb
   const heroImg =
-    props.heroImageSrc ||
-    visible?.[0]?.preview ||
-    visible?.[0]?.thumb ||
-    items?.[0]?.preview ||
-    items?.[0]?.thumb ||
-    staticFallback?.[0]?.preview
+    cleanUrl(props.heroImageSrc) ||
+    cleanUrl(visible?.[0]?.src) ||
+    cleanUrl(items?.[0]?.src) ||
+    cleanUrl(staticFallback?.[0]?.src)
 
   function prev() {
     setPage((p) => (p - 1 + pages) % pages)
   }
   function next() {
     setPage((p) => (p + 1) % pages)
+  }
+
+  const refreshNow = () => {
+    if (props.randomEndpoint) return loadFromGalleryRandom()
+    if (props.apiEndpoint) return loadFromStorePhotos()
   }
 
   return (
@@ -200,8 +266,8 @@ const WhoItsForPhotography = (props) => {
               <p className="wifDesc thq-body-large">{descNode}</p>
 
               <div className="wifActions">
-                {props.apiEndpoint && (
-                  <button className="wifBtnGhost" type="button" onClick={loadFromStore} disabled={loading}>
+                {(props.randomEndpoint || props.apiEndpoint) && (
+                  <button className="wifBtnGhost" type="button" onClick={refreshNow} disabled={loading}>
                     <span className="thq-body-small">{loading ? 'Refreshing…' : 'Refresh'}</span>
                   </button>
                 )}
@@ -225,9 +291,7 @@ const WhoItsForPhotography = (props) => {
                 </div>
               </div>
 
-              <div className="wifMicro thq-body-small">
-                Auto sliding · Two-frame story beats · Cinematic continuity
-              </div>
+              <div className="wifMicro thq-body-small">Auto sliding · Two-frame story beats · Cinematic continuity</div>
             </div>
           </header>
 
@@ -241,13 +305,23 @@ const WhoItsForPhotography = (props) => {
               {visible.map((it, idx) => {
                 const num = start + idx + 1
                 const href = it.href || props.storeHref || '/store'
-                const imgSrc = it.thumb || it.preview
+                const imgSrc = cleanUrl(it.src)
 
                 return (
                   <Link href={href} legacyBehavior key={`${it.id}-${num}`}>
                     <a className="wifTile" aria-label={`Open image ${num}`}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img className="wifImg" src={imgSrc} alt={it.title || `Who it’s for ${num}`} loading="lazy" />
+                      <img
+                        className="wifImg"
+                        src={imgSrc}
+                        alt={it.title || `Who it’s for ${num}`}
+                        loading="lazy"
+                        onError={(e) => {
+                          // ✅ if store URL fails, fallback to local placeholder
+                          const fallback = staticFallback?.[(num - 1) % staticFallback.length]?.src
+                          if (fallback && e.currentTarget.src !== fallback) e.currentTarget.src = fallback
+                        }}
+                      />
                       <div className="wifShade" />
                       <div className="wifChip">{String(num).padStart(2, '0')}</div>
                       <div className="wifHint">View</div>
@@ -316,11 +390,7 @@ const WhoItsForPhotography = (props) => {
         .wifHeroVignette {
           position: absolute;
           inset: 0;
-          background: radial-gradient(
-              80% 60% at 50% 22%,
-              rgba(0, 0, 0, 0.06),
-              rgba(0, 0, 0, 0.72)
-            ),
+          background: radial-gradient(80% 60% at 50% 22%, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.72)),
             linear-gradient(
               90deg,
               rgba(0, 0, 0, 0.78) 0%,
@@ -332,11 +402,7 @@ const WhoItsForPhotography = (props) => {
         .wifHeroGlow {
           position: absolute;
           inset: -18%;
-          background: radial-gradient(
-            40% 32% at 22% 28%,
-            rgba(37, 195, 226, 0.12),
-            rgba(37, 195, 226, 0) 62%
-          );
+          background: radial-gradient(40% 32% at 22% 28%, rgba(37, 195, 226, 0.12), rgba(37, 195, 226, 0) 62%);
           filter: blur(14px);
           opacity: 0.9;
         }
@@ -381,11 +447,7 @@ const WhoItsForPhotography = (props) => {
         .wifLine {
           flex: 1;
           height: 1px;
-          background: linear-gradient(
-            90deg,
-            rgba(245, 244, 244, 0.16),
-            rgba(245, 244, 244, 0)
-          );
+          background: linear-gradient(90deg, rgba(245, 244, 244, 0.16), rgba(245, 244, 244, 0));
         }
 
         .wifTitle {
@@ -417,11 +479,7 @@ const WhoItsForPhotography = (props) => {
           padding: 10px 16px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.16);
-          background: linear-gradient(
-            180deg,
-            rgba(245, 244, 244, 0.18),
-            rgba(245, 244, 244, 0.06)
-          );
+          background: linear-gradient(180deg, rgba(245, 244, 244, 0.18), rgba(245, 244, 244, 0.06));
           text-decoration: none;
           box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
           backdrop-filter: blur(10px);
@@ -640,15 +698,15 @@ WhoItsForPhotography.defaultProps = {
   // ✅ if empty, uses first visible image
   heroImageSrc: '',
 
-  // ✅ your endpoint
-  apiEndpoint: '/api/store/photos',
+  // ✅ PREFERRED: random endpoint that returns { images: [{src,href,alt}] }
+  randomEndpoint: '/api/gallery/random',
+  randomLimit: 12,
+
+  // ✅ optional alternative
+  apiEndpoint: '', // '/api/store/photos'
   apiLimit: 24,
 
-  // where tiles link (fallback)
   storeHref: '/store',
-
-  // optional: if you have store detail route base
-  // will become `${itemHrefBase}/${id}`
   itemHrefBase: '/store',
 
   intervalMs: 5200,
@@ -665,6 +723,9 @@ WhoItsForPhotography.propTypes = {
   content1: PropTypes.element,
 
   heroImageSrc: PropTypes.string,
+
+  randomEndpoint: PropTypes.string,
+  randomLimit: PropTypes.number,
 
   apiEndpoint: PropTypes.string,
   apiLimit: PropTypes.number,
