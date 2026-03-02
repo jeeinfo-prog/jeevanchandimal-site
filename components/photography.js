@@ -6,7 +6,6 @@ const WorkHero = (props) => {
   // ✅ default slideshow: /public/work/photo-01.jpg ... photo-06.jpg
   const slides = useMemo(() => {
     if (Array.isArray(props.slides) && props.slides.length) return props.slides
-
     const total = props.slideCount || 6
     return Array.from({ length: total }, (_, i) => {
       const n = String(i + 1).padStart(2, '0')
@@ -38,7 +37,6 @@ const WorkHero = (props) => {
     if (typeof window === 'undefined') return
     const cur = slides[idx]
     const next = slides[(idx + 1) % slides.length]
-
     ;[cur, next].forEach((src) => {
       if (!src || loaded.has(src)) return
       const img = new window.Image()
@@ -78,164 +76,178 @@ const WorkHero = (props) => {
 
   return (
     <>
-      <div
-        className={`hero ${props.rootClassName}`}
-        onMouseEnter={() => (hoverRef.current = true)}
-        onMouseLeave={() => (hoverRef.current = false)}
-      >
-        {/* Background layers for crossfade */}
-        <div className="bgStack" aria-hidden="true">
-          {nextSrc && (
-            <img
-              alt=""
-              src={nextSrc}
-              className="bg bgNext"
-              loading="eager"
-              draggable="false"
-            />
-          )}
-
-          {currentSrc && (
-            <img
-              alt={props.imageAlt}
-              src={currentSrc}
-              className="bg bgCurrent"
-              loading="eager"
-              draggable="false"
-              style={{ transitionDuration: `${transitionMs}ms` }}
-            />
-          )}
-        </div>
-
-        {/* ✅ softer cinematic overlays (don’t dim the picture) */}
-        <div className="vignette" aria-hidden="true" />
-        <div className="grain" aria-hidden="true" />
-        <div className="glow" aria-hidden="true" />
-
-        {/* content */}
-        <div className="content">
-          {/* ✅ EndNote-style kicker row */}
-          <div className="kickerRow" aria-label="Section label">
-            <span className="kicker">{props.kickerText}</span>
-            <span className="kickerLine" />
-          </div>
-
-          <h1 className="title">
-            {props.heading1 ?? (
-              <Fragment>
-                <span className="t">
-                  Selected work across film, photography, sound, and motion.
-                </span>
-              </Fragment>
-            )}
-          </h1>
-
-          <p className="desc">
-            {props.content1 ?? (
-              <Fragment>
-                <span className="t">
-                  Explore each discipline as a focused body of work.
-                </span>
-              </Fragment>
-            )}
-          </p>
-
-          {/* ✅ EndNote-like divider under paragraph */}
-          <div className="divider" aria-hidden="true" />
-
-          <div className="actions">
-            <Link href={props.primaryHref} legacyBehavior>
-              <a className="btnPrimary" aria-label="Explore Work">
-                <span className="btnText">
-                  {props.primaryLabel ?? (
-                    <Fragment>
-                      <span className="t">Explore Work</span>
-                    </Fragment>
-                  )}
-                </span>
-                <span className="arrow">→</span>
-              </a>
-            </Link>
-
-            <Link href={props.secondaryHref} legacyBehavior>
-              <a className="btnGhost" aria-label="Create Together">
-                <span className="btnText">
-                  {props.secondaryLabel ?? (
-                    <Fragment>
-                      <span className="t">Create Together</span>
-                    </Fragment>
-                  )}
-                </span>
-                <span className="arrow">→</span>
-              </a>
-            </Link>
-          </div>
-
-          {/* tiny slide indicators */}
-          {!reduceMotion && slides.length > 1 && (
-            <div className="dots" aria-label="Slideshow indicators">
-              {slides.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`dot ${i === idx ? 'on' : ''}`}
-                  onClick={() => setIdx(i)}
-                  aria-label={`Go to slide ${i + 1}`}
+      <section className={`whWrap ${props.rootClassName || ''}`}>
+        <div className="whMax thq-section-padding">
+          {/* ✅ not full page width: use thq-section-max-width like SoundDesign */}
+          <div
+            className="whCard thq-section-max-width"
+            onMouseEnter={() => (hoverRef.current = true)}
+            onMouseLeave={() => (hoverRef.current = false)}
+          >
+            {/* ===== slideshow background (absolute) ===== */}
+            <div className="whMedia" aria-hidden="true">
+              {nextSrc && (
+                <img
+                  alt=""
+                  src={nextSrc}
+                  className="whBg whBgNext"
+                  loading="eager"
+                  draggable="false"
                 />
-              ))}
+              )}
+              {currentSrc && (
+                <img
+                  alt={props.imageAlt}
+                  src={currentSrc}
+                  className="whBg whBgCurrent"
+                  loading="eager"
+                  draggable="false"
+                  style={{ animationDuration: `${transitionMs}ms` }}
+                />
+              )}
+
+              {/* ✅ soft overlays (don’t dim like crazy) */}
+              <div className="whVignette" />
+              <div className="whGlow" />
+              <div className="whGrain" />
             </div>
-          )}
+
+            {/* ===== content (aligned like sdInner) ===== */}
+            <div className="whInner">
+              <div className="whKickerRow">
+                <span className="whKicker">{props.kickerText}</span>
+                <span className="whLine" />
+              </div>
+
+              <h1 className="thq-heading-1 whTitle">
+                {props.heading1 ?? (
+                  <Fragment>
+                    <span className="t">
+                      Selected work across film, photography, sound, and motion.
+                    </span>
+                  </Fragment>
+                )}
+              </h1>
+
+              <p className="thq-body-large whCopy">
+                {props.content1 ?? (
+                  <Fragment>
+                    <span className="t">
+                      Explore each discipline as a focused body of work.
+                    </span>
+                  </Fragment>
+                )}
+              </p>
+
+              {/* ✅ same thin divider as SoundDesign */}
+              <div className="whDivider" aria-hidden="true" />
+
+              <div className="whActions">
+                <Link href={props.primaryHref} legacyBehavior>
+                  <a className="whBtnPrimary" aria-label="Explore Work">
+                    <span className="whBtnText">
+                      {props.primaryLabel ?? (
+                        <Fragment>
+                          <span className="t">Explore Work</span>
+                        </Fragment>
+                      )}
+                    </span>
+                    <span className="whArrow">→</span>
+                  </a>
+                </Link>
+
+                <Link href={props.secondaryHref} legacyBehavior>
+                  <a className="whBtnGhost" aria-label="Create Together">
+                    <span className="whBtnText">
+                      {props.secondaryLabel ?? (
+                        <Fragment>
+                          <span className="t">Create Together</span>
+                        </Fragment>
+                      )}
+                    </span>
+                    <span className="whArrow">→</span>
+                  </a>
+                </Link>
+              </div>
+
+              {/* dots */}
+              {!reduceMotion && slides.length > 1 && (
+                <div className="whDots" aria-label="Slideshow indicators">
+                  {slides.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`whDot ${i === idx ? 'on' : ''}`}
+                      onClick={() => setIdx(i)}
+                      aria-label={`Go to slide ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       <style jsx>{`
-        .hero {
+        .whWrap {
           width: 100%;
-          min-height: 72vh;
+          position: relative;
           display: flex;
           align-items: center;
+          flex-direction: column;
+        }
+
+        .whMax {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+        }
+
+        /* ✅ same "card" behavior as SoundDesign */
+        .whCard {
+          width: 100%;
           position: relative;
           overflow: hidden;
           border-radius: 22px;
-          border: 1px solid rgba(245, 244, 244, 0.08);
+          border: 1px solid rgba(245, 244, 244, 0.1);
           background: rgba(12, 12, 12, 0.55);
-          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.55);
           backdrop-filter: blur(10px);
-          margin-top: 18px;
+          min-height: 72vh;
         }
 
-        /* ===== slideshow stack ===== */
-        .bgStack {
+        /* ===== media layer ===== */
+        .whMedia {
           position: absolute;
           inset: 0;
           z-index: 0;
+          pointer-events: none;
           overflow: hidden;
         }
 
-        .bg {
+        .whBg {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
           object-fit: cover;
           transform: scale(1.03);
-          /* ✅ brighter / less dim */
-          filter: brightness(0.92) contrast(1.06) saturate(1.02);
+          /* ✅ keep it bright */
+          filter: brightness(1) contrast(1.05) saturate(1.05);
           user-select: none;
-          pointer-events: none;
         }
 
-        .bgNext {
+        .whBgNext {
           opacity: 1;
         }
 
-        .bgCurrent {
+        .whBgCurrent {
           opacity: 1;
-          animation: fadeIn ease both;
-          animation-duration: ${transitionMs}ms;
+          animation: whFadeIn ease both;
         }
 
-        @keyframes fadeIn {
+        @keyframes whFadeIn {
           from {
             opacity: 0;
             transform: scale(1.035);
@@ -246,70 +258,66 @@ const WorkHero = (props) => {
           }
         }
 
-        /* ===== cinematic overlays (soft, so image stays visible) ===== */
-        .vignette {
+        /* ✅ overlay style closer to SoundDesign (still cinematic, less dim) */
+        .whVignette {
           position: absolute;
           inset: 0;
           z-index: 1;
           background: radial-gradient(
-              80% 65% at 30% 30%,
-              rgba(0, 0, 0, 0.06),
-              rgba(0, 0, 0, 0.46)
+              80% 70% at 50% 15%,
+              rgba(255, 255, 255, 0.04),
+              rgba(0, 0, 0, 0.78)
             ),
             linear-gradient(
               90deg,
-              rgba(0, 0, 0, 0.48) 0%,
-              rgba(0, 0, 0, 0.18) 55%,
-              rgba(0, 0, 0, 0.34) 100%
+              rgba(0, 0, 0, 0.62) 0%,
+              rgba(0, 0, 0, 0.26) 55%,
+              rgba(0, 0, 0, 0.55) 100%
             );
         }
 
-        .glow {
+        .whGlow {
           position: absolute;
           inset: -18%;
           z-index: 2;
           background: radial-gradient(
             38% 28% at 18% 44%,
-            rgba(37, 195, 226, 0.12),
+            rgba(37, 195, 226, 0.14),
             rgba(37, 195, 226, 0) 62%
           );
           filter: blur(10px);
-          pointer-events: none;
         }
 
-        .grain {
+        .whGrain {
           position: absolute;
           inset: 0;
           z-index: 3;
-          opacity: 0.045;
+          opacity: 0.06;
           mix-blend-mode: overlay;
-          pointer-events: none;
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
           background-size: 240px 240px;
         }
 
-        /* ===== content (luxury) ===== */
-        .content {
+        /* ✅ inner content matches sdInner (left-top, not centered) */
+        .whInner {
           position: relative;
           z-index: 4;
-          max-width: 560px;
+          padding: 34px 28px 22px; /* same as SoundDesign */
           display: flex;
           flex-direction: column;
           gap: 12px;
-          padding: 0 18px;
-          margin-left: var(--dl-layout-space-fiveunits);
+          align-items: flex-start;
+          max-width: 920px; /* same idea as SoundDesign */
         }
 
-        /* kicker row like EndNote */
-        .kickerRow {
+        .whKickerRow {
           width: 100%;
           display: flex;
           align-items: center;
           gap: 10px;
-          margin-bottom: 2px;
         }
 
-        .kicker {
+        .whKicker {
           font-size: 12px;
           letter-spacing: 0.24em;
           text-transform: uppercase;
@@ -317,11 +325,12 @@ const WorkHero = (props) => {
           padding: 6px 10px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(0, 0, 0, 0.18);
+          background: rgba(0, 0, 0, 0.22);
           white-space: nowrap;
         }
 
-        .kickerLine {
+        /* ✅ EXACT sdLine style */
+        .whLine {
           flex: 1;
           height: 1px;
           background: linear-gradient(
@@ -331,26 +340,21 @@ const WorkHero = (props) => {
           );
         }
 
-        .title {
+        .whTitle {
           margin: 0;
-          font-size: clamp(32px, 5vw, 44px);
-          letter-spacing: -0.02em;
-          color: #f5f4f4;
-          text-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
-          line-height: 1.08;
+          line-height: 1.15;
+          text-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
         }
 
-        .desc {
+        .whCopy {
           margin: 0;
-          margin-top: var(--dl-layout-space-twounits);
-          font-size: 16px;
-          line-height: 1.7;
+          line-height: 1.75;
           color: rgba(245, 244, 244, 0.84);
-          max-width: 48ch;
+          max-width: 70ch;
         }
 
-        /* ✅ EndNote divider under paragraph */
-        .divider {
+        /* ✅ EXACT sdDivider style */
+        .whDivider {
           width: 100%;
           height: 1px;
           margin-top: 6px;
@@ -362,15 +366,16 @@ const WorkHero = (props) => {
           );
         }
 
-        .actions {
-          margin-top: 2px; /* tighter since divider exists */
+        .whActions {
+          margin-top: 4px;
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
+          align-items: center;
         }
 
-        .btnPrimary,
-        .btnGhost {
+        .whBtnPrimary,
+        .whBtnGhost {
           height: 36px;
           padding: 0 14px 0 16px;
           border-radius: 999px;
@@ -386,7 +391,7 @@ const WorkHero = (props) => {
           white-space: nowrap;
         }
 
-        .btnPrimary {
+        .whBtnPrimary {
           border: 1px solid rgba(37, 195, 226, 0.45);
           background: linear-gradient(
             180deg,
@@ -396,35 +401,37 @@ const WorkHero = (props) => {
           color: #f5f4f4;
           box-shadow: 0 14px 26px rgba(0, 0, 0, 0.35);
         }
-        .btnPrimary:hover {
+
+        .whBtnPrimary:hover {
           transform: translateY(-1px);
           border-color: rgba(37, 195, 226, 0.7);
         }
 
-        .btnGhost {
+        .whBtnGhost {
           border: 1px solid rgba(245, 244, 244, 0.18);
           background: rgba(255, 255, 255, 0.03);
           color: rgba(245, 244, 244, 0.92);
         }
-        .btnGhost:hover {
+
+        .whBtnGhost:hover {
           border-color: rgba(37, 195, 226, 0.45);
           background: rgba(37, 195, 226, 0.08);
           transform: translateY(-1px);
         }
 
-        .arrow {
+        .whArrow {
           color: #25c3e2;
           transform: translateY(-1px);
         }
 
-        /* dots */
-        .dots {
+        .whDots {
           margin-top: 14px;
           display: inline-flex;
           gap: 8px;
           align-items: center;
         }
-        .dot {
+
+        .whDot {
           width: 28px;
           height: 3px;
           border-radius: 99px;
@@ -434,11 +441,13 @@ const WorkHero = (props) => {
           padding: 0;
           transition: all 180ms ease;
         }
-        .dot.on {
+
+        .whDot.on {
           background: rgba(37, 195, 226, 0.7);
           box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.18);
         }
-        .dot:hover {
+
+        .whDot:hover {
           background: rgba(245, 244, 244, 0.28);
         }
 
@@ -446,37 +455,42 @@ const WorkHero = (props) => {
           display: inline-block;
         }
 
-        @media (max-width: 767px) {
-          .hero {
-            border-radius: 18px;
+        @media (max-width: 991px) {
+          .whCard {
+            min-height: 66vh;
           }
-          .content {
-            width: 100%;
-            margin-left: 0;
-            text-align: center;
-            align-items: center;
-            padding: 0 16px;
-          }
+        }
 
-          .kickerRow {
+        @media (max-width: 767px) {
+          .whInner {
+            padding: 22px 16px 16px; /* same as SoundDesign mobile */
+            align-items: center;
+            text-align: center;
+          }
+          .whKickerRow {
             justify-content: center;
           }
-          .kickerLine {
+          .whLine {
             display: none;
           }
-
-          .actions {
+          .whActions {
             width: 100%;
             justify-content: center;
           }
-          .btnPrimary,
-          .btnGhost {
+          .whBtnPrimary,
+          .whBtnGhost {
             width: 100%;
             justify-content: center;
             max-width: 520px;
           }
-          .dots {
+          .whDots {
             justify-content: center;
+          }
+        }
+
+        @media (max-width: 479px) {
+          .whCard {
+            min-height: 52vh;
           }
         }
       `}</style>
