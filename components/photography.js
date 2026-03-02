@@ -114,6 +114,12 @@ const WorkHero = (props) => {
 
         {/* content */}
         <div className="content">
+          {/* ✅ EndNote-style kicker row */}
+          <div className="kickerRow" aria-label="Section label">
+            <span className="kicker">{props.kickerText}</span>
+            <span className="kickerLine" />
+          </div>
+
           <h1 className="title">
             {props.heading1 ?? (
               <Fragment>
@@ -127,7 +133,9 @@ const WorkHero = (props) => {
           <p className="desc">
             {props.content1 ?? (
               <Fragment>
-                <span className="t">Explore each discipline as a focused body of work.</span>
+                <span className="t">
+                  Explore each discipline as a focused body of work.
+                </span>
               </Fragment>
             )}
           </p>
@@ -213,12 +221,10 @@ const WorkHero = (props) => {
           pointer-events: none;
         }
 
-        /* keep next visible underneath */
         .bgNext {
           opacity: 1;
         }
 
-        /* current fades in on top */
         .bgCurrent {
           opacity: 1;
           animation: fadeIn ease both;
@@ -261,7 +267,7 @@ const WorkHero = (props) => {
           background: radial-gradient(
             40% 30% at 18% 40%,
             rgba(37, 195, 226, 0.16),
-            rgba(37, 195, 226, 0.0) 60%
+            rgba(37, 195, 226, 0) 60%
           );
           filter: blur(8px);
           pointer-events: none;
@@ -288,6 +294,37 @@ const WorkHero = (props) => {
           gap: 12px;
           padding: 0 18px;
           margin-left: var(--dl-layout-space-fiveunits);
+        }
+
+        /* ✅ kicker row like EndNote */
+        .kickerRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 2px; /* tight like EndNote */
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+          white-space: nowrap;
+        }
+
+        .kickerLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
         }
 
         .title {
@@ -403,6 +440,15 @@ const WorkHero = (props) => {
             align-items: center;
             padding: 0 16px;
           }
+
+          /* ✅ kicker row centered like EndNote mobile */
+          .kickerRow {
+            justify-content: center;
+          }
+          .kickerLine {
+            display: none;
+          }
+
           .actions {
             width: 100%;
             justify-content: center;
@@ -426,9 +472,12 @@ WorkHero.defaultProps = {
   rootClassName: '',
   imageAlt: 'Work hero background',
 
+  // ✅ new
+  kickerText: 'WORK',
+
   // slideshow
-  slides: undefined, // optional: ['/work/photo-01.jpg', '/work/photo-02.jpg', ...]
-  slideCount: 6, // used only when slides is undefined
+  slides: undefined,
+  slideCount: 6,
   intervalMs: 5200,
   transitionMs: 900,
 
@@ -444,6 +493,9 @@ WorkHero.defaultProps = {
 WorkHero.propTypes = {
   rootClassName: PropTypes.string,
   imageAlt: PropTypes.string,
+
+  // ✅ new
+  kickerText: PropTypes.string,
 
   slides: PropTypes.arrayOf(PropTypes.string),
   slideCount: PropTypes.number,
