@@ -1,18 +1,22 @@
 import React, { Fragment } from 'react'
+import Link from 'next/link'
 import PropTypes from 'prop-types'
 
 const WorkHero = (props) => {
   return (
     <>
-      <div className={`work-hero-container1 ${props.rootClassName}`}>
+      <div className={`hero ${props.rootClassName}`}>
         {/* background image */}
-        <img
-          alt={props.image1Alt}
-          src={props.image1Src}
-          className="work-hero-image"
-        />
+        {props.image1Src && (
+          <img
+            alt={props.image1Alt}
+            src={props.image1Src}
+            className="bg"
+            loading="eager"
+          />
+        )}
 
-        {/* cinematic overlays */}
+        {/* cinematic overlays (same vibe as your WorkHero) */}
         <div className="vignette" />
         <div className="grain" />
 
@@ -20,7 +24,7 @@ const WorkHero = (props) => {
           <h1 className="title">
             {props.heading1 ?? (
               <Fragment>
-                <span className="work-hero-text1">
+                <span className="t">
                   Selected work across film, photography, sound, and motion.
                 </span>
               </Fragment>
@@ -30,37 +34,45 @@ const WorkHero = (props) => {
           <p className="desc">
             {props.content1 ?? (
               <Fragment>
-                <span className="work-hero-text3">
-                  Explore each discipline as a focused body of work.
-                </span>
+                <span className="t">Explore each discipline as a focused body of work.</span>
               </Fragment>
             )}
           </p>
 
-          <div className="ctaRow">
-            <input
-              type="email"
-              placeholder={props.textinputPlaceholder}
-              className="work-hero-textinput thq-input"
-            />
+          <div className="actions">
+            <Link href={props.primaryHref} legacyBehavior>
+              <a className="btnPrimary" aria-label="Explore Work">
+                <span className="btnText">
+                  {props.primaryLabel ?? (
+                    <Fragment>
+                      <span className="t">Explore Work</span>
+                    </Fragment>
+                  )}
+                </span>
+                <span className="arrow">→</span>
+              </a>
+            </Link>
 
-            <button className="work-hero-thq-button-elm" type="button">
-              <span className="thq-body-small">
-                {props.action3 ?? (
-                  <Fragment>
-                    <span className="work-hero-text2">Explore Work</span>
-                  </Fragment>
-                )}
-              </span>
-            </button>
+            <Link href={props.secondaryHref} legacyBehavior>
+              <a className="btnGhost" aria-label="Create Together">
+                <span className="btnText">
+                  {props.secondaryLabel ?? (
+                    <Fragment>
+                      <span className="t">Create Together</span>
+                    </Fragment>
+                  )}
+                </span>
+                <span className="arrow">→</span>
+              </a>
+            </Link>
           </div>
         </div>
       </div>
 
       <style jsx>{`
-        .work-hero-container1 {
+        .hero {
           width: 100%;
-          min-height: 72vh; /* match the 2nd image feel */
+          min-height: 72vh; /* match homepage feel */
           display: flex;
           align-items: center;
           position: relative;
@@ -73,13 +85,12 @@ const WorkHero = (props) => {
           margin-top: 18px;
         }
 
-        .work-hero-image {
+        .bg {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
           object-fit: cover;
-          /* softer than before so image stays visible like 2nd image */
           filter: brightness(0.82) contrast(1.05) saturate(0.95);
           z-index: 0;
         }
@@ -113,7 +124,7 @@ const WorkHero = (props) => {
           background-size: 240px 240px;
         }
 
-        /* ===== content layout like 2nd image ===== */
+        /* ===== content layout like HomePageHero ===== */
         .content {
           position: relative;
           z-index: 3;
@@ -122,7 +133,7 @@ const WorkHero = (props) => {
           flex-direction: column;
           gap: 12px;
           padding: 0 18px;
-          margin-left: var(--dl-layout-space-fiveunits); /* left offset like homepage */
+          margin-left: var(--dl-layout-space-fiveunits);
         }
 
         .title {
@@ -143,30 +154,32 @@ const WorkHero = (props) => {
           max-width: 48ch;
         }
 
-        .ctaRow {
+        .actions {
           margin-top: var(--dl-layout-space-twounits);
           display: flex;
           gap: 10px;
-          align-items: center;
           flex-wrap: wrap;
         }
 
-        .work-hero-textinput {
-          width: min(420px, 64vw);
-          height: 36px;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(245, 244, 244, 0.18);
-          color: rgba(245, 244, 244, 0.92);
-          border-radius: 999px;
-        }
-
-        .work-hero-thq-button-elm {
+        /* ========= buttons (same as HomePageHero) ========= */
+        .btnPrimary,
+        .btnGhost {
           height: 36px;
           padding: 0 14px 0 16px;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
           gap: 8px;
+          text-decoration: none !important;
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          font-weight: 900;
+          transition: all 180ms ease;
+          white-space: nowrap;
+        }
+
+        .btnPrimary {
           border: 1px solid rgba(37, 195, 226, 0.45);
           background: linear-gradient(
             180deg,
@@ -174,29 +187,37 @@ const WorkHero = (props) => {
             rgba(37, 195, 226, 0.08)
           );
           color: #f5f4f4;
-          font-size: 11px;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          font-weight: 900;
-          cursor: pointer;
-          transition: all 180ms ease;
           box-shadow: 0 14px 26px rgba(0, 0, 0, 0.35);
-          white-space: nowrap;
         }
 
-        .work-hero-thq-button-elm:hover {
+        .btnPrimary:hover {
           transform: translateY(-1px);
           border-color: rgba(37, 195, 226, 0.7);
         }
 
-        .work-hero-text1,
-        .work-hero-text2,
-        .work-hero-text3 {
+        .btnGhost {
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(255, 255, 255, 0.03);
+          color: rgba(245, 244, 244, 0.92);
+        }
+
+        .btnGhost:hover {
+          border-color: rgba(37, 195, 226, 0.45);
+          background: rgba(37, 195, 226, 0.08);
+          transform: translateY(-1px);
+        }
+
+        .arrow {
+          color: #25c3e2;
+          transform: translateY(-1px);
+        }
+
+        .t {
           display: inline-block;
         }
 
         @media (max-width: 767px) {
-          .work-hero-container1 {
+          .hero {
             border-radius: 18px;
           }
           .content {
@@ -206,18 +227,15 @@ const WorkHero = (props) => {
             align-items: center;
             padding: 0 16px;
           }
-          .work-hero-textinput {
+          .actions {
             width: 100%;
-            max-width: 520px;
+            justify-content: center;
           }
-          .work-hero-thq-button-elm {
+          .btnPrimary,
+          .btnGhost {
             width: 100%;
             justify-content: center;
             max-width: 520px;
-          }
-          .ctaRow {
-            width: 100%;
-            justify-content: center;
           }
         }
       `}</style>
@@ -226,24 +244,34 @@ const WorkHero = (props) => {
 }
 
 WorkHero.defaultProps = {
-  heading1: undefined,
   rootClassName: '',
-  image1Alt: 'Professional film production equipment',
-  image1Src:
-    '/work/herowrok.jpg',
-  action3: undefined,
+  image1Alt: 'Work hero background',
+  image1Src: '/work/herowrok.jpg',
+
+  heading1: undefined,
   content1: undefined,
-  textinputPlaceholder: 'Create Together',
+
+  // ✅ links like HomePageHero
+  primaryHref: '/work',
+  secondaryHref: '/contact',
+
+  primaryLabel: undefined,
+  secondaryLabel: undefined,
 }
 
 WorkHero.propTypes = {
-  heading1: PropTypes.element,
   rootClassName: PropTypes.string,
   image1Alt: PropTypes.string,
   image1Src: PropTypes.string,
-  action3: PropTypes.element,
+
+  heading1: PropTypes.element,
   content1: PropTypes.element,
-  textinputPlaceholder: PropTypes.string,
+
+  primaryHref: PropTypes.string,
+  secondaryHref: PropTypes.string,
+
+  primaryLabel: PropTypes.element,
+  secondaryLabel: PropTypes.element,
 }
 
 export default WorkHero
