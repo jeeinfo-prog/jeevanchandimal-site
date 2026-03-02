@@ -107,7 +107,7 @@ const WorkHero = (props) => {
           )}
         </div>
 
-        {/* cinematic overlays */}
+        {/* ✅ softer cinematic overlays (don’t dim the picture) */}
         <div className="vignette" aria-hidden="true" />
         <div className="grain" aria-hidden="true" />
         <div className="glow" aria-hidden="true" />
@@ -139,6 +139,9 @@ const WorkHero = (props) => {
               </Fragment>
             )}
           </p>
+
+          {/* ✅ EndNote-like divider under paragraph */}
+          <div className="divider" aria-hidden="true" />
 
           <div className="actions">
             <Link href={props.primaryHref} legacyBehavior>
@@ -216,7 +219,8 @@ const WorkHero = (props) => {
           height: 100%;
           object-fit: cover;
           transform: scale(1.03);
-          filter: brightness(0.78) contrast(1.08) saturate(0.92);
+          /* ✅ brighter / less dim */
+          filter: brightness(0.92) contrast(1.06) saturate(1.02);
           user-select: none;
           pointer-events: none;
         }
@@ -242,34 +246,34 @@ const WorkHero = (props) => {
           }
         }
 
-        /* ===== cinematic overlays ===== */
+        /* ===== cinematic overlays (soft, so image stays visible) ===== */
         .vignette {
           position: absolute;
           inset: 0;
           z-index: 1;
           background: radial-gradient(
-              75% 60% at 28% 30%,
-              rgba(0, 0, 0, 0.12),
-              rgba(0, 0, 0, 0.72)
+              80% 65% at 30% 30%,
+              rgba(0, 0, 0, 0.06),
+              rgba(0, 0, 0, 0.46)
             ),
             linear-gradient(
               90deg,
-              rgba(0, 0, 0, 0.74) 0%,
-              rgba(0, 0, 0, 0.34) 55%,
-              rgba(0, 0, 0, 0.62) 100%
+              rgba(0, 0, 0, 0.48) 0%,
+              rgba(0, 0, 0, 0.18) 55%,
+              rgba(0, 0, 0, 0.34) 100%
             );
         }
 
         .glow {
           position: absolute;
-          inset: -20%;
+          inset: -18%;
           z-index: 2;
           background: radial-gradient(
-            40% 30% at 18% 40%,
-            rgba(37, 195, 226, 0.16),
-            rgba(37, 195, 226, 0) 60%
+            38% 28% at 18% 44%,
+            rgba(37, 195, 226, 0.12),
+            rgba(37, 195, 226, 0) 62%
           );
-          filter: blur(8px);
+          filter: blur(10px);
           pointer-events: none;
         }
 
@@ -296,13 +300,13 @@ const WorkHero = (props) => {
           margin-left: var(--dl-layout-space-fiveunits);
         }
 
-        /* ✅ kicker row like EndNote */
+        /* kicker row like EndNote */
         .kickerRow {
           width: 100%;
           display: flex;
           align-items: center;
           gap: 10px;
-          margin-bottom: 2px; /* tight like EndNote */
+          margin-bottom: 2px;
         }
 
         .kicker {
@@ -313,7 +317,7 @@ const WorkHero = (props) => {
           padding: 6px 10px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(0, 0, 0, 0.22);
+          background: rgba(0, 0, 0, 0.18);
           white-space: nowrap;
         }
 
@@ -332,7 +336,7 @@ const WorkHero = (props) => {
           font-size: clamp(32px, 5vw, 44px);
           letter-spacing: -0.02em;
           color: #f5f4f4;
-          text-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+          text-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
           line-height: 1.08;
         }
 
@@ -341,12 +345,25 @@ const WorkHero = (props) => {
           margin-top: var(--dl-layout-space-twounits);
           font-size: 16px;
           line-height: 1.7;
-          color: rgba(245, 244, 244, 0.82);
+          color: rgba(245, 244, 244, 0.84);
           max-width: 48ch;
         }
 
+        /* ✅ EndNote divider under paragraph */
+        .divider {
+          width: 100%;
+          height: 1px;
+          margin-top: 6px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.12),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0.12)
+          );
+        }
+
         .actions {
-          margin-top: var(--dl-layout-space-twounits);
+          margin-top: 2px; /* tighter since divider exists */
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
@@ -441,7 +458,6 @@ const WorkHero = (props) => {
             padding: 0 16px;
           }
 
-          /* ✅ kicker row centered like EndNote mobile */
           .kickerRow {
             justify-content: center;
           }
@@ -472,7 +488,6 @@ WorkHero.defaultProps = {
   rootClassName: '',
   imageAlt: 'Work hero background',
 
-  // ✅ new
   kickerText: 'WORK',
 
   // slideshow
@@ -494,7 +509,6 @@ WorkHero.propTypes = {
   rootClassName: PropTypes.string,
   imageAlt: PropTypes.string,
 
-  // ✅ new
   kickerText: PropTypes.string,
 
   slides: PropTypes.arrayOf(PropTypes.string),
