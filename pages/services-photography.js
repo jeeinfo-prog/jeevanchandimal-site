@@ -34,23 +34,14 @@ export default function ServicesPhotography() {
           property="og:description"
           content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound."
         />
-        <meta
-          property="og:image"
-          content="https://www.jeevanchandimal.com/services/og.jpg"
-        />
-        <link
-          rel="canonical"
-          href="https://www.jeevanchandimal.com/services-photography"
-        />
+        <meta property="og:image" content="https://www.jeevanchandimal.com/services/og.jpg" />
+        <link rel="canonical" href="https://www.jeevanchandimal.com/services-photography" />
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background (below navbar) */}
+        {/* ✅ Cinematic background */}
         <div className="heroBg" aria-hidden="true">
-          <div
-            className="heroBgImg"
-            style={{ backgroundImage: `url(${HERO_BG})` }}
-          />
+          <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
           <div className="heroBgGrain" />
           <div className="heroBgGlow" />
@@ -157,8 +148,8 @@ export default function ServicesPhotography() {
               content1={
                 <Fragment>
                   <span className="t">
-                    Photography approached as storytelling — crafted with
-                    cinematic intent and emotional clarity.
+                    Photography approached as storytelling — crafted with cinematic intent
+                    and emotional clarity.
                   </span>
                 </Fragment>
               }
@@ -186,15 +177,15 @@ export default function ServicesPhotography() {
                 <Fragment>
                   <span className="t">
                     <span>
-                      Photography is where my visual language began. I approach
-                      still images the same way I approach film — with attention
-                      to light, composition, and the feeling a moment carries.
+                      Photography is where my visual language began. I approach still
+                      images the same way I approach film — with attention to light,
+                      composition, and the feeling a moment carries.
                     </span>
                     <br />
                     <span>
-                      Each photograph is created to stand on its own, while also
-                      fitting naturally into larger visual narratives for
-                      editorial, commercial, and artistic use.
+                      Each photograph is created to stand on its own, while also fitting
+                      naturally into larger visual narratives for editorial, commercial,
+                      and artistic use.
                     </span>
                   </span>
                 </Fragment>
@@ -208,8 +199,8 @@ export default function ServicesPhotography() {
               content1={
                 <Fragment>
                   <span className="t">
-                    A curated selection of editorial, cinematic, and fine-art
-                    photography — focused on atmosphere, texture, and detail.
+                    A curated selection of editorial, cinematic, and fine-art photography —
+                    focused on atmosphere, texture, and detail.
                   </span>
                 </Fragment>
               }
@@ -281,16 +272,15 @@ export default function ServicesPhotography() {
               feature2Description={
                 <Fragment>
                   <span className="t">
-                    Quiet, patient observations of the natural world, captured
-                    with respect and realism.
+                    Quiet, patient observations of the natural world, captured with
+                    respect and realism.
                   </span>
                 </Fragment>
               }
               feature3Description={
                 <Fragment>
                   <span className="t">
-                    Expansive scenes that convey scale, mood, and a sense of
-                    place.
+                    Expansive scenes that convey scale, mood, and a sense of place.
                   </span>
                 </Fragment>
               }
@@ -317,14 +307,14 @@ export default function ServicesPhotography() {
                 <Fragment>
                   <span className="t">
                     <span>
-                      I look for moments that feel honest and unforced. Light,
-                      timing, and stillness matter more than spectacle.
+                      I look for moments that feel honest and unforced. Light, timing,
+                      and stillness matter more than spectacle.
                     </span>
                     <br />
                     <span>
-                      Whether working in controlled environments or in the field,
-                      the goal is always the same — to create images that feel
-                      considered, immersive, and lasting.
+                      Whether working in controlled environments or in the field, the
+                      goal is always the same — to create images that feel considered,
+                      immersive, and lasting.
                     </span>
                   </span>
                 </Fragment>
@@ -338,9 +328,9 @@ export default function ServicesPhotography() {
               content1={
                 <Fragment>
                   <span className="t">
-                    I work with brands, agencies, filmmakers, and individuals
-                    who value craft, atmosphere, and intentional storytelling —
-                    and who see film as more than just content.
+                    I work with brands, agencies, filmmakers, and individuals who value
+                    craft, atmosphere, and intentional storytelling — and who see film as
+                    more than just content.
                   </span>
                 </Fragment>
               }
@@ -370,9 +360,7 @@ export default function ServicesPhotography() {
               }
               heading1={
                 <Fragment>
-                  <span className="t">
-                    Looking for imagery with depth and intention?
-                  </span>
+                  <span className="t">Looking for imagery with depth and intention?</span>
                 </Fragment>
               }
               rootClassName="photography-services-final-ct-aroot-class-name"
@@ -393,34 +381,22 @@ export default function ServicesPhotography() {
           overflow-x: hidden;
         }
 
-        /* ✅ single source of truth */
-        :global(:root) {
-          --nav-h: 72px;
-        }
-
-        @media (max-width: 767px) {
-          :global(:root) {
-            --nav-h: 64px;
-          }
-        }
-
         .page {
           width: 100%;
           min-height: 100vh;
           position: relative;
+
           overflow-x: hidden;
           overflow-y: visible;
+
           background: #0b0b0b;
           color: #f5f4f4;
         }
 
-        /* ========= CINEMATIC BACKGROUND (below navbar) ========= */
+        /* ========= CINEMATIC BACKGROUND ========= */
         .heroBg {
           position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          top: var(--nav-h); /* ✅ start below nav */
+          inset: 0;
           z-index: 0;
           pointer-events: none;
         }
@@ -431,6 +407,8 @@ export default function ServicesPhotography() {
           background-size: cover;
           background-position: center;
           background-repeat: no-repeat;
+
+          /* ✅ keep detail + luxury */
           filter: saturate(0.95) contrast(1.06) brightness(0.78);
           transform: scale(1.02);
         }
@@ -480,7 +458,8 @@ export default function ServicesPhotography() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-top: var(--nav-h); /* ✅ match nav height */
+
+          padding-top: 72px; /* ✅ space for fixed navbar */
         }
 
         .section {
