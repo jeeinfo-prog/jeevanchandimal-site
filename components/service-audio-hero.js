@@ -4,29 +4,10 @@ import Link from 'next/link'
 import PropTypes from 'prop-types'
 
 const ServiceAudioHero = (props) => {
-  const headingNode =
-    props.heading1 ?? (
-      <Fragment>
-        <span className="t">
-          <span>Sound designed to deepen emotion and presence.</span>
-          <br />
-        </span>
-      </Fragment>
-    )
-
-  const descNode =
-    props.content1 ?? (
-      <Fragment>
-        <span className="t">
-          <span>Audio treated as a storytelling layer — not an afterthought.</span>
-          <br />
-        </span>
-      </Fragment>
-    )
-
   return (
     <>
       <section className={`hero ${props.rootClassName || ''}`}>
+        {/* ✅ VIDEO BACKGROUND (NO DIM) */}
         <video
           className="bgVideo"
           src={props.videoSrc}
@@ -37,50 +18,57 @@ const ServiceAudioHero = (props) => {
           preload="auto"
         />
 
-        {/* light vignette (for readability) */}
-        <div className="vignette" aria-hidden="true" />
+        {/* ✅ keep only subtle legibility layers (NOT dimming the whole video) */}
+        <div className="vignette" />
+        <div className="grain" />
 
-        <div className="content thq-section-padding">
-          <div className="inner">
-            <h1 className="name thq-heading-2">{headingNode}</h1>
+        <div className="content">
+          <h1 className="title">
+            {props.heading1 ?? (
+              <Fragment>
+                <span className="t">
+                  Sound designed to deepen emotion and presence.
+                </span>
+              </Fragment>
+            )}
+          </h1>
 
-            <h2 className="role">
-              {props.heading11 ?? (
-                <Fragment>
-                  <span className="t">Sound Design · Composition · Post</span>
-                </Fragment>
-              )}
-            </h2>
+          <p className="desc">
+            {props.content1 ?? (
+              <Fragment>
+                <span className="t">
+                  Audio treated as a storytelling layer — not an afterthought.
+                </span>
+              </Fragment>
+            )}
+          </p>
 
-            <p className="tagline thq-body-large">{descNode}</p>
+          <div className="actions">
+            <Link href={props.primaryHref} legacyBehavior>
+              <a className="btnPrimary">
+                <span className="btnText">
+                  {props.primaryLabel ?? (
+                    <Fragment>
+                      <span className="t">Listen to Work</span>
+                    </Fragment>
+                  )}
+                </span>
+                <span className="arrow">→</span>
+              </a>
+            </Link>
 
-            <div className="actions">
-              <Link href={props.primaryHref} legacyBehavior>
-                <a className="btnPrimary" aria-label="Listen to Work">
-                  <span className="btnText">
-                    {props.primaryLabel ?? (
-                      <Fragment>
-                        <span className="t">Listen to Work</span>
-                      </Fragment>
-                    )}
-                  </span>
-                  <span className="arrow">→</span>
-                </a>
-              </Link>
-
-              <Link href={props.secondaryHref} legacyBehavior>
-                <a className="btnGhost" aria-label="Create Together">
-                  <span className="btnText">
-                    {props.secondaryLabel ?? (
-                      <Fragment>
-                        <span className="t">Create Together</span>
-                      </Fragment>
-                    )}
-                  </span>
-                  <span className="arrow">→</span>
-                </a>
-              </Link>
-            </div>
+            <Link href={props.secondaryHref} legacyBehavior>
+              <a className="btnGhost">
+                <span className="btnText">
+                  {props.secondaryLabel ?? (
+                    <Fragment>
+                      <span className="t">Create Together</span>
+                    </Fragment>
+                  )}
+                </span>
+                <span className="arrow">→</span>
+              </a>
+            </Link>
           </div>
         </div>
       </section>
@@ -93,8 +81,15 @@ const ServiceAudioHero = (props) => {
           align-items: center;
           position: relative;
           overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.08);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+          margin-top: 18px;
         }
 
+        /* ✅ video full-bleed, NO brightness filter */
         .bgVideo {
           position: absolute;
           inset: 0;
@@ -102,75 +97,65 @@ const ServiceAudioHero = (props) => {
           height: 100%;
           object-fit: cover;
           z-index: 0;
-          filter: none; /* ✅ no dim */
         }
 
+        /* ✅ cinematic legibility, without “dimming” the whole video */
         .vignette {
           position: absolute;
           inset: 0;
-          z-index: 0;
-          pointer-events: none;
+          z-index: 1;
           background: radial-gradient(
-              80% 70% at 28% 45%,
-              rgba(0, 0, 0, 0.35),
-              rgba(0, 0, 0, 0)
+              75% 60% at 30% 28%,
+              rgba(0, 0, 0, 0.12),
+              rgba(0, 0, 0, 0.58)
             ),
             linear-gradient(
               90deg,
-              rgba(0, 0, 0, 0.55) 0%,
-              rgba(0, 0, 0, 0.18) 55%,
-              rgba(0, 0, 0, 0.35) 100%
+              rgba(0, 0, 0, 0.64) 0%,
+              rgba(0, 0, 0, 0.26) 55%,
+              rgba(0, 0, 0, 0.52) 100%
             );
-          opacity: 0.85;
+          pointer-events: none;
         }
 
-        /* ✅ FORCE LEFT ALIGN like Home hero */
+        .grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.045;
+          mix-blend-mode: overlay;
+          pointer-events: none;
+          z-index: 2;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
         .content {
-          width: 100%;
           position: relative;
-          z-index: 1;
-          display: flex;
-          align-items: center;
-          justify-content: flex-start; /* ✅ key */
-          padding-left: var(--dl-layout-space-fiveunits); /* ✅ key */
-          padding-right: var(--dl-layout-space-fiveunits);
-        }
-
-        .inner {
+          z-index: 3;
           max-width: 560px;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          text-align: left;
-          align-items: flex-start;
+          padding: 0 18px;
+          margin-left: var(--dl-layout-space-fiveunits);
         }
 
-        .name {
+        .title {
           margin: 0;
           font-size: clamp(32px, 5vw, 44px);
           letter-spacing: -0.02em;
           color: #f5f4f4;
           text-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
-          line-height: 1.12;
+          line-height: 1.08;
         }
 
-        .role {
-          margin: 0;
-          font-size: clamp(18px, 2.4vw, 22px);
-          color: #25c3e2;
-          letter-spacing: 0.04em;
-          text-transform: none;
-          text-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
-        }
-
-        .tagline {
+        .desc {
           margin: 0;
           margin-top: var(--dl-layout-space-twounits);
           font-size: 16px;
           line-height: 1.7;
-          color: rgba(245, 244, 244, 0.86);
-          max-width: 52ch;
-          text-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+          color: rgba(245, 244, 244, 0.82);
+          max-width: 48ch;
         }
 
         .actions {
@@ -178,7 +163,6 @@ const ServiceAudioHero = (props) => {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
-          justify-content: flex-start;
         }
 
         .btnPrimary,
@@ -196,7 +180,6 @@ const ServiceAudioHero = (props) => {
           font-weight: 900;
           transition: all 180ms ease;
           white-space: nowrap;
-          backdrop-filter: blur(6px);
         }
 
         .btnPrimary {
@@ -232,25 +215,26 @@ const ServiceAudioHero = (props) => {
           transform: translateY(-1px);
         }
 
-        @media (max-width: 991px) {
-          .content {
-            padding-left: var(--dl-layout-space-twounits);
-            padding-right: var(--dl-layout-space-twounits);
-          }
+        .t {
+          display: inline-block;
         }
 
         @media (max-width: 767px) {
-          .content {
-            padding-left: 0;
-            padding-right: 0;
-            justify-content: flex-start;
+          .hero {
+            border-radius: 18px;
           }
 
-          .inner {
+          .content {
             width: 100%;
-            padding: 0 var(--dl-layout-space-twounits);
-            text-align: left;
-            align-items: flex-start;
+            margin-left: 0;
+            text-align: center;
+            align-items: center;
+            padding: 0 16px;
+          }
+
+          .actions {
+            width: 100%;
+            justify-content: center;
           }
 
           .btnPrimary,
@@ -259,19 +243,6 @@ const ServiceAudioHero = (props) => {
             justify-content: center;
             max-width: 520px;
           }
-
-          .vignette {
-            background: linear-gradient(
-              180deg,
-              rgba(0, 0, 0, 0.55),
-              rgba(0, 0, 0, 0.15),
-              rgba(0, 0, 0, 0.45)
-            );
-          }
-        }
-
-        .t {
-          display: inline-block;
         }
       `}</style>
     </>
@@ -279,13 +250,12 @@ const ServiceAudioHero = (props) => {
 }
 
 ServiceAudioHero.defaultProps = {
-  heading1: undefined,
-  heading11: undefined,
-  content1: undefined,
   rootClassName: '',
-
   videoSrc: '/Audio/audio%20production%2003.mov',
+  heading1: undefined,
+  content1: undefined,
 
+  // links + labels (matches your animation hero structure)
   primaryHref: '/work-audio',
   secondaryHref: '/contact',
   primaryLabel: undefined,
@@ -293,12 +263,10 @@ ServiceAudioHero.defaultProps = {
 }
 
 ServiceAudioHero.propTypes = {
-  heading1: PropTypes.element,
-  heading11: PropTypes.element,
-  content1: PropTypes.element,
   rootClassName: PropTypes.string,
-
   videoSrc: PropTypes.string,
+  heading1: PropTypes.element,
+  content1: PropTypes.element,
 
   primaryHref: PropTypes.string,
   secondaryHref: PropTypes.string,
