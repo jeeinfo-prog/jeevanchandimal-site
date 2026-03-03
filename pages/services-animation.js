@@ -20,7 +20,9 @@ export default function ServicesAnimation() {
   return (
     <>
       <Head>
-        <title>Animation &amp; Motion - Jeevan Chandimal | Filmmaker &amp; Visual Storyteller</title>
+        <title>
+          Animation &amp; Motion - Jeevan Chandimal | Filmmaker &amp; Visual Storyteller
+        </title>
         <meta
           name="description"
           content="Animation and movement used to support story — not distract from it. Motion designed with clarity, rhythm, and intent."
@@ -33,8 +35,10 @@ export default function ServicesAnimation() {
           property="og:description"
           content="Motion designed with clarity, rhythm, and intent — crafted to support narrative with purpose and restraint."
         />
-        {/* ✅ Use your own hosted image later */}
-        <meta property="og:image" content="https://www.jeevanchandimal.com/services/animation/og.jpg" />
+        <meta
+          property="og:image"
+          content="https://www.jeevanchandimal.com/services/animation/og.jpg"
+        />
         <link rel="canonical" href="https://www.jeevanchandimal.com/services-animation" />
       </Head>
 
@@ -49,21 +53,23 @@ export default function ServicesAnimation() {
         <JeevanChandimalNavi rootClassName="jeevan-chandimal-naviroot-class-name21" />
 
         <main className="main">
-          {/* HERO */}
-          <section className="section heroSection">
-            <ServiceAnimationHero
-              heading1="Motion designed with clarity, rhythm, and intent."
-              content1={
-                <>
-                  <span>
-                    Animation and movement used to support story — not distract from it.
-                  </span>
-                  <br />
-                </>
-              }
-              action3="View Motion Work"
-              rootClassName="service-animation-heroroot-class-name"
-            />
+          {/* ✅ HERO (PLACED LIKE work-photography.js: section -> block -> component) */}
+          <section className="section">
+            <div className="block">
+              <ServiceAnimationHero
+                heading1="Motion designed with clarity, rhythm, and intent."
+                content1={
+                  <>
+                    <span>
+                      Animation and movement used to support story — not distract from it.
+                    </span>
+                    <br />
+                  </>
+                }
+                action3="View Motion Work"
+                rootClassName="service-animation-heroroot-class-name"
+              />
+            </div>
           </section>
 
           {/* INTRO */}
@@ -128,7 +134,9 @@ export default function ServicesAnimation() {
                     decision.
                   </span>
                   <br />
-                  <span>Animation is used to strengthen the story — never to overwhelm it.</span>
+                  <span>
+                    Animation is used to strengthen the story — never to overwhelm it.
+                  </span>
                 </>
               }
               rootClassName="how-i-approach-motionroot-class-name"
@@ -244,6 +252,14 @@ export default function ServicesAnimation() {
 
         .section :global(> *) {
           width: 100%;
+        }
+
+        /* ✅ matches work-photography.js rhythm (fixes hero placement) */
+        .block {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
         }
 
         /* subtle depth separation between blocks */
