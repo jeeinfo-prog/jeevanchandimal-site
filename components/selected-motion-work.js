@@ -1,276 +1,409 @@
-import React, { Fragment } from 'react'
-
+import React, { Fragment, useMemo } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const SelectedMotionWork = (props) => {
+  // ✅ default local images (public/services/animation/sani-01.jpg ... sani-07.jpg)
+  const localFallback = useMemo(
+    () => ({
+      image1Src: '/services/animation/sani-01.jpg',
+      image2Src: '/services/animation/sani-02.jpg',
+      image3Src: '/services/animation/sani-03.jpg',
+      image4Src: '/services/animation/sani-04.jpg',
+      image5Src: '/services/animation/sani-05.jpg',
+      image6Src: '/services/animation/sani-06.jpg',
+      image7Src: '/services/animation/sani-07.jpg',
+    }),
+    []
+  )
+
+  const img1 = props.image1Src || localFallback.image1Src
+  const img2 = props.image2Src || localFallback.image2Src
+  const img3 = props.image3Src || localFallback.image3Src
+  const img4 = props.image4Src || localFallback.image4Src
+  const img5 = props.image5Src || localFallback.image5Src
+  const img6 = props.image6Src || localFallback.image6Src
+  const img7 = props.image7Src || localFallback.image7Src
+
   return (
     <>
-      <div
-        className={`selected-motion-work-thq-gallery3-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="selected-motion-work-thq-max-width-elm">
-          <div className="selected-motion-work-thq-section-title-elm">
-            <h2 className="selected-motion-work-thq-text-elm1 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="selected-motion-work-text1">
-                    Selected Motion Work
-                  </span>
-                </Fragment>
-              )}
-            </h2>
-            <span className="selected-motion-work-thq-text-elm2 thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="selected-motion-work-text2">
-                    A selection of motion and animation projects created to
-                    support film, brands, and visual narratives.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="selected-motion-work-container1">
-            <div className="selected-motion-work-thq-content-elm">
-              <div className="selected-motion-work-container2">
-                <img
-                  alt={props.image1Alt}
-                  src={props.image1Src}
-                  className="selected-motion-work-thq-image1-elm thq-img-ratio-1-1"
-                />
-                <img
-                  alt={props.image2Alt}
-                  src={props.image2Src}
-                  className="selected-motion-work-thq-image2-elm thq-img-ratio-1-1"
-                />
+      <section className={`smw-wrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="smw-max thq-section-max-width">
+          {/* ===== Title card (cinematic glass) ===== */}
+          <div className="smw-titleCard">
+            <div className="smw-titleBg" aria-hidden="true">
+              <div className="smw-vignette" />
+              <div className="smw-grain" />
+            </div>
+
+            <div className="smw-titleInner">
+              <div className="smw-kickerRow">
+                <span className="smw-kicker">SELECTED WORK</span>
+                <span className="smw-line" />
               </div>
-              <div className="selected-motion-work-container3">
-                <img
-                  alt={props.image3Alt}
-                  src={props.image3Src}
-                  className="selected-motion-work-thq-image3-elm thq-img-ratio-4-3"
-                />
-                <img
-                  alt={props.image4Alt}
-                  src={props.image4Src}
-                  className="selected-motion-work-thq-image4-elm thq-img-ratio-1-1"
-                />
-                <img
-                  alt={props.image5Alt}
-                  src={props.image5Src}
-                  className="selected-motion-work-thq-image5-elm thq-img-ratio-4-3"
-                />
-              </div>
-              <div className="selected-motion-work-container4">
-                <img
-                  alt={props.image6Alt}
-                  src={props.image6Src}
-                  className="selected-motion-work-thq-image6-elm thq-img-ratio-1-1"
-                />
-                <img
-                  alt={props.image7Alt}
-                  src={props.image7Src}
-                  className="selected-motion-work-thq-image7-elm thq-img-ratio-1-1"
-                />
-              </div>
+
+              <h2 className="thq-heading-2 smw-title">
+                {props.heading1 ?? (
+                  <Fragment>
+                    <span className="selected-motion-work-text1">
+                      Selected Motion Work
+                    </span>
+                  </Fragment>
+                )}
+              </h2>
+
+              <p className="thq-body-large smw-sub">
+                {props.content1 ?? (
+                  <Fragment>
+                    <span className="selected-motion-work-text2">
+                      A selection of motion and animation projects created to
+                      support film, brands, and visual narratives.
+                    </span>
+                  </Fragment>
+                )}
+              </p>
             </div>
           </div>
+
+          {/* ===== Film-strip grid ===== */}
+          <div className="smw-grid">
+            <a className="smw-tile tall" href={props.href1 || '#'} aria-label="Motion work 01">
+              <img src={img1} alt={props.image1Alt} className="smw-img" loading="lazy" />
+              <div className="smw-overlay" />
+            </a>
+
+            <a className="smw-tile tall" href={props.href2 || '#'} aria-label="Motion work 02">
+              <img src={img2} alt={props.image2Alt} className="smw-img" loading="lazy" />
+              <div className="smw-overlay" />
+            </a>
+
+            <a className="smw-tile wide" href={props.href3 || '#'} aria-label="Motion work 03">
+              <img src={img3} alt={props.image3Alt} className="smw-img" loading="lazy" />
+              <div className="smw-overlay" />
+            </a>
+
+            <a className="smw-tile tall" href={props.href4 || '#'} aria-label="Motion work 04">
+              <img src={img4} alt={props.image4Alt} className="smw-img" loading="lazy" />
+              <div className="smw-overlay" />
+            </a>
+
+            <a className="smw-tile wide" href={props.href5 || '#'} aria-label="Motion work 05">
+              <img src={img5} alt={props.image5Alt} className="smw-img" loading="lazy" />
+              <div className="smw-overlay" />
+            </a>
+
+            <a className="smw-tile tall" href={props.href6 || '#'} aria-label="Motion work 06">
+              <img src={img6} alt={props.image6Alt} className="smw-img" loading="lazy" />
+              <div className="smw-overlay" />
+            </a>
+
+            <a className="smw-tile tall" href={props.href7 || '#'} aria-label="Motion work 07">
+              <img src={img7} alt={props.image7Alt} className="smw-img" loading="lazy" />
+              <div className="smw-overlay" />
+            </a>
+          </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .selected-motion-work-thq-gallery3-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .selected-motion-work-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .selected-motion-work-thq-section-title-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .selected-motion-work-thq-text-elm1 {
-            text-align: center;
-          }
-          .selected-motion-work-thq-text-elm2 {
-            text-align: center;
-          }
-          .selected-motion-work-container1 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: row;
-          }
-          .selected-motion-work-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-shrink: 0;
-            justify-content: center;
-          }
-          .selected-motion-work-container2 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .selected-motion-work-thq-image1-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-motion-work-thq-image2-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-motion-work-container3 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: auto;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .selected-motion-work-thq-image3-elm {
-            width: 100%;
-            height: 240px;
-            object-fit: cover;
-          }
-          .selected-motion-work-thq-image4-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-motion-work-thq-image5-elm {
-            width: 100%;
-            height: 240px;
-            object-fit: cover;
-          }
-          .selected-motion-work-container4 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: auto;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .selected-motion-work-thq-image6-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-motion-work-thq-image7-elm {
-            width: 100%;
-            height: 440px;
-            object-fit: cover;
-          }
-          .selected-motion-work-text1 {
-            display: inline-block;
-          }
-          .selected-motion-work-text2 {
-            display: inline-block;
+      </section>
+
+      <style jsx>{`
+        .smw-wrap {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+        }
+
+        .smw-max {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        /* ========= title glass card ========= */
+        .smw-titleCard {
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(10px);
+        }
+
+        .smw-titleBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .smw-vignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              80% 70% at 50% 15%,
+              rgba(255, 255, 255, 0.05),
+              rgba(0, 0, 0, 0.78)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.82) 0%,
+              rgba(0, 0, 0, 0.35) 50%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+        }
+
+        .smw-grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .smw-titleInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 22px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          align-items: center;
+          text-align: center;
+          max-width: 920px;
+          margin: 0 auto;
+        }
+
+        .smw-kickerRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          justify-content: center;
+        }
+
+        .smw-kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+        }
+
+        .smw-line {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .smw-title {
+          margin: 0;
+          line-height: 1.15;
+          text-shadow: 0 16px 42px rgba(0, 0, 0, 0.55);
+        }
+
+        .smw-sub {
+          margin: 0;
+          line-height: 1.8;
+          color: rgba(245, 244, 244, 0.85);
+          max-width: 70ch;
+        }
+
+        /* ========= grid ========= */
+        .smw-grid {
+          width: 100%;
+          display: grid;
+          gap: 12px;
+          grid-template-columns: repeat(12, 1fr);
+          align-items: stretch;
+        }
+
+        .smw-tile {
+          position: relative;
+          overflow: hidden;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.4);
+          box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+          transform: translateY(0);
+          transition: transform 180ms ease, border-color 180ms ease;
+          display: block;
+          text-decoration: none !important;
+        }
+
+        .smw-tile:hover {
+          transform: translateY(-2px);
+          border-color: rgba(37, 195, 226, 0.35);
+        }
+
+        .smw-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .smw-overlay {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              60% 60% at 50% 35%,
+              rgba(0, 0, 0, 0.04),
+              rgba(0, 0, 0, 0.48)
+            ),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.35));
+          opacity: 0.55;
+          transition: opacity 180ms ease;
+          pointer-events: none;
+        }
+
+        .smw-tile:hover .smw-overlay {
+          opacity: 0.42;
+        }
+
+        /* layout spans (film-strip feeling) */
+        .tall {
+          grid-column: span 4;
+          min-height: 420px;
+        }
+
+        .wide {
+          grid-column: span 4;
+          min-height: 230px;
+        }
+
+        /* tweak layout to resemble your old 3 columns */
+        .smw-grid > :nth-child(1) {
+          grid-column: 1 / span 4;
+        }
+        .smw-grid > :nth-child(2) {
+          grid-column: 5 / span 4;
+        }
+        .smw-grid > :nth-child(3) {
+          grid-column: 9 / span 4;
+          min-height: 230px;
+        }
+        .smw-grid > :nth-child(4) {
+          grid-column: 9 / span 4;
+          min-height: 420px;
+        }
+        .smw-grid > :nth-child(5) {
+          grid-column: 9 / span 4;
+          min-height: 230px;
+        }
+        .smw-grid > :nth-child(6) {
+          grid-column: 1 / span 4;
+        }
+        .smw-grid > :nth-child(7) {
+          grid-column: 5 / span 4;
+        }
+
+        .selected-motion-work-text1,
+        .selected-motion-work-text2 {
+          display: inline-block;
+        }
+
+        @media (max-width: 991px) {
+          .smw-grid {
+            grid-template-columns: repeat(6, 1fr);
           }
 
-          @media (max-width: 991px) {
-            .selected-motion-work-thq-content-elm {
-              align-items: center;
-              flex-direction: column;
-            }
-            .selected-motion-work-container2 {
-              width: 100%;
-            }
-            .selected-motion-work-thq-image1-elm {
-              flex: 0 0 auto;
-              width: 100%;
-            }
-            .selected-motion-work-container3 {
-              width: 100%;
-            }
-            .selected-motion-work-container4 {
-              width: 100%;
-            }
+          .tall,
+          .wide {
+            grid-column: span 3;
           }
-          @media (max-width: 767px) {
-            .selected-motion-work-thq-section-title-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
+
+          .smw-grid > :nth-child(1),
+          .smw-grid > :nth-child(2),
+          .smw-grid > :nth-child(3),
+          .smw-grid > :nth-child(4),
+          .smw-grid > :nth-child(5),
+          .smw-grid > :nth-child(6),
+          .smw-grid > :nth-child(7) {
+            grid-column: span 3;
+            min-height: 320px;
           }
-        `}
-      </style>
+        }
+
+        @media (max-width: 767px) {
+          .smw-titleInner {
+            padding: 20px 16px 16px;
+          }
+          .smw-line {
+            display: none;
+          }
+          .smw-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .smw-grid > :nth-child(n) {
+            grid-column: span 2;
+            min-height: 260px;
+          }
+        }
+      `}</style>
     </>
   )
 }
 
 SelectedMotionWork.defaultProps = {
-  image7Src:
-    '/Animation/New Animation Pic/a899ba28-4f7b-402b-a72f-74b78a94bafc_3x2_2000x1333_u_100-1500w.jpg',
-  image6Alt: 'Intuitive Design Services',
-  image4Src:
-    '/Animation/New Animation Pic/hf_20260119_201908_b183ab80-964a-4339-873f-55cdf707938e_3x2_2000x1333_u_100-1500w.jpg',
-  image2Alt: 'High-Quality Audio Production',
-  image1Src:
-    '/Animation/New Animation Pic/gemini_generated_image_3oc4gm3oc4gm3oc4_3x2_2000x1333_u_100-1500w.jpg',
-  image3Src:
-    '/Animation/New Animation Pic/the%20bridege%20that%20wakes%2008%20a_3x2_2000x1333_u_100-1500w.jpg',
-  image2Src:
-    '/Animation/New Animation Pic/hf_20260119_115635_40a00c59-34b8-44ae-a55f-ecfb92202b09_3x2_2000x1333_u_100-1500w.jpg',
-  image5Src:
-    '/Animation/New Animation Pic/the%20clockwork%20mountain%2013_3x2_2000x1333_u_100-1500w.jpg',
-  image5Alt: 'Customized Solutions for Clients',
   heading1: undefined,
-  rootClassName: '',
-  image3Alt: 'Creative Animation & Graphics',
-  image7Alt: 'Dedicated Customer Support',
-  image4Alt: 'Stunning Photography Services',
-  image6Src: '/Animation/PIC/the%20bridege%20that%20wakes%2004-1500w.jpg',
   content1: undefined,
-  image1Alt: 'Professional Film Production',
+  rootClassName: '',
+
+  // ✅ you can still override, but default uses sani-xx
+  image1Alt: 'Motion work 01',
+  image2Alt: 'Motion work 02',
+  image3Alt: 'Motion work 03',
+  image4Alt: 'Motion work 04',
+  image5Alt: 'Motion work 05',
+  image6Alt: 'Motion work 06',
+  image7Alt: 'Motion work 07',
+
+  // optional click targets
+  href1: '',
+  href2: '',
+  href3: '',
+  href4: '',
+  href5: '',
+  href6: '',
+  href7: '',
 }
 
 SelectedMotionWork.propTypes = {
-  image7Src: PropTypes.string,
-  image6Alt: PropTypes.string,
-  image4Src: PropTypes.string,
-  image2Alt: PropTypes.string,
-  image1Src: PropTypes.string,
-  image3Src: PropTypes.string,
-  image2Src: PropTypes.string,
-  image5Src: PropTypes.string,
-  image5Alt: PropTypes.string,
   heading1: PropTypes.element,
-  rootClassName: PropTypes.string,
-  image3Alt: PropTypes.string,
-  image7Alt: PropTypes.string,
-  image4Alt: PropTypes.string,
-  image6Src: PropTypes.string,
   content1: PropTypes.element,
+  rootClassName: PropTypes.string,
+
+  image1Src: PropTypes.string,
+  image2Src: PropTypes.string,
+  image3Src: PropTypes.string,
+  image4Src: PropTypes.string,
+  image5Src: PropTypes.string,
+  image6Src: PropTypes.string,
+  image7Src: PropTypes.string,
+
   image1Alt: PropTypes.string,
+  image2Alt: PropTypes.string,
+  image3Alt: PropTypes.string,
+  image4Alt: PropTypes.string,
+  image5Alt: PropTypes.string,
+  image6Alt: PropTypes.string,
+  image7Alt: PropTypes.string,
+
+  href1: PropTypes.string,
+  href2: PropTypes.string,
+  href3: PropTypes.string,
+  href4: PropTypes.string,
+  href5: PropTypes.string,
+  href6: PropTypes.string,
+  href7: PropTypes.string,
 }
 
 export default SelectedMotionWork
