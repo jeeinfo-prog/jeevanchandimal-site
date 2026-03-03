@@ -18,9 +18,7 @@ const ServiceAudioHero = (props) => {
     props.content1 ?? (
       <Fragment>
         <span className="t">
-          <span>
-            Audio treated as a storytelling layer — not an afterthought.
-          </span>
+          <span>Audio treated as a storytelling layer — not an afterthought.</span>
           <br />
         </span>
       </Fragment>
@@ -29,7 +27,6 @@ const ServiceAudioHero = (props) => {
   return (
     <>
       <section className={`hero ${props.rootClassName || ''}`}>
-        {/* ✅ VIDEO BACKGROUND (no dim) */}
         <video
           className="bgVideo"
           src={props.videoSrc}
@@ -40,7 +37,7 @@ const ServiceAudioHero = (props) => {
           preload="auto"
         />
 
-        {/* optional: keep a light vignette ONLY for text legibility (not dimming video) */}
+        {/* light vignette (for readability) */}
         <div className="vignette" aria-hidden="true" />
 
         <div className="content thq-section-padding">
@@ -105,11 +102,9 @@ const ServiceAudioHero = (props) => {
           height: 100%;
           object-fit: cover;
           z-index: 0;
-          /* ✅ no dim filters */
-          filter: none;
+          filter: none; /* ✅ no dim */
         }
 
-        /* ✅ subtle text-legibility vignette (doesn't dim the whole video) */
         .vignette {
           position: absolute;
           inset: 0;
@@ -129,23 +124,26 @@ const ServiceAudioHero = (props) => {
           opacity: 0.85;
         }
 
+        /* ✅ FORCE LEFT ALIGN like Home hero */
         .content {
-  width: 100%;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-}
+          width: 100%;
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: flex-start; /* ✅ key */
+          padding-left: var(--dl-layout-space-fiveunits); /* ✅ key */
+          padding-right: var(--dl-layout-space-fiveunits);
+        }
 
-.inner {
-  max-width: 560px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-left: var(--dl-layout-space-fiveunits); /* same left offset as Home */
-  text-align: left;
-  align-items: flex-start;
-}
+        .inner {
+          max-width: 560px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          text-align: left;
+          align-items: flex-start;
+        }
 
         .name {
           margin: 0;
@@ -180,6 +178,7 @@ const ServiceAudioHero = (props) => {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
+          justify-content: flex-start;
         }
 
         .btnPrimary,
@@ -234,24 +233,25 @@ const ServiceAudioHero = (props) => {
         }
 
         @media (max-width: 991px) {
-          .inner {
-            margin-left: var(--dl-layout-space-twounits);
+          .content {
+            padding-left: var(--dl-layout-space-twounits);
+            padding-right: var(--dl-layout-space-twounits);
           }
         }
 
         @media (max-width: 767px) {
-  .inner {
-    width: 100%;
-    margin-left: 0;
-    padding: 0 var(--dl-layout-space-twounits);
-    text-align: left;
-    align-items: flex-start;
-  }
+          .content {
+            padding-left: 0;
+            padding-right: 0;
+            justify-content: flex-start;
+          }
 
-  .actions {
-    justify-content: flex-start;
-  }
-}
+          .inner {
+            width: 100%;
+            padding: 0 var(--dl-layout-space-twounits);
+            text-align: left;
+            align-items: flex-start;
+          }
 
           .btnPrimary,
           .btnGhost {
@@ -286,7 +286,6 @@ ServiceAudioHero.defaultProps = {
 
   videoSrc: '/Audio/audio%20production%2003.mov',
 
-  // ✅ buttons
   primaryHref: '/work-audio',
   secondaryHref: '/contact',
   primaryLabel: undefined,
