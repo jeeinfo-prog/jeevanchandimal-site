@@ -80,6 +80,12 @@ function normalizeCurrency(v) {
   return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
 
+function normalizePaymentId(v) {
+  const s = String(v || '').trim()
+  if (!s || s === '0') return null
+  return s
+}
+
 /* ===== MEMBERSHIP HELPERS ===== */
 
 function normalizeMembershipTier(v) {
@@ -245,8 +251,8 @@ async function claimSendOnce(orderId, column) {
  * Claim payhere_payment_id only once (first webhook wins).
  */
 async function claimPaymentOnce(orderDbId, paymentId) {
-  const pid = String(paymentId || '').trim()
-  if (!pid || pid === '0') return false
+  const pid = normalizePaymentId(paymentId)
+  if (!pid) return false
 
   const r = await supabaseAdmin
     .from('orders')
@@ -330,6 +336,8 @@ export default async function handler(req, res) {
 
     if (!order_id) return res.status(200).send('OK')
 
+    const pid = normalizePaymentId(payment_id)
+
     // ✅ Signature check
     const ok = payhereVerifyMd5Sig({
       merchantSecret: PAYHERE.merchantSecret,
@@ -363,6 +371,7 @@ export default async function handler(req, res) {
 
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 
+      // ✅ For INVALID_SIG: never store payhere_payment_id (security)
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
@@ -370,7 +379,7 @@ export default async function handler(req, res) {
             .from('orders')
             .update({
               status: 'INVALID_SIG',
-              payhere_payment_id: null, // ✅ never store on invalid
+              payhere_payment_id: null,
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -383,7 +392,7 @@ export default async function handler(req, res) {
             .from('orders')
             .update({
               status: 'INVALID_SIG',
-              payhere_payment_id: null, // ✅ never store on invalid
+              payhere_payment_id: null,
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -431,21 +440,34 @@ export default async function handler(req, res) {
         if (!order) return res.status(200).send('OK')
 
         if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
+          // ✅ store payment_id (if valid) for audit + to stop repeated mismatch loops
+          if (pid) await claimPaymentOnce(order.id, pid)
+
           await supabaseAdmin
             .from('orders')
             .update({
               status: 'AMOUNT_MISMATCH',
-              payhere_payment_id: null, // ✅ never store on mismatch
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
             .eq('id', order.id)
+
           return res.status(200).send('OK')
         }
 
         // ✅ Webhook idempotency: claim payment id once
-        const claimedPayment = await claimPaymentOnce(order.id, payment_id)
+        const claimedPayment = pid ? await claimPaymentOnce(order.id, pid) : false
+
+        // Even if already paid / duplicate webhook, still update status fields once
         if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', order.id)
+
           return res.status(200).send('OK')
         }
 
@@ -460,7 +482,6 @@ export default async function handler(req, res) {
             .update({
               status: 'PAID',
               paid_at: new Date().toISOString(),
-              // payhere_payment_id already claimed in claimPaymentOnce (leave as-is)
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -533,7 +554,7 @@ export default async function handler(req, res) {
               photoTitle: `Membership (${tier} • ${term})`,
               license: tier,
               format: term,
-              paymentId: payment_id || null,
+              paymentId: pid || null,
             })
           }
         } catch (e) {
@@ -552,20 +573,30 @@ export default async function handler(req, res) {
         }
 
         if (!amountCurrencyMatchOrLog({ dbOrder: cartOrder, payhere_amount, payhere_currency })) {
+          if (pid) await claimPaymentOnce(cartOrder.id, pid)
+
           await supabaseAdmin
             .from('orders')
             .update({
               status: 'AMOUNT_MISMATCH',
-              payhere_payment_id: null, // ✅ never store on mismatch
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
             .eq('id', cartOrder.id)
+
           return res.status(200).send('OK')
         }
 
-        const claimedPayment = await claimPaymentOnce(cartOrder.id, payment_id)
+        const claimedPayment = pid ? await claimPaymentOnce(cartOrder.id, pid) : false
         if (!claimedPayment && String(cartOrder.status || '').toUpperCase() === 'PAID') {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', cartOrder.id)
+
           return res.status(200).send('OK')
         }
 
@@ -614,7 +645,6 @@ export default async function handler(req, res) {
             .from('orders')
             .update({
               status: 'PAID_NO_ITEMS',
-              payhere_payment_id: null, // ✅ don't store
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -652,7 +682,7 @@ export default async function handler(req, res) {
             photoTitle: `Cart (${items.length} items)`,
             license: '—',
             format: '—',
-            paymentId: payment_id || null,
+            paymentId: pid || null,
           })
         }
 
@@ -750,20 +780,30 @@ export default async function handler(req, res) {
       if (!order) return res.status(200).send('OK')
 
       if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
+        if (pid) await claimPaymentOnce(order.id, pid)
+
         await supabaseAdmin
           .from('orders')
           .update({
             status: 'AMOUNT_MISMATCH',
-            payhere_payment_id: null, // ✅ never store on mismatch
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
           .eq('id', order.id)
+
         return res.status(200).send('OK')
       }
 
-      const claimedPayment = await claimPaymentOnce(order.id, payment_id)
+      const claimedPayment = pid ? await claimPaymentOnce(order.id, pid) : false
       if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
+        await supabaseAdmin
+          .from('orders')
+          .update({
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
+          .eq('id', order.id)
+
         return res.status(200).send('OK')
       }
 
@@ -788,7 +828,11 @@ export default async function handler(req, res) {
           .eq('id', order.id)
       }
 
-      const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).single()
+      const { data: fresh } = await supabaseAdmin
+        .from('orders')
+        .select('*')
+        .eq('id', order.id)
+        .maybeSingle()
       const o = fresh || order
 
       const email = normalizeEmail(o.email)
@@ -859,7 +903,7 @@ export default async function handler(req, res) {
             photoTitle: o.photo_id,
             license: normalizeLicense(o.license),
             format: normalizeFormat(o.format),
-            paymentId: payment_id || null,
+            paymentId: pid || null,
           })
         }
 
@@ -881,21 +925,25 @@ export default async function handler(req, res) {
     }
 
     /* =========================================================
-       ❌ PAYMENT FAILED / CANCELED
+       ❌ PAYMENT FAILED / CANCELED / CHARGEDBACK
     ========================================================= */
     if (statusCodeNum < 0) {
-      const isCart =
-        String(order_id || '').startsWith('CART_') ||
-        String(custom_1 || '').trim().toLowerCase() === 'cart'
+      const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
+
+      // Try to attach payment_id for audit (only if valid and column is NULL)
+      const attachPid = async (orderRow) => {
+        if (!orderRow) return
+        if (pid) await claimPaymentOnce(orderRow.id, pid)
+      }
 
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
+          await attachPid(cartOrder)
           await supabaseAdmin
             .from('orders')
             .update({
               status: 'FAILED',
-              payhere_payment_id: null, // ✅ never store on fail
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -906,11 +954,11 @@ export default async function handler(req, res) {
 
       const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (order && String(order.status || '').toUpperCase() !== 'FAILED') {
+        await attachPid(order)
         await supabaseAdmin
           .from('orders')
           .update({
             status: 'FAILED',
-            payhere_payment_id: null, // ✅ never store on fail
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
