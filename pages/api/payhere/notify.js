@@ -149,14 +149,8 @@ async function ensureInvoiceNo(order) {
   if (order.invoice_no) return order.invoice_no
   const invoiceNo = genInvoiceNo(order.id)
 
-  const up = await supabaseAdmin
-    .from('orders')
-    .update({ invoice_no: invoiceNo })
-    .eq('id', order.id)
-
-  if (up.error) {
-    console.error('ensureInvoiceNo update failed:', up.error.message)
-  }
+  const up = await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', order.id)
+  if (up.error) console.error('ensureInvoiceNo update failed:', up.error.message)
   return invoiceNo
 }
 
@@ -187,9 +181,7 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   if (!p) return null
 
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
-  return p.original_jpg_key || p.original_key
-    ? String(p.original_jpg_key || p.original_key)
-    : null
+  return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
 }
 
 /* ===== ORDER LOOKUPS ===== */
@@ -198,13 +190,11 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
   const id = String(cartOrderDbId || '').trim()
   const code = String(cartCode || '').trim()
 
-  // 1) Prefer custom_2 (DB id)
   if (id) {
     const byId = await supabaseAdmin.from('orders').select('*').eq('id', id).maybeSingle()
     if (!byId.error && byId?.data) return byId.data
   }
 
-  // 2) Fallback to code = CART_...
   if (code) {
     const byCode = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
     if (!byCode.error && byCode?.data) return byCode.data
@@ -256,7 +246,7 @@ async function claimSendOnce(orderId, column) {
  */
 async function claimPaymentOnce(orderDbId, paymentId) {
   const pid = String(paymentId || '').trim()
-  if (!pid) return false
+  if (!pid || pid === '0') return false
 
   const r = await supabaseAdmin
     .from('orders')
@@ -351,6 +341,10 @@ export default async function handler(req, res) {
       md5sig,
     })
 
+    // cart detection vars (used in multiple places)
+    const cartCode = String(order_id || '').trim()
+    const cartDbId = String(custom_2 || '').trim()
+
     if (!ok) {
       console.error('MD5 signature mismatch for order:', order_id)
 
@@ -361,10 +355,7 @@ export default async function handler(req, res) {
           String(order_id || '').startsWith('CART_') ||
           String(custom_1 || '').trim().toLowerCase() === 'cart'
         ) {
-          dbOrder = await findCartOrder({
-            cartOrderDbId: String(custom_2 || '').trim(),
-            cartCode: String(order_id || '').trim(),
-          })
+          dbOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
         } else {
           dbOrder = await findSingleOrderByRef(order_id)
         }
@@ -373,19 +364,13 @@ export default async function handler(req, res) {
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 
       if (isCart) {
-        const cartOrder =
-          dbOrder ||
-          (await findCartOrder({
-            cartOrderDbId: String(custom_2 || '').trim(),
-            cartCode: String(order_id || '').trim(),
-          }))
-
+        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
           await supabaseAdmin
             .from('orders')
             .update({
               status: 'INVALID_SIG',
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: null, // ✅ never store on invalid
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -398,7 +383,7 @@ export default async function handler(req, res) {
             .from('orders')
             .update({
               status: 'INVALID_SIG',
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: null, // ✅ never store on invalid
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -409,7 +394,7 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
-    // ✅ merchant_id hard check (prevents accepting another merchant’s webhook)
+    // ✅ merchant_id hard check
     if (String(merchant_id || '').trim() !== String(PAYHERE.merchantId || '').trim()) {
       console.error('Merchant ID mismatch:', {
         got: String(merchant_id || '').trim(),
@@ -422,9 +407,6 @@ export default async function handler(req, res) {
 
     // Try to find DB row early (helps kind detection + amount validation)
     let dbOrder = null
-    const cartCode = String(order_id || '').trim()
-    const cartDbId = String(custom_2 || '').trim()
-
     try {
       if (
         String(order_id || '').startsWith('CART_') ||
@@ -453,7 +435,7 @@ export default async function handler(req, res) {
             .from('orders')
             .update({
               status: 'AMOUNT_MISMATCH',
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: null, // ✅ never store on mismatch
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -461,7 +443,7 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
-        // ✅ Webhook idempotency: if payment already claimed AND already PAID, exit early
+        // ✅ Webhook idempotency: claim payment id once
         const claimedPayment = await claimPaymentOnce(order.id, payment_id)
         if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
           return res.status(200).send('OK')
@@ -478,13 +460,12 @@ export default async function handler(req, res) {
             .update({
               status: 'PAID',
               paid_at: new Date().toISOString(),
-              payhere_payment_id: payment_id || order.payhere_payment_id || null,
+              // payhere_payment_id already claimed in claimPaymentOnce (leave as-is)
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
             .eq('id', order.id)
         } else {
-          // Keep status_code/message updated even on retries
           await supabaseAdmin
             .from('orders')
             .update({
@@ -506,7 +487,6 @@ export default async function handler(req, res) {
 
         const o = freshRes.data || order
 
-        // ✅ your membership order encodes: license=tier, format=term
         const tier = normalizeMembershipTier(o.license)
         const term = normalizeMembershipTerm(o.format)
 
@@ -518,7 +498,7 @@ export default async function handler(req, res) {
 
         const monthlyLimit = MEMBER_LIMITS[tier] ?? 75
 
-        // ✅ Activate membership in *memberships* table (this matches /api/member/download.js)
+        // Activate membership
         try {
           const payload = {
             email,
@@ -563,7 +543,7 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
-      /* ================= CART (NEW: SINGLE ROW) ================= */
+      /* ================= CART (SINGLE ROW) ================= */
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (!cartOrder) {
@@ -576,7 +556,7 @@ export default async function handler(req, res) {
             .from('orders')
             .update({
               status: 'AMOUNT_MISMATCH',
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: null, // ✅ never store on mismatch
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -584,7 +564,6 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
-        // ✅ Webhook idempotency
         const claimedPayment = await claimPaymentOnce(cartOrder.id, payment_id)
         if (!claimedPayment && String(cartOrder.status || '').toUpperCase() === 'PAID') {
           return res.status(200).send('OK')
@@ -601,7 +580,6 @@ export default async function handler(req, res) {
             .update({
               status: 'PAID',
               paid_at: new Date().toISOString(),
-              payhere_payment_id: payment_id || cartOrder.payhere_payment_id || null,
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -616,7 +594,6 @@ export default async function handler(req, res) {
             .eq('id', cartOrder.id)
         }
 
-        // Re-fetch latest
         const { data: freshCart, error: freshErr } = await supabaseAdmin
           .from('orders')
           .select('*')
@@ -631,33 +608,27 @@ export default async function handler(req, res) {
         const o = freshCart || cartOrder
         const items = Array.isArray(o.items) ? o.items : []
 
-        // ✅ IMPORTANT: if paid cart has no items, mark it clearly in DB
         if (items.length === 0) {
           console.error('Cart order has no items array:', o.id)
-
           await supabaseAdmin
             .from('orders')
             .update({
               status: 'PAID_NO_ITEMS',
-              payhere_payment_id: payment_id || o.payhere_payment_id || null,
+              payhere_payment_id: null, // ✅ don't store
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
             .eq('id', o.id)
-
           return res.status(200).send('OK')
         }
 
-        // Ensure download_limit on cart order
         const desiredLimit = cartLimitFromItems(items)
         if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
           await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
         }
 
-        // Invoice number
         const invoiceNo = await ensureInvoiceNo(o)
 
-        // Receipt email (send once)
         const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
         if (claimedReceipt) {
           const amount =
@@ -685,7 +656,6 @@ export default async function handler(req, res) {
           })
         }
 
-        // Download email (send once)
         const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
         if (claimedDownload) {
           const links = []
@@ -774,7 +744,7 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
-      /* ================= SINGLE PHOTO (EXISTING) ================= */
+      /* ================= SINGLE PHOTO ================= */
 
       const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (!order) return res.status(200).send('OK')
@@ -784,7 +754,7 @@ export default async function handler(req, res) {
           .from('orders')
           .update({
             status: 'AMOUNT_MISMATCH',
-            payhere_payment_id: payment_id || null,
+            payhere_payment_id: null, // ✅ never store on mismatch
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
@@ -792,7 +762,6 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
-      // ✅ Webhook idempotency
       const claimedPayment = await claimPaymentOnce(order.id, payment_id)
       if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
         return res.status(200).send('OK')
@@ -805,7 +774,6 @@ export default async function handler(req, res) {
           .update({
             status: 'PAID',
             paid_at: new Date().toISOString(),
-            payhere_payment_id: payment_id || order.payhere_payment_id || null,
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
@@ -849,7 +817,6 @@ export default async function handler(req, res) {
 
         const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
         const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
-
         if (!claimedReceipt && !claimedDownload) return res.status(200).send('OK')
 
         const jti = crypto.randomUUID()
@@ -922,14 +889,13 @@ export default async function handler(req, res) {
         String(custom_1 || '').trim().toLowerCase() === 'cart'
 
       if (isCart) {
-        const cartOrder =
-          dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
+        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
           await supabaseAdmin
             .from('orders')
             .update({
               status: 'FAILED',
-              payhere_payment_id: payment_id || cartOrder.payhere_payment_id || null,
+              payhere_payment_id: null, // ✅ never store on fail
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -944,7 +910,7 @@ export default async function handler(req, res) {
           .from('orders')
           .update({
             status: 'FAILED',
-            payhere_payment_id: payment_id || order.payhere_payment_id || null,
+            payhere_payment_id: null, // ✅ never store on fail
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
