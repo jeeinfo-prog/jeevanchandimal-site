@@ -153,6 +153,7 @@ async function ensureInvoiceNo(order) {
     .from('orders')
     .update({ invoice_no: invoiceNo })
     .eq('id', order.id)
+
   if (up.error) {
     console.error('ensureInvoiceNo update failed:', up.error.message)
   }
@@ -223,7 +224,7 @@ async function findSingleOrderByRef(ref) {
   if (!byOrderId.error && byOrderId?.data) return byOrderId.data
 
   const byCode = await supabaseAdmin.from('orders').select('*').eq('code', v).maybeSingle()
-  if (!byCode.error && byId?.data) return byId.data
+  if (!byCode.error && byCode?.data) return byCode.data
 
   return null
 }
@@ -244,6 +245,29 @@ async function claimSendOnce(orderId, column) {
 
   if (r.error) {
     console.error('claimSendOnce failed:', column, r.error.message)
+    return false
+  }
+  return !!r.data
+}
+
+/**
+ * ✅ Webhook idempotency helper:
+ * Claim payhere_payment_id only once (first webhook wins).
+ */
+async function claimPaymentOnce(orderDbId, paymentId) {
+  const pid = String(paymentId || '').trim()
+  if (!pid) return false
+
+  const r = await supabaseAdmin
+    .from('orders')
+    .update({ payhere_payment_id: pid })
+    .eq('id', orderDbId)
+    .is('payhere_payment_id', null)
+    .select('id')
+    .maybeSingle()
+
+  if (r.error) {
+    console.error('claimPaymentOnce failed:', r.error.message)
     return false
   }
   return !!r.data
@@ -316,7 +340,7 @@ export default async function handler(req, res) {
 
     if (!order_id) return res.status(200).send('OK')
 
-    // ✅ After signature check passes, we also enforce merchant_id match
+    // ✅ Signature check
     const ok = payhereVerifyMd5Sig({
       merchantSecret: PAYHERE.merchantSecret,
       merchant_id,
@@ -329,16 +353,18 @@ export default async function handler(req, res) {
 
     if (!ok) {
       console.error('MD5 signature mismatch for order:', order_id)
-      // Preserve your existing behavior: mark INVALID_SIG when possible, then return OK.
 
-      // Try to find DB row early (helps kind detection + amount validation)
+      // Try to find DB row early (helps kind detection + marking)
       let dbOrder = null
       try {
         if (
           String(order_id || '').startsWith('CART_') ||
           String(custom_1 || '').trim().toLowerCase() === 'cart'
         ) {
-          dbOrder = await findCartOrder({ cartOrderDbId: String(custom_2 || '').trim(), cartCode: String(order_id).trim() })
+          dbOrder = await findCartOrder({
+            cartOrderDbId: String(custom_2 || '').trim(),
+            cartCode: String(order_id || '').trim(),
+          })
         } else {
           dbOrder = await findSingleOrderByRef(order_id)
         }
@@ -435,6 +461,12 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
+        // ✅ Webhook idempotency: if payment already claimed AND already PAID, exit early
+        const claimedPayment = await claimPaymentOnce(order.id, payment_id)
+        if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
+          return res.status(200).send('OK')
+        }
+
         const email = normalizeEmail(order.email)
         if (!email) return res.status(200).send('OK')
 
@@ -446,7 +478,16 @@ export default async function handler(req, res) {
             .update({
               status: 'PAID',
               paid_at: new Date().toISOString(),
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: payment_id || order.payhere_payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', order.id)
+        } else {
+          // Keep status_code/message updated even on retries
+          await supabaseAdmin
+            .from('orders')
+            .update({
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -543,6 +584,12 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
+        // ✅ Webhook idempotency
+        const claimedPayment = await claimPaymentOnce(cartOrder.id, payment_id)
+        if (!claimedPayment && String(cartOrder.status || '').toUpperCase() === 'PAID') {
+          return res.status(200).send('OK')
+        }
+
         const email = normalizeEmail(cartOrder.email)
         if (!email) return res.status(200).send('OK')
 
@@ -554,7 +601,15 @@ export default async function handler(req, res) {
             .update({
               status: 'PAID',
               paid_at: new Date().toISOString(),
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: payment_id || cartOrder.payhere_payment_id || null,
+              payhere_status_code: status_code || null,
+              payhere_status_message: status_message || null,
+            })
+            .eq('id', cartOrder.id)
+        } else {
+          await supabaseAdmin
+            .from('orders')
+            .update({
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -584,7 +639,7 @@ export default async function handler(req, res) {
             .from('orders')
             .update({
               status: 'PAID_NO_ITEMS',
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: payment_id || o.payhere_payment_id || null,
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -737,6 +792,12 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
+      // ✅ Webhook idempotency
+      const claimedPayment = await claimPaymentOnce(order.id, payment_id)
+      if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
+        return res.status(200).send('OK')
+      }
+
       const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
       if (!wasPaidAlready) {
         await supabaseAdmin
@@ -744,18 +805,22 @@ export default async function handler(req, res) {
           .update({
             status: 'PAID',
             paid_at: new Date().toISOString(),
-            payhere_payment_id: payment_id || null,
+            payhere_payment_id: payment_id || order.payhere_payment_id || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
+          .eq('id', order.id)
+      } else {
+        await supabaseAdmin
+          .from('orders')
+          .update({
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
           .eq('id', order.id)
       }
 
-      const { data: fresh } = await supabaseAdmin
-        .from('orders')
-        .select('*')
-        .eq('id', order.id)
-        .single()
+      const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).single()
       const o = fresh || order
 
       const email = normalizeEmail(o.email)
@@ -852,16 +917,19 @@ export default async function handler(req, res) {
        ❌ PAYMENT FAILED / CANCELED
     ========================================================= */
     if (statusCodeNum < 0) {
-      const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
+      const isCart =
+        String(order_id || '').startsWith('CART_') ||
+        String(custom_1 || '').trim().toLowerCase() === 'cart'
 
       if (isCart) {
-        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
+        const cartOrder =
+          dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
           await supabaseAdmin
             .from('orders')
             .update({
               status: 'FAILED',
-              payhere_payment_id: payment_id || null,
+              payhere_payment_id: payment_id || cartOrder.payhere_payment_id || null,
               payhere_status_code: status_code || null,
               payhere_status_message: status_message || null,
             })
@@ -876,7 +944,7 @@ export default async function handler(req, res) {
           .from('orders')
           .update({
             status: 'FAILED',
-            payhere_payment_id: payment_id || null,
+            payhere_payment_id: payment_id || order.payhere_payment_id || null,
             payhere_status_code: status_code || null,
             payhere_status_message: status_message || null,
           })
