@@ -1,218 +1,277 @@
+// components/service-film-hero.js
 import React, { Fragment } from 'react'
-
+import Link from 'next/link'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const ServiceFilmHero = (props) => {
   return (
     <>
-      <div className="service-film-hero-container1 thq-section-padding">
-        <img
-          alt={props.videoSrc}
+      <section className={`hero ${props.rootClassName || ''}`}>
+        {/* ✅ VIDEO BACKGROUND (NO DIM) */}
+        <video
+          className="bgVideo"
           src={props.videoSrc}
-          className="service-film-hero-image"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
         />
-        <div className="service-film-hero-thq-column-elm">
-          <div className="service-film-hero-thq-content-elm">
-            <h1 className="thq-heading-2 service-film-hero-thq-text-elm1">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="service-film-hero-text1">
-                    Cinematic films crafted with story, mood, and precision.
-                  </span>
-                </Fragment>
-              )}
-            </h1>
-            <p className="thq-body-large service-film-hero-thq-text-elm2">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="service-film-hero-text3">
-                    Film-led visual production where image, motion, and sound
-                    work as one - from concept to final delivery.
-                  </span>
-                </Fragment>
-              )}
-            </p>
-            <div className="service-film-hero-container2">
-              <input
-                type="email"
-                placeholder={props.textinputPlaceholder}
-                className="service-film-hero-textinput thq-input"
-              />
-              <div className="service-film-hero-container3">
-                <button className="service-film-hero-thq-button-elm thq-button-filled">
-                  <span className="thq-body-small">
-                    {props.action3 ?? (
-                      <Fragment>
-                        <span className="service-film-hero-text2">
-                          Create Together
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </button>
-              </div>
-            </div>
+
+        {/* ✅ cinematic legibility (not dimming the video) */}
+        <div className="vignette" />
+        <div className="grain" />
+
+        <div className="content">
+          <h1 className="title">
+            {props.heading1 ?? (
+              <Fragment>
+                <span className="t">
+                  Cinematic films crafted with story, mood, and precision.
+                </span>
+              </Fragment>
+            )}
+          </h1>
+
+          <p className="desc">
+            {props.content1 ?? (
+              <Fragment>
+                <span className="t">
+                  Film-led visual production where image, motion, and sound work
+                  as one — from concept to final delivery.
+                </span>
+              </Fragment>
+            )}
+          </p>
+
+          <div className="actions">
+            <Link href={props.primaryHref} legacyBehavior>
+              <a className="btnPrimary">
+                <span className="btnText">
+                  {props.primaryLabel ?? (
+                    <Fragment>
+                      <span className="t">View Film Work</span>
+                    </Fragment>
+                  )}
+                </span>
+                <span className="arrow">→</span>
+              </a>
+            </Link>
+
+            <Link href={props.secondaryHref} legacyBehavior>
+              <a className="btnGhost">
+                <span className="btnText">
+                  {props.secondaryLabel ?? (
+                    <Fragment>
+                      <span className="t">Create Together</span>
+                    </Fragment>
+                  )}
+                </span>
+                <span className="arrow">→</span>
+              </a>
+            </Link>
           </div>
         </div>
-        <video
-          src={props.videoSrc}
-          loop="true"
-          muted="true"
-          poster="https://play.teleporthq.io/static/svg/videoposter.svg"
-          autoPlay="true"
-          playsInline="true"
-          className="service-film-hero-video"
-        ></video>
-      </div>
-      <style jsx>
-        {`
-          .service-film-hero-container1 {
+      </section>
+
+      <style jsx>{`
+        .hero {
+          width: 100%;
+          min-height: 72vh;
+          display: flex;
+          align-items: center;
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.08);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+          margin-top: 18px;
+        }
+
+        /* ✅ full-bleed video, NO brightness filter */
+        .bgVideo {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          z-index: 0;
+        }
+
+        /* ✅ subtle legibility layers (keeps video vivid) */
+        .vignette {
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          background: radial-gradient(
+              75% 60% at 30% 28%,
+              rgba(0, 0, 0, 0.12),
+              rgba(0, 0, 0, 0.58)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.64) 0%,
+              rgba(0, 0, 0, 0.26) 55%,
+              rgba(0, 0, 0, 0.52) 100%
+            );
+          pointer-events: none;
+        }
+
+        .grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.045;
+          mix-blend-mode: overlay;
+          pointer-events: none;
+          z-index: 2;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .content {
+          position: relative;
+          z-index: 3;
+          max-width: 560px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 0 18px;
+          margin-left: var(--dl-layout-space-fiveunits);
+        }
+
+        .title {
+          margin: 0;
+          font-size: clamp(32px, 5vw, 44px);
+          letter-spacing: -0.02em;
+          color: #f5f4f4;
+          text-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+          line-height: 1.08;
+        }
+
+        .desc {
+          margin: 0;
+          margin-top: var(--dl-layout-space-twounits);
+          font-size: 16px;
+          line-height: 1.7;
+          color: rgba(245, 244, 244, 0.82);
+          max-width: 52ch;
+        }
+
+        .actions {
+          margin-top: var(--dl-layout-space-twounits);
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .btnPrimary,
+        .btnGhost {
+          height: 36px;
+          padding: 0 14px 0 16px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none !important;
+          font-size: 11px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          font-weight: 900;
+          transition: all 180ms ease;
+          white-space: nowrap;
+        }
+
+        .btnPrimary {
+          border: 1px solid rgba(37, 195, 226, 0.45);
+          background: linear-gradient(
+            180deg,
+            rgba(37, 195, 226, 0.22),
+            rgba(37, 195, 226, 0.08)
+          );
+          color: #f5f4f4;
+          box-shadow: 0 14px 26px rgba(0, 0, 0, 0.35);
+        }
+
+        .btnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.7);
+        }
+
+        .btnGhost {
+          border: 1px solid rgba(245, 244, 244, 0.18);
+          background: rgba(255, 255, 255, 0.03);
+          color: rgba(245, 244, 244, 0.92);
+        }
+
+        .btnGhost:hover {
+          border-color: rgba(37, 195, 226, 0.45);
+          background: rgba(37, 195, 226, 0.08);
+          transform: translateY(-1px);
+        }
+
+        .arrow {
+          color: #25c3e2;
+          transform: translateY(-1px);
+        }
+
+        .t {
+          display: inline-block;
+        }
+
+        @media (max-width: 767px) {
+          .hero {
+            border-radius: 18px;
+          }
+
+          .content {
             width: 100%;
-            height: 1015px;
-            display: flex;
-            position: relative;
+            margin-left: 0;
+            text-align: center;
             align-items: center;
-            flex-direction: row;
+            padding: 0 16px;
           }
-          .service-film-hero-image {
-            top: 0px;
-            left: 0px;
-            right: 0px;
+
+          .actions {
             width: 100%;
-            height: 100%;
-            margin: auto;
-            position: absolute;
-            object-fit: cover;
-          }
-          .service-film-hero-thq-column-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            z-index: 1;
-            max-width: 560px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .service-film-hero-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-            animation-name: fadeInLeft;
-            flex-direction: column;
-            animation-delay: 0s;
-            animation-duration: 500ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .service-film-hero-container2 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 0 0 auto;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-direction: row;
-            justify-content: flex-start;
-          }
-          .service-film-hero-textinput {
-            width: 70%;
-            background-color: transparent;
-          }
-          .service-film-hero-container3 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-          }
-          .service-film-hero-thq-button-elm {
-            gap: var(--dl-layout-space-halfunit);
-            flex: 1;
-            display: flex;
-            box-sizing: content-box;
-            align-items: center;
-            border-color: var(--dl-color-theme-primary1);
-            border-style: solid;
-            border-width: 1px;
             justify-content: center;
-            background-color: var(--dl-color-theme-primary1);
           }
-          .service-film-hero-video {
-            top: 0px;
-            left: 0px;
-            right: 0px;
+
+          .btnPrimary,
+          .btnGhost {
             width: 100%;
-            height: 100%;
-            margin: auto;
-            position: absolute;
-            object-fit: cover;
+            justify-content: center;
+            max-width: 520px;
           }
-          .service-film-hero-text1 {
-            display: inline-block;
-          }
-          .service-film-hero-text2 {
-            display: inline-block;
-          }
-          .service-film-hero-text3 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .service-film-hero-thq-column-elm {
-              align-self: center;
-            }
-          }
-          @media (max-width: 767px) {
-            .service-film-hero-thq-column-elm {
-              width: 100%;
-            }
-            .service-film-hero-thq-text-elm1 {
-              text-align: center;
-            }
-            .service-film-hero-thq-text-elm2 {
-              text-align: center;
-            }
-            .service-film-hero-container2 {
-              flex-direction: column;
-            }
-            .service-film-hero-textinput {
-              width: 100%;
-            }
-            .service-film-hero-container3 {
-              width: 100%;
-            }
-            .service-film-hero-thq-button-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 479px) {
-            .service-film-hero-container3 {
-              width: 100%;
-            }
-            .service-film-hero-thq-button-elm {
-              width: 100%;
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 ServiceFilmHero.defaultProps = {
+  rootClassName: '',
   videoSrc: '/Film/film%20production%2002.mov',
   heading1: undefined,
-  action3: undefined,
-  textinputPlaceholder: 'Create Together',
   content1: undefined,
+
+  primaryHref: '/work-film',
+  secondaryHref: '/contact',
+  primaryLabel: undefined,
+  secondaryLabel: undefined,
 }
 
 ServiceFilmHero.propTypes = {
+  rootClassName: PropTypes.string,
   videoSrc: PropTypes.string,
   heading1: PropTypes.element,
-  action3: PropTypes.element,
-  textinputPlaceholder: PropTypes.string,
   content1: PropTypes.element,
+
+  primaryHref: PropTypes.string,
+  secondaryHref: PropTypes.string,
+  primaryLabel: PropTypes.element,
+  secondaryLabel: PropTypes.element,
 }
 
 export default ServiceFilmHero
