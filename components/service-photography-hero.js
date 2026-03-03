@@ -5,21 +5,21 @@ import PropTypes from 'prop-types'
 const ServicePhotographyHero = (props) => {
   return (
     <>
-      <div className={`hero ${props.rootClassName || ''}`}>
-        {/* background video (NOT dimmed) */}
+      <section className={`hero ${props.rootClassName || ''}`}>
+        {/* ✅ VIDEO BACKGROUND (NO DIM) */}
         {props.videoSrc && (
           <video
+            className="bgVideo"
             src={props.videoSrc}
-            loop
-            muted
             autoPlay
+            muted
+            loop
             playsInline
             preload="auto"
-            className="bgVideo"
           />
         )}
 
-        {/* cinematic overlays (no dim filter on video) */}
+        {/* ✅ cinematic legibility layers */}
         <div className="vignette" />
         <div className="grain" />
 
@@ -27,7 +27,9 @@ const ServicePhotographyHero = (props) => {
           <h1 className="title">
             {props.heading1 ?? (
               <Fragment>
-                <span className="t">Still imagery shaped by light, mood, and atmosphere.</span>
+                <span className="t">
+                  Still imagery shaped by light, mood, and atmosphere.
+                </span>
               </Fragment>
             )}
           </h1>
@@ -48,7 +50,7 @@ const ServicePhotographyHero = (props) => {
                 <span className="btnText">
                   {props.action3 ?? (
                     <Fragment>
-                      <span className="service-photography-hero-text1">Explore Work</span>
+                      <span className="t">Explore Work</span>
                     </Fragment>
                   )}
                 </span>
@@ -70,22 +72,31 @@ const ServicePhotographyHero = (props) => {
             </Link>
           </div>
         </div>
-      </div>
+      </section>
 
       <style jsx>{`
         .hero {
           width: 100%;
           min-height: 72vh;
+
           display: flex;
           align-items: center;
+          justify-content: flex-start;
+
           position: relative;
           overflow: hidden;
+
           border-radius: 22px;
           border: 1px solid rgba(245, 244, 244, 0.08);
+
+          /* ✅ EXACT SAME background as service-film-hero */
           background: rgba(12, 12, 12, 0.45);
+
           box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(10px);
+
           margin-top: 18px;
+          padding-top: 0;
         }
 
         .bgVideo {
@@ -94,13 +105,9 @@ const ServicePhotographyHero = (props) => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-
-          /* ✅ don't dim video */
-          filter: none;
           z-index: 0;
         }
 
-        /* overlays help legibility WITHOUT dimming the video */
         .vignette {
           position: absolute;
           inset: 0;
@@ -116,6 +123,7 @@ const ServicePhotographyHero = (props) => {
               rgba(0, 0, 0, 0.22) 55%,
               rgba(0, 0, 0, 0.42) 100%
             );
+          pointer-events: none;
         }
 
         .grain {
@@ -155,7 +163,7 @@ const ServicePhotographyHero = (props) => {
           font-size: 16px;
           line-height: 1.7;
           color: rgba(245, 244, 244, 0.82);
-          max-width: 48ch;
+          max-width: 52ch;
         }
 
         .actions {
@@ -215,9 +223,6 @@ const ServicePhotographyHero = (props) => {
           transform: translateY(-1px);
         }
 
-        .service-photography-hero-text1,
-        .service-photography-hero-text2,
-        .service-photography-hero-text3,
         .t {
           display: inline-block;
         }
@@ -226,6 +231,7 @@ const ServicePhotographyHero = (props) => {
           .hero {
             border-radius: 18px;
           }
+
           .content {
             width: 100%;
             margin-left: 0;
@@ -233,10 +239,12 @@ const ServicePhotographyHero = (props) => {
             align-items: center;
             padding: 0 16px;
           }
+
           .actions {
             width: 100%;
             justify-content: center;
           }
+
           .btnPrimary,
           .btnGhost {
             width: 100%;
@@ -254,10 +262,8 @@ ServicePhotographyHero.defaultProps = {
   heading1: undefined,
   content1: undefined,
   action3: undefined,
-
   videoSrc: '/Photography/Video/photography%2001.mov',
 
-  // ✅ links like HomePageHero
   primaryHref: '/work-photography',
   secondaryHref: '/contact',
   secondaryLabel: undefined,
@@ -268,9 +274,7 @@ ServicePhotographyHero.propTypes = {
   heading1: PropTypes.element,
   content1: PropTypes.element,
   action3: PropTypes.element,
-
   videoSrc: PropTypes.string,
-
   primaryHref: PropTypes.string,
   secondaryHref: PropTypes.string,
   secondaryLabel: PropTypes.element,
