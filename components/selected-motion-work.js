@@ -2,7 +2,6 @@ import React, { Fragment, useMemo } from 'react'
 import PropTypes from 'prop-types'
 
 const SelectedMotionWork = (props) => {
-  // ✅ default local images (public/services/animation/sani-01.jpg ... sani-07.jpg)
   const localFallback = useMemo(
     () => ({
       image1Src: '/services/animation/sani-01.jpg',
@@ -16,19 +15,21 @@ const SelectedMotionWork = (props) => {
     []
   )
 
-  const img1 = props.image1Src || localFallback.image1Src
-  const img2 = props.image2Src || localFallback.image2Src
-  const img3 = props.image3Src || localFallback.image3Src
-  const img4 = props.image4Src || localFallback.image4Src
-  const img5 = props.image5Src || localFallback.image5Src
-  const img6 = props.image6Src || localFallback.image6Src
-  const img7 = props.image7Src || localFallback.image7Src
+  const tiles = [
+    { src: props.image1Src || localFallback.image1Src, alt: props.image1Alt, href: props.href1 || '' },
+    { src: props.image2Src || localFallback.image2Src, alt: props.image2Alt, href: props.href2 || '' },
+    { src: props.image3Src || localFallback.image3Src, alt: props.image3Alt, href: props.href3 || '' },
+    { src: props.image4Src || localFallback.image4Src, alt: props.image4Alt, href: props.href4 || '' },
+    { src: props.image5Src || localFallback.image5Src, alt: props.image5Alt, href: props.href5 || '' },
+    { src: props.image6Src || localFallback.image6Src, alt: props.image6Alt, href: props.href6 || '' },
+    { src: props.image7Src || localFallback.image7Src, alt: props.image7Alt, href: props.href7 || '' },
+  ]
 
   return (
     <>
       <section className={`smw-wrap thq-section-padding ${props.rootClassName || ''}`}>
         <div className="smw-max thq-section-max-width">
-          {/* ===== Title card (cinematic glass) ===== */}
+          {/* ===== Title card ===== */}
           <div className="smw-titleCard">
             <div className="smw-titleBg" aria-hidden="true">
               <div className="smw-vignette" />
@@ -44,9 +45,7 @@ const SelectedMotionWork = (props) => {
               <h2 className="thq-heading-2 smw-title">
                 {props.heading1 ?? (
                   <Fragment>
-                    <span className="selected-motion-work-text1">
-                      Selected Motion Work
-                    </span>
+                    <span className="selected-motion-work-text1">Selected Motion Work</span>
                   </Fragment>
                 )}
               </h2>
@@ -55,8 +54,7 @@ const SelectedMotionWork = (props) => {
                 {props.content1 ?? (
                   <Fragment>
                     <span className="selected-motion-work-text2">
-                      A selection of motion and animation projects created to
-                      support film, brands, and visual narratives.
+                      A selection of motion and animation projects created to support film, brands, and visual narratives.
                     </span>
                   </Fragment>
                 )}
@@ -64,42 +62,18 @@ const SelectedMotionWork = (props) => {
             </div>
           </div>
 
-          {/* ===== Film-strip grid ===== */}
-          <div className="smw-grid">
-            <a className="smw-tile tall" href={props.href1 || '#'} aria-label="Motion work 01">
-              <img src={img1} alt={props.image1Alt} className="smw-img" loading="lazy" />
-              <div className="smw-overlay" />
-            </a>
-
-            <a className="smw-tile tall" href={props.href2 || '#'} aria-label="Motion work 02">
-              <img src={img2} alt={props.image2Alt} className="smw-img" loading="lazy" />
-              <div className="smw-overlay" />
-            </a>
-
-            <a className="smw-tile wide" href={props.href3 || '#'} aria-label="Motion work 03">
-              <img src={img3} alt={props.image3Alt} className="smw-img" loading="lazy" />
-              <div className="smw-overlay" />
-            </a>
-
-            <a className="smw-tile tall" href={props.href4 || '#'} aria-label="Motion work 04">
-              <img src={img4} alt={props.image4Alt} className="smw-img" loading="lazy" />
-              <div className="smw-overlay" />
-            </a>
-
-            <a className="smw-tile wide" href={props.href5 || '#'} aria-label="Motion work 05">
-              <img src={img5} alt={props.image5Alt} className="smw-img" loading="lazy" />
-              <div className="smw-overlay" />
-            </a>
-
-            <a className="smw-tile tall" href={props.href6 || '#'} aria-label="Motion work 06">
-              <img src={img6} alt={props.image6Alt} className="smw-img" loading="lazy" />
-              <div className="smw-overlay" />
-            </a>
-
-            <a className="smw-tile tall" href={props.href7 || '#'} aria-label="Motion work 07">
-              <img src={img7} alt={props.image7Alt} className="smw-img" loading="lazy" />
-              <div className="smw-overlay" />
-            </a>
+          {/* ===== Masonry grid (NO GAPS) ===== */}
+          <div className="smw-masonry" aria-label="Selected motion work gallery">
+            {tiles.map((t, i) => {
+              const Tag = t.href ? 'a' : 'div'
+              const tagProps = t.href ? { href: t.href } : {}
+              return (
+                <Tag key={i} className="smw-tile" {...tagProps} aria-label={t.alt || `Motion work ${i + 1}`}>
+                  <img src={t.src} alt={t.alt} className="smw-img" loading="lazy" />
+                  <div className="smw-overlay" />
+                </Tag>
+              )
+            })}
           </div>
         </div>
       </section>
@@ -116,10 +90,10 @@ const SelectedMotionWork = (props) => {
           width: 100%;
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 16px;
         }
 
-        /* ========= title glass card ========= */
+        /* ===== title glass card ===== */
         .smw-titleCard {
           position: relative;
           overflow: hidden;
@@ -196,11 +170,7 @@ const SelectedMotionWork = (props) => {
         .smw-line {
           flex: 1;
           height: 1px;
-          background: linear-gradient(
-            90deg,
-            rgba(245, 244, 244, 0.18),
-            rgba(245, 244, 244, 0)
-          );
+          background: linear-gradient(90deg, rgba(245, 244, 244, 0.18), rgba(245, 244, 244, 0));
         }
 
         .smw-title {
@@ -216,16 +186,17 @@ const SelectedMotionWork = (props) => {
           max-width: 70ch;
         }
 
-        /* ========= grid ========= */
-        .smw-grid {
+        /* ===== Masonry (this removes holes) ===== */
+        .smw-masonry {
           width: 100%;
-          display: grid;
-          gap: 12px;
-          grid-template-columns: repeat(12, 1fr);
-          align-items: stretch;
+          column-count: 3;
+          column-gap: 12px;
         }
 
         .smw-tile {
+          width: 100%;
+          display: inline-block; /* required for columns */
+          margin: 0 0 12px;
           position: relative;
           overflow: hidden;
           border-radius: 18px;
@@ -234,8 +205,8 @@ const SelectedMotionWork = (props) => {
           box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
           transform: translateY(0);
           transition: transform 180ms ease, border-color 180ms ease;
-          display: block;
           text-decoration: none !important;
+          break-inside: avoid;
         }
 
         .smw-tile:hover {
@@ -245,9 +216,9 @@ const SelectedMotionWork = (props) => {
 
         .smw-img {
           width: 100%;
-          height: 100%;
-          object-fit: cover;
+          height: auto; /* natural masonry */
           display: block;
+          object-fit: cover;
         }
 
         .smw-overlay {
@@ -268,67 +239,14 @@ const SelectedMotionWork = (props) => {
           opacity: 0.42;
         }
 
-        /* layout spans (film-strip feeling) */
-        .tall {
-          grid-column: span 4;
-          min-height: 420px;
-        }
-
-        .wide {
-          grid-column: span 4;
-          min-height: 230px;
-        }
-
-        /* tweak layout to resemble your old 3 columns */
-        .smw-grid > :nth-child(1) {
-          grid-column: 1 / span 4;
-        }
-        .smw-grid > :nth-child(2) {
-          grid-column: 5 / span 4;
-        }
-        .smw-grid > :nth-child(3) {
-          grid-column: 9 / span 4;
-          min-height: 230px;
-        }
-        .smw-grid > :nth-child(4) {
-          grid-column: 9 / span 4;
-          min-height: 420px;
-        }
-        .smw-grid > :nth-child(5) {
-          grid-column: 9 / span 4;
-          min-height: 230px;
-        }
-        .smw-grid > :nth-child(6) {
-          grid-column: 1 / span 4;
-        }
-        .smw-grid > :nth-child(7) {
-          grid-column: 5 / span 4;
-        }
-
         .selected-motion-work-text1,
         .selected-motion-work-text2 {
           display: inline-block;
         }
 
         @media (max-width: 991px) {
-          .smw-grid {
-            grid-template-columns: repeat(6, 1fr);
-          }
-
-          .tall,
-          .wide {
-            grid-column: span 3;
-          }
-
-          .smw-grid > :nth-child(1),
-          .smw-grid > :nth-child(2),
-          .smw-grid > :nth-child(3),
-          .smw-grid > :nth-child(4),
-          .smw-grid > :nth-child(5),
-          .smw-grid > :nth-child(6),
-          .smw-grid > :nth-child(7) {
-            grid-column: span 3;
-            min-height: 320px;
+          .smw-masonry {
+            column-count: 2;
           }
         }
 
@@ -339,12 +257,8 @@ const SelectedMotionWork = (props) => {
           .smw-line {
             display: none;
           }
-          .smw-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .smw-grid > :nth-child(n) {
-            grid-column: span 2;
-            min-height: 260px;
+          .smw-masonry {
+            column-count: 1;
           }
         }
       `}</style>
@@ -357,7 +271,6 @@ SelectedMotionWork.defaultProps = {
   content1: undefined,
   rootClassName: '',
 
-  // ✅ you can still override, but default uses sani-xx
   image1Alt: 'Motion work 01',
   image2Alt: 'Motion work 02',
   image3Alt: 'Motion work 03',
@@ -366,7 +279,6 @@ SelectedMotionWork.defaultProps = {
   image6Alt: 'Motion work 06',
   image7Alt: 'Motion work 07',
 
-  // optional click targets
   href1: '',
   href2: '',
   href3: '',
