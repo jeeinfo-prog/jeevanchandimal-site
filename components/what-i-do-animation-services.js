@@ -1,484 +1,346 @@
-import React, { Fragment } from 'react'
-
+import React, { Fragment, useMemo } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
+import Link from 'next/link'
 
 const WhatIDoAnimationServices = (props) => {
+  // ✅ Edit this list only to update services
+  const ITEMS = useMemo(
+    () => [
+      {
+        key: 'feature1',
+        img: '/services/animation/swid-01.jpg',
+        alt: 'Motion Graphics',
+        title: 'Motion Graphics',
+        desc:
+          'Clean, intentional motion designed to elevate brand communication and cinematic storytelling.',
+        href: '/services/animation/motion-graphics',
+        cta: 'Explore',
+      },
+      {
+        key: 'feature2',
+        img: '/services/animation/swid-02.jpg',
+        alt: '2D & 3D Animation',
+        title: '2D & 3D Animation',
+        desc:
+          'Structured animation built with pacing, clarity, and visual depth.',
+        href: '/services/animation/2d-3d',
+        cta: 'Discover',
+      },
+      {
+        key: 'feature3',
+        img: '/services/animation/swid-03.jpg',
+        alt: 'Title Sequences',
+        title: 'Title Sequences',
+        desc:
+          'Opening visuals crafted to establish tone, rhythm, and cinematic atmosphere.',
+        href: '/services/animation/title-sequences',
+        cta: 'View',
+      },
+      {
+        key: 'feature4',
+        img: '/services/animation/swid-04.jpg',
+        alt: 'Visual Story Support',
+        title: 'Visual Story Support',
+        desc:
+          'Motion elements seamlessly integrated with film and photography.',
+        href: '/services/animation/visual-support',
+        cta: 'Browse',
+      },
+    ],
+    []
+  )
+
+  const hero =
+    props.heroImageSrc || ITEMS?.[0]?.img || '/services/animation/swid-01.jpg'
+
+  const sectionTitleNode =
+    props.sectionTitle ?? (
+      <Fragment>
+        <span className="titleText">Animation Services</span>
+      </Fragment>
+    )
+
+  const descriptionNode =
+    props.text ?? (
+      <Fragment>
+        <span>
+          Motion and animation crafted with cinematic restraint and visual
+          clarity. Each project is shaped by atmosphere, rhythm, and emotional
+          intent — whether supporting film, brands, or narrative worlds.
+        </span>
+      </Fragment>
+    )
+
   return (
     <>
-      <div
-        className={`what-i-do-animation-services-thq-layout301-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="what-i-do-animation-services-thq-max-width-elm thq-section-max-width">
-          <h2 className="what-i-do-animation-services-thq-text-elm thq-heading-2">
-            {props.sectionTitle ?? (
-              <Fragment>
-                <span className="what-i-do-animation-services-text18">
-                  What I Do
-                </span>
-              </Fragment>
-            )}
-          </h2>
-          <div className="what-i-do-animation-services-thq-row-elm thq-grid-auto-300">
-            <div className="what-i-do-animation-services-thq-feature1-elm">
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
+      <section className="wrap thq-section-padding">
+        <div className="shell thq-section-max-width">
+
+          {/* ===== CINEMATIC HERO CARD ===== */}
+          <div className="heroCard">
+            <div className="heroBg" aria-hidden="true">
+              <div
+                className="heroImg"
+                style={{ backgroundImage: `url(${hero})` }}
               />
-              <div className="what-i-do-animation-services-thq-content-elm1 thq-flex-column">
-                <div className="what-i-do-animation-services-thq-section-title-elm1 thq-flex-column">
-                  <h3 className="what-i-do-animation-services-thq-title1-elm thq-heading-3">
-                    {props.feature1Title ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text13">
-                          Motion Graphics
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="what-i-do-animation-services-thq-description1-elm thq-body-small">
-                    {props.feature1Description ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text22">
-                          Clean, purposeful motion that enhances visual
-                          communication.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="what-i-do-animation-services-thq-action-elm1 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature1Button ?? (
-                        <Fragment>
-                          <span className="what-i-do-animation-services-text21">
-                            Learn More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <div className="heroVignette" />
+              <div className="heroGrain" />
             </div>
-            <div className="what-i-do-animation-services-thq-feature2-elm">
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="what-i-do-animation-services-thq-content-elm2 thq-flex-column">
-                <div className="what-i-do-animation-services-thq-section-title-elm2 thq-flex-column">
-                  <strong className="what-i-do-animation-services-thq-title2-elm thq-heading-3">
-                    {props.feature2Title ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text10">
-                          2D &amp; 3D Animation
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="what-i-do-animation-services-thq-description2-elm thq-body-small">
-                    {props.feature2Description ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text20">
-                          Animated elements built with structure, pacing, and
-                          clarity.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="what-i-do-animation-services-thq-action-elm2 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature2Button ?? (
-                        <Fragment>
-                          <span className="what-i-do-animation-services-text11">
-                            Discover More
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
+
+            <div className="heroInner">
+              <div className="kickerRow">
+                <span className="kicker">SERVICES / ANIMATION</span>
+                <span className="kickerLine" />
               </div>
-            </div>
-            <div className="what-i-do-animation-services-thq-feature3-elm">
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="what-i-do-animation-services-thq-content-elm3 thq-flex-column">
-                <div className="what-i-do-animation-services-thq-section-title-elm3 thq-flex-column">
-                  <strong className="what-i-do-animation-services-thq-title3-elm thq-heading-3">
-                    {props.feature3Title ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text12">
-                          Title Sequences
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="what-i-do-animation-services-thq-description3-elm thq-body-small">
-                    {props.feature3Description ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text16">
-                          Opening visuals designed to set tone and atmosphere.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="what-i-do-animation-services-thq-action-elm3 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature3Button ?? (
-                        <Fragment>
-                          <span className="what-i-do-animation-services-text17">
-                            Explore Now
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="what-i-do-animation-services-thq-feature4-elm">
-              <img
-                alt={props.feature4ImageAlt}
-                src={props.feature4ImageSrc}
-                className="thq-img-ratio-4-3"
-              />
-              <div className="what-i-do-animation-services-thq-content-elm4 thq-flex-column">
-                <div className="what-i-do-animation-services-thq-section-title-elm4 thq-flex-column">
-                  <strong className="what-i-do-animation-services-thq-title4-elm thq-heading-3">
-                    {props.feature4Title ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text15">
-                          Visual Story Support
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="what-i-do-animation-services-thq-description4-elm thq-body-small">
-                    {props.feature4Description ?? (
-                      <Fragment>
-                        <span className="what-i-do-animation-services-text19">
-                          Motion elements that integrate seamlessly with film
-                          and photography.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
-                </div>
-                <div className="what-i-do-animation-services-thq-action-elm4 thq-flex-row">
-                  <button className="thq-button-flat">
-                    <span className="thq-body-small">
-                      {props.feature4Button ?? (
-                        <Fragment>
-                          <span className="what-i-do-animation-services-text14">
-                            View Portfolio
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
-                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
-                    </svg>
-                  </button>
-                </div>
+
+              <h2 className="thq-heading-2 heroTitle">
+                {sectionTitleNode}
+              </h2>
+
+              <p className="thq-body-large heroDesc">
+                {descriptionNode}
+              </p>
+
+              <div className="micro thq-body-small">
+                Cinematic motion • Structured rhythm • Premium finish
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      <style jsx>
-        {`
-          .what-i-do-animation-services-thq-layout301-elm {
-            gap: var(--dl-layout-space-fiveunits);
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .what-i-do-animation-services-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .what-i-do-animation-services-thq-text-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-row-elm {
-            width: 100%;
-          }
-          .what-i-do-animation-services-thq-feature1-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .what-i-do-animation-services-thq-content-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-section-title-elm1 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-title1-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-description1-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-action-elm1 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .what-i-do-animation-services-thq-feature2-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .what-i-do-animation-services-thq-content-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-section-title-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-title2-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-description2-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-action-elm2 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .what-i-do-animation-services-thq-feature3-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .what-i-do-animation-services-thq-content-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-section-title-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-title3-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-description3-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-action-elm3 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .what-i-do-animation-services-thq-feature4-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .what-i-do-animation-services-thq-content-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-section-title-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .what-i-do-animation-services-thq-title4-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-description4-elm {
-            text-align: center;
-          }
-          .what-i-do-animation-services-thq-action-elm4 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .what-i-do-animation-services-text10 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text11 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text12 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text13 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text14 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text15 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text16 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text17 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text18 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text19 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text20 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text21 {
-            display: inline-block;
-          }
-          .what-i-do-animation-services-text22 {
-            display: inline-block;
-          }
 
-          @media (max-width: 991px) {
-            .what-i-do-animation-services-thq-row-elm {
-              width: auto;
-              align-items: center;
-              flex-direction: column;
-            }
-            .what-i-do-animation-services-thq-feature1-elm {
-              width: 100%;
-            }
-            .what-i-do-animation-services-thq-feature2-elm {
-              width: 100%;
-            }
-            .what-i-do-animation-services-thq-feature3-elm {
-              width: 100%;
-            }
-            .what-i-do-animation-services-thq-feature4-elm {
-              width: 100%;
-            }
+          {/* ===== GRID ===== */}
+          <div className="grid">
+            {ITEMS.map((it) => (
+              <article key={it.key} className="card">
+                <Link href={it.href} legacyBehavior>
+                  <a className="media" aria-label={it.title}>
+                    <img className="img" src={it.img} alt={it.alt} />
+                    <div className="shade" />
+                    <div className="badge">Animation</div>
+                  </a>
+                </Link>
+
+                <div className="body">
+                  <div className="top">
+                    <h3 className="cardTitle thq-heading-3">
+                      {it.title}
+                    </h3>
+                    <p className="cardDesc thq-body-small">
+                      {it.desc}
+                    </p>
+                  </div>
+
+                  <div className="actions">
+                    <Link href={it.href} legacyBehavior>
+                      <a className="btn">
+                        <span className="thq-body-small">
+                          {it.cta}
+                        </span>
+                        <svg viewBox="0 0 1024 1024" className="icon">
+                          <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                        </svg>
+                      </a>
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <style jsx>{`
+        .wrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .shell {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        /* ===== HERO ===== */
+        .heroCard {
+          position: relative;
+          width: 100%;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .heroBg {
+          position: absolute;
+          inset: 0;
+        }
+
+        .heroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+        }
+
+        .heroVignette {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            90deg,
+            rgba(0, 0, 0, 0.8),
+            rgba(0, 0, 0, 0.35),
+            rgba(0, 0, 0, 0.8)
+          );
+        }
+
+        .heroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.08;
+          mix-blend-mode: overlay;
+        }
+
+        .heroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 24px;
+          max-width: 900px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+        }
+
+        .heroTitle {
+          margin: 0;
+        }
+
+        .heroDesc {
+          margin: 0;
+          opacity: 0.85;
+        }
+
+        .micro {
+          opacity: 0.6;
+        }
+
+        /* ===== GRID ===== */
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(12, 1fr);
+          gap: 18px;
+        }
+
+        .card {
+          grid-column: span 3;
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(34, 34, 34, 0.35);
+          backdrop-filter: blur(10px);
+          transition: all 0.18s ease;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .card:hover {
+          transform: translateY(-3px);
+          border-color: rgba(120, 166, 255, 0.35);
+        }
+
+        .media {
+          position: relative;
+          aspect-ratio: 4 / 3;
+          overflow: hidden;
+        }
+
+        .img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.28s ease;
+        }
+
+        .card:hover .img {
+          transform: scale(1.07);
+        }
+
+        .shade {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.6));
+        }
+
+        .badge {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          font-size: 12px;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+        }
+
+        .body {
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          flex: 1;
+        }
+
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.06);
+          text-decoration: none;
+        }
+
+        @media (max-width: 991px) {
+          .card {
+            grid-column: span 6;
           }
-          @media (max-width: 767px) {
-            .what-i-do-animation-services-thq-text-elm {
-              text-align: center;
-            }
+        }
+
+        @media (max-width: 767px) {
+          .card {
+            grid-column: span 12;
           }
-          @media (max-width: 479px) {
-            .what-i-do-animation-services-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 WhatIDoAnimationServices.defaultProps = {
-  feature2Title: undefined,
-  feature3ImageAlt: 'Animation & Graphics Image',
-  rootClassName: '',
-  feature4ImageSrc:
-    '/Animation/New Animation Pic/gemini_generated_image_3oc4gm3oc4gm3oc4_3x2_2000x1333_u_100-600w.jpg',
-  feature2ImageSrc:
-    '/Animation/New Animation Pic/the%20bridege%20that%20wakes%2004_3x2_2000x1333_u_100-600w.jpg',
-  feature3ImageSrc:
-    '/Animation/New Animation Pic/the%20river%20that%20climbed%20the%20sky%2004_3x2_2000x1333_u_100-600w.jpg',
-  feature1ImageAlt: 'Film Production Image',
-  feature1ImageSrc:
-    '/Animation/New Animation Pic/hf_20260119_201908_b183ab80-964a-4339-873f-55cdf707938e_3x2_2000x1333_u_100-600w.jpg',
-  feature2Button: undefined,
-  feature3Title: undefined,
-  feature1Title: undefined,
-  feature4Button: undefined,
-  feature4ImageAlt: 'Photography Image',
-  feature4Title: undefined,
-  feature3Description: undefined,
-  feature3Button: undefined,
-  feature2ImageAlt: 'Audio Production Image',
   sectionTitle: undefined,
-  feature4Description: undefined,
-  feature2Description: undefined,
-  feature1Button: undefined,
-  feature1Description: undefined,
+  text: undefined,
+  heroImageSrc: '/services/animation/swid-01.jpg',
 }
 
 WhatIDoAnimationServices.propTypes = {
-  feature2Title: PropTypes.element,
-  feature3ImageAlt: PropTypes.string,
-  rootClassName: PropTypes.string,
-  feature4ImageSrc: PropTypes.string,
-  feature2ImageSrc: PropTypes.string,
-  feature3ImageSrc: PropTypes.string,
-  feature1ImageAlt: PropTypes.string,
-  feature1ImageSrc: PropTypes.string,
-  feature2Button: PropTypes.element,
-  feature3Title: PropTypes.element,
-  feature1Title: PropTypes.element,
-  feature4Button: PropTypes.element,
-  feature4ImageAlt: PropTypes.string,
-  feature4Title: PropTypes.element,
-  feature3Description: PropTypes.element,
-  feature3Button: PropTypes.element,
-  feature2ImageAlt: PropTypes.string,
   sectionTitle: PropTypes.element,
-  feature4Description: PropTypes.element,
-  feature2Description: PropTypes.element,
-  feature1Button: PropTypes.element,
-  feature1Description: PropTypes.element,
+  text: PropTypes.element,
+  heroImageSrc: PropTypes.string,
 }
 
 export default WhatIDoAnimationServices
