@@ -112,7 +112,7 @@ function addYears(date, years) {
   return d
 }
 
-// ✅ monthly caps (your final numbers)
+// ✅ monthly caps
 const MEMBER_LIMITS = {
   basic: 20,
   pro: 75,
@@ -371,7 +371,7 @@ export default async function handler(req, res) {
 
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 
-      // ✅ For INVALID_SIG: never store payhere_payment_id (security)
+      // ✅ INVALID_SIG: never store payhere_payment_id
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
@@ -440,7 +440,7 @@ export default async function handler(req, res) {
         if (!order) return res.status(200).send('OK')
 
         if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
-          // ✅ store payment_id (if valid) for audit + to stop repeated mismatch loops
+          // Optional audit: store payment_id once (if valid)
           if (pid) await claimPaymentOnce(order.id, pid)
 
           await supabaseAdmin
@@ -458,7 +458,7 @@ export default async function handler(req, res) {
         // ✅ Webhook idempotency: claim payment id once
         const claimedPayment = pid ? await claimPaymentOnce(order.id, pid) : false
 
-        // Even if already paid / duplicate webhook, still update status fields once
+        // Duplicate webhook: still refresh PayHere status fields
         if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
           await supabaseAdmin
             .from('orders')
@@ -501,6 +501,7 @@ export default async function handler(req, res) {
           .select('*')
           .eq('id', order.id)
           .maybeSingle()
+
         if (freshRes.error) {
           console.error('membership refetch failed:', freshRes.error.message)
           return res.status(200).send('OK')
@@ -508,10 +509,15 @@ export default async function handler(req, res) {
 
         const o = freshRes.data || order
 
+        // IMPORTANT:
+        // - orders.license stores membership tier (basic/pro/elite)
+        // - orders.format stores membership term (monthly/yearly/lifetime)
         const tier = normalizeMembershipTier(o.license)
         const term = normalizeMembershipTerm(o.format)
 
         const now = new Date()
+        const startDate = now.toISOString()
+
         let endDate = null
         if (term === 'monthly') endDate = addMonths(now, 1).toISOString()
         if (term === 'yearly') endDate = addYears(now, 1).toISOString()
@@ -519,19 +525,23 @@ export default async function handler(req, res) {
 
         const monthlyLimit = MEMBER_LIMITS[tier] ?? 75
 
-        // Activate membership
+        // ✅ Activate membership (matches your memberships table columns)
         try {
           const payload = {
             email,
             plan: tier,
             status: 'active',
+
+            start_date: startDate,
             end_date: endDate,
 
-            billing_cycle_start: now.toISOString(),
+            billing_cycle: term,
+            billing_cycle_start: startDate,
+            billing_cycle_end: endDate,
+
+            // usage
             monthly_download_limit: monthlyLimit,
             monthly_download_used: 0,
-
-            updated_at: now.toISOString(),
           }
 
           const up = await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'email' })
@@ -833,6 +843,7 @@ export default async function handler(req, res) {
         .select('*')
         .eq('id', order.id)
         .maybeSingle()
+
       const o = fresh || order
 
       const email = normalizeEmail(o.email)
@@ -930,8 +941,7 @@ export default async function handler(req, res) {
     if (statusCodeNum < 0) {
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 
-      // Try to attach payment_id for audit (only if valid and column is NULL)
-      const attachPid = async (orderRow) => {
+      const attachPidIfPossible = async (orderRow) => {
         if (!orderRow) return
         if (pid) await claimPaymentOnce(orderRow.id, pid)
       }
@@ -939,7 +949,7 @@ export default async function handler(req, res) {
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
-          await attachPid(cartOrder)
+          await attachPidIfPossible(cartOrder)
           await supabaseAdmin
             .from('orders')
             .update({
@@ -954,7 +964,7 @@ export default async function handler(req, res) {
 
       const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (order && String(order.status || '').toUpperCase() !== 'FAILED') {
-        await attachPid(order)
+        await attachPidIfPossible(order)
         await supabaseAdmin
           .from('orders')
           .update({
