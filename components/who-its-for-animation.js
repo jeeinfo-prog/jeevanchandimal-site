@@ -1,381 +1,541 @@
-import React, { Fragment } from 'react'
-
+// components/who-its-for-animation.js
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
+
+function clampInt(v, min, max, fallback) {
+  const n = Number.parseInt(String(v ?? ''), 10)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, n))
+}
 
 const WhoItsForAnimation = (props) => {
+  // ✅ Local fallback: public/services/animation/swif-01.jpg ... swif-06.jpg
+  const staticFallback = useMemo(() => {
+    const total = clampInt(props.fallbackCount, 2, 24, 6)
+    return Array.from({ length: total }, (_, i) => {
+      const n = String(i + 1).padStart(2, '0')
+      const src = `/services/animation/swif-${n}.jpg`
+      return {
+        id: `swif-${n}`,
+        title: `Who it’s for ${i + 1}`,
+        src,
+        href: props.ctaHref || '/contact',
+      }
+    })
+  }, [props.fallbackCount, props.ctaHref])
+
+  const [items] = useState(staticFallback)
+  const [page, setPage] = useState(0) // each page shows 2 images
+
+  const hoverRef = useRef(false)
+  const timerRef = useRef(null)
+
+  const perPage = 2
+  const pages = Math.max(1, Math.ceil(items.length / perPage))
+  const intervalMs = Math.max(2500, Number(props.intervalMs || 5200))
+
+  // prefers-reduced-motion
+  const [reduceMotion, setReduceMotion] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const apply = () => setReduceMotion(!!mq.matches)
+    apply()
+    mq.addEventListener?.('change', apply)
+    return () => mq.removeEventListener?.('change', apply)
+  }, [])
+
+  // ✅ Auto slide pages
+  useEffect(() => {
+    if (reduceMotion) return
+    if (pages <= 1) return
+
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => {
+      if (hoverRef.current) return
+      setPage((p) => (p + 1) % pages)
+    }, intervalMs)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }, [pages, intervalMs, reduceMotion])
+
+  const headingNode =
+    props.heading1 ?? (
+      <Fragment>
+        <span className="t">Who It’s For</span>
+      </Fragment>
+    )
+
+  const descNode =
+    props.content1 ?? (
+      <Fragment>
+        <span className="t">
+          I work with filmmakers, brands, and creatives who value thoughtful motion, refined pacing, and
+          a cinematic visual language — built with intention, not noise.
+        </span>
+      </Fragment>
+    )
+
+  const start = page * perPage
+  const visible = items.slice(start, start + perPage)
+
+  const heroImg =
+    props.heroImageSrc ||
+    visible?.[0]?.src ||
+    items?.[0]?.src ||
+    staticFallback?.[0]?.src
+
+  function prev() {
+    setPage((p) => (p - 1 + pages) % pages)
+  }
+  function next() {
+    setPage((p) => (p + 1) % pages)
+  }
+
   return (
     <>
-      <div
-        className={`who-its-for-animation-thq-gallery3-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="who-its-for-animation-thq-max-width-elm thq-section-max-width">
-          <div className="who-its-for-animation-thq-section-title-elm">
-            <h2 className="who-its-for-animation-thq-text-elm1 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="who-its-for-animation-text2">
-                    Who It’s For
-                  </span>
-                </Fragment>
-              )}
-            </h2>
-            <span className="who-its-for-animation-thq-text-elm2 thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="who-its-for-animation-text1">
-                    I work with filmmakers, brands, and creatives who value
-                    thoughtful motion and refined visual language.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="who-its-for-animation-container1">
-            <div className="who-its-for-animation-thq-content-elm">
-              <div
-                data-thq="slider"
-                data-navigation="true"
-                data-pagination="true"
-                className="who-its-for-animation-thq-slider-elm swiper"
-              >
-                <div
-                  data-thq="slider-wrapper"
-                  className="who-its-for-animation-thq-slider-wrapper-elm swiper-wrapper"
-                >
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-animation-thq-slider-slide-elm1 swiper-slide"
-                  >
-                    <div className="who-its-for-animation-container2">
-                      <img
-                        alt={props.image1Alt}
-                        src={props.image1Src}
-                        className="who-its-for-animation-thq-image1-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-animation-container3">
-                      <img
-                        alt={props.image2Alt}
-                        src={props.image2Src}
-                        className="who-its-for-animation-thq-image2-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-animation-thq-slider-slide-elm2 swiper-slide"
-                  >
-                    <div className="who-its-for-animation-container4">
-                      <img
-                        alt={props.image3Alt}
-                        src={props.image3Src}
-                        className="who-its-for-animation-thq-image3-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-animation-container5">
-                      <img
-                        alt={props.image4Alt}
-                        src={props.image4Src}
-                        className="who-its-for-animation-thq-image4-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-animation-thq-slider-slide-elm3 swiper-slide"
-                  >
-                    <div className="who-its-for-animation-container6">
-                      <img
-                        alt={props.image5Alt}
-                        src={props.image5Src}
-                        className="who-its-for-animation-thq-image5-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-animation-container7">
-                      <img
-                        alt={props.image6Alt}
-                        src={props.image6Src}
-                        className="who-its-for-animation-thq-image6-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div
-                  data-thq="slider-button-prev"
-                  className="swiper-button-prev"
-                ></div>
-                <div
-                  data-thq="slider-button-next"
-                  className="swiper-button-next"
-                ></div>
-                <div
-                  data-thq="slider-pagination"
-                  className="who-its-for-animation-thq-slider-pagination-elm swiper-pagination swiper-pagination-bullets swiper-pagination-horizontal"
-                >
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet swiper-pagination-bullet-active"
-                  ></div>
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet"
-                  ></div>
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet"
-                  ></div>
+      <section className={`wifWrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="wifShell thq-section-max-width">
+          {/* ===== cinematic header card ===== */}
+          <header className="wifHero">
+            <div className="wifHeroBg" aria-hidden="true">
+              <div className="wifHeroImg" style={{ backgroundImage: `url(${heroImg})` }} />
+              <div className="wifHeroVignette" />
+              <div className="wifHeroGrain" />
+              <div className="wifHeroGlow" />
+            </div>
+
+            <div className="wifHeroInner">
+              <div className="wifKickerRow">
+                <span className="wifKicker">ANIMATION</span>
+                <span className="wifLine" />
+              </div>
+
+              <h2 className="wifTitle thq-heading-2">{headingNode}</h2>
+              <p className="wifDesc thq-body-large">{descNode}</p>
+
+              <div className="wifActions">
+                <Link href={props.ctaHref || '/contact'} legacyBehavior>
+                  <a className="wifBtnPrimary" aria-label="Create Together">
+                    <span className="thq-body-small">{props.ctaText || 'Create Together'}</span>
+                    <svg viewBox="0 0 1024 1024" className="wifIcon" aria-hidden="true">
+                      <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
+                    </svg>
+                  </a>
+                </Link>
+
+                <div className="wifNav">
+                  <button className="wifNavBtn" type="button" onClick={prev} aria-label="Previous">
+                    ←
+                  </button>
+                  <button className="wifNavBtn" type="button" onClick={next} aria-label="Next">
+                    →
+                  </button>
                 </div>
               </div>
+
+              <div className="wifMicro thq-body-small">
+                Auto sliding · Two-frame story beats · Cinematic continuity
+              </div>
+            </div>
+          </header>
+
+          {/* ===== double-frame slider ===== */}
+          <div
+            className="wifStage"
+            onMouseEnter={() => (hoverRef.current = true)}
+            onMouseLeave={() => (hoverRef.current = false)}
+          >
+            <div className="wifGrid">
+              {visible.map((it, idx) => {
+                const num = start + idx + 1
+                const href = it.href || props.ctaHref || '/contact'
+                return (
+                  <Link href={href} legacyBehavior key={`${it.id}-${num}`}>
+                    <a className="wifTile" aria-label={`Open image ${num}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        className="wifImg"
+                        src={it.src}
+                        alt={it.title || `Who it’s for ${num}`}
+                        loading="lazy"
+                      />
+                      <div className="wifShade" />
+                      <div className="wifChip">{String(num).padStart(2, '0')}</div>
+                      <div className="wifHint">View</div>
+                    </a>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* pagination */}
+            <div className="wifDots" aria-label="Slider indicators">
+              {Array.from({ length: pages }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`wifDot ${i === page ? 'on' : ''}`}
+                  onClick={() => setPage(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
             </div>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .who-its-for-animation-thq-gallery3-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .who-its-for-animation-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-section-title-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-text-elm1 {
-            text-align: center;
-          }
-          .who-its-for-animation-thq-text-elm2 {
-            text-align: center;
-          }
-          .who-its-for-animation-container1 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: row;
-          }
-          .who-its-for-animation-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-shrink: 0;
-            justify-content: center;
-          }
-          .who-its-for-animation-thq-slider-elm {
-            width: 100%;
-            height: 600px;
-            display: inline-block;
-          }
-          .who-its-for-animation-thq-slider-wrapper-elm {
-            width: 100%;
-          }
-          .who-its-for-animation-thq-slider-slide-elm1 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-animation-container2 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-image1-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-animation-container3 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-image2-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-animation-thq-slider-slide-elm2 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-animation-container4 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-image3-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-animation-container5 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-image4-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-animation-thq-slider-slide-elm3 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-animation-container6 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-image5-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-animation-container7 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-animation-thq-image6-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-animation-thq-slider-pagination-elm {
-            display: block;
-          }
-          .who-its-for-animation-text1 {
-            display: inline-block;
-          }
-          .who-its-for-animation-text2 {
-            display: inline-block;
-          }
+      </section>
 
-          @media (max-width: 991px) {
-            .who-its-for-animation-thq-content-elm {
-              align-items: center;
-              flex-direction: column;
-            }
+      <style jsx>{`
+        .wifWrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .wifShell {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        /* ================= HERO ================= */
+        .wifHero {
+          position: relative;
+          border-radius: 22px;
+          overflow: hidden;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+        }
+
+        .wifHeroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .wifHeroImg {
+          position: absolute;
+          inset: 0;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          transform: scale(1.03);
+          filter: saturate(0.92) contrast(1.08) brightness(0.72);
+        }
+
+        .wifHeroVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(80% 60% at 50% 22%, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.72)),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.78) 0%,
+              rgba(0, 0, 0, 0.45) 55%,
+              rgba(0, 0, 0, 0.84) 100%
+            );
+        }
+
+        .wifHeroGlow {
+          position: absolute;
+          inset: -18%;
+          background: radial-gradient(40% 32% at 22% 28%, rgba(37, 195, 226, 0.12), rgba(37, 195, 226, 0) 62%);
+          filter: blur(14px);
+          opacity: 0.9;
+        }
+
+        .wifHeroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.08;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .wifHeroInner {
+          position: relative;
+          z-index: 1;
+          padding: 26px 22px 18px;
+          max-width: 920px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .wifKickerRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .wifKicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.25);
+          white-space: nowrap;
+        }
+
+        .wifLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(90deg, rgba(245, 244, 244, 0.16), rgba(245, 244, 244, 0));
+        }
+
+        .wifTitle {
+          margin: 0;
+          line-height: 1.1;
+          text-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+        }
+
+        .wifDesc {
+          margin: 0;
+          opacity: 0.9;
+          line-height: 1.65;
+          color: rgba(245, 244, 244, 0.84);
+          max-width: 70ch;
+        }
+
+        .wifActions {
+          margin-top: 6px;
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+
+        .wifBtnPrimary {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: linear-gradient(180deg, rgba(245, 244, 244, 0.18), rgba(245, 244, 244, 0.06));
+          text-decoration: none;
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(10px);
+          transition: transform 200ms ease, border-color 200ms ease;
+        }
+
+        .wifBtnPrimary:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.35);
+        }
+
+        .wifNav {
+          margin-left: auto;
+          display: inline-flex;
+          gap: 8px;
+        }
+
+        .wifNavBtn {
+          height: 36px;
+          min-width: 44px;
+          padding: 0 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.18);
+          color: rgba(245, 244, 244, 0.92);
+          cursor: pointer;
+          transition: transform 180ms ease, border-color 180ms ease;
+        }
+
+        .wifNavBtn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(37, 195, 226, 0.35);
+        }
+
+        .wifMicro {
+          margin-top: 6px;
+          color: rgba(245, 244, 244, 0.62);
+        }
+
+        .wifIcon {
+          width: 18px;
+          height: 18px;
+        }
+
+        /* ================= STAGE ================= */
+        .wifStage {
+          width: 100%;
+          position: relative;
+        }
+
+        .wifGrid {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+
+        .wifTile {
+          position: relative;
+          overflow: hidden;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(0, 0, 0, 0.25);
+          aspect-ratio: 4 / 3;
+          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+          text-decoration: none;
+          display: block;
+          transform: translateZ(0);
+          transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+        }
+
+        .wifTile:hover {
+          transform: translateY(-2px);
+          border-color: rgba(37, 195, 226, 0.28);
+          box-shadow: 0 26px 70px rgba(0, 0, 0, 0.45);
+        }
+
+        .wifImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.02);
+          transition: transform 650ms ease;
+          filter: brightness(0.95) contrast(1.05) saturate(1.02);
+        }
+
+        .wifTile:hover .wifImg {
+          transform: scale(1.06);
+        }
+
+        .wifShade {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.58));
+        }
+
+        .wifChip {
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.28em;
+          color: rgba(245, 244, 244, 0.92);
+        }
+
+        .wifHint {
+          position: absolute;
+          right: 10px;
+          top: 10px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.28);
+          backdrop-filter: blur(8px);
+          font-size: 12px;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.82);
+        }
+
+        .wifDots {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 10px;
+        }
+
+        .wifDot {
+          width: 26px;
+          height: 3px;
+          border: 0;
+          border-radius: 99px;
+          background: rgba(245, 244, 244, 0.18);
+          cursor: pointer;
+          padding: 0;
+          transition: background 180ms ease, box-shadow 180ms ease;
+        }
+
+        .wifDot.on {
+          background: rgba(37, 195, 226, 0.7);
+          box-shadow: 0 0 0 1px rgba(37, 195, 226, 0.18);
+        }
+
+        .t {
+          display: inline-block;
+        }
+
+        @media (max-width: 767px) {
+          .wifHeroInner {
+            padding: 18px 14px 14px;
+            text-align: center;
+            align-items: center;
           }
-          @media (max-width: 767px) {
-            .who-its-for-animation-thq-section-title-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .who-its-for-animation-thq-slider-slide-elm1 {
-              flex-direction: column;
-            }
-            .who-its-for-animation-container2 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-animation-container3 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-animation-thq-slider-slide-elm2 {
-              flex-direction: column;
-            }
-            .who-its-for-animation-container4 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-animation-container5 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-animation-thq-slider-slide-elm3 {
-              flex-direction: column;
-            }
-            .who-its-for-animation-container6 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-animation-container7 {
-              height: calc(50% - 8px);
-            }
+          .wifKickerRow {
+            justify-content: center;
           }
-          @media (max-width: 479px) {
-            .who-its-for-animation-thq-slider-elm {
-              height: 440px;
-            }
+          .wifLine {
+            display: none;
           }
-        `}
-      </style>
+          .wifNav {
+            margin-left: 0;
+            width: 100%;
+            justify-content: center;
+          }
+          .wifActions {
+            width: 100%;
+            justify-content: center;
+          }
+          .wifGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </>
   )
 }
 
 WhoItsForAnimation.defaultProps = {
-  image2Alt: 'Audio Production',
-  image6Src: '/Animation/a899ba28-4f7b-402b-a72f-74b78a94bafc-1400w.jpg',
-  content1: undefined,
-  image1Src:
-    '/Animation/New Animation Pic/a899ba28-4f7b-402b-a72f-74b78a94bafc_3x2_2000x1333_u_100-2-1400w.jpg',
-  image2Src:
-    '/Animation/New Animation Pic/the%20clockwork%20mountain%2013_3x2_2000x1333_u_100-1400w.jpg',
-  image3Alt: 'Animation & Graphics',
-  image5Alt: 'AI & Animations Services',
-  image6Alt: 'Sound Design',
-  image3Src:
-    '/Animation/New Animation Pic/hf_20260119_113429_1501ca54-e5e1-4056-8b40-85fea12c982b_3x2_2000x1333_u_100-1400w.jpg',
   rootClassName: '',
   heading1: undefined,
-  image4Src:
-    '/Animation/New Animation Pic/hf_20260119_201908_b183ab80-964a-4339-873f-55cdf707938e_3x2_2000x1333_u_100-1400w.jpg',
-  image4Alt: 'Photography',
-  image5Src: '/Animation/PIC/the%20bridege%20that%20wakes%2008%20a-1400w.jpg',
-  image1Alt: 'Film Production',
+  content1: undefined,
+
+  heroImageSrc: '',
+
+  // ✅ Local images count (swif-01..swif-06)
+  fallbackCount: 6,
+
+  intervalMs: 5200,
+
+  // CTA
+  ctaHref: '/contact',
+  ctaText: 'Create Together',
 }
 
 WhoItsForAnimation.propTypes = {
-  image2Alt: PropTypes.string,
-  image6Src: PropTypes.string,
-  content1: PropTypes.element,
-  image1Src: PropTypes.string,
-  image2Src: PropTypes.string,
-  image3Alt: PropTypes.string,
-  image5Alt: PropTypes.string,
-  image6Alt: PropTypes.string,
-  image3Src: PropTypes.string,
   rootClassName: PropTypes.string,
   heading1: PropTypes.element,
-  image4Src: PropTypes.string,
-  image4Alt: PropTypes.string,
-  image5Src: PropTypes.string,
-  image1Alt: PropTypes.string,
+  content1: PropTypes.element,
+
+  heroImageSrc: PropTypes.string,
+
+  fallbackCount: PropTypes.number,
+  intervalMs: PropTypes.number,
+
+  ctaHref: PropTypes.string,
+  ctaText: PropTypes.string,
 }
 
 export default WhoItsForAnimation
