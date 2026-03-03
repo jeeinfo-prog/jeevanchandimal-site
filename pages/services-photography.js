@@ -34,14 +34,23 @@ export default function ServicesPhotography() {
           property="og:description"
           content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound."
         />
-        <meta property="og:image" content="https://www.jeevanchandimal.com/services/og.jpg" />
-        <link rel="canonical" href="https://www.jeevanchandimal.com/services-photography" />
+        <meta
+          property="og:image"
+          content="https://www.jeevanchandimal.com/services/og.jpg"
+        />
+        <link
+          rel="canonical"
+          href="https://www.jeevanchandimal.com/services-photography"
+        />
       </Head>
 
       <div className="page">
         {/* ✅ Cinematic background */}
         <div className="heroBg" aria-hidden="true">
-          <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
+          <div
+            className="heroBgImg"
+            style={{ backgroundImage: `url(${HERO_BG})` }}
+          />
           <div className="heroBgVignette" />
           <div className="heroBgGrain" />
           <div className="heroBgGlow" />
@@ -137,31 +146,33 @@ export default function ServicesPhotography() {
         />
 
         <main className="main">
-          {/* HERO */}
-          <section className="section heroSection">
-            <ServicePhotographyHero
-              action3={
-                <Fragment>
-                  <span className="t">Explore Work</span>
-                </Fragment>
-              }
-              content1={
-                <Fragment>
-                  <span className="t">
-                    Photography approached as storytelling — crafted with cinematic intent
-                    and emotional clarity.
-                  </span>
-                </Fragment>
-              }
-              heading1={
-                <Fragment>
-                  <span className="t">
-                    Still imagery shaped by light, mood, and atmosphere.
-                  </span>
-                </Fragment>
-              }
-              rootClassName="service-photography-heroroot-class-name"
-            />
+          {/* ✅ HERO (PLACED LIKE work-photography.js: section -> block -> component) */}
+          <section className="section">
+            <div className="block">
+              <ServicePhotographyHero
+                action3={
+                  <Fragment>
+                    <span className="t">Explore Work</span>
+                  </Fragment>
+                }
+                content1={
+                  <Fragment>
+                    <span className="t">
+                      Photography approached as storytelling — crafted with cinematic
+                      intent and emotional clarity.
+                    </span>
+                  </Fragment>
+                }
+                heading1={
+                  <Fragment>
+                    <span className="t">
+                      Still imagery shaped by light, mood, and atmosphere.
+                    </span>
+                  </Fragment>
+                }
+                rootClassName="service-photography-heroroot-class-name"
+              />
+            </div>
           </section>
 
           {/* INTRO */}
@@ -360,7 +371,9 @@ export default function ServicesPhotography() {
               }
               heading1={
                 <Fragment>
-                  <span className="t">Looking for imagery with depth and intention?</span>
+                  <span className="t">
+                    Looking for imagery with depth and intention?
+                  </span>
                 </Fragment>
               }
               rootClassName="photography-services-final-ct-aroot-class-name"
@@ -385,10 +398,8 @@ export default function ServicesPhotography() {
           width: 100%;
           min-height: 100vh;
           position: relative;
-
           overflow-x: hidden;
           overflow-y: visible;
-
           background: #0b0b0b;
           color: #f5f4f4;
         }
@@ -407,8 +418,6 @@ export default function ServicesPhotography() {
           background-size: cover;
           background-position: center;
           background-repeat: no-repeat;
-
-          /* ✅ keep detail + luxury */
           filter: saturate(0.95) contrast(1.06) brightness(0.78);
           transform: scale(1.02);
         }
@@ -450,7 +459,7 @@ export default function ServicesPhotography() {
           background-size: 240px 240px;
         }
 
-        /* ========= LAYOUT ========= */
+        /* ========= LAYOUT (match work-photography.js rhythm) ========= */
         .main {
           position: relative;
           z-index: 1;
@@ -458,14 +467,21 @@ export default function ServicesPhotography() {
           display: flex;
           flex-direction: column;
           align-items: center;
-
-          padding-top: 72px; /* ✅ space for fixed navbar */
+          padding-top: 72px; /* ✅ space for sticky nav */
         }
 
         .section {
           width: 100%;
           display: flex;
           justify-content: center;
+        }
+
+        /* ✅ this is what makes the hero “sit” correctly under nav */
+        .block {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
         }
 
         .section :global(> *) {
