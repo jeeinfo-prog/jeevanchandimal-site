@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
 import { sendDownloadEmail, sendReceiptEmail } from '../../../lib/email'
-import { payhereVerifyMd5Sig } from '../../../lib/payhere'
+import { PAYHERE, assertPayhereEnv, payhereVerifyMd5Sig } from '../../../lib/payhere'
 
 export const config = {
   api: { bodyParser: false }, // PayHere posts x-www-form-urlencoded
@@ -149,7 +149,10 @@ async function ensureInvoiceNo(order) {
   if (order.invoice_no) return order.invoice_no
   const invoiceNo = genInvoiceNo(order.id)
 
-  const up = await supabaseAdmin.from('orders').update({ invoice_no: invoiceNo }).eq('id', order.id)
+  const up = await supabaseAdmin
+    .from('orders')
+    .update({ invoice_no: invoiceNo })
+    .eq('id', order.id)
   if (up.error) {
     console.error('ensureInvoiceNo update failed:', up.error.message)
   }
@@ -183,7 +186,9 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   if (!p) return null
 
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
-  return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
+  return p.original_jpg_key || p.original_key
+    ? String(p.original_jpg_key || p.original_key)
+    : null
 }
 
 /* ===== ORDER LOOKUPS ===== */
@@ -218,7 +223,7 @@ async function findSingleOrderByRef(ref) {
   if (!byOrderId.error && byOrderId?.data) return byOrderId.data
 
   const byCode = await supabaseAdmin.from('orders').select('*').eq('code', v).maybeSingle()
-  if (!byCode.error && byCode?.data) return byCode.data
+  if (!byCode.error && byId?.data) return byId.data
 
   return null
 }
@@ -242,32 +247,6 @@ async function claimSendOnce(orderId, column) {
     return false
   }
   return !!r.data
-}
-
-/* ===== PAYHERE SECRET RESOLVER (your required version) ===== */
-
-function getCandidateMerchantSecrets() {
-  const sandboxFlag =
-    String(process.env.PAYHERE_SANDBOX || process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
-      .trim()
-      .toLowerCase() === 'true'
-
-  const list = sandboxFlag
-    ? [process.env.PAYHERE_MERCHANT_SECRET_SANDBOX, process.env.PAYHERE_MERCHANT_SECRET]
-    : [process.env.PAYHERE_MERCHANT_SECRET_LIVE, process.env.PAYHERE_MERCHANT_SECRET]
-
-  return Array.from(new Set(list.map((x) => String(x || '').trim()).filter(Boolean)))
-}
-
-function verifyMd5WithAnySecret(payload) {
-  const secrets = getCandidateMerchantSecrets()
-  for (const merchantSecret of secrets) {
-    try {
-      const ok = payhereVerifyMd5Sig({ ...payload, merchantSecret })
-      if (ok) return true
-    } catch {}
-  }
-  return false
 }
 
 /* ===== KIND DETECTION + AMOUNT SAFETY ===== */
@@ -317,6 +296,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
+    assertPayhereEnv()
+
     const raw = await readRawBody(req)
     const data = parseForm(raw)
 
@@ -335,24 +316,9 @@ export default async function handler(req, res) {
 
     if (!order_id) return res.status(200).send('OK')
 
-    const cartCode = String(order_id || '').trim()
-    const cartDbId = String(custom_2 || '').trim()
-
-    // Try to find DB row early (helps kind detection + amount validation)
-    let dbOrder = null
-    try {
-      if (
-        String(order_id || '').startsWith('CART_') ||
-        String(custom_1 || '').trim().toLowerCase() === 'cart'
-      ) {
-        dbOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
-      } else {
-        dbOrder = await findSingleOrderByRef(order_id)
-      }
-    } catch {}
-
-    // Verify signature
-    const ok = verifyMd5WithAnySecret({
+    // ✅ After signature check passes, we also enforce merchant_id match
+    const ok = payhereVerifyMd5Sig({
+      merchantSecret: PAYHERE.merchantSecret,
       merchant_id,
       order_id,
       payhere_amount: normalizePayhereAmount(payhere_amount),
@@ -363,10 +329,31 @@ export default async function handler(req, res) {
 
     if (!ok) {
       console.error('MD5 signature mismatch for order:', order_id)
+      // Preserve your existing behavior: mark INVALID_SIG when possible, then return OK.
+
+      // Try to find DB row early (helps kind detection + amount validation)
+      let dbOrder = null
+      try {
+        if (
+          String(order_id || '').startsWith('CART_') ||
+          String(custom_1 || '').trim().toLowerCase() === 'cart'
+        ) {
+          dbOrder = await findCartOrder({ cartOrderDbId: String(custom_2 || '').trim(), cartCode: String(order_id).trim() })
+        } else {
+          dbOrder = await findSingleOrderByRef(order_id)
+        }
+      } catch {}
 
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
+
       if (isCart) {
-        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
+        const cartOrder =
+          dbOrder ||
+          (await findCartOrder({
+            cartOrderDbId: String(custom_2 || '').trim(),
+            cartCode: String(order_id || '').trim(),
+          }))
+
         if (cartOrder) {
           await supabaseAdmin
             .from('orders')
@@ -396,7 +383,32 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
+    // ✅ merchant_id hard check (prevents accepting another merchant’s webhook)
+    if (String(merchant_id || '').trim() !== String(PAYHERE.merchantId || '').trim()) {
+      console.error('Merchant ID mismatch:', {
+        got: String(merchant_id || '').trim(),
+        expected: String(PAYHERE.merchantId || '').trim(),
+      })
+      return res.status(200).send('OK')
+    }
+
     const statusCodeNum = Number(status_code)
+
+    // Try to find DB row early (helps kind detection + amount validation)
+    let dbOrder = null
+    const cartCode = String(order_id || '').trim()
+    const cartDbId = String(custom_2 || '').trim()
+
+    try {
+      if (
+        String(order_id || '').startsWith('CART_') ||
+        String(custom_1 || '').trim().toLowerCase() === 'cart'
+      ) {
+        dbOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
+      } else {
+        dbOrder = await findSingleOrderByRef(order_id)
+      }
+    } catch {}
 
     /* =========================================================
        ✅ PAYMENT SUCCESS
@@ -441,7 +453,11 @@ export default async function handler(req, res) {
             .eq('id', order.id)
         }
 
-        const freshRes = await supabaseAdmin.from('orders').select('*').eq('id', order.id).maybeSingle()
+        const freshRes = await supabaseAdmin
+          .from('orders')
+          .select('*')
+          .eq('id', order.id)
+          .maybeSingle()
         if (freshRes.error) {
           console.error('membership refetch failed:', freshRes.error.message)
           return res.status(200).send('OK')
@@ -465,11 +481,10 @@ export default async function handler(req, res) {
         try {
           const payload = {
             email,
-            plan: tier, // store tier in plan (your existing code expects member.plan)
+            plan: tier,
             status: 'active',
             end_date: endDate,
 
-            // caps + cycle
             billing_cycle_start: now.toISOString(),
             monthly_download_limit: monthlyLimit,
             monthly_download_used: 0,
@@ -736,7 +751,11 @@ export default async function handler(req, res) {
           .eq('id', order.id)
       }
 
-      const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).single()
+      const { data: fresh } = await supabaseAdmin
+        .from('orders')
+        .select('*')
+        .eq('id', order.id)
+        .single()
       const o = fresh || order
 
       const email = normalizeEmail(o.email)
