@@ -1,7 +1,7 @@
 // pages/api/payhere/create-checkout.js
 
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
-import { payhereInitHash } from '../../../lib/payhere'
+import { PAYHERE, assertPayhereEnv, payhereInitHash } from '../../../lib/payhere'
 
 function uid() {
   return `ORD_${Date.now()}_${Math.random().toString(16).slice(2)}`
@@ -29,46 +29,32 @@ function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
 
-function toBool(v) {
-  return String(v || '').trim().toLowerCase() === 'true'
+function cleanBaseUrl(v) {
+  return String(v || '')
+    .trim()
+    .replace(/\/+$/, '')
 }
 
-// ✅ NEW: unified PayHere mode resolver (Supabase setting first)
-async function getPayhereMode() {
-  // 1) env fallback (optional)
-  const envFallback = String(process.env.PAYHERE_ENV || '').trim().toLowerCase()
-  if (envFallback === 'live') return 'live'
-  if (envFallback === 'sandbox') return 'sandbox'
+function getBaseUrl(req) {
+  const explicit =
+    cleanBaseUrl(process.env.WEBHOOK_BASE_URL) ||
+    cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL) ||
+    cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL)
 
-  // 2) boolean env fallback (what you currently have)
-  const sandboxBool =
-    toBool(process.env.PAYHERE_SANDBOX) || toBool(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX)
+  if (explicit) return explicit
 
-  const fallbackMode = sandboxBool ? 'sandbox' : 'live'
-
-  // 3) Supabase app_settings override (no redeploy)
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'payhere_mode')
-      .maybeSingle()
-
-    if (error) return fallbackMode
-
-    const v = String(data?.value || '').trim().toLowerCase()
-    if (v === 'live') return 'live'
-    if (v === 'sandbox') return 'sandbox'
-    return fallbackMode
-  } catch {
-    return fallbackMode
-  }
+  const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
+  return host ? `${proto}://${host}` : ''
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  if (req.method !== 'POST')
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
+    assertPayhereEnv()
+
     const {
       photoId,
       license,
@@ -102,21 +88,21 @@ export default async function handler(req, res) {
     }
 
     const amount = PRICES?.[currency]?.[license]?.[format]
-    if (!amount) return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+    if (!amount) {
+      return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+    }
 
-    const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
-    const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
-    const siteUrl = String(process.env.NEXT_PUBLIC_SITE_URL || '').trim()
-    const webhookBase = String(process.env.WEBHOOK_BASE_URL || siteUrl).trim()
-
-    if (!merchantId || !merchantSecret || !siteUrl) {
+    const siteUrl = cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL)
+    if (!siteUrl) {
       return res.status(500).json({
         ok: false,
-        error: 'Missing env vars (PAYHERE_MERCHANT_ID, PAYHERE_MERCHANT_SECRET, NEXT_PUBLIC_SITE_URL)',
+        error: 'Missing env var NEXT_PUBLIC_SITE_URL',
       })
     }
 
-    // ✅ Fetch photo
+    const webhookBase = getBaseUrl(req) || siteUrl
+
+    // ✅ Fetch photo (published only)
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, title, status')
@@ -147,30 +133,23 @@ export default async function handler(req, res) {
     }
 
     const { error: insertError } = await supabaseAdmin.from('orders').insert(insertPayload)
-
     if (insertError) {
       console.error('Supabase insert error:', insertError)
-      return res.status(500).json({ ok: false, error: insertError.message || 'Failed to create order' })
+      return res
+        .status(500)
+        .json({ ok: false, error: insertError.message || 'Failed to create order' })
     }
 
-    // ✅ NEW: mode from Supabase (with env fallback)
-    const payhereMode = await getPayhereMode()
-
-    const actionUrl =
-      payhereMode === 'live'
-        ? 'https://www.payhere.lk/pay/checkout'
-        : 'https://sandbox.payhere.lk/pay/checkout'
-
     const hash = payhereInitHash({
-      merchantId,
-      merchantSecret,
+      merchantId: PAYHERE.merchantId,
+      merchantSecret: PAYHERE.merchantSecret,
       orderId,
       amount,
       currency,
     })
 
     const fields = {
-      merchant_id: merchantId,
+      merchant_id: PAYHERE.merchantId,
 
       return_url: `${siteUrl}/store/return?order_id=${encodeURIComponent(orderId)}`,
       cancel_url: `${siteUrl}/store/cancel?order_id=${encodeURIComponent(orderId)}`,
@@ -196,10 +175,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      actionUrl,
+      actionUrl: PAYHERE.checkoutUrl, // ✅ auto sandbox/live
       fields,
       orderId,
-      payhereMode, // ✅ helpful debug
+      sandbox: PAYHERE.sandbox, // ✅ helpful debug
     })
   } catch (e) {
     console.error('create-checkout error:', e)
