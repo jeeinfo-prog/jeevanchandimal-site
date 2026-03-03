@@ -1,47 +1,115 @@
-import React, { useState, Fragment } from 'react'
-
+// components/service-film-process.js
+import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const ServiceFilmProcess = (props) => {
   const [activeTab, setActiveTab] = useState(0)
+  const [paused, setPaused] = useState(false)
+
+  // ✅ Same image source behavior as Process01 (supports arrays + single fallback)
+  const images = useMemo(() => {
+    const t0 = (
+      props.feature1Imgs?.length ? props.feature1Imgs : [props.feature1ImgSrc]
+    ).filter(Boolean)
+
+    const t1 = (
+      props.feature2Imgs?.length ? props.feature2Imgs : [props.feature2ImgSrc]
+    ).filter(Boolean)
+
+    const t2 = (
+      props.feature3Imgs?.length ? props.feature3Imgs : [props.feature3ImgSrc]
+    ).filter(Boolean)
+
+    return {
+      0: t0.length ? t0 : ['/services/film/process/process-01.jpg'],
+      1: t1.length ? t1 : ['/services/film/process/process-02.jpg'],
+      2: t2.length ? t2 : ['/services/film/process/process-03.jpg'],
+    }
+  }, [
+    props.feature1Imgs,
+    props.feature2Imgs,
+    props.feature3Imgs,
+    props.feature1ImgSrc,
+    props.feature2ImgSrc,
+    props.feature3ImgSrc,
+  ])
+
+  const [i0, setI0] = useState(0)
+  const [i1, setI1] = useState(0)
+  const [i2, setI2] = useState(0)
+
+  useEffect(() => {
+    if (paused) return
+    const id = setInterval(() => {
+      if (activeTab === 0) setI0((i) => (i + 1) % images[0].length)
+      if (activeTab === 1) setI1((i) => (i + 1) % images[1].length)
+      if (activeTab === 2) setI2((i) => (i + 1) % images[2].length)
+    }, 4500)
+    return () => clearInterval(id)
+  }, [paused, activeTab, images])
+
+  const currentIdx = activeTab === 0 ? i0 : activeTab === 1 ? i1 : i2
+  const pool = images[activeTab] || []
+  const safeLen = pool.length || 1
+
+  const currentSrc =
+    pool[currentIdx % safeLen] || '/services/film/process/process-01.jpg'
+
+  // ✅ same “two stacked images” idea (top rotates, bottom supports)
+  const bottomSrc =
+    activeTab === 0
+      ? props.bottomImgSrc0 || '/services/film/process/process-bottom-01.jpg'
+      : activeTab === 1
+      ? props.bottomImgSrc1 || '/services/film/process/process-bottom-02.jpg'
+      : props.bottomImgSrc2 || '/services/film/process/process-bottom-03.jpg'
+
+  const currentAlt =
+    activeTab === 0
+      ? props.feature1ImgAlt || 'Discovery and concept'
+      : activeTab === 1
+      ? props.feature2ImgAlt || 'Visual direction'
+      : props.feature3ImgAlt || 'Production and post'
+
+  const onTab = (n) => {
+    setActiveTab(n)
+    setPaused(true)
+    window.setTimeout(() => setPaused(false), 7000)
+  }
+
   return (
     <>
-      <div className={`thq-section-padding ${props.rootClassName} `}>
-        <div className="service-film-process-container2 thq-section-max-width">
-          <div className="service-film-process-thq-tabs-menu-elm">
-            <div
-              onClick={() => setActiveTab(0)}
-              className="service-film-process-thq-tab-horizontal-elm1"
+      <div className={`thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="process-01-container2 thq-section-max-width">
+          {/* TEXT TABS */}
+          <div className="process-01-thq-tabs-menu-elm">
+            <button
+              type="button"
+              onClick={() => onTab(0)}
+              className={`processTab menuItem ${
+                activeTab === 0 ? 'isActiveItem' : ''
+              }`}
             >
-              <div className="service-film-process-thq-divider-container-elm1">
-                {activeTab === 0 && (
-                  <div className="service-film-process-container3"></div>
-                )}
-              </div>
-              <div className="service-film-process-thq-content-elm1">
+              <div className="processTabInner">
                 <h2 className="thq-heading-2">
                   {props.feature1Title2 ?? (
                     <Fragment>
-                      <span className="service-film-process-text3">
-                        Process
-                      </span>
+                      <span>Process</span>
                     </Fragment>
                   )}
                 </h2>
-                <h2 className="thq-heading-3">
+
+                <h3 className="thq-heading-3">
                   {props.feature1Title11 ?? (
                     <Fragment>
-                      <span className="service-film-process-text2">
-                        Discovery &amp; Concept
-                      </span>
+                      <span>Discovery &amp; Concept</span>
                     </Fragment>
                   )}
-                </h2>
+                </h3>
+
                 <span className="thq-body-small">
                   {props.feature1Description2 ?? (
                     <Fragment>
-                      <span className="service-film-process-text8">
+                      <span>
                         Understanding the idea, intention, and emotional
                         direction of the project.
                       </span>
@@ -49,30 +117,29 @@ const ServiceFilmProcess = (props) => {
                   )}
                 </span>
               </div>
-            </div>
-            <div
-              onClick={() => setActiveTab(2)}
-              className="service-film-process-thq-tab-horizontal-elm2"
+              <span className="hoverArrow">→</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onTab(1)}
+              className={`processTab menuItem ${
+                activeTab === 1 ? 'isActiveItem' : ''
+              }`}
             >
-              <div className="service-film-process-thq-divider-container-elm2">
-                {activeTab === 2 && (
-                  <div className="service-film-process-container4"></div>
-                )}
-              </div>
-              <div className="service-film-process-thq-content-elm2">
-                <h2 className="thq-heading-3">
+              <div className="processTabInner">
+                <h3 className="thq-heading-3">
                   {props.feature3Title ?? (
                     <Fragment>
-                      <span className="service-film-process-text6">
-                        Visual Direction
-                      </span>
+                      <span>Visual Direction</span>
                     </Fragment>
                   )}
-                </h2>
+                </h3>
+
                 <span className="thq-body-small">
                   {props.feature3Description ?? (
                     <Fragment>
-                      <span className="service-film-process-text9">
+                      <span>
                         Shaping the look, rhythm, and cinematic language of the
                         film.
                       </span>
@@ -80,61 +147,59 @@ const ServiceFilmProcess = (props) => {
                   )}
                 </span>
               </div>
-            </div>
-            <div
-              onClick={() => setActiveTab(2)}
-              className="service-film-process-thq-tab-horizontal-elm3"
+              <span className="hoverArrow">→</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onTab(2)}
+              className={`processTab menuItem ${
+                activeTab === 2 ? 'isActiveItem' : ''
+              }`}
             >
-              <div className="service-film-process-thq-divider-container-elm3">
-                {activeTab === 2 && (
-                  <div className="service-film-process-container5"></div>
-                )}
-              </div>
-              <div className="service-film-process-thq-content-elm3">
-                <h2 className="thq-heading-3">
+              <div className="processTabInner">
+                <h3 className="thq-heading-3">
                   {props.feature3Title1 ?? (
                     <Fragment>
-                      <span className="service-film-process-text5">
-                        Production &amp; Post
-                      </span>
+                      <span>Production &amp; Post</span>
                     </Fragment>
                   )}
-                </h2>
+                </h3>
+
                 <span className="thq-body-small">
                   {props.feature3Description1 ?? (
                     <Fragment>
-                      <span className="service-film-process-text1">
-                        Careful execution through filming, editing, sound
-                        design, and grading.
+                      <span>
+                        Careful execution through filming, editing, sound design,
+                        and grading.
                       </span>
                     </Fragment>
                   )}
                 </span>
               </div>
-            </div>
-            <div
-              onClick={() => setActiveTab(2)}
-              className="service-film-process-thq-tab-horizontal-elm4"
+              <span className="hoverArrow">→</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onTab(3)}
+              className={`processTab menuItem ${
+                activeTab === 3 ? 'isActiveItem' : ''
+              }`}
             >
-              <div className="service-film-process-thq-divider-container-elm4">
-                {activeTab === 2 && (
-                  <div className="service-film-process-container6"></div>
-                )}
-              </div>
-              <div className="service-film-process-thq-content-elm4">
-                <h2 className="thq-heading-3">
+              <div className="processTabInner">
+                <h3 className="thq-heading-3">
                   {props.feature3Title11 ?? (
                     <Fragment>
-                      <span className="service-film-process-text4">
-                        Final Delivery
-                      </span>
+                      <span>Final Delivery</span>
                     </Fragment>
                   )}
-                </h2>
+                </h3>
+
                 <span className="thq-body-small">
                   {props.feature3Description11 ?? (
                     <Fragment>
-                      <span className="service-film-process-text7">
+                      <span>
                         A refined, complete film ready for its intended audience
                         and platform.
                       </span>
@@ -142,281 +207,262 @@ const ServiceFilmProcess = (props) => {
                   )}
                 </span>
               </div>
-            </div>
+              <span className="hoverArrow">→</span>
+            </button>
           </div>
-          <div className="service-film-process-thq-image-container-elm">
-            {activeTab === 0 && (
-              <img
-                alt={props.feature1ImgAlt}
-                src={props.feature1ImgSrc}
-                className="service-film-process-image1 thq-img-ratio-16-9"
-              />
-            )}
-            {activeTab === 1 && (
-              <img
-                alt={props.feature2ImgAlt}
-                src={props.feature2ImgSrc}
-                className="service-film-process-image2 thq-img-ratio-16-9"
-              />
-            )}
-            {activeTab === 2 && (
-              <img
-                alt={props.feature3ImgAlt}
-                src={props.feature3ImgSrc}
-                className="service-film-process-image3 thq-img-ratio-16-9"
-              />
-            )}
+
+          {/* RIGHT STACKED IMAGES */}
+          <div
+            className="process-01-thq-image-container-elm"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+          >
+            <div className="imgColumn">
+              <div className="imgCard small">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={
+                    activeTab === 3
+                      ? props.finalImgSrc || currentSrc
+                      : currentSrc
+                  }
+                  alt={
+                    activeTab === 3
+                      ? props.finalImgAlt || 'Final delivery'
+                      : currentAlt
+                  }
+                  className="process-img"
+                  loading="lazy"
+                />
+                <div className="imgOverlay" />
+              </div>
+
+              <div className="imgCard small">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={
+                    activeTab === 3
+                      ? props.finalBottomImgSrc || bottomSrc
+                      : bottomSrc
+                  }
+                  alt="Supporting process frame"
+                  className="process-img"
+                  loading="lazy"
+                />
+                <div className="imgOverlay" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      <style jsx>
-        {`
-          .service-film-process-container2 {
-            width: 100%;
-            display: grid;
-            grid-gap: var(--dl-layout-space-fiveunits);
-            position: relative;
-            grid-template-columns: 1fr 1fr;
-          }
-          .service-film-process-thq-tabs-menu-elm {
+
+      <style jsx>{`
+        .process-01-container2 {
+          width: 100%;
+          display: grid;
+          gap: var(--dl-layout-space-fiveunits);
+          grid-template-columns: 1fr 1fr;
+          align-items: center;
+        }
+
+        .process-01-thq-tabs-menu-elm {
+          display: flex;
+          flex-direction: column;
+          gap: var(--dl-layout-space-twounits);
+          justify-content: center;
+        }
+
+        .processTab {
+          width: 100%;
+          text-align: left;
+          border: 1px solid rgba(245, 244, 244, 0.08);
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 16px;
+          padding: 18px;
+          cursor: pointer;
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          color: #f5f4f4;
+          opacity: 0.92;
+          transition: all 0.22s ease;
+        }
+
+        .processTabInner {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .menuItem:hover {
+          opacity: 1;
+          background: rgba(245, 244, 244, 0.08);
+          color: #25c3e2 !important;
+        }
+
+        .processTab:hover {
+          transform: translateY(-3px) scale(1.01);
+          border-color: rgba(37, 195, 226, 0.28);
+          box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35),
+            0 0 0 1px rgba(37, 195, 226, 0.15);
+        }
+
+        .menuItem.isActiveItem {
+          background: linear-gradient(
+            180deg,
+            rgba(37, 195, 226, 0.2),
+            rgba(37, 195, 226, 0.08)
+          );
+          border: 1px solid rgba(37, 195, 226, 0.18);
+          color: #25c3e2 !important;
+          opacity: 1;
+          font-weight: 700;
+        }
+
+        .hoverArrow {
+          font-size: 18px;
+          opacity: 0;
+          transform: translateX(-6px);
+          transition: all 220ms ease;
+          color: #25c3e2;
+        }
+
+        .processTab:hover .hoverArrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
+
+        .process-01-thq-image-container-elm {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .imgColumn {
+          width: 100%;
+          height: 740px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .imgCard.small {
+          position: relative;
+          width: 100%;
+          height: 360px;
+          overflow: hidden;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+          background: rgba(0, 0, 0, 0.2);
+        }
+
+        .process-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.01);
+          transition: transform 320ms ease, filter 320ms ease;
+        }
+
+        .imgCard.small:hover .process-img {
+          transform: scale(1.05);
+          filter: saturate(1.08) contrast(1.06);
+        }
+
+        .imgOverlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            180deg,
+            rgba(0, 0, 0, 0.08),
+            rgba(0, 0, 0, 0.5)
+          );
+          opacity: 0.9;
+          pointer-events: none;
+        }
+
+        @media (max-width: 991px) {
+          .process-01-container2 {
+            grid-template-columns: 1fr;
             gap: var(--dl-layout-space-twounits);
-            width: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .service-film-process-thq-tab-horizontal-elm1 {
-            gap: var(--dl-layout-space-twounits);
-            cursor: pointer;
-            display: flex;
-            overflow: hidden;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .service-film-process-thq-divider-container-elm1 {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .service-film-process-container3 {
-            width: 2px;
-            align-self: stretch;
-            background-color: var(--dl-color-theme-neutral-dark);
-          }
-          .service-film-process-thq-content-elm1 {
-            gap: 16px;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .service-film-process-thq-tab-horizontal-elm2 {
-            gap: var(--dl-layout-space-twounits);
-            cursor: pointer;
-            display: flex;
-            overflow: hidden;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .service-film-process-thq-divider-container-elm2 {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .service-film-process-container4 {
-            width: 2px;
-            align-self: stretch;
-            background-color: var(--dl-color-theme-neutral-dark);
-          }
-          .service-film-process-thq-content-elm2 {
-            gap: 16px;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .service-film-process-thq-tab-horizontal-elm3 {
-            gap: var(--dl-layout-space-twounits);
-            cursor: pointer;
-            display: flex;
-            overflow: hidden;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .service-film-process-thq-divider-container-elm3 {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .service-film-process-container5 {
-            width: 2px;
-            align-self: stretch;
-            background-color: var(--dl-color-theme-neutral-dark);
-          }
-          .service-film-process-thq-content-elm3 {
-            gap: 16px;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .service-film-process-thq-tab-horizontal-elm4 {
-            gap: var(--dl-layout-space-twounits);
-            cursor: pointer;
-            display: flex;
-            overflow: hidden;
-            align-self: stretch;
-            align-items: flex-start;
-            flex-shrink: 0;
-          }
-          .service-film-process-thq-divider-container-elm4 {
-            display: flex;
-            align-self: stretch;
-            align-items: flex-start;
-          }
-          .service-film-process-container6 {
-            width: 2px;
-            align-self: stretch;
-            background-color: var(--dl-color-theme-neutral-dark);
-          }
-          .service-film-process-thq-content-elm4 {
-            gap: 16px;
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            flex-grow: 1;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .service-film-process-thq-image-container-elm {
-            height: 100%;
-            display: flex;
-            position: relative;
-          }
-          .service-film-process-image1 {
-            animation-name: fadeIn;
-            animation-delay: 0s;
-            animation-duration: 300ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .service-film-process-image2 {
-            animation-name: fadeIn;
-            animation-delay: 0s;
-            animation-duration: 300ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .service-film-process-image3 {
-            animation-name: fadeIn;
-            animation-delay: 0s;
-            animation-duration: 300ms;
-            animation-direction: normal;
-            animation-iteration-count: 1;
-            animation-timing-function: ease;
-          }
-          .service-film-process-text1 {
-            display: inline-block;
-          }
-          .service-film-process-text2 {
-            display: inline-block;
-          }
-          .service-film-process-text3 {
-            display: inline-block;
-          }
-          .service-film-process-text4 {
-            display: inline-block;
-          }
-          .service-film-process-text5 {
-            display: inline-block;
-          }
-          .service-film-process-text6 {
-            display: inline-block;
-          }
-          .service-film-process-text7 {
-            display: inline-block;
-          }
-          .service-film-process-text8 {
-            display: inline-block;
-          }
-          .service-film-process-text9 {
-            display: inline-block;
           }
 
-          @media (max-width: 991px) {
-            .service-film-process-container2 {
-              grid-gap: var(--dl-layout-space-twounits);
-              grid-template-columns: 1fr;
-            }
-            .service-film-process-thq-tabs-menu-elm {
-              order: 2;
-            }
+          .process-01-thq-tabs-menu-elm {
+            order: 2;
           }
-        `}
-      </style>
+
+          .imgColumn {
+            height: auto;
+            gap: var(--dl-layout-space-oneandhalfunits);
+          }
+
+          .imgCard.small {
+            height: 320px;
+          }
+        }
+      `}</style>
     </>
   )
 }
 
 ServiceFilmProcess.defaultProps = {
-  feature3Description1: undefined,
-  feature1Title11: undefined,
-  feature2ImgAlt: 'Photography Image',
   rootClassName: '',
-  feature1Title2: undefined,
-  feature3ImgAlt: 'Sound Image',
-  feature3Title11: undefined,
-  feature3Title1: undefined,
-  feature2ImgSrc:
-    'https://images.unsplash.com/photo-1759417501248-0aa9489dab3f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc3MDA2MjkwOXw&ixlib=rb-4.1.0&q=80&w=1080',
-  feature1ImgSrc:
-    'https://images.unsplash.com/photo-1769399287730-6e42c3990377?ixid=M3w5MTMyMXwwfDF8YWxsfDU0fHx8fHx8fHwxNzcwMDYzMTM1fA&ixlib=rb-4.1.0&w=1400',
-  feature3Title: undefined,
-  feature1ImgAlt: 'Film Image',
-  feature3Description11: undefined,
-  feature1Description2: undefined,
-  feature3Description: undefined,
-  feature3ImgSrc:
-    'https://images.unsplash.com/photo-1496492813606-88559707e685?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5MTMyMXwwfDF8cmFuZG9tfHx8fHx8fHx8MTc3MDA2MjkwOHw&ixlib=rb-4.1.0&q=80&w=1080',
+
+  // ✅ single fallback images (still supports arrays via featureXImgs)
+  feature1ImgSrc: '/services/film/process/process-01.jpg',
+  feature2ImgSrc: '/services/film/process/process-02.jpg',
+  feature3ImgSrc: '/services/film/process/process-03.jpg',
+
+  bottomImgSrc0: '/services/film/process/process-bottom-01.jpg',
+  bottomImgSrc1: '/services/film/process/process-bottom-02.jpg',
+  bottomImgSrc2: '/services/film/process/process-bottom-03.jpg',
+
+  finalImgSrc: '/services/film/process/process-04.jpg',
+  finalBottomImgSrc: '/services/film/process/process-bottom-04.jpg',
 }
 
 ServiceFilmProcess.propTypes = {
-  feature3Description1: PropTypes.element,
-  feature1Title11: PropTypes.element,
-  feature2ImgAlt: PropTypes.string,
   rootClassName: PropTypes.string,
+
+  // Titles / copy
   feature1Title2: PropTypes.element,
-  feature3ImgAlt: PropTypes.string,
-  feature3Title11: PropTypes.element,
-  feature3Title1: PropTypes.element,
-  feature2ImgSrc: PropTypes.string,
-  feature1ImgSrc: PropTypes.string,
-  feature3Title: PropTypes.element,
-  feature1ImgAlt: PropTypes.string,
-  feature3Description11: PropTypes.element,
+  feature1Title11: PropTypes.element,
   feature1Description2: PropTypes.element,
+
+  feature3Title: PropTypes.element,
   feature3Description: PropTypes.element,
+
+  feature3Title1: PropTypes.element,
+  feature3Description1: PropTypes.element,
+
+  feature3Title11: PropTypes.element,
+  feature3Description11: PropTypes.element,
+
+  // Images: single + optional arrays (same approach as Process01)
+  feature1ImgSrc: PropTypes.string,
+  feature2ImgSrc: PropTypes.string,
   feature3ImgSrc: PropTypes.string,
+
+  feature1Imgs: PropTypes.arrayOf(PropTypes.string),
+  feature2Imgs: PropTypes.arrayOf(PropTypes.string),
+  feature3Imgs: PropTypes.arrayOf(PropTypes.string),
+
+  feature1ImgAlt: PropTypes.string,
+  feature2ImgAlt: PropTypes.string,
+  feature3ImgAlt: PropTypes.string,
+
+  // Bottom stack images per tab
+  bottomImgSrc0: PropTypes.string,
+  bottomImgSrc1: PropTypes.string,
+  bottomImgSrc2: PropTypes.string,
+
+  // Optional explicit “final delivery” imagery
+  finalImgSrc: PropTypes.string,
+  finalBottomImgSrc: PropTypes.string,
+  finalImgAlt: PropTypes.string,
 }
 
 export default ServiceFilmProcess
