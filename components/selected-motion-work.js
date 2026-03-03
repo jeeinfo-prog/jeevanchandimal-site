@@ -1,247 +1,239 @@
-import React, { Fragment, useMemo } from 'react'
+import React, { Fragment, useMemo, useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 
 const SelectedMotionWork = (props) => {
   const localFallback = useMemo(
-    () => ({
-      image1Src: '/services/animation/sani-01.jpg',
-      image2Src: '/services/animation/sani-02.jpg',
-      image3Src: '/services/animation/sani-03.jpg',
-      image4Src: '/services/animation/sani-04.jpg',
-      image5Src: '/services/animation/sani-05.jpg',
-      image6Src: '/services/animation/sani-06.jpg',
-      image7Src: '/services/animation/sani-07.jpg',
-    }),
+    () => [
+      '/services/animation/sani-01.jpg',
+      '/services/animation/sani-02.jpg',
+      '/services/animation/sani-03.jpg',
+      '/services/animation/sani-04.jpg',
+      '/services/animation/sani-05.jpg',
+      '/services/animation/sani-06.jpg',
+      '/services/animation/sani-07.jpg',
+    ],
     []
   )
 
-  const tiles = [
-    { src: props.image1Src || localFallback.image1Src, alt: props.image1Alt, href: props.href1 || '' },
-    { src: props.image2Src || localFallback.image2Src, alt: props.image2Alt, href: props.href2 || '' },
-    { src: props.image3Src || localFallback.image3Src, alt: props.image3Alt, href: props.href3 || '' },
-    { src: props.image4Src || localFallback.image4Src, alt: props.image4Alt, href: props.href4 || '' },
-    { src: props.image5Src || localFallback.image5Src, alt: props.image5Alt, href: props.href5 || '' },
-    { src: props.image6Src || localFallback.image6Src, alt: props.image6Alt, href: props.href6 || '' },
-    { src: props.image7Src || localFallback.image7Src, alt: props.image7Alt, href: props.href7 || '' },
-  ]
+  const images = localFallback.map((src, i) => ({
+    src: props[`image${i + 1}Src`] || src,
+    alt: props[`image${i + 1}Alt`] || `Motion work ${i + 1}`,
+  }))
+
+  const [active, setActive] = useState(null)
+
+  const close = () => setActive(null)
+
+  const next = () =>
+    setActive((prev) => (prev + 1) % images.length)
+
+  const prev = () =>
+    setActive((prev) =>
+      prev === 0 ? images.length - 1 : prev - 1
+    )
+
+  // keyboard support
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (active === null) return
+      if (e.key === 'Escape') close()
+      if (e.key === 'ArrowRight') next()
+      if (e.key === 'ArrowLeft') prev()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [active])
 
   return (
     <>
-      <section className={`smw-wrap thq-section-padding ${props.rootClassName || ''}`}>
-        <div className="smw-max thq-section-max-width">
-          {/* ===== Title card ===== */}
-          <div className="smw-titleCard">
-            <div className="smw-titleBg" aria-hidden="true">
-              <div className="smw-vignette" />
-              <div className="smw-grain" />
-            </div>
+      <section className="smw-wrap thq-section-padding">
+        <div className="thq-section-max-width smw-max">
 
-            <div className="smw-titleInner">
-              <div className="smw-kickerRow">
-                <span className="smw-kicker">SELECTED WORK</span>
-                <span className="smw-line" />
-              </div>
-
-              <h2 className="thq-heading-2 smw-title">
-                {props.heading1 ?? (
-                  <Fragment>
-                    <span className="selected-motion-work-text1">Selected Motion Work</span>
-                  </Fragment>
-                )}
-              </h2>
-
-              <p className="thq-body-large smw-sub">
-                {props.content1 ?? (
-                  <Fragment>
-                    <span className="selected-motion-work-text2">
-                      A selection of motion and animation projects created to support film, brands, and visual narratives.
-                    </span>
-                  </Fragment>
-                )}
-              </p>
-            </div>
+          {/* Title */}
+          <div className="smw-header">
+            <h2 className="thq-heading-2">
+              {props.heading1 ?? (
+                <Fragment>
+                  <span>Selected Motion Work</span>
+                </Fragment>
+              )}
+            </h2>
+            <p className="thq-body-large">
+              {props.content1 ?? (
+                <Fragment>
+                  <span>
+                    A curated selection of motion and animation projects.
+                  </span>
+                </Fragment>
+              )}
+            </p>
           </div>
 
-          {/* ===== Masonry grid (NO GAPS) ===== */}
-          <div className="smw-masonry" aria-label="Selected motion work gallery">
-            {tiles.map((t, i) => {
-              const Tag = t.href ? 'a' : 'div'
-              const tagProps = t.href ? { href: t.href } : {}
-              return (
-                <Tag key={i} className="smw-tile" {...tagProps} aria-label={t.alt || `Motion work ${i + 1}`}>
-                  <img src={t.src} alt={t.alt} className="smw-img" loading="lazy" />
-                  <div className="smw-overlay" />
-                </Tag>
-              )
-            })}
+          {/* Masonry */}
+          <div className="smw-masonry">
+            {images.map((img, i) => (
+              <div
+                key={i}
+                className="smw-tile"
+                onClick={() => setActive(i)}
+              >
+                <img
+                  src={img.src}
+                  alt={img.alt}
+                  className="smw-img"
+                  loading="lazy"
+                />
+                <div className="smw-overlay" />
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
+      {/* LIGHTBOX */}
+      {active !== null && (
+        <div className="lightbox" onClick={close}>
+          <div
+            className="lightbox-inner"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={images[active].src}
+              alt={images[active].alt}
+              className="lightbox-img"
+            />
+
+            <button className="lb-close" onClick={close}>
+              ✕
+            </button>
+
+            <button className="lb-prev" onClick={prev}>
+              ‹
+            </button>
+
+            <button className="lb-next" onClick={next}>
+              ›
+            </button>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
-        .smw-wrap {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          flex-direction: column;
-        }
-
         .smw-max {
-          width: 100%;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 20px;
         }
 
-        /* ===== title glass card ===== */
-        .smw-titleCard {
-          position: relative;
-          overflow: hidden;
-          border-radius: 22px;
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          background: rgba(12, 12, 12, 0.55);
-          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.55);
-          backdrop-filter: blur(10px);
-        }
-
-        .smw-titleBg {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-        }
-
-        .smw-vignette {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(
-              80% 70% at 50% 15%,
-              rgba(255, 255, 255, 0.05),
-              rgba(0, 0, 0, 0.78)
-            ),
-            linear-gradient(
-              90deg,
-              rgba(0, 0, 0, 0.82) 0%,
-              rgba(0, 0, 0, 0.35) 50%,
-              rgba(0, 0, 0, 0.82) 100%
-            );
-        }
-
-        .smw-grain {
-          position: absolute;
-          inset: 0;
-          opacity: 0.07;
-          mix-blend-mode: overlay;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-          background-size: 240px 240px;
-        }
-
-        .smw-titleInner {
-          position: relative;
-          z-index: 1;
-          padding: 26px 22px 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          align-items: center;
+        .smw-header {
           text-align: center;
-          max-width: 920px;
-          margin: 0 auto;
         }
 
-        .smw-kickerRow {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          justify-content: center;
-        }
-
-        .smw-kicker {
-          font-size: 12px;
-          letter-spacing: 0.24em;
-          text-transform: uppercase;
-          color: rgba(245, 244, 244, 0.72);
-          padding: 6px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(0, 0, 0, 0.22);
-        }
-
-        .smw-line {
-          flex: 1;
-          height: 1px;
-          background: linear-gradient(90deg, rgba(245, 244, 244, 0.18), rgba(245, 244, 244, 0));
-        }
-
-        .smw-title {
-          margin: 0;
-          line-height: 1.15;
-          text-shadow: 0 16px 42px rgba(0, 0, 0, 0.55);
-        }
-
-        .smw-sub {
-          margin: 0;
-          line-height: 1.8;
-          color: rgba(245, 244, 244, 0.85);
-          max-width: 70ch;
-        }
-
-        /* ===== Masonry (this removes holes) ===== */
         .smw-masonry {
-          width: 100%;
           column-count: 3;
-          column-gap: 12px;
+          column-gap: 14px;
         }
 
         .smw-tile {
+          display: inline-block;
           width: 100%;
-          display: inline-block; /* required for columns */
-          margin: 0 0 12px;
-          position: relative;
-          overflow: hidden;
+          margin-bottom: 14px;
           border-radius: 18px;
-          border: 1px solid rgba(245, 244, 244, 0.1);
-          background: rgba(12, 12, 12, 0.4);
-          box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
-          transform: translateY(0);
-          transition: transform 180ms ease, border-color 180ms ease;
-          text-decoration: none !important;
-          break-inside: avoid;
+          overflow: hidden;
+          cursor: pointer;
+          position: relative;
+          transition: transform 200ms ease;
         }
 
         .smw-tile:hover {
-          transform: translateY(-2px);
-          border-color: rgba(37, 195, 226, 0.35);
+          transform: translateY(-3px);
         }
 
         .smw-img {
           width: 100%;
-          height: auto; /* natural masonry */
+          height: auto;
           display: block;
-          object-fit: cover;
         }
 
         .smw-overlay {
           position: absolute;
           inset: 0;
-          background: radial-gradient(
-              60% 60% at 50% 35%,
-              rgba(0, 0, 0, 0.04),
-              rgba(0, 0, 0, 0.48)
-            ),
-            linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.35));
-          opacity: 0.55;
-          transition: opacity 180ms ease;
-          pointer-events: none;
+          background: linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.15),
+            rgba(0, 0, 0, 0.55)
+          );
+          opacity: 0.5;
+          transition: opacity 200ms ease;
         }
 
         .smw-tile:hover .smw-overlay {
-          opacity: 0.42;
+          opacity: 0.3;
         }
 
-        .selected-motion-work-text1,
-        .selected-motion-work-text2 {
-          display: inline-block;
+        /* ===== Lightbox ===== */
+        .lightbox {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.92);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          animation: fadeIn 200ms ease;
+        }
+
+        .lightbox-inner {
+          position: relative;
+          max-width: 90%;
+          max-height: 85%;
+        }
+
+        .lightbox-img {
+          max-width: 100%;
+          max-height: 85vh;
+          border-radius: 16px;
+          box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7);
+          animation: zoomIn 250ms ease;
+        }
+
+        .lb-close,
+        .lb-prev,
+        .lb-next {
+          position: absolute;
+          background: rgba(0, 0, 0, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: white;
+          border-radius: 50%;
+          width: 44px;
+          height: 44px;
+          font-size: 22px;
+          cursor: pointer;
+          transition: all 180ms ease;
+        }
+
+        .lb-close {
+          top: -20px;
+          right: -20px;
+        }
+
+        .lb-prev {
+          top: 50%;
+          left: -60px;
+          transform: translateY(-50%);
+        }
+
+        .lb-next {
+          top: 50%;
+          right: -60px;
+          transform: translateY(-50%);
+        }
+
+        .lb-close:hover,
+        .lb-prev:hover,
+        .lb-next:hover {
+          background: rgba(37, 195, 226, 0.3);
+          border-color: rgba(37, 195, 226, 0.5);
         }
 
         @media (max-width: 991px) {
@@ -251,71 +243,32 @@ const SelectedMotionWork = (props) => {
         }
 
         @media (max-width: 767px) {
-          .smw-titleInner {
-            padding: 20px 16px 16px;
-          }
-          .smw-line {
-            display: none;
-          }
           .smw-masonry {
             column-count: 1;
           }
+          .lb-prev,
+          .lb-next {
+            display: none;
+          }
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes zoomIn {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
         }
       `}</style>
     </>
   )
 }
 
-SelectedMotionWork.defaultProps = {
-  heading1: undefined,
-  content1: undefined,
-  rootClassName: '',
-
-  image1Alt: 'Motion work 01',
-  image2Alt: 'Motion work 02',
-  image3Alt: 'Motion work 03',
-  image4Alt: 'Motion work 04',
-  image5Alt: 'Motion work 05',
-  image6Alt: 'Motion work 06',
-  image7Alt: 'Motion work 07',
-
-  href1: '',
-  href2: '',
-  href3: '',
-  href4: '',
-  href5: '',
-  href6: '',
-  href7: '',
-}
-
 SelectedMotionWork.propTypes = {
   heading1: PropTypes.element,
   content1: PropTypes.element,
-  rootClassName: PropTypes.string,
-
-  image1Src: PropTypes.string,
-  image2Src: PropTypes.string,
-  image3Src: PropTypes.string,
-  image4Src: PropTypes.string,
-  image5Src: PropTypes.string,
-  image6Src: PropTypes.string,
-  image7Src: PropTypes.string,
-
-  image1Alt: PropTypes.string,
-  image2Alt: PropTypes.string,
-  image3Alt: PropTypes.string,
-  image4Alt: PropTypes.string,
-  image5Alt: PropTypes.string,
-  image6Alt: PropTypes.string,
-  image7Alt: PropTypes.string,
-
-  href1: PropTypes.string,
-  href2: PropTypes.string,
-  href3: PropTypes.string,
-  href4: PropTypes.string,
-  href5: PropTypes.string,
-  href6: PropTypes.string,
-  href7: PropTypes.string,
 }
 
 export default SelectedMotionWork
