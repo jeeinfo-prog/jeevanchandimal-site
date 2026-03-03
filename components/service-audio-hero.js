@@ -130,18 +130,22 @@ const ServiceAudioHero = (props) => {
         }
 
         .content {
-          width: 100%;
-          position: relative;
-          z-index: 1;
-        }
+  width: 100%;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
 
-        .inner {
-          max-width: 560px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          margin-left: var(--dl-layout-space-fiveunits);
-        }
+.inner {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-left: var(--dl-layout-space-fiveunits); /* same left offset as Home */
+  text-align: left;
+  align-items: flex-start;
+}
 
         .name {
           margin: 0;
@@ -236,16 +240,18 @@ const ServiceAudioHero = (props) => {
         }
 
         @media (max-width: 767px) {
-          .inner {
-            width: 100%;
-            text-align: center;
-            align-items: center;
-            margin-left: 0;
-          }
+  .inner {
+    width: 100%;
+    margin-left: 0;
+    padding: 0 var(--dl-layout-space-twounits);
+    text-align: left;
+    align-items: flex-start;
+  }
 
-          .actions {
-            justify-content: center;
-          }
+  .actions {
+    justify-content: flex-start;
+  }
+}
 
           .btnPrimary,
           .btnGhost {
