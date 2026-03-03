@@ -1,375 +1,209 @@
-import React, { Fragment } from 'react'
-
+// components/who-its-for-audio.js
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
+
+function clampInt(v, min, max, fallback) {
+  const n = Number.parseInt(String(v ?? ''), 10)
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, n))
+}
 
 const WhoItsForAudio = (props) => {
+  // ✅ LOCAL STATIC IMAGES
+  const staticItems = useMemo(() => {
+    const total = clampInt(props.fallbackCount, 2, 24, 6)
+    return Array.from({ length: total }, (_, i) => {
+      const n = String(i + 1).padStart(2, '0')
+      return {
+        id: `sawif-${n}`,
+        title: `Audio ${i + 1}`,
+        src: `/services/audio/sawif-${n}.jpg`,
+      }
+    })
+  }, [props.fallbackCount])
+
+  const [page, setPage] = useState(0)
+  const hoverRef = useRef(false)
+  const timerRef = useRef(null)
+
+  const perPage = 2
+  const pages = Math.ceil(staticItems.length / perPage)
+  const intervalMs = Math.max(2500, Number(props.intervalMs || 5200))
+
+  useEffect(() => {
+    if (pages <= 1) return
+
+    timerRef.current = setInterval(() => {
+      if (hoverRef.current) return
+      setPage((p) => (p + 1) % pages)
+    }, intervalMs)
+
+    return () => clearInterval(timerRef.current)
+  }, [pages, intervalMs])
+
+  const start = page * perPage
+  const visible = staticItems.slice(start, start + perPage)
+
+  const headingNode =
+    props.heading1 ?? (
+      <Fragment>
+        <span className="t">Who It’s For</span>
+      </Fragment>
+    )
+
+  const descNode =
+    props.content1 ?? (
+      <Fragment>
+        <span className="t">
+          I collaborate with filmmakers, visual artists, studios, and brands
+          who understand the emotional power of sound in storytelling.
+        </span>
+      </Fragment>
+    )
+
+  function prev() {
+    setPage((p) => (p - 1 + pages) % pages)
+  }
+
+  function next() {
+    setPage((p) => (p + 1) % pages)
+  }
+
   return (
     <>
-      <div
-        className={`who-its-for-audio-thq-gallery3-elm thq-section-padding ${props.rootClassName} `}
-      >
-        <div className="who-its-for-audio-thq-max-width-elm thq-section-max-width">
-          <div className="who-its-for-audio-thq-section-title-elm">
-            <h2 className="who-its-for-audio-thq-text-elm1 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span className="who-its-for-audio-text1">Who It’s For</span>
-                </Fragment>
-              )}
-            </h2>
-            <span className="who-its-for-audio-thq-text-elm2 thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span className="who-its-for-audio-text2">
-                    I collaborate with filmmakers, visual artists, and studios
-                    who understand the power of sound in storytelling.
-                  </span>
-                </Fragment>
-              )}
-            </span>
-          </div>
-          <div className="who-its-for-audio-container1">
-            <div className="who-its-for-audio-thq-content-elm">
-              <div
-                data-thq="slider"
-                data-navigation="true"
-                data-pagination="true"
-                className="who-its-for-audio-thq-slider-elm swiper"
-              >
-                <div
-                  data-thq="slider-wrapper"
-                  className="who-its-for-audio-thq-slider-wrapper-elm swiper-wrapper"
-                >
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-audio-thq-slider-slide-elm1 swiper-slide"
-                  >
-                    <div className="who-its-for-audio-container2">
-                      <img
-                        alt={props.image1Alt}
-                        src={props.image1Src}
-                        className="who-its-for-audio-thq-image1-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-audio-container3">
-                      <img
-                        alt={props.image2Alt}
-                        src={props.image2Src}
-                        className="who-its-for-audio-thq-image2-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-audio-thq-slider-slide-elm2 swiper-slide"
-                  >
-                    <div className="who-its-for-audio-container4">
-                      <img
-                        alt={props.image3Alt}
-                        src={props.image3Src}
-                        className="who-its-for-audio-thq-image3-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-audio-container5">
-                      <img
-                        alt={props.image4Alt}
-                        src={props.image4Src}
-                        className="who-its-for-audio-thq-image4-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                  <div
-                    data-thq="slider-slide"
-                    className="who-its-for-audio-thq-slider-slide-elm3 swiper-slide"
-                  >
-                    <div className="who-its-for-audio-container6">
-                      <img
-                        alt={props.image5Alt}
-                        src={props.image5Src}
-                        className="who-its-for-audio-thq-image5-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                    <div className="who-its-for-audio-container7">
-                      <img
-                        alt={props.image6Alt}
-                        src={props.image6Src}
-                        className="who-its-for-audio-thq-image6-elm thq-img-ratio-4-3"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div
-                  data-thq="slider-button-prev"
-                  className="swiper-button-prev"
-                ></div>
-                <div
-                  data-thq="slider-button-next"
-                  className="swiper-button-next"
-                ></div>
-                <div
-                  data-thq="slider-pagination"
-                  className="who-its-for-audio-thq-slider-pagination-elm swiper-pagination swiper-pagination-bullets swiper-pagination-horizontal"
-                >
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet swiper-pagination-bullet-active"
-                  ></div>
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet"
-                  ></div>
-                  <div
-                    data-thq="slider-pagination-bullet"
-                    className="swiper-pagination-bullet"
-                  ></div>
-                </div>
+      <section className={`wifWrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="wifShell thq-section-max-width">
+
+          <header className="wifHero">
+            <div className="wifHeroInner">
+              <h2 className="wifTitle thq-heading-2">{headingNode}</h2>
+              <p className="wifDesc thq-body-large">{descNode}</p>
+
+              <div className="wifNav">
+                <button onClick={prev} className="wifNavBtn">←</button>
+                <button onClick={next} className="wifNavBtn">→</button>
               </div>
+            </div>
+          </header>
+
+          <div
+            className="wifStage"
+            onMouseEnter={() => (hoverRef.current = true)}
+            onMouseLeave={() => (hoverRef.current = false)}
+          >
+            <div className="wifGrid">
+              {visible.map((it, idx) => (
+                <div key={it.id} className="wifTile">
+                  <img
+                    src={it.src}
+                    alt={it.title}
+                    className="wifImg"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="wifDots">
+              {Array.from({ length: pages }, (_, i) => (
+                <button
+                  key={i}
+                  className={`wifDot ${i === page ? 'on' : ''}`}
+                  onClick={() => setPage(i)}
+                />
+              ))}
             </div>
           </div>
         </div>
-      </div>
-      <style jsx>
-        {`
-          .who-its-for-audio-thq-gallery3-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .who-its-for-audio-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-section-title-elm {
-            gap: 24px;
-            width: auto;
-            display: flex;
-            max-width: 800px;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-text-elm1 {
-            text-align: center;
-          }
-          .who-its-for-audio-thq-text-elm2 {
-            text-align: center;
-          }
-          .who-its-for-audio-container1 {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            width: 100%;
-            display: flex;
-            align-items: center;
-            flex-direction: row;
-          }
-          .who-its-for-audio-thq-content-elm {
-            gap: var(--dl-layout-space-oneandhalfunits);
-            flex: 1;
-            width: 100%;
-            display: flex;
-            align-self: stretch;
-            align-items: center;
-            flex-shrink: 0;
-            justify-content: center;
-          }
-          .who-its-for-audio-thq-slider-elm {
-            width: 100%;
-            height: 600px;
-            display: inline-block;
-          }
-          .who-its-for-audio-thq-slider-wrapper-elm {
-            width: 100%;
-          }
-          .who-its-for-audio-thq-slider-slide-elm1 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-audio-container2 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-image1-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-audio-container3 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-image2-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-audio-thq-slider-slide-elm2 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-audio-container4 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-image3-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-audio-container5 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-image4-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-audio-thq-slider-slide-elm3 {
-            gap: var(--dl-layout-space-unit);
-            width: 100%;
-            height: calc(100% - 20px);
-            display: flex;
-          }
-          .who-its-for-audio-container6 {
-            flex: 1;
-            height: 100%;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-image5-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-audio-container7 {
-            flex: 1;
-            display: flex;
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .who-its-for-audio-thq-image6-elm {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-          .who-its-for-audio-thq-slider-pagination-elm {
-            display: block;
-          }
-          .who-its-for-audio-text1 {
-            display: inline-block;
-          }
-          .who-its-for-audio-text2 {
-            display: inline-block;
-          }
+      </section>
 
-          @media (max-width: 991px) {
-            .who-its-for-audio-thq-content-elm {
-              align-items: center;
-              flex-direction: column;
-            }
-          }
-          @media (max-width: 767px) {
-            .who-its-for-audio-thq-section-title-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-            .who-its-for-audio-thq-slider-slide-elm1 {
-              flex-direction: column;
-            }
-            .who-its-for-audio-container2 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-audio-container3 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-audio-thq-slider-slide-elm2 {
-              flex-direction: column;
-            }
-            .who-its-for-audio-container4 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-audio-container5 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-audio-thq-slider-slide-elm3 {
-              flex-direction: column;
-            }
-            .who-its-for-audio-container6 {
-              height: calc(50% - 8px);
-            }
-            .who-its-for-audio-container7 {
-              height: calc(50% - 8px);
-            }
-          }
-          @media (max-width: 479px) {
-            .who-its-for-audio-thq-slider-elm {
-              height: 440px;
-            }
-          }
-        `}
-      </style>
+      <style jsx>{`
+        .wifWrap { width: 100%; }
+        .wifShell { display: flex; flex-direction: column; gap: 18px; }
+
+        .wifHeroInner { text-align: center; }
+
+        .wifTitle { margin: 0; }
+        .wifDesc { margin-top: 10px; opacity: 0.85; }
+
+        .wifNav { margin-top: 14px; display: flex; gap: 8px; justify-content: center; }
+
+        .wifNavBtn {
+          padding: 8px 14px;
+          border-radius: 999px;
+          border: 1px solid rgba(245,244,244,0.15);
+          background: rgba(0,0,0,0.25);
+          cursor: pointer;
+        }
+
+        .wifGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+
+        .wifTile {
+          overflow: hidden;
+          border-radius: 16px;
+          border: 1px solid rgba(245,244,244,0.1);
+          aspect-ratio: 4 / 3;
+        }
+
+        .wifImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.5s ease;
+        }
+
+        .wifTile:hover .wifImg {
+          transform: scale(1.05);
+        }
+
+        .wifDots {
+          margin-top: 12px;
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .wifDot {
+          width: 26px;
+          height: 3px;
+          border: 0;
+          background: rgba(245,244,244,0.2);
+          border-radius: 99px;
+          cursor: pointer;
+        }
+
+        .wifDot.on {
+          background: rgba(37,195,226,0.8);
+        }
+
+        @media (max-width: 767px) {
+          .wifGrid { grid-template-columns: 1fr; }
+        }
+
+        .t { display: inline-block; }
+      `}</style>
     </>
   )
 }
 
 WhoItsForAudio.defaultProps = {
-  image2Alt: 'Audio Production',
-  image6Alt: 'Sound Design',
-  image1Src: '/Audio/Studio/46761_107423292651247_2063467_n-1400w.jpg',
-  heading1: undefined,
-  image4Alt: 'Photography',
   rootClassName: '',
-  image2Src: '/Audio/Studio/jeevan%20chandimal_0003_layer%2019-1400w.jpg',
-  image6Src: '/Audio/Studio/jeevan%20chandimal_0001_layer%2021-1400w.jpg',
-  image1Alt: 'Film Production',
-  image5Alt: 'AI & Animations Services',
-  image4Src: '/Audio/Studio/277309_381817668545140_1195496920_o-1400w.jpg',
-  image3Alt: 'Animation & Graphics',
+  heading1: undefined,
   content1: undefined,
-  image3Src: '/Audio/Studio/194813_381818151878425_1300551683_o-1400w.jpg',
-  image5Src: '/Audio/Studio/jeevan%20chandimal_0002_layer%2020-1400w.jpg',
+  intervalMs: 5200,
+  fallbackCount: 6,
 }
 
 WhoItsForAudio.propTypes = {
-  image2Alt: PropTypes.string,
-  image6Alt: PropTypes.string,
-  image1Src: PropTypes.string,
-  heading1: PropTypes.element,
-  image4Alt: PropTypes.string,
   rootClassName: PropTypes.string,
-  image2Src: PropTypes.string,
-  image6Src: PropTypes.string,
-  image1Alt: PropTypes.string,
-  image5Alt: PropTypes.string,
-  image4Src: PropTypes.string,
-  image3Alt: PropTypes.string,
+  heading1: PropTypes.element,
   content1: PropTypes.element,
-  image3Src: PropTypes.string,
-  image5Src: PropTypes.string,
+  intervalMs: PropTypes.number,
+  fallbackCount: PropTypes.number,
 }
 
 export default WhoItsForAudio
