@@ -15,6 +15,7 @@
     "@aws-sdk/s3-request-presigner": "^3.987.0",
     "@supabase/supabase-js": "^2.95.3",
     "@teleporthq/react-components": "latest",
+    "dotenv": "^17.3.1",
     "jsonwebtoken": "^9.0.3",
     "next": "^12.1.10",
     "next-intl": "2.10.0",
