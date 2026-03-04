@@ -2,24 +2,18 @@
 import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import { createClient } from '@supabase/supabase-js'
-
 import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
 
-function getSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anon) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  return createClient(url, anon)
-}
-
-function normalizeEmail(v) {
-  return String(v || '').trim().toLowerCase()
-}
+const STORAGE_EMAIL_KEY = 'user_email'
+const STORAGE_DEVICE_ID = 'jc_device_id_v1'
+const STORAGE_SESSION = 'jc_member_session_v1'
 
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+}
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
 }
 
 function fmtTier(t) {
@@ -38,6 +32,15 @@ function normalizeTierUpper(v) {
   return ''
 }
 
+function safeJson(v, fallback) {
+  try {
+    const x = JSON.parse(v)
+    return x ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 function useRevealOnScroll() {
   React.useEffect(() => {
     if (typeof window === 'undefined') return
@@ -53,171 +56,237 @@ function useRevealOnScroll() {
           }
         })
       },
-      { threshold: 0.16, rootMargin: '0px 0px -10% 0px' }
+      { threshold: 0.16 }
     )
     els.forEach((el) => io.observe(el))
     return () => io.disconnect()
   }, [])
 }
 
+function getOrCreateDeviceId() {
+  if (typeof window === 'undefined') return ''
+  const existing = window.localStorage.getItem(STORAGE_DEVICE_ID)
+  if (existing && existing.length > 8) return existing
+  const id =
+    (globalThis.crypto?.randomUUID?.() || `dev_${Date.now()}_${Math.random().toString(16).slice(2)}`)
+      .toString()
+      .slice(0, 64)
+  window.localStorage.setItem(STORAGE_DEVICE_ID, id)
+  return id
+}
+
+function readSessionToken() {
+  if (typeof window === 'undefined') return ''
+  return String(window.localStorage.getItem(STORAGE_SESSION) || '')
+}
+
+function writeSessionToken(token) {
+  if (typeof window === 'undefined') return
+  if (!token) window.localStorage.removeItem(STORAGE_SESSION)
+  else window.localStorage.setItem(STORAGE_SESSION, String(token))
+}
+
 export default function Members() {
   useRevealOnScroll()
 
-  const supabase = React.useMemo(() => getSupabaseClient(), [])
-
   const [email, setEmail] = React.useState('')
-  const [sendingLink, setSendingLink] = React.useState(false)
   const [checking, setChecking] = React.useState(false)
-  const [error, setError] = React.useState('')
-
-  const [session, setSession] = React.useState(null)
   const [member, setMember] = React.useState(null)
+  const [error, setError] = React.useState('')
 
   const [photos, setPhotos] = React.useState([])
   const [photosLoading, setPhotosLoading] = React.useState(false)
 
   const [query, setQuery] = React.useState('')
   const [downloadingId, setDownloadingId] = React.useState('')
-  const [format, setFormat] = React.useState('jpg') // jpg | raw (elite only)
+  const [format, setFormat] = React.useState('jpg')
+
+  const [deviceInfo, setDeviceInfo] = React.useState({ active: 0, max: 2 })
+
+  // Cinematic overlay message
+  const [overlay, setOverlay] = React.useState(null) // {title, body, hint}
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const saved = window.localStorage.getItem(STORAGE_EMAIL_KEY)
+    if (saved) setEmail(saved)
+  }, [])
 
   const canRaw = String(member?.tier || '').toLowerCase() === 'elite'
   React.useEffect(() => {
     if (!canRaw && format === 'raw') setFormat('jpg')
   }, [canRaw, format])
 
-  // Load session + listen changes
-  React.useEffect(() => {
-    let alive = true
+  async function authedFetch(url, init = {}) {
+    const token = readSessionToken()
+    const headers = { ...(init.headers || {}) }
+    if (token) headers.Authorization = `Bearer ${token}`
+    return fetch(url, { ...init, headers, cache: 'no-store' })
+  }
 
-    async function init() {
-      const { data } = await supabase.auth.getSession()
-      if (!alive) return
-      setSession(data?.session || null)
-
-      // Prefill email from session if available
-      const em = data?.session?.user?.email
-      if (em) setEmail(String(em))
+  function handleSessionError(j) {
+    const cinematic = j?.cinematic
+    if (cinematic?.title || cinematic?.body) {
+      setOverlay({
+        title: cinematic.title || 'Session ended',
+        body: cinematic.body || 'Please sign in again.',
+        hint: cinematic.hint || 'Max 2 devices • No sharing',
+      })
+    } else {
+      setOverlay({
+        title: 'Session ended',
+        body: 'Please sign in again to continue.',
+        hint: 'Max 2 devices • No sharing',
+      })
     }
 
-    init()
+    writeSessionToken('')
+    try {
+      window.localStorage.removeItem('member_tier')
+      window.localStorage.removeItem('member_remaining')
+      window.dispatchEvent(new Event('jc_member_updated'))
+    } catch {}
+  }
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess || null)
-      const em = sess?.user?.email
-      if (em) setEmail(String(em))
-      if (!sess) {
-        setMember(null)
-        setPhotos([])
-      }
+  async function startSession(cleanEmail) {
+    const deviceId = getOrCreateDeviceId()
+    const r = await fetch('/api/member/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({
+        action: 'start',
+        email: cleanEmail,
+        deviceId,
+        ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      }),
     })
 
-    return () => {
-      alive = false
-      sub?.subscription?.unsubscribe?.()
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || !j?.ok) {
+      if (j?.cinematic) setOverlay(j.cinematic)
+      return { ok: false, error: j?.error || 'Could not start session.' }
     }
-  }, [supabase])
 
-  async function sendMagicLink() {
+    writeSessionToken(j.token || '')
+    setDeviceInfo({ active: Number(j.active || 0), max: Number(j.max || 2) })
+    return { ok: true }
+  }
+
+  async function loadDeviceInfo() {
+    const r = await authedFetch('/api/member/session')
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || !j?.ok) {
+      if (r.status === 401) handleSessionError(j)
+      return
+    }
+    setDeviceInfo({ active: Number(j.active || 0), max: Number(j.max || 2) })
+  }
+
+  async function signOutOtherDevices() {
     try {
-      setError('')
-      const clean = normalizeEmail(email)
-      if (!isValidEmail(clean)) {
-        setError('Enter a valid email address.')
-        return
-      }
-
-      setSendingLink(true)
-
-      const redirectTo =
-        (typeof window !== 'undefined' ? window.location.origin : '') + '/members'
-
-      const { error: e } = await supabase.auth.signInWithOtp({
-        email: clean,
-        options: { emailRedirectTo: redirectTo },
+      const r = await authedFetch('/api/member/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ action: 'revoke_others' }),
       })
+      const j = await r.json().catch(() => ({}))
 
-      if (e) {
-        setError(e.message || 'Failed to send magic link.')
+      if (!r.ok || !j?.ok) {
+        if (r.status === 401) handleSessionError(j)
+        else setError(j?.error || 'Could not revoke devices.')
         return
       }
 
-      setError('Magic link sent — check your inbox.')
+      setDeviceInfo({ active: Number(j.active || 0), max: Number(j.max || 2) })
     } catch (e) {
       setError(e?.message || 'Something went wrong.')
-    } finally {
-      setSendingLink(false)
     }
   }
 
-  async function signOut() {
+  async function refreshMemberStatus(cleanEmail) {
+    const url = `/api/member/status?email=${encodeURIComponent(cleanEmail)}&t=${Date.now()}`
+    const r = await authedFetch(url)
+    const d = await r.json().catch(() => ({}))
+
+    if (!r.ok || !d?.ok) {
+      if (r.status === 401) handleSessionError(d)
+      return { ok: false, error: d?.error || 'Not a member.' }
+    }
+
+    const isMember = !!d?.member
+    if (!isMember) return { ok: false, error: 'No active membership found.' }
+
+    const tier = d?.tier || 'pro'
+    const used = Number(d?.used ?? 0)
+    const limit = Number(d?.limit ?? 0)
+    const remaining = Number(d?.remaining ?? Math.max(0, limit - used))
+
+    if (d?.devices) {
+      setDeviceInfo({
+        active: Number(d.devices.active || 0),
+        max: Number(d.devices.max || 2),
+      })
+    }
+
+    return { ok: true, tier, used, limit, remaining }
+  }
+
+  async function checkMembership() {
     try {
       setError('')
-      await supabase.auth.signOut()
-    } catch (e) {
-      setError(e?.message || 'Sign out failed.')
-    }
-  }
+      setOverlay(null)
 
-  async function authedFetch(path, opts = {}) {
-    const accessToken = session?.access_token
-    if (!accessToken) throw new Error('Not authenticated')
-
-    const headers = {
-      ...(opts.headers || {}),
-      Authorization: `Bearer ${accessToken}`,
-      'Cache-Control': 'no-store',
-    }
-
-    return fetch(path, { ...opts, headers, cache: 'no-store' })
-  }
-
-  async function refreshMemberStatus() {
-    setChecking(true)
-    setError('')
-
-    try {
-      const r = await authedFetch('/api/member/status?t=' + Date.now())
-      const d = await r.json().catch(() => ({}))
-
-      if (!r.ok || !d?.ok) {
-        setMember(null)
-        setError(d?.error || 'Failed to check membership.')
+      const clean = normalizeEmail(email)
+      if (!isValidEmail(clean)) {
+        setError('Please enter a valid email address.')
         return
       }
 
-      if (!d.member) {
-        setMember({ ok: false })
+      if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_EMAIL_KEY, clean)
+
+      setChecking(true)
+      setMember(null)
+
+      // ✅ Step 1: start session (enforces max devices)
+      const sess = await startSession(clean)
+      if (!sess.ok) {
+        setChecking(false)
+        setError(sess.error || 'Could not start session.')
         return
       }
 
-      const next = {
-        ok: true,
-        tier: d.tier || 'pro',
-        used: Number(d.used ?? 0),
-        limit: Number(d.limit ?? 0),
-        remaining: Number(d.remaining ?? 0),
+      // ✅ Step 2: refresh status (requires session)
+      const status = await refreshMemberStatus(clean)
+      if (!status.ok) {
+        setChecking(false)
+        setError(status.error || 'Not a member.')
+        return
       }
 
-      setMember(next)
+      setMember(status)
+      setChecking(false)
 
-      // ✅ Update nav badge (no refresh)
+      // ✅ update nav badge
       try {
-        const tierUpper = normalizeTierUpper(next.tier)
+        const tierUpper = normalizeTierUpper(status.tier)
         if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
-        if (Number.isFinite(Number(next.remaining))) {
-          window.localStorage.setItem('member_remaining', String(Number(next.remaining)))
+
+        if (Number.isFinite(Number(status.remaining))) {
+          window.localStorage.setItem('member_remaining', String(Number(status.remaining)))
         } else {
           window.localStorage.removeItem('member_remaining')
         }
+
         window.dispatchEvent(new Event('jc_member_updated'))
       } catch {}
 
-      await loadLibrary()
+      await loadDeviceInfo()
+      loadLibrary()
     } catch (e) {
-      setMember(null)
-      setError(e?.message || 'Something went wrong.')
-    } finally {
       setChecking(false)
+      setError(e?.message || 'Something went wrong.')
     }
   }
 
@@ -228,18 +297,12 @@ export default function Members() {
       const j = await r.json().catch(() => null)
       const list = Array.isArray(j?.photos) ? j.photos : []
       setPhotos(list)
-    } catch {
-      setPhotos([])
-    } finally {
       setPhotosLoading(false)
+    } catch {
+      setPhotosLoading(false)
+      setPhotos([])
     }
   }
-
-  React.useEffect(() => {
-    // Auto-refresh status when session becomes available
-    if (session?.access_token) refreshMemberStatus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.access_token])
 
   const filteredPhotos = React.useMemo(() => {
     const q = String(query || '').trim().toLowerCase()
@@ -254,8 +317,11 @@ export default function Members() {
   async function downloadPhoto(photo) {
     try {
       setError('')
-      if (!session?.access_token) {
-        setError('Please sign in first.')
+      setOverlay(null)
+
+      const clean = normalizeEmail(email)
+      if (!isValidEmail(clean)) {
+        setError('Please enter a valid email address.')
         return
       }
 
@@ -270,19 +336,23 @@ export default function Members() {
       const r = await authedFetch('/api/member/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId: pid, format }),
+        cache: 'no-store',
+        body: JSON.stringify({ email: clean, photoId: pid, format }),
       })
 
       const j = await r.json().catch(() => ({}))
 
       if (!r.ok || !j?.ok) {
-        setError(j?.error || 'Download failed.')
+        setDownloadingId('')
+        if (r.status === 401) handleSessionError(j)
+        else setError(j?.error || 'Download failed.')
         return
       }
 
-      // Update meter immediately
+      setDownloadingId('')
+
       setMember((prev) => {
-        if (!prev?.ok) return prev
+        if (!prev) return prev
         const nextTier = j?.tier || prev.tier
         const nextUsed = Number(j?.used ?? prev.used ?? 0)
         const nextLimit = Number(j?.limit ?? prev.limit ?? 0)
@@ -290,21 +360,22 @@ export default function Members() {
         return { ...prev, tier: nextTier, used: nextUsed, limit: nextLimit, remaining: nextRemaining }
       })
 
-      // Update nav badge
+      // update nav badge
       try {
         const tierUpper = normalizeTierUpper(j?.tier || member?.tier)
         if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
+
         if (Number.isFinite(Number(j?.remaining))) {
           window.localStorage.setItem('member_remaining', String(Number(j.remaining)))
         }
+
         window.dispatchEvent(new Event('jc_member_updated'))
       } catch {}
 
       if (j?.url) window.location.href = j.url
     } catch (e) {
-      setError(e?.message || 'Something went wrong.')
-    } finally {
       setDownloadingId('')
+      setError(e?.message || 'Something went wrong.')
     }
   }
 
@@ -312,251 +383,252 @@ export default function Members() {
     <>
       <Head>
         <title>Members — Jeevan Chandimal</title>
-        <meta name="description" content="Secure member downloads and archive access." />
+        <meta name="description" content="Member downloads and archive access." />
       </Head>
 
       <JeevanChandimalNavi />
+
+      {/* Cinematic overlay */}
+      {overlay ? (
+        <div className="overlay">
+          <div className="overlayCard">
+            <div className="overlayGlow" />
+            <h3 className="overlayTitle">{overlay.title || 'Session ended'}</h3>
+            <p className="overlayBody">{overlay.body || 'Please sign in again.'}</p>
+            {overlay.hint ? <p className="overlayHint">{overlay.hint}</p> : null}
+
+            <div className="overlayActions">
+              <button
+                type="button"
+                className="thq-button-filled"
+                onClick={() => {
+                  setOverlay(null)
+                  setMember(null)
+                  setError('')
+                }}
+              >
+                Sign in again
+              </button>
+              <Link href="/memberships" className="thq-button-outline">
+                Membership
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <main className="page thq-section-padding">
         <div className="thq-section-max-width">
           <section className="hero" data-reveal>
             <h1 className="thq-heading-1 center">Member Downloads</h1>
             <p className="thq-body-large center sub">
-              Secure access via magic link. No password, no email spoofing.
+              Access your membership archive and download directly.
             </p>
 
             <div className="accessCard">
-              {!session ? (
-                <>
-                  <div className="row">
-                    <label className="label">Email</label>
-                    <div className="inputRow">
-                      <input
-                        className="input"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        inputMode="email"
-                      />
-                      <button
-                        type="button"
-                        className="thq-button-filled btn"
-                        onClick={sendMagicLink}
-                        disabled={sendingLink}
-                      >
-                        {sendingLink ? 'Sending…' : 'Send magic link'}
-                      </button>
-                    </div>
+              <div className="row">
+                <label className="label">Email</label>
+                <div className="inputRow">
+                  <input
+                    className="input"
+                    value={email}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setEmail(v)
+                      if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_EMAIL_KEY, v)
+                    }}
+                    placeholder="you@example.com"
+                    inputMode="email"
+                  />
+                  <button
+                    type="button"
+                    className="thq-button-filled btn"
+                    onClick={checkMembership}
+                    disabled={checking}
+                  >
+                    {checking ? 'Checking…' : 'Access'}
+                  </button>
+                </div>
+                {error ? <p className="err">{error}</p> : null}
+              </div>
 
-                    <p className="hint">
-                      You’ll receive an email with a sign-in link. Open it and you’ll land back here automatically.
-                    </p>
-
-                    {error ? <p className="err">{error}</p> : null}
+              <div className="meterRow">
+                <div className="leftStack">
+                  <div className="pill">
+                    <span className="pillDot" />
+                    <span className="pillText">
+                      {member?.ok ? `${fmtTier(member.tier)} active` : 'Enter your email to check'}
+                    </span>
                   </div>
 
-                  <div className="rightLinks">
-                    <Link href="/memberships" className="linkBtn subtle">
-                      Membership
-                    </Link>
-                    <Link href="/store" className="linkBtn">
-                      Browse Store
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="row">
-                    <div className="signedRow">
-                      <div className="pill">
-                        <span className="pillDot" />
-                        <span className="pillText">
-                          Signed in as <strong>{session.user?.email}</strong>
-                        </span>
-                      </div>
-
-                      <div className="signedActions">
-                        <button type="button" className="thq-button-outline smallBtn" onClick={refreshMemberStatus} disabled={checking}>
-                          {checking ? 'Refreshing…' : 'Refresh'}
-                        </button>
-                        <button type="button" className="thq-button-outline smallBtn" onClick={signOut}>
-                          Sign out
-                        </button>
-                      </div>
-                    </div>
-
-                    {error ? <p className="err">{error}</p> : null}
-                  </div>
-
-                  <div className="meterRow">
-                    <div className="pill">
-                      <span className="pillDot" />
-                      <span className="pillText">
-                        {member?.ok ? `${fmtTier(member.tier)} active` : member ? 'No active membership' : 'Checking…'}
+                  <div className="deviceStatus">
+                    <div className="devicePill" title="No-share protection">
+                      <span className="deviceDot" />
+                      <span className="deviceText">
+                        Devices {deviceInfo.active}/{deviceInfo.max}
                       </span>
                     </div>
 
-                    <div className="meter">
-                      <div className="meterTop">
-                        <span className="meterLabel">Monthly usage</span>
-                        <span className="meterValue">
-                          {member?.ok ? `${member.used}/${member.limit} used` : '—'}
-                        </span>
-                      </div>
+                    {member?.ok && deviceInfo.active > 1 ? (
+                      <button type="button" className="deviceReset" onClick={signOutOtherDevices}>
+                        Sign out other devices
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
 
-                      <div className="bar">
-                        <div
-                          className="fill"
-                          style={{
-                            width:
-                              member?.ok && member.limit > 0
-                                ? `${Math.min(100, (Number(member.used || 0) / Number(member.limit || 1)) * 100)}%`
-                                : '0%',
-                          }}
-                        />
-                      </div>
-
-                      <div className="meterBottom">
-                        <span className="muted">{member?.ok ? `${member.remaining} remaining` : '—'}</span>
-                      </div>
-                    </div>
+                <div className="meter">
+                  <div className="meterTop">
+                    <span className="meterLabel">Monthly usage</span>
+                    <span className="meterValue">
+                      {member?.ok ? `${member.used}/${member.limit} used` : '—'}
+                    </span>
                   </div>
 
-                  <div className="controls">
-                    <div className="searchWrap">
-                      <input
-                        className="search"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search the archive…"
-                      />
-                    </div>
-
-                    <div className="formatWrap">
-                      <span className="labelSmall">Format</span>
-                      <div className="togglePills" role="tablist" aria-label="Format toggle">
-                        <button
-                          type="button"
-                          className={`pillBtn ${format === 'jpg' ? 'active' : ''}`}
-                          onClick={() => setFormat('jpg')}
-                        >
-                          JPG <span className="pillArrow">→</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`pillBtn ${format === 'raw' ? 'active' : ''} ${!canRaw ? 'disabled' : ''}`}
-                          onClick={() => {
-                            if (!canRaw) return
-                            setFormat('raw')
-                          }}
-                          title={!canRaw ? 'RAW is available for Elite members' : 'RAW ZIP'}
-                        >
-                          RAW <span className="pillArrow">→</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="rightLinks">
-                      <Link href="/store" className="linkBtn">
-                        Browse Store
-                      </Link>
-                      <Link href="/memberships" className="linkBtn subtle">
-                        Membership
-                      </Link>
-                    </div>
+                  <div className="bar">
+                    <div
+                      className="fill"
+                      style={{
+                        width:
+                          member?.ok && member.limit > 0
+                            ? `${Math.min(100, (Number(member.used || 0) / Number(member.limit || 1)) * 100)}%`
+                            : '0%',
+                      }}
+                    />
                   </div>
-                </>
-              )}
-            </div>
-          </section>
 
-          {session ? (
-            <section className="library" data-reveal>
-              <div className="libHead">
-                <h2 className="thq-heading-2">Archive</h2>
-                <p className="thq-body-small muted">
-                  Tip: Use search and click download. (Elite can choose RAW.)
-                </p>
+                  <div className="meterBottom">
+                    <span className="muted">{member?.ok ? `${member.remaining} remaining` : '—'}</span>
+                  </div>
+                </div>
               </div>
 
-              {photosLoading ? (
-                <div className="skeletonGrid">
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <div className="skCard" key={i} />
-                  ))}
+              <div className="controls">
+                <div className="searchWrap">
+                  <input
+                    className="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search the archive…"
+                  />
                 </div>
-              ) : filteredPhotos.length === 0 ? (
-                <div className="emptyCard">
-                  <h3 className="thq-heading-3">No items loaded</h3>
-                  <p className="thq-body-small muted">Click “Try Load Again”.</p>
-                  <div className="emptyActions">
-                    <Link href="/store" className="thq-button-filled">
-                      Go to Store
-                    </Link>
-                    <button type="button" className="thq-button-outline" onClick={loadLibrary}>
-                      Try Load Again
+
+                <div className="formatWrap">
+                  <span className="labelSmall">Format</span>
+                  <div className="togglePills" role="tablist" aria-label="Format toggle">
+                    <button
+                      type="button"
+                      className={`pillBtn ${format === 'jpg' ? 'active' : ''}`}
+                      onClick={() => setFormat('jpg')}
+                    >
+                      JPG <span className="pillArrow">→</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`pillBtn ${format === 'raw' ? 'active' : ''} ${!canRaw ? 'disabled' : ''}`}
+                      onClick={() => {
+                        if (!canRaw) return
+                        setFormat('raw')
+                      }}
+                      title={!canRaw ? 'RAW is available for Elite members' : 'RAW ZIP'}
+                    >
+                      RAW <span className="pillArrow">→</span>
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="grid">
-                  {filteredPhotos.map((p) => {
-                    const id = String(p?.id || '')
-                    const title = String(p?.title || 'Photo')
-                    const thumb = p?.thumb_url || p?.preview_url || ''
-                    const canDownload = !!member?.ok
 
-                    return (
-                      <div className="card" key={id}>
-                        <div className="thumb">
-                          {thumb ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={thumb} alt={title} />
-                          ) : (
-                            <div className="thumbFallback">Preview</div>
-                          )}
-                        </div>
-
-                        <div className="cardBody">
-                          <div className="cardTop">
-                            <div className="title">{title}</div>
-                            <div className="tags">
-                              {Array.isArray(p?.tags) &&
-                                p.tags.slice(0, 3).map((t) => (
-                                  <span className="tag" key={t}>
-                                    {t}
-                                  </span>
-                                ))}
-                            </div>
-                          </div>
-
-                          <div className="cardActions">
-                            <Link href={`/store/${encodeURIComponent(id)}`} className="thq-button-outline smallBtn">
-                              View
-                            </Link>
-
-                            <button
-                              type="button"
-                              className="thq-button-filled smallBtn"
-                              onClick={() => downloadPhoto(p)}
-                              disabled={!canDownload || downloadingId === id}
-                              title={!canDownload ? 'No active membership' : 'Download'}
-                            >
-                              {downloadingId === id ? 'Preparing…' : 'Download'}
-                            </button>
-                          </div>
-
-                          {!member?.ok ? (
-                            <p className="hint">No active membership found for this account.</p>
-                          ) : null}
-                        </div>
-                      </div>
-                    )
-                  })}
+                <div className="rightLinks">
+                  <Link href="/store" className="linkBtn">
+                    Browse Store
+                  </Link>
+                  <Link href="/memberships" className="linkBtn subtle">
+                    Membership
+                  </Link>
                 </div>
-              )}
-            </section>
-          ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className="library" data-reveal>
+            <div className="libHead">
+              <h2 className="thq-heading-2">Archive</h2>
+              <p className="thq-body-small muted">Tip: Use search and click download. (Elite can choose RAW.)</p>
+            </div>
+
+            {photosLoading ? (
+              <div className="skeletonGrid">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div className="skCard" key={i} />
+                ))}
+              </div>
+            ) : filteredPhotos.length === 0 ? (
+              <div className="emptyCard">
+                <h3 className="thq-heading-3">No items loaded</h3>
+                <p className="thq-body-small muted">If no photos appear, click “Try Load Again”.</p>
+                <div className="emptyActions">
+                  <Link href="/store" className="thq-button-filled">
+                    Go to Store
+                  </Link>
+                  <button type="button" className="thq-button-outline" onClick={loadLibrary}>
+                    Try Load Again
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid">
+                {filteredPhotos.map((p) => {
+                  const id = String(p?.id || '')
+                  const title = String(p?.title || 'Photo')
+                  const thumb = p?.thumb_url || p?.preview_url || ''
+                  const canDownload = !!member?.ok
+
+                  return (
+                    <div className="card" key={id}>
+                      <div className="thumb">
+                        {thumb ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumb} alt={title} />
+                        ) : (
+                          <div className="thumbFallback">Preview</div>
+                        )}
+                      </div>
+
+                      <div className="cardBody">
+                        <div className="cardTop">
+                          <div className="title">{title}</div>
+                          <div className="tags">
+                            {Array.isArray(p?.tags) && p.tags.slice(0, 3).map((t) => (
+                              <span className="tag" key={t}>{t}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="cardActions">
+                          <Link href={`/store/${encodeURIComponent(id)}`} className="thq-button-outline smallBtn">
+                            View
+                          </Link>
+
+                          <button
+                            type="button"
+                            className="thq-button-filled smallBtn"
+                            onClick={() => downloadPhoto(p)}
+                            disabled={!canDownload || downloadingId === id}
+                            title={!canDownload ? 'Check membership first' : 'Download'}
+                          >
+                            {downloadingId === id ? 'Preparing…' : 'Download'}
+                          </button>
+                        </div>
+
+                        {!member?.ok ? (
+                          <p className="hint">Enter your email above and click Access to enable downloads.</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
 
           <section className="support" data-reveal>
             <div className="ctaCard subtle">
@@ -597,7 +669,6 @@ export default function Members() {
 
         .row { display: grid; gap: 10px; width: 100%; }
         .label { font-size: 13px; opacity: 0.9; }
-
         .inputRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; width: 100%; }
 
         .input {
@@ -611,14 +682,11 @@ export default function Members() {
         }
         .input:focus { border-color: rgba(37, 195, 226, 0.65); box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12); }
 
-        .btn { border-radius: 12px; padding: 12px 16px; min-width: 160px; }
+        .btn { border-radius: 12px; padding: 12px 16px; min-width: 120px; }
         .err { margin: 0; font-size: 13px; color: #ffb3b3; }
-        .hint { margin: 0; font-size: 12px; opacity: 0.8; line-height: 1.6; }
 
-        .signedRow { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .signedActions { display: inline-flex; gap: 10px; flex-wrap: wrap; }
-
-        .meterRow { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+        .meterRow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center; }
+        .leftStack { display: grid; gap: 10px; }
 
         .pill {
           display: inline-flex; align-items: center; gap: 10px;
@@ -626,10 +694,49 @@ export default function Members() {
           border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(0, 0, 0, 0.18);
           white-space: nowrap;
+          width: fit-content;
         }
         .pillDot { width: 10px; height: 10px; border-radius: 999px; background: rgba(37, 195, 226, 0.9); box-shadow: 0 0 12px rgba(37, 195, 226, 0.35); }
         .pillText { font-size: 12px; font-weight: 800; opacity: 0.92; }
 
+        /* --- devices --- */
+        .deviceStatus { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .devicePill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(245,244,244,0.14);
+          background: rgba(0,0,0,0.18);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: .04em;
+        }
+        .deviceDot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: rgba(37,195,226,0.9);
+          box-shadow: 0 0 10px rgba(37,195,226,0.35);
+        }
+        .deviceReset {
+          border: 1px solid rgba(245,244,244,0.16);
+          background: rgba(255,255,255,0.02);
+          border-radius: 999px;
+          padding: 8px 12px;
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: .18s ease;
+          color: inherit;
+        }
+        .deviceReset:hover {
+          border-color: rgba(37,195,226,0.6);
+          box-shadow: 0 0 0 3px rgba(37,195,226,0.1);
+        }
+
+        /* --- meter --- */
         .meter { display: grid; gap: 8px; }
         .meterTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         .meterLabel { font-size: 12px; opacity: 0.85; }
@@ -638,6 +745,7 @@ export default function Members() {
         .fill { height: 100%; border-radius: 999px; background: rgba(37, 195, 226, 0.75); box-shadow: 0 0 18px rgba(37, 195, 226, 0.25); transition: width 240ms ease; }
         .meterBottom { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
 
+        /* --- controls --- */
         .controls { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; }
         .search { width: 100%; border-radius: 12px; border: 1px solid rgba(245, 244, 244, 0.16); background: rgba(0,0,0,0.2); color: #f5f4f4; padding: 12px 14px; outline: none; }
         .search:focus { border-color: rgba(37, 195, 226, 0.65); box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.1); }
@@ -672,6 +780,7 @@ export default function Members() {
         .linkBtn:hover { opacity: 1; border-color: rgba(37, 195, 226, 0.55); box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1); }
         .linkBtn.subtle { background: rgba(255, 255, 255, 0.02); }
 
+        /* --- library --- */
         .library { margin-top: var(--dl-layout-space-fiveunits); display: grid; gap: 14px; }
         .libHead { display: grid; gap: 6px; max-width: 980px; margin: 0 auto; width: 100%; }
 
@@ -691,6 +800,8 @@ export default function Members() {
         .cardActions { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
         .smallBtn { padding: 10px 12px; border-radius: 12px; font-size: 12px; }
 
+        .hint { margin: 0; font-size: 12px; opacity: 0.8; line-height: 1.6; }
+
         .skeletonGrid { width: 100%; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
         .skCard { border-radius: 18px; border: 1px solid rgba(245, 244, 244, 0.1); background: rgba(255, 255, 255, 0.02); height: 220px; position: relative; overflow: hidden; }
         .skCard:before {
@@ -707,9 +818,63 @@ export default function Members() {
 
         .support { margin-top: var(--dl-layout-space-fiveunits); }
         .ctaCard { width: 100%; max-width: 980px; margin: 0 auto; border-radius: 18px; border: 1px solid rgba(245, 244, 244, 0.14); background: rgba(255,255,255,0.02); padding: 22px 18px; text-align: center; display: grid; gap: 10px; }
-        .ctaCard.subtle { border-color: rgba(245, 244, 244, 0.14); background: rgba(255,255,255,0.02); }
         .ctaCard h3 { margin: 0; font-size: 18px; }
         .ctaCard p { margin: 0; line-height: 1.7; }
+
+        /* --- cinematic overlay --- */
+        .overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.72);
+          backdrop-filter: blur(10px);
+          z-index: 9999;
+          display: grid;
+          place-items: center;
+          padding: 20px;
+        }
+        .overlayCard {
+          width: 100%;
+          max-width: 560px;
+          border-radius: 20px;
+          border: 1px solid rgba(245,244,244,0.14);
+          background: rgba(255,255,255,0.04);
+          box-shadow: 0 18px 44px rgba(0,0,0,0.55);
+          padding: 22px 18px;
+          position: relative;
+          overflow: hidden;
+        }
+        .overlayGlow {
+          position: absolute;
+          inset: -80px;
+          background: radial-gradient(circle at 30% 20%, rgba(37,195,226,0.18), transparent 55%),
+                      radial-gradient(circle at 80% 60%, rgba(255,255,255,0.06), transparent 60%);
+          pointer-events: none;
+        }
+        .overlayTitle {
+          margin: 0;
+          font-size: 18px;
+          position: relative;
+        }
+        .overlayBody {
+          margin: 10px 0 0;
+          opacity: 0.9;
+          line-height: 1.8;
+          white-space: pre-line;
+          position: relative;
+        }
+        .overlayHint {
+          margin: 12px 0 0;
+          font-size: 12px;
+          opacity: 0.8;
+          position: relative;
+        }
+        .overlayActions {
+          margin-top: 16px;
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          position: relative;
+        }
 
         @media (max-width: 1100px) {
           .grid, .skeletonGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -1,19 +1,55 @@
 // pages/api/member/status.js
 import crypto from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
+const MAX_DEVICES = 2
+const SESSION_SECRET = process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
+
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
+}
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+}
 function cleanLower(v) {
   return String(v || '').trim().toLowerCase()
 }
 
+function cinematicKickMessage() {
+  return {
+    title: 'Session closed',
+    body:
+      'This membership is active on another device.\n\nFor protection, your session has been closed here. Please sign in again to continue.',
+    hint: 'Max 2 devices • No sharing',
+  }
+}
+
+function verifySessionFromReq(req) {
+  const auth = String(req.headers.authorization || '')
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+  if (!token) return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
+
+  if (!SESSION_SECRET) {
+    return { ok: false, code: 'SERVER_MISCONFIG', error: 'Missing MEMBER_SESSION_SECRET' }
+  }
+
+  try {
+    const payload = jwt.verify(token, SESSION_SECRET)
+    return { ok: true, payload, token }
+  } catch {
+    return {
+      ok: false,
+      code: 'SESSION_INVALID',
+      error: 'Session expired. Please sign in again.',
+      cinematic: cinematicKickMessage(),
+    }
+  }
+}
+
 function resolveTierTermFromMembershipRow(memberRow) {
-  // memberships.plan could be:
-  // - legacy: monthly/yearly/lifetime
-  // - new: basic/pro/elite
   const planRaw = cleanLower(memberRow?.plan)
 
-  // legacy mapping
   if (planRaw === 'monthly') return { tier: 'basic', term: 'monthly' }
   if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
   if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
@@ -49,26 +85,28 @@ function cycleKey(term, now = new Date()) {
   return `${yyyy}-${mm}`
 }
 
-function getBearerToken(req) {
-  const h = req.headers.authorization || ''
-  const m = String(h).match(/^Bearer\s+(.+)$/i)
-  return m?.[1] ? String(m[1]).trim() : ''
+async function ensureActiveSession(email, deviceId) {
+  const { data, error } = await supabaseAdmin
+    .from('member_sessions')
+    .select('sid')
+    .eq('email', email)
+    .eq('device_id', deviceId)
+    .is('revoked_at', null)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return !!data
 }
 
-function getAuthClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anon) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  return createClient(url, anon)
-}
+async function countActiveSessions(email) {
+  const { count, error } = await supabaseAdmin
+    .from('member_sessions')
+    .select('sid', { count: 'exact', head: true })
+    .eq('email', email)
+    .is('revoked_at', null)
 
-async function getUserFromRequest(req) {
-  const token = getBearerToken(req)
-  if (!token) return null
-  const supabase = getAuthClient()
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error) return null
-  return data?.user || null
+  if (error) throw new Error(error.message)
+  return Number(count || 0)
 }
 
 async function getOrCreateMemberOrder(email, tier, term) {
@@ -88,10 +126,13 @@ async function getOrCreateMemberOrder(email, tier, term) {
     amount: 0,
     currency: 'LKR',
     order_kind: 'membership',
+
     photo_id: 'membership',
     delivery_object_key: 'membership',
+
     license: cleanLower(tier),
     format: cleanLower(term),
+
     download_limit: limitForTier(tier),
     download_count: 0,
   }
@@ -102,22 +143,47 @@ async function getOrCreateMemberOrder(email, tier, term) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.setHeader('Surrogate-Control', 'no-store')
+
   if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
-    const user = await getUserFromRequest(req)
-    if (!user) return res.status(401).json({ ok: false, error: 'Unauthorized' })
+    const email = normalizeEmail(req.query?.email)
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ ok: false, error: 'Invalid email' })
+    }
 
-    const userId = user.id
-    const email = String(user.email || '').trim().toLowerCase()
-    if (!email) return res.status(400).json({ ok: false, error: 'Missing user email' })
+    const sess = verifySessionFromReq(req)
+    if (!sess.ok) return res.status(401).json(sess)
 
-    // IMPORTANT: user_id-backed membership lookup
+    const tokenEmail = normalizeEmail(sess.payload?.email)
+    const deviceId = String(sess.payload?.deviceId || '').trim()
+    if (!tokenEmail || tokenEmail !== email || !deviceId) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_MISMATCH',
+        error: 'Session mismatch. Please sign in again.',
+        cinematic: cinematicKickMessage(),
+      })
+    }
+
+    const activeSession = await ensureActiveSession(email, deviceId)
+    if (!activeSession) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_REVOKED',
+        error: 'Session closed.',
+        cinematic: cinematicKickMessage(),
+      })
+    }
+
     const { data: member, error } = await supabaseAdmin
       .from('memberships')
-      .select('plan,status,end_date,created_at,user_id')
-      .eq('user_id', userId)
+      .select('plan,status,end_date,created_at')
+      .eq('email', email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -132,12 +198,13 @@ export default async function handler(req, res) {
     }
 
     const { tier, term } = resolveTierTermFromMembershipRow(member)
-
-    // Your metering stays in orders (same as before)
     const order = await getOrCreateMemberOrder(email, tier, term)
+
     const used = Number(order?.download_count ?? 0)
     const limit = Number(order?.download_limit ?? limitForTier(tier))
     const remaining = Math.max(0, limit - used)
+
+    const activeDevices = await countActiveSessions(email)
 
     return res.status(200).json({
       ok: true,
@@ -148,6 +215,8 @@ export default async function handler(req, res) {
       limit,
       remaining,
       ends_at: endDate,
+
+      devices: { active: activeDevices, max: MAX_DEVICES },
     })
   } catch (e) {
     console.error('member/status error:', e)

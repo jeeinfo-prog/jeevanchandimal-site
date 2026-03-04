@@ -1,14 +1,66 @@
 // pages/api/member/download.js
 import crypto from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
 
+const SESSION_SECRET = process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
+
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
+}
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+}
 function cleanLower(v) {
   return String(v || '').trim().toLowerCase()
 }
 function normalizeFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
+}
+
+function cinematicKickMessage() {
+  return {
+    title: 'Session closed',
+    body:
+      'This membership is active on another device.\n\nFor protection, your session has been closed here. Please sign in again to continue.',
+    hint: 'Max 2 devices • No sharing',
+  }
+}
+
+function verifySessionFromReq(req) {
+  const auth = String(req.headers.authorization || '')
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+  if (!token) return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
+
+  if (!SESSION_SECRET) {
+    return { ok: false, code: 'SERVER_MISCONFIG', error: 'Missing MEMBER_SESSION_SECRET' }
+  }
+
+  try {
+    const payload = jwt.verify(token, SESSION_SECRET)
+    return { ok: true, payload, token }
+  } catch {
+    return {
+      ok: false,
+      code: 'SESSION_INVALID',
+      error: 'Session expired. Please sign in again.',
+      cinematic: cinematicKickMessage(),
+    }
+  }
+}
+
+async function ensureActiveSession(email, deviceId) {
+  const { data, error } = await supabaseAdmin
+    .from('member_sessions')
+    .select('sid')
+    .eq('email', email)
+    .eq('device_id', deviceId)
+    .is('revoked_at', null)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return !!data
 }
 
 function resolveTierTermFromMembershipRow(memberRow) {
@@ -47,28 +99,6 @@ function cycleKey(term, now = new Date()) {
   return `${yyyy}-${mm}`
 }
 
-function getBearerToken(req) {
-  const h = req.headers.authorization || ''
-  const m = String(h).match(/^Bearer\s+(.+)$/i)
-  return m?.[1] ? String(m[1]).trim() : ''
-}
-
-function getAuthClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anon) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  return createClient(url, anon)
-}
-
-async function getUserFromRequest(req) {
-  const token = getBearerToken(req)
-  if (!token) return null
-  const supabase = getAuthClient()
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error) return null
-  return data?.user || null
-}
-
 async function resolveObjectKeyFromPhotos(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) return null
@@ -88,14 +118,39 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
 }
 
+async function safeInsertOrder(payload) {
+  const attempt = async (obj) => supabaseAdmin.from('orders').insert(obj).select('*').maybeSingle()
+
+  let r = await attempt(payload)
+  if (!r.error) return r.data
+
+  const msg = String(r.error.message || '').toLowerCase()
+  if (msg.includes('does not exist') && msg.includes('column')) {
+    const ultra = {
+      id: payload.id,
+      code: payload.code,
+      email: payload.email,
+      status: payload.status,
+      paid_at: payload.paid_at,
+      amount: payload.amount,
+      currency: payload.currency,
+      order_kind: payload.order_kind,
+      photo_id: payload.photo_id,
+    }
+    const r2 = await attempt(ultra)
+    if (!r2.error) return r2.data
+    throw new Error(r2.error.message)
+  }
+
+  throw new Error(r.error.message)
+}
+
 async function ensureMemberOrder(email, tier, term) {
   const code = `MEMBER_${cycleKey(term)}_${email}`
-
   const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
   if (!existing.error && existing.data) return existing.data
 
   const id = crypto.randomUUID()
-
   const payload = {
     id,
     code,
@@ -112,10 +167,7 @@ async function ensureMemberOrder(email, tier, term) {
     download_limit: limitForTier(tier),
     download_count: 0,
   }
-
-  const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
-  if (ins.error) throw new Error(ins.error.message)
-  return ins.data
+  return await safeInsertOrder(payload)
 }
 
 export default async function handler(req, res) {
@@ -127,23 +179,41 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
-    const user = await getUserFromRequest(req)
-    if (!user) return res.status(401).json({ ok: false, error: 'Unauthorized' })
-
-    const email = String(user.email || '').trim().toLowerCase()
-    const userId = user.id
-    if (!email) return res.status(400).json({ ok: false, error: 'Missing user email' })
-
     const photoId = String(req.body?.photoId || '').trim()
+    const email = normalizeEmail(req.body?.email)
     const requestedFormat = normalizeFormat(req.body?.format)
 
-    if (!photoId) return res.status(400).json({ ok: false, error: 'Missing photoId' })
+    if (!photoId || !email) return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
+    if (!isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
 
-    // Membership by user_id
+    const sess = verifySessionFromReq(req)
+    if (!sess.ok) return res.status(401).json(sess)
+
+    const tokenEmail = normalizeEmail(sess.payload?.email)
+    const deviceId = String(sess.payload?.deviceId || '').trim()
+    if (!tokenEmail || tokenEmail !== email || !deviceId) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_MISMATCH',
+        error: 'Session mismatch. Please sign in again.',
+        cinematic: cinematicKickMessage(),
+      })
+    }
+
+    const activeSession = await ensureActiveSession(email, deviceId)
+    if (!activeSession) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_REVOKED',
+        error: 'Session closed.',
+        cinematic: cinematicKickMessage(),
+      })
+    }
+
     const { data: member, error: mErr } = await supabaseAdmin
       .from('memberships')
-      .select('plan,status,end_date,created_at,user_id')
-      .eq('user_id', userId)
+      .select('plan,status,end_date,created_at')
+      .eq('email', email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
