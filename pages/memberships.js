@@ -243,127 +243,119 @@ export default function Memberships() {
   }
 
   async function startMembershipCheckout(plan) {
-    try {
-      setError('')
-      const cleanEmail = String(email || '').trim().toLowerCase()
+  try {
+    setError('')
+    const cleanEmail = String(email || '').trim().toLowerCase()
 
-      if (!isValidEmail(cleanEmail)) {
-        setError('Please enter a valid email address.')
-        return
-      }
-
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('user_email', cleanEmail)
-      }
-
-      setLoadingPlan(plan)
-
-      // ✅ Server controls final amount + PayHere hash.
-      const res = await fetch('/api/membership/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          plan, // backward compatible ('monthly' -> pro monthly)
-          currency: safeCurrency(currency), // ✅ required by server
-        }),
-      })
-
-      const json = await res.json()
-      if (!json.ok) {
-        setError(json.error || 'Failed to create membership order.')
-        setLoadingPlan('')
-        return
-      }
-
-      const merchantId = String(process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID || '').trim()
-      const siteUrl =
-        String(process.env.NEXT_PUBLIC_SITE_URL || '').trim() ||
-        (typeof window !== 'undefined' ? window.location.origin : '')
-
-      const webhookBase = String(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || '').trim() || siteUrl
-
-      const sandboxFlag = String(process.env.NEXT_PUBLIC_PAYHERE_SANDBOX ?? 'true')
-        .toLowerCase()
-        .trim()
-      const isSandbox = sandboxFlag === 'true'
-
-      if (!merchantId || !siteUrl) {
-        setError(
-          'Missing PayHere env variables (NEXT_PUBLIC_PAYHERE_MERCHANT_ID / NEXT_PUBLIC_SITE_URL).'
-        )
-        setLoadingPlan('')
-        return
-      }
-
-      const orderId = json.orderId
-      const amount = json.amount
-      const payCurrency = json.currency
-      const hash = json.hash
-
-      if (!orderId || !amount || !payCurrency || !hash) {
-        setError('Missing order details from server (orderId/amount/currency/hash).')
-        setLoadingPlan('')
-        return
-      }
-
-      const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(
-        orderId
-      )}&email=${encodeURIComponent(cleanEmail)}`
-      const cancelUrl = `${siteUrl}/membership/cancel?order_id=${encodeURIComponent(
-        orderId
-      )}&email=${encodeURIComponent(cleanEmail)}`
-      const notifyUrl = `${webhookBase}/api/payhere/notify`
-
-      const form = document.createElement('form')
-      form.method = 'POST'
-      form.action = isSandbox
-        ? 'https://sandbox.payhere.lk/pay/checkout'
-        : 'https://www.payhere.lk/pay/checkout'
-
-      const fields = {
-        merchant_id: merchantId,
-        return_url: returnUrl,
-        cancel_url: cancelUrl,
-        notify_url: notifyUrl,
-
-        order_id: orderId,
-        items: `Membership (${plan})`,
-        currency: payCurrency,
-        amount: formatPayhereAmount(amount),
-
-        // ✅ REQUIRED
-        hash,
-
-        // Buyer details
-        first_name: cleanEmail.split('@')[0] || 'Member',
-        last_name: 'User',
-        email: cleanEmail,
-        phone: '0000000000',
-        address: 'N/A',
-        city: 'Colombo',
-        country: 'Sri Lanka',
-
-        // Helpful for webhook routing
-        custom_1: 'membership',
-        custom_2: String(plan || ''),
-      }
-
-      Object.entries(fields).forEach(([name, value]) => {
-        const input = document.createElement('input')
-        input.type = 'hidden'
-        input.name = name
-        input.value = value == null ? '' : String(value)
-        form.appendChild(input)
-      })
-
-      document.body.appendChild(form)
-      form.submit()
-    } catch (e) {
-      setError(e?.message || 'Something went wrong.')
-      setLoadingPlan('')
+    if (!isValidEmail(cleanEmail)) {
+      setError('Please enter a valid email address.')
+      return
     }
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('user_email', cleanEmail)
+    }
+
+    setLoadingPlan(plan)
+
+    const res = await fetch('/api/membership/create-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        plan, // backward compatible
+        currency: safeCurrency(currency), // display only; server charges LKR
+        // optional: fx_rate: getFxForDisplay() if you want to lock it from client
+      }),
+    })
+
+    const json = await res.json().catch(() => null)
+
+    if (!res.ok || !json?.ok) {
+      setError(json?.error || 'Failed to create membership order.')
+      setLoadingPlan('')
+      return
+    }
+
+    // ✅ ALWAYS trust server response (prevents sandbox/live/hash mismatch)
+    const {
+      checkoutUrl,
+      merchantId,
+      orderId,
+      amount,
+      currency: payCurrency,
+      hash,
+      notifyUrl,
+    } = json
+
+    if (!checkoutUrl || !merchantId || !orderId || !amount || !payCurrency || !hash) {
+      setError('Missing order details from server.')
+      setLoadingPlan('')
+      return
+    }
+
+    const siteUrl =
+      String(process.env.NEXT_PUBLIC_SITE_URL || '').trim() ||
+      (typeof window !== 'undefined' ? window.location.origin : '')
+
+    if (!siteUrl) {
+      setError('Missing NEXT_PUBLIC_SITE_URL.')
+      setLoadingPlan('')
+      return
+    }
+
+    const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(
+      orderId
+    )}&email=${encodeURIComponent(cleanEmail)}`
+    const cancelUrl = `${siteUrl}/membership/cancel?order_id=${encodeURIComponent(
+      orderId
+    )}&email=${encodeURIComponent(cleanEmail)}`
+    const finalNotifyUrl = notifyUrl || `${siteUrl}/api/payhere/notify`
+
+    const form = document.createElement('form')
+    form.method = 'POST'
+    form.action = checkoutUrl
+
+    const fields = {
+      merchant_id: merchantId,
+      return_url: returnUrl,
+      cancel_url: cancelUrl,
+      notify_url: finalNotifyUrl,
+
+      order_id: orderId,
+      items: `Membership (${plan})`,
+      currency: payCurrency,
+      amount: formatPayhereAmount(amount),
+
+      hash,
+
+      first_name: cleanEmail.split('@')[0] || 'Member',
+      last_name: 'User',
+      email: cleanEmail,
+      phone: '0000000000',
+      address: 'N/A',
+      city: 'Colombo',
+      country: 'Sri Lanka',
+
+      custom_1: 'membership',
+      custom_2: String(plan || ''),
+    }
+
+    Object.entries(fields).forEach(([name, value]) => {
+      const input = document.createElement('input')
+      input.type = 'hidden'
+      input.name = name
+      input.value = value == null ? '' : String(value)
+      form.appendChild(input)
+    })
+
+    document.body.appendChild(form)
+    form.submit()
+  } catch (e) {
+    setError(e?.message || 'Something went wrong.')
+    setLoadingPlan('')
   }
+}
 
   return (
     <>
