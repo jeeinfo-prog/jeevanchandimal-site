@@ -14,7 +14,12 @@ function normalizeEmail(v) {
 export default function MemberAccess() {
   const router = useRouter()
   const [loading, setLoading] = React.useState(true)
-  const [status, setStatus] = React.useState({ member: false, plan: null, end_date: null })
+  const [status, setStatus] = React.useState({
+    member: false,
+    tier: null,
+    term: null,
+    ends_at: null,
+  })
   const [email, setEmail] = React.useState('')
   const [error, setError] = React.useState('')
 
@@ -32,7 +37,7 @@ export default function MemberAccess() {
         setEmail(clean)
 
         if (!clean) {
-          setStatus({ member: false, plan: null, end_date: null })
+          setStatus({ member: false, tier: null, term: null, ends_at: null })
           return
         }
 
@@ -45,12 +50,17 @@ export default function MemberAccess() {
 
         if (!r.ok || !j?.ok) {
           setError(j?.error || 'Failed to check membership status.')
-          setStatus({ member: false, plan: null, end_date: null })
+          setStatus({ member: false, tier: null, term: null, ends_at: null })
           return
         }
 
         const isMember = Boolean(j.member)
-        setStatus({ member: isMember, plan: j.plan || null, end_date: j.end_date || null })
+        setStatus({
+          member: isMember,
+          tier: j.tier || null,
+          term: j.term || null,
+          ends_at: j.ends_at || null,
+        })
 
         // ✅ if active member -> send them to Store for now
         if (isMember) {
@@ -70,6 +80,9 @@ export default function MemberAccess() {
       alive = false
     }
   }, [router])
+
+  const planLabel =
+    status.tier && status.term ? `${status.tier.toUpperCase()} • ${status.term.toUpperCase()}` : null
 
   return (
     <>
@@ -97,6 +110,8 @@ export default function MemberAccess() {
                   ? `No active membership found for ${email}.`
                   : 'Please enter your email on the Membership page to continue.'}
               </p>
+
+              {planLabel ? <p className="sub">Plan detected: {planLabel}</p> : null}
 
               <div className="actions">
                 <Link href="/memberships" legacyBehavior>
