@@ -1,11 +1,8 @@
 import React, { Fragment } from 'react'
 import Link from 'next/link'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const SoundDesign = (props) => {
-  const t = useTranslations()
-
   return (
     <>
       <section className={`sdWrap ${props.rootClassName || ''}`}>
