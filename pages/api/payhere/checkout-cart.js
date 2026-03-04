@@ -1,6 +1,9 @@
 // pages/api/payhere/checkout-cart.js
+
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import crypto from 'crypto'
+
+/* ---------------- helpers ---------------- */
 
 function round2(n) {
   const x = Number(n || 0)
@@ -20,9 +23,11 @@ function normLicense(v) {
   const x = String(v || '').trim().toLowerCase()
   return x === 'commercial' || x === 'editorial' ? x : 'personal'
 }
+
 function normFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
+
 function normCurrency(v) {
   return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
@@ -30,14 +35,17 @@ function normCurrency(v) {
 function cleanBaseUrl(v) {
   return String(v || '').trim().replace(/\/+$/, '')
 }
+
 function getSiteBaseUrl(req) {
   return (
+    cleanBaseUrl(process.env.SITE_URL) ||
     cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
     `${(req.headers['x-forwarded-proto'] || 'https').toString()}://${(
       req.headers['x-forwarded-host'] || req.headers.host || ''
     ).toString()}`
   )
 }
+
 function getNotifyBaseUrl(req) {
   return (
     cleanBaseUrl(process.env.WEBHOOK_BASE_URL) ||
@@ -46,38 +54,53 @@ function getNotifyBaseUrl(req) {
   )
 }
 
-// ✅ Reads PayHere mode from Supabase app_settings, with env fallbacks.
-async function getPayhereMode() {
-  const sandboxFlag =
-    String(process.env.PAYHERE_SANDBOX || process.env.NEXT_PUBLIC_PAYHERE_SANDBOX || '')
-      .trim()
-      .toLowerCase() === 'true'
-
-  const envModeRaw = String(process.env.PAYHERE_ENV || process.env.PAYHERE_MODE || '')
-    .trim()
-    .toLowerCase()
-
-  let fallbackMode = 'sandbox'
-  if (sandboxFlag) fallbackMode = 'sandbox'
-  else if (envModeRaw === 'live') fallbackMode = 'live'
-  else if (envModeRaw === 'sandbox') fallbackMode = 'sandbox'
-
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'payhere_mode')
-      .maybeSingle()
-
-    if (error) return fallbackMode
-
-    const v = String(data?.value || '').trim().toLowerCase()
-    if (v === 'live') return 'live'
-    return 'sandbox'
-  } catch {
-    return fallbackMode
-  }
+/**
+ * ✅ One source of truth for PayHere mode:
+ * - PAYHERE_MODE="sandbox" => sandbox
+ * - otherwise => live
+ */
+function getPayhereMode() {
+  const m = String(process.env.PAYHERE_MODE || '').trim().toLowerCase()
+  return m === 'sandbox' ? 'sandbox' : 'live'
 }
+
+function getCheckoutUrl(mode) {
+  return mode === 'sandbox'
+    ? 'https://sandbox.payhere.lk/pay/checkout'
+    : 'https://www.payhere.lk/pay/checkout'
+}
+
+/**
+ * ✅ Server-only credentials
+ * Supports:
+ * - PAYHERE_MERCHANT_ID / PAYHERE_MERCHANT_SECRET (recommended single set)
+ * OR optional split:
+ * - PAYHERE_MERCHANT_ID_LIVE / PAYHERE_MERCHANT_SECRET_LIVE
+ * - PAYHERE_MERCHANT_ID_SANDBOX / PAYHERE_MERCHANT_SECRET_SANDBOX
+ *
+ * NEVER use NEXT_PUBLIC_* here.
+ */
+function getMerchantCreds(mode) {
+  const isSandbox = mode === 'sandbox'
+
+  const merchant_id = String(
+    (isSandbox ? process.env.PAYHERE_MERCHANT_ID_SANDBOX : process.env.PAYHERE_MERCHANT_ID_LIVE) ||
+      process.env.PAYHERE_MERCHANT_ID ||
+      ''
+  ).trim()
+
+  const merchant_secret = String(
+    (isSandbox
+      ? process.env.PAYHERE_MERCHANT_SECRET_SANDBOX
+      : process.env.PAYHERE_MERCHANT_SECRET_LIVE) ||
+      process.env.PAYHERE_MERCHANT_SECRET ||
+      ''
+  ).trim()
+
+  return { merchant_id, merchant_secret }
+}
+
+/* ---------------- photos / object keys ---------------- */
 
 async function getObjectKeyForPhoto(photoId, format) {
   const pid = String(photoId || '').trim()
@@ -92,10 +115,7 @@ async function getObjectKeyForPhoto(photoId, format) {
   if (error) throw new Error(error.message)
   if (!p) throw new Error(`Photo not found: ${pid}`)
 
-  if (format === 'raw') {
-    if (p.original_raw_key) return String(p.original_raw_key)
-    return null
-  }
+  if (format === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
 
   const jpgKey = p.original_jpg_key || p.original_key
   return jpgKey ? String(jpgKey) : null
@@ -147,12 +167,11 @@ async function insertOrderStrict(orderRow) {
   }
 
   ins = await retry(['payhere_mode', 'fx_usd_lkr', 'fx_locked_at'])
-  if (!ins.error) return ins
-
   return ins
 }
 
-// PayHere hash helper
+/* ---------------- PayHere hash ---------------- */
+
 function md5(s) {
   return crypto.createHash('md5').update(String(s)).digest('hex')
 }
@@ -162,24 +181,7 @@ function computePayHereHash({ merchant_id, order_id, amount, currency, merchant_
   return md5(`${merchant_id}${order_id}${amount}${currency}${secretHash}`).toUpperCase()
 }
 
-function getMerchantCreds(payhereMode) {
-  const isLive = payhereMode === 'live'
-
-  const merchant_id =
-    (isLive
-      ? process.env.PAYHERE_MERCHANT_ID_LIVE
-      : process.env.PAYHERE_MERCHANT_ID_SANDBOX) ||
-    process.env.PAYHERE_MERCHANT_ID ||
-    process.env.NEXT_PUBLIC_PAYHERE_MERCHANT_ID
-
-  const merchant_secret =
-    (isLive
-      ? process.env.PAYHERE_MERCHANT_SECRET_LIVE
-      : process.env.PAYHERE_MERCHANT_SECRET_SANDBOX) ||
-    process.env.PAYHERE_MERCHANT_SECRET
-
-  return { merchant_id, merchant_secret }
-}
+/* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -204,6 +206,7 @@ export default async function handler(req, res) {
     if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
     if (!items.length) return res.status(400).json({ ok: false, error: 'Cart is empty' })
 
+    // Normalize + validate items; compute total
     const normalizedItems = []
     let total = 0
 
@@ -231,7 +234,7 @@ export default async function handler(req, res) {
       }
 
       const lineAmount = round2(unitPrice * qty)
-      total += lineAmount
+      total = round2(total + lineAmount)
 
       normalizedItems.push({
         photoId,
@@ -245,14 +248,14 @@ export default async function handler(req, res) {
       })
     }
 
-    total = round2(total)
-
     const code = makeCartCode()
     const topPhotoId = String(normalizedItems[0]?.photoId || '').trim()
     if (!topPhotoId) return res.status(400).json({ ok: false, error: 'Cart missing first photoId' })
 
-    const payhereMode = await getPayhereMode()
+    const payhereMode = getPayhereMode()
+    const checkoutUrl = getCheckoutUrl(payhereMode)
 
+    // IMPORTANT: use DB row id for linking; but PayHere order_id is the cart code
     const orderRow = {
       id: `ORD_${Date.now()}_${Math.random().toString(16).slice(2, 14)}`,
       status: 'PENDING',
@@ -270,15 +273,16 @@ export default async function handler(req, res) {
       order_kind: 'cart',
       code,
       items: normalizedItems,
+
+      // keep a reference field if your notify uses it
       order_id: code,
 
+      // optional (will be dropped if column missing)
       payhere_mode: payhereMode,
     }
 
     const ins = await insertOrderStrict(orderRow)
-    if (ins.error) {
-      return res.status(500).json({ ok: false, error: ins.error.message })
-    }
+    if (ins.error) return res.status(500).json({ ok: false, error: ins.error.message })
 
     const created = ins.data
 
@@ -293,11 +297,6 @@ export default async function handler(req, res) {
     const return_url = `${baseUrl}/store/return?order_id=${encodeURIComponent(code)}`
     const cancel_url = `${baseUrl}/store/cancel?order_id=${encodeURIComponent(code)}`
     const notify_url = `${notifyBase}/api/payhere/notify`
-
-    const action =
-      payhereMode === 'live'
-        ? 'https://www.payhere.lk/pay/checkout'
-        : 'https://sandbox.payhere.lk/pay/checkout'
 
     const amountStr = money2(total)
 
@@ -334,12 +333,21 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
+
+      // ✅ frontend should POST to checkoutUrl with fields
+      checkoutUrl,
+      merchantId: merchant_id,
+
+      // order info
       id: created?.id || orderRow.id,
       code,
       total: amountStr,
       payhereMode,
-      action,
+
+      // keep backward compat with your client
+      action: checkoutUrl,
       fields,
+
       fxLockedAt: fxLockedAt || null,
     })
   } catch (e) {
