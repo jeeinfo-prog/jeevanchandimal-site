@@ -73,7 +73,7 @@ export default function Members() {
     if (saved) setEmail(saved)
   }, [])
 
-  const canRaw = String(member?.tier || '').toLowerCase() === 'elite'
+  const canRaw = String(member?.tier || '').toLowerCase() === 'elite' && !!member?.ok
   React.useEffect(() => {
     if (!canRaw && format === 'raw') setFormat('jpg')
   }, [canRaw, format])
@@ -83,7 +83,10 @@ export default function Members() {
     const r = await fetch(url, { cache: 'no-store' })
     const d = await r.json().catch(() => ({}))
 
-    const isMember = !!(d?.member || d?.ok || d?.active)
+    // ✅ CRITICAL FIX:
+    // /api/member/status returns { ok:true, member:false } for non-members
+    // So we must check BOTH ok and member.
+    const isMember = d?.ok === true && d?.member === true
     if (!isMember) return { ok: false, error: d?.error || 'Not a member.' }
 
     const tier = d?.tier || d?.plan || d?.membership?.tier || d?.membership?.plan || 'pro'
@@ -97,6 +100,8 @@ export default function Members() {
       used,
       limit,
       remaining,
+      term: d?.term || null,
+      ends_at: d?.ends_at || d?.end_date || null,
     }
   }
 
@@ -126,19 +131,19 @@ export default function Members() {
       setChecking(false)
 
       // ✅ update nav badge without refresh
-try {
-  const tierUpper = normalizeTierUpper(status.tier)
-  if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
+      try {
+        const tierUpper = normalizeTierUpper(status.tier)
+        if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
 
-  // ✅ store remaining countdown
-  if (Number.isFinite(Number(status.remaining))) {
-    window.localStorage.setItem('member_remaining', String(Number(status.remaining)))
-  } else {
-    window.localStorage.removeItem('member_remaining')
-  }
+        // ✅ store remaining countdown
+        if (Number.isFinite(Number(status.remaining))) {
+          window.localStorage.setItem('member_remaining', String(Number(status.remaining)))
+        } else {
+          window.localStorage.removeItem('member_remaining')
+        }
 
-  window.dispatchEvent(new Event('jc_member_updated'))
-} catch {}
+        window.dispatchEvent(new Event('jc_member_updated'))
+      } catch {}
 
       // ✅ load archive
       loadLibrary()
@@ -216,20 +221,20 @@ try {
         const nextUsed = Number(j?.used ?? prev.used ?? 0)
         const nextLimit = Number(j?.limit ?? prev.limit ?? 0)
         const nextRemaining = Number(j?.remaining ?? Math.max(0, nextLimit - nextUsed))
-        return { ...prev, tier: nextTier, used: nextUsed, limit: nextLimit, remaining: nextRemaining }
+        return { ...prev, ok: true, tier: nextTier, used: nextUsed, limit: nextLimit, remaining: nextRemaining }
       })
 
       // ✅ keep nav badge updated without refresh
-try {
-  const tierUpper = normalizeTierUpper(j?.tier || member?.tier)
-  if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
+      try {
+        const tierUpper = normalizeTierUpper(j?.tier || member?.tier)
+        if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
 
-  if (Number.isFinite(Number(j?.remaining))) {
-    window.localStorage.setItem('member_remaining', String(Number(j.remaining)))
-  }
+        if (Number.isFinite(Number(j?.remaining))) {
+          window.localStorage.setItem('member_remaining', String(Number(j.remaining)))
+        }
 
-  window.dispatchEvent(new Event('jc_member_updated'))
-} catch {}
+        window.dispatchEvent(new Event('jc_member_updated'))
+      } catch {}
 
       if (j?.url) window.location.href = j.url
     } catch (e) {
@@ -268,7 +273,12 @@ try {
                     placeholder="you@example.com"
                     inputMode="email"
                   />
-                  <button type="button" className="thq-button-filled btn" onClick={checkMembership} disabled={checking}>
+                  <button
+                    type="button"
+                    className="thq-button-filled btn"
+                    onClick={checkMembership}
+                    disabled={checking}
+                  >
                     {checking ? 'Checking…' : 'Access'}
                   </button>
                 </div>
@@ -309,13 +319,22 @@ try {
 
               <div className="controls">
                 <div className="searchWrap">
-                  <input className="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search the archive…" />
+                  <input
+                    className="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search the archive…"
+                  />
                 </div>
 
                 <div className="formatWrap">
                   <span className="labelSmall">Format</span>
                   <div className="togglePills" role="tablist" aria-label="Format toggle">
-                    <button type="button" className={`pillBtn ${format === 'jpg' ? 'active' : ''}`} onClick={() => setFormat('jpg')}>
+                    <button
+                      type="button"
+                      className={`pillBtn ${format === 'jpg' ? 'active' : ''}`}
+                      onClick={() => setFormat('jpg')}
+                    >
                       JPG <span className="pillArrow">→</span>
                     </button>
                     <button
@@ -392,9 +411,12 @@ try {
                         <div className="cardTop">
                           <div className="title">{title}</div>
                           <div className="tags">
-                            {Array.isArray(p?.tags) && p.tags.slice(0, 3).map((t) => (
-                              <span className="tag" key={t}>{t}</span>
-                            ))}
+                            {Array.isArray(p?.tags) &&
+                              p.tags.slice(0, 3).map((t) => (
+                                <span className="tag" key={t}>
+                                  {t}
+                                </span>
+                              ))}
                           </div>
                         </div>
 
@@ -414,7 +436,9 @@ try {
                           </button>
                         </div>
 
-                        {!member?.ok ? <p className="hint">Enter your email above and click Access to enable downloads.</p> : null}
+                        {!member?.ok ? (
+                          <p className="hint">Enter your email above and click Access to enable downloads.</p>
+                        ) : null}
                       </div>
                     </div>
                   )
@@ -438,14 +462,32 @@ try {
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
-        .center { text-align: center; }
-        .muted { opacity: 0.85; }
+        .center {
+          text-align: center;
+        }
+        .muted {
+          opacity: 0.85;
+        }
 
-        .revealInit { opacity: 0; transform: translateY(12px); transition: opacity 600ms ease, transform 600ms ease; }
-        .revealIn { opacity: 1; transform: translateY(0); }
+        .revealInit {
+          opacity: 0;
+          transform: translateY(12px);
+          transition: opacity 600ms ease, transform 600ms ease;
+        }
+        .revealIn {
+          opacity: 1;
+          transform: translateY(0);
+        }
 
-        .hero { display: grid; justify-items: center; gap: 16px; }
-        .sub { max-width: 760px; line-height: 1.7; }
+        .hero {
+          display: grid;
+          justify-items: center;
+          gap: 16px;
+        }
+        .sub {
+          max-width: 760px;
+          line-height: 1.7;
+        }
 
         .accessCard {
           width: 100%;
@@ -460,10 +502,22 @@ try {
           gap: 16px;
         }
 
-        .row { display: grid; gap: 10px; width: 100%; }
-        .label { font-size: 13px; opacity: 0.9; }
+        .row {
+          display: grid;
+          gap: 10px;
+          width: 100%;
+        }
+        .label {
+          font-size: 13px;
+          opacity: 0.9;
+        }
 
-        .inputRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; width: 100%; }
+        .inputRow {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 10px;
+          width: 100%;
+        }
 
         .input {
           width: 100%;
@@ -474,38 +528,127 @@ try {
           padding: 12px 14px;
           outline: none;
         }
-        .input:focus { border-color: rgba(37, 195, 226, 0.65); box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12); }
+        .input:focus {
+          border-color: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12);
+        }
 
-        .btn { border-radius: 12px; padding: 12px 16px; min-width: 120px; }
-        .err { margin: 0; font-size: 13px; color: #ffb3b3; }
+        .btn {
+          border-radius: 12px;
+          padding: 12px 16px;
+          min-width: 120px;
+        }
+        .err {
+          margin: 0;
+          font-size: 13px;
+          color: #ffb3b3;
+        }
 
-        .meterRow { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+        .meterRow {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          gap: 14px;
+          align-items: center;
+        }
 
         .pill {
-          display: inline-flex; align-items: center; gap: 10px;
-          padding: 10px 12px; border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(0, 0, 0, 0.18);
           white-space: nowrap;
         }
-        .pillDot { width: 10px; height: 10px; border-radius: 999px; background: rgba(37, 195, 226, 0.9); box-shadow: 0 0 12px rgba(37, 195, 226, 0.35); }
-        .pillText { font-size: 12px; font-weight: 800; opacity: 0.92; }
+        .pillDot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: rgba(37, 195, 226, 0.9);
+          box-shadow: 0 0 12px rgba(37, 195, 226, 0.35);
+        }
+        .pillText {
+          font-size: 12px;
+          font-weight: 800;
+          opacity: 0.92;
+        }
 
-        .meter { display: grid; gap: 8px; }
-        .meterTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-        .meterLabel { font-size: 12px; opacity: 0.85; }
-        .meterValue { font-size: 12px; font-weight: 800; opacity: 0.9; }
-        .bar { width: 100%; height: 10px; border-radius: 999px; border: 1px solid rgba(245, 244, 244, 0.12); background: rgba(0, 0, 0, 0.22); overflow: hidden; }
-        .fill { height: 100%; border-radius: 999px; background: rgba(37, 195, 226, 0.75); box-shadow: 0 0 18px rgba(37, 195, 226, 0.25); transition: width 240ms ease; }
-        .meterBottom { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
+        .meter {
+          display: grid;
+          gap: 8px;
+        }
+        .meterTop {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+        }
+        .meterLabel {
+          font-size: 12px;
+          opacity: 0.85;
+        }
+        .meterValue {
+          font-size: 12px;
+          font-weight: 800;
+          opacity: 0.9;
+        }
+        .bar {
+          width: 100%;
+          height: 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+          overflow: hidden;
+        }
+        .fill {
+          height: 100%;
+          border-radius: 999px;
+          background: rgba(37, 195, 226, 0.75);
+          box-shadow: 0 0 18px rgba(37, 195, 226, 0.25);
+          transition: width 240ms ease;
+        }
+        .meterBottom {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          font-size: 12px;
+        }
 
-        .controls { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; }
-        .search { width: 100%; border-radius: 12px; border: 1px solid rgba(245, 244, 244, 0.16); background: rgba(0,0,0,0.2); color: #f5f4f4; padding: 12px 14px; outline: none; }
-        .search:focus { border-color: rgba(37, 195, 226, 0.65); box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.1); }
+        .controls {
+          display: grid;
+          grid-template-columns: 1fr auto auto;
+          gap: 12px;
+          align-items: center;
+        }
+        .search {
+          width: 100%;
+          border-radius: 12px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(0, 0, 0, 0.2);
+          color: #f5f4f4;
+          padding: 12px 14px;
+          outline: none;
+        }
+        .search:focus {
+          border-color: rgba(37, 195, 226, 0.65);
+          box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.1);
+        }
 
-        .formatWrap { display: grid; gap: 6px; justify-items: end; }
-        .labelSmall { font-size: 12px; opacity: 0.85; }
-        .togglePills { display: inline-flex; gap: 10px; }
+        .formatWrap {
+          display: grid;
+          gap: 6px;
+          justify-items: end;
+        }
+        .labelSmall {
+          font-size: 12px;
+          opacity: 0.85;
+        }
+        .togglePills {
+          display: inline-flex;
+          gap: 10px;
+        }
 
         .pillBtn {
           border: 1px solid rgba(245, 244, 244, 0.16);
@@ -522,68 +665,269 @@ try {
           opacity: 0.86;
           transition: 0.18s ease;
         }
-        .pillBtn:hover { opacity: 1; border-color: rgba(37, 195, 226, 0.55); box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1); }
-        .pillBtn.active { border-color: rgba(37, 195, 226, 0.7); background: rgba(37, 195, 226, 0.08); opacity: 1; }
-        .pillBtn.disabled { opacity: 0.45; cursor: not-allowed; }
-        .pillArrow { opacity: 0; transform: translateX(-4px); transition: 0.18s ease; }
-        .pillBtn:hover .pillArrow, .pillBtn.active .pillArrow { opacity: 1; transform: translateX(0); }
+        .pillBtn:hover {
+          opacity: 1;
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+        .pillBtn.active {
+          border-color: rgba(37, 195, 226, 0.7);
+          background: rgba(37, 195, 226, 0.08);
+          opacity: 1;
+        }
+        .pillBtn.disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+        .pillArrow {
+          opacity: 0;
+          transform: translateX(-4px);
+          transition: 0.18s ease;
+        }
+        .pillBtn:hover .pillArrow,
+        .pillBtn.active .pillArrow {
+          opacity: 1;
+          transform: translateX(0);
+        }
 
-        .rightLinks { display: inline-flex; gap: 10px; justify-content: end; flex-wrap: wrap; }
-        .linkBtn { border: 1px solid rgba(245, 244, 244, 0.16); background: rgba(0, 0, 0, 0.18); color: inherit; border-radius: 999px; padding: 10px 12px; font-size: 12px; font-weight: 800; opacity: 0.88; transition: 0.18s ease; text-decoration: none; }
-        .linkBtn:hover { opacity: 1; border-color: rgba(37, 195, 226, 0.55); box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1); }
-        .linkBtn.subtle { background: rgba(255, 255, 255, 0.02); }
+        .rightLinks {
+          display: inline-flex;
+          gap: 10px;
+          justify-content: end;
+          flex-wrap: wrap;
+        }
+        .linkBtn {
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(0, 0, 0, 0.18);
+          color: inherit;
+          border-radius: 999px;
+          padding: 10px 12px;
+          font-size: 12px;
+          font-weight: 800;
+          opacity: 0.88;
+          transition: 0.18s ease;
+          text-decoration: none;
+        }
+        .linkBtn:hover {
+          opacity: 1;
+          border-color: rgba(37, 195, 226, 0.55);
+          box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1);
+        }
+        .linkBtn.subtle {
+          background: rgba(255, 255, 255, 0.02);
+        }
 
-        .library { margin-top: var(--dl-layout-space-fiveunits); display: grid; gap: 14px; }
-        .libHead { display: grid; gap: 6px; max-width: 980px; margin: 0 auto; width: 100%; }
+        .library {
+          margin-top: var(--dl-layout-space-fiveunits);
+          display: grid;
+          gap: 14px;
+        }
+        .libHead {
+          display: grid;
+          gap: 6px;
+          max-width: 980px;
+          margin: 0 auto;
+          width: 100%;
+        }
 
-        .grid { width: 100%; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-        .card { border-radius: 18px; border: 1px solid rgba(245, 244, 244, 0.12); background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(8px); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
-        .card:hover { transform: translateY(-4px); border-color: rgba(245, 244, 244, 0.3); box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25); }
+        .grid {
+          width: 100%;
+          max-width: 1100px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+        }
+        .card {
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(8px);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(245, 244, 244, 0.3);
+          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+        }
 
-        .thumb { width: 100%; aspect-ratio: 16 / 10; background: rgba(0,0,0,0.22); display: grid; place-items: center; overflow: hidden; }
-        .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .thumbFallback { font-size: 12px; opacity: 0.75; }
+        .thumb {
+          width: 100%;
+          aspect-ratio: 16 / 10;
+          background: rgba(0, 0, 0, 0.22);
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+        }
+        .thumb img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+        .thumbFallback {
+          font-size: 12px;
+          opacity: 0.75;
+        }
 
-        .cardBody { padding: 14px; display: grid; gap: 12px; }
-        .title { font-size: 13px; font-weight: 900; opacity: 0.95; line-height: 1.35; }
-        .tags { display: flex; flex-wrap: wrap; gap: 8px; }
-        .tag { font-size: 11px; opacity: 0.85; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(245, 244, 244, 0.14); background: rgba(0,0,0,0.18); }
+        .cardBody {
+          padding: 14px;
+          display: grid;
+          gap: 12px;
+        }
+        .title {
+          font-size: 13px;
+          font-weight: 900;
+          opacity: 0.95;
+          line-height: 1.35;
+        }
+        .tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .tag {
+          font-size: 11px;
+          opacity: 0.85;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.18);
+        }
 
-        .cardActions { display: flex; gap: 10px; justify-content: space-between; align-items: center; }
-        .smallBtn { padding: 10px 12px; border-radius: 12px; font-size: 12px; }
+        .cardActions {
+          display: flex;
+          gap: 10px;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .smallBtn {
+          padding: 10px 12px;
+          border-radius: 12px;
+          font-size: 12px;
+        }
 
-        .hint { margin: 0; font-size: 12px; opacity: 0.8; line-height: 1.6; }
+        .hint {
+          margin: 0;
+          font-size: 12px;
+          opacity: 0.8;
+          line-height: 1.6;
+        }
 
-        .skeletonGrid { width: 100%; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-        .skCard { border-radius: 18px; border: 1px solid rgba(245, 244, 244, 0.1); background: rgba(255, 255, 255, 0.02); height: 220px; position: relative; overflow: hidden; }
+        .skeletonGrid {
+          width: 100%;
+          max-width: 1100px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+        }
+        .skCard {
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(255, 255, 255, 0.02);
+          height: 220px;
+          position: relative;
+          overflow: hidden;
+        }
         .skCard:before {
           content: '';
-          position: absolute; inset: 0;
+          position: absolute;
+          inset: 0;
           transform: translateX(-40%);
-          background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0) 100%);
+          background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.06) 50%,
+            rgba(255, 255, 255, 0) 100%
+          );
           animation: shimmer 1.2s infinite;
         }
-        @keyframes shimmer { 0% { transform: translateX(-40%); } 100% { transform: translateX(140%); } }
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-40%);
+          }
+          100% {
+            transform: translateX(140%);
+          }
+        }
 
-        .emptyCard { width: 100%; max-width: 980px; margin: 0 auto; border-radius: 18px; border: 1px solid rgba(245, 244, 244, 0.14); background: rgba(255,255,255,0.02); padding: 18px; display: grid; gap: 10px; text-align: center; }
-        .emptyActions { display: inline-flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+        .emptyCard {
+          width: 100%;
+          max-width: 980px;
+          margin: 0 auto;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          padding: 18px;
+          display: grid;
+          gap: 10px;
+          text-align: center;
+        }
+        .emptyActions {
+          display: inline-flex;
+          justify-content: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 6px;
+        }
 
-        .support { margin-top: var(--dl-layout-space-fiveunits); }
-        .ctaCard { width: 100%; max-width: 980px; margin: 0 auto; border-radius: 18px; border: 1px solid rgba(245, 244, 244, 0.14); background: rgba(255,255,255,0.02); padding: 22px 18px; text-align: center; display: grid; gap: 10px; }
-        .ctaCard h3 { margin: 0; font-size: 18px; }
-        .ctaCard p { margin: 0; line-height: 1.7; }
+        .support {
+          margin-top: var(--dl-layout-space-fiveunits);
+        }
+        .ctaCard {
+          width: 100%;
+          max-width: 980px;
+          margin: 0 auto;
+          border-radius: 18px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(255, 255, 255, 0.02);
+          padding: 22px 18px;
+          text-align: center;
+          display: grid;
+          gap: 10px;
+        }
+        .ctaCard h3 {
+          margin: 0;
+          font-size: 18px;
+        }
+        .ctaCard p {
+          margin: 0;
+          line-height: 1.7;
+        }
 
         @media (max-width: 1100px) {
-          .grid, .skeletonGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .controls { grid-template-columns: 1fr; }
-          .formatWrap { justify-items: start; }
-          .rightLinks { justify-content: start; }
-          .meterRow { grid-template-columns: 1fr; }
+          .grid,
+          .skeletonGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .controls {
+            grid-template-columns: 1fr;
+          }
+          .formatWrap {
+            justify-items: start;
+          }
+          .rightLinks {
+            justify-content: start;
+          }
+          .meterRow {
+            grid-template-columns: 1fr;
+          }
         }
         @media (max-width: 760px) {
-          .grid, .skeletonGrid { grid-template-columns: 1fr; }
-          .inputRow { grid-template-columns: 1fr; }
-          .btn { width: 100%; }
+          .grid,
+          .skeletonGrid {
+            grid-template-columns: 1fr;
+          }
+          .inputRow {
+            grid-template-columns: 1fr;
+          }
+          .btn {
+            width: 100%;
+          }
         }
       `}</style>
     </>
