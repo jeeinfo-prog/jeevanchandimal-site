@@ -35,13 +35,21 @@ function verifySessionFromReq(req) {
   const auth = String(req.headers.authorization || '')
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!token) return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
-  if (!SESSION_SECRET) return { ok: false, code: 'SERVER_MISCONFIG', error: 'Missing MEMBER_SESSION_SECRET' }
+
+  if (!SESSION_SECRET) {
+    return { ok: false, code: 'SERVER_MISCONFIG', error: 'Missing MEMBER_SESSION_SECRET' }
+  }
 
   try {
     const payload = jwt.verify(token, SESSION_SECRET)
     return { ok: true, payload }
   } catch {
-    return { ok: false, code: 'SESSION_INVALID', error: 'Session expired. Please sign in again.', cinematic: cinematicKickMessage() }
+    return {
+      ok: false,
+      code: 'SESSION_INVALID',
+      error: 'Session expired. Please sign in again.',
+      cinematic: cinematicKickMessage(),
+    }
   }
 }
 
@@ -53,6 +61,7 @@ async function ensureActiveSession(userId, deviceId) {
     .eq('device_id', deviceId)
     .is('revoked_at', null)
     .maybeSingle()
+
   if (error) throw new Error(error.message)
   return !!data
 }
@@ -81,6 +90,7 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
 
   const fmt = normalizeFormat(format)
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
+
   return String(p.original_jpg_key || p.original_key || '')
 }
 
@@ -97,12 +107,13 @@ async function incrementMonthlyUsedCAS(memberRow) {
     .from('memberships')
     .update({ monthly_download_used: nextUsed })
     .eq('id', id)
-    .eq('monthly_download_used', used)
+    .eq('monthly_download_used', used) // CAS
     .select('monthly_download_used,monthly_download_limit,billing_cycle_end')
     .maybeSingle()
 
   if (error) throw new Error(error.message)
 
+  // CAS lost → retry once with fresh row
   if (!data) {
     const { data: fresh, error: fErr } = await supabaseAdmin
       .from('memberships')
@@ -120,30 +131,35 @@ async function incrementMonthlyUsedCAS(memberRow) {
   return { ok: true, used: finalUsed, limit: finalLimit, remaining, reset_at: data.billing_cycle_end || null }
 }
 
-async function ensureMemberOrder(email, tier, term, membershipRow) {
-  // Keep your existing ORD_ format so download_tokens.order_id stays consistent
-  const code = `ORD_MEMBER_${membershipRow?.id}_${email}`.slice(0, 180)
+async function ensureMemberOrder(email, tier, term, memberRow, quotaUsed) {
+  // Stable per membership per cycle (prevents infinite orders)
+  const cycle = memberRow?.billing_cycle_end
+    ? `CYC_${String(memberRow.billing_cycle_end).slice(0, 10)}`
+    : `CYC_${new Date().toISOString().slice(0, 7)}` // YYYY-MM
+  const code = `MEMBER_${cycle}_${email}`.slice(0, 180)
 
   const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
   if (!existing.error && existing.data) return existing.data
 
+  // Your DB uses ORD_* as orders.id (string)
+  const id = `ORD_${Date.now()}_${crypto.randomBytes(10).toString('hex')}`
+
   const payload = {
-    id: crypto.randomUUID(),
+    id,
     code,
     status: 'PAID',
     email,
-    amount: 0,
     currency: 'LKR',
-    paid_at: new Date().toISOString(),
-    order_kind: 'membership',
+    amount: '0',
     photo_id: 'membership',
-
-    // keep fields compatible with your existing structure
     license: cleanLower(tier),
     format: cleanLower(term),
-
-    download_limit: Number(membershipRow?.monthly_download_limit ?? 0),
-    download_count: Number(membershipRow?.monthly_download_used ?? 0),
+    created_at: new Date().toISOString(),
+    paid_at: new Date().toISOString(),
+    order_kind: 'membership',
+    download_count: Number(quotaUsed ?? memberRow?.monthly_download_used ?? 0),
+    download_limit: Number(memberRow?.monthly_download_limit ?? 0),
+    items: '[]',
   }
 
   const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
@@ -195,7 +211,9 @@ export default async function handler(req, res) {
 
     const { data: member, error: mErr } = await supabaseAdmin
       .from('memberships')
-      .select('id,email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle_end')
+      .select(
+        'id,email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle_end'
+      )
       .eq('email', email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -204,7 +222,11 @@ export default async function handler(req, res) {
 
     if (mErr) return res.status(500).json({ ok: false, error: mErr.message })
     if (!member) return res.status(403).json({ ok: false, error: 'Not a member' })
-    if (member.end_date && new Date(member.end_date) < new Date()) return res.status(403).json({ ok: false, error: 'Membership expired' })
+    if (!member.user_id) return res.status(500).json({ ok: false, error: 'Membership missing user_id' })
+
+    if (member.end_date && new Date(member.end_date) < new Date()) {
+      return res.status(403).json({ ok: false, error: 'Membership expired' })
+    }
 
     const { tier, term } = resolveTierTermFromMembershipRow(member)
 
@@ -215,7 +237,7 @@ export default async function handler(req, res) {
     const objectKey = await resolveObjectKeyFromPhotos(photoId, format)
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
-    // ✅ quota update
+    // ✅ Quota update (atomic-ish via CAS)
     const quota = await incrementMonthlyUsedCAS(member)
     if (!quota.ok) {
       return res.status(403).json({
@@ -230,15 +252,13 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ keep orders row in sync + create a stable "order_id text" value
-    const order = await ensureMemberOrder(email, tier, term, {
-      ...member,
-      monthly_download_used: quota.used,
-    })
+    // ✅ Create/ensure an ORD_* order (so download_tokens.order_id stays TEXT as expected)
+    const order = await ensureMemberOrder(email, tier, term, member, quota.used)
+    const orderIdText = String(order?.id || '')
 
-    // ✅ download_tokens.order_id is TEXT and expects "ORD_*"
-    const orderIdText = String(order?.id || order?.code || `ORD_MEMBER_${member.id}_${email}`)
+    if (!orderIdText) return res.status(500).json({ ok: false, error: 'Could not create member order' })
 
+    // ✅ Record token (download_tokens expects: jti text, order_id text, expires_at timestamptz)
     const jti = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
@@ -247,6 +267,7 @@ export default async function handler(req, res) {
       order_id: orderIdText,
       expires_at: expiresAt.toISOString(),
     })
+
     if (insTok.error) return res.status(500).json({ ok: false, error: insTok.error.message })
 
     const token = createDownloadToken(
