@@ -4,7 +4,12 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '../../../lib/secureDownload'
 import { sendDownloadEmail, sendReceiptEmail } from '../../../lib/email'
-import { PAYHERE, assertPayhereEnv, payhereVerifyMd5Sig } from '../../../lib/payhere'
+import {
+  PAYHERE,
+  assertPayhereEnv,
+  payhereVerifyMd5Sig,
+  getPayhereSecretForMerchantId,
+} from '../../../lib/payhere'
 
 export const config = {
   api: { bodyParser: false }, // PayHere posts x-www-form-urlencoded
@@ -162,7 +167,6 @@ async function ensureInvoiceNo(order) {
 
 /* ===== OBJECT KEY RESOLVE ===== */
 
-// NOTE: last resort fallback
 function fallbackObjectKeyFromPhotoId(photoId, format) {
   const pid = String(photoId || '')
   if (!pid) return null
@@ -170,7 +174,6 @@ function fallbackObjectKeyFromPhotoId(photoId, format) {
   return `photos/original/${pid}.jpg`
 }
 
-// ✅ Resolve correct R2 key from photos table
 async function resolveObjectKeyFromPhotos(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) return null
@@ -226,8 +229,7 @@ async function findSingleOrderByRef(ref) {
 }
 
 /**
- * ✅ Idempotency helper:
- * Set timestamp only if currently NULL.
+ * ✅ Idempotency helper: set timestamp only if currently NULL.
  */
 async function claimSendOnce(orderId, column) {
   const now = new Date().toISOString()
@@ -247,8 +249,7 @@ async function claimSendOnce(orderId, column) {
 }
 
 /**
- * ✅ Webhook idempotency helper:
- * Claim payhere_payment_id only once (first webhook wins).
+ * ✅ Webhook idempotency helper: claim payhere_payment_id only once.
  */
 async function claimPaymentOnce(orderDbId, paymentId) {
   const pid = normalizePaymentId(paymentId)
@@ -288,7 +289,7 @@ function orderLooksLikeMembership(custom_1, dbOrder) {
 
 function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency }) {
   if (!dbOrder) return true
-  if (!dbOrder.amount || !dbOrder.currency) return true
+  if (dbOrder.amount == null || dbOrder.currency == null) return true
 
   const dbAmount = normalizePayhereAmount(dbOrder.amount)
   const dbCurrency = normalizeCurrency(dbOrder.currency)
@@ -338,9 +339,11 @@ export default async function handler(req, res) {
 
     const pid = normalizePaymentId(payment_id)
 
-    // ✅ Signature check
+    // ✅ Signature check (use correct secret for this merchant_id)
+    const secretForThisMerchant = getPayhereSecretForMerchantId(merchant_id)
+
     const ok = payhereVerifyMd5Sig({
-      merchantSecret: PAYHERE.merchantSecret,
+      merchantSecret: secretForThisMerchant,
       merchant_id,
       order_id,
       payhere_amount: normalizePayhereAmount(payhere_amount),
@@ -403,11 +406,17 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
-    // ✅ merchant_id hard check
-    if (String(merchant_id || '').trim() !== String(PAYHERE.merchantId || '').trim()) {
+    // ✅ merchant_id hard check (accept both default + split merchant ids)
+    const knownIds = [
+      String(PAYHERE.merchantId || '').trim(),
+      String(PAYHERE.merchantIdLive || '').trim(),
+      String(PAYHERE.merchantIdSandbox || '').trim(),
+    ].filter(Boolean)
+
+    if (!knownIds.includes(String(merchant_id || '').trim())) {
       console.error('Merchant ID mismatch:', {
         got: String(merchant_id || '').trim(),
-        expected: String(PAYHERE.merchantId || '').trim(),
+        expected_any_of: knownIds,
       })
       return res.status(200).send('OK')
     }
@@ -440,7 +449,6 @@ export default async function handler(req, res) {
         if (!order) return res.status(200).send('OK')
 
         if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
-          // Optional audit: store payment_id once (if valid)
           if (pid) await claimPaymentOnce(order.id, pid)
 
           await supabaseAdmin
@@ -455,10 +463,8 @@ export default async function handler(req, res) {
           return res.status(200).send('OK')
         }
 
-        // ✅ Webhook idempotency: claim payment id once
         const claimedPayment = pid ? await claimPaymentOnce(order.id, pid) : false
 
-        // Duplicate webhook: still refresh PayHere status fields
         if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
           await supabaseAdmin
             .from('orders')
@@ -525,7 +531,6 @@ export default async function handler(req, res) {
 
         const monthlyLimit = MEMBER_LIMITS[tier] ?? 75
 
-        // ✅ Activate membership (matches your memberships table columns)
         try {
           const payload = {
             email,
@@ -539,7 +544,6 @@ export default async function handler(req, res) {
             billing_cycle_start: startDate,
             billing_cycle_end: endDate,
 
-            // usage
             monthly_download_limit: monthlyLimit,
             monthly_download_used: 0,
           }
@@ -550,7 +554,6 @@ export default async function handler(req, res) {
           console.error('memberships activate error:', e?.message || e)
         }
 
-        // Receipt email (send once)
         try {
           const invoiceNo = await ensureInvoiceNo(o)
           const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
