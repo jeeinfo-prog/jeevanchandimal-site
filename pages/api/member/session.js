@@ -1,11 +1,9 @@
 // pages/api/member/session.js
-import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 const MAX_DEVICES = 2
 const SESSION_TTL_DAYS = 30
-
 const SESSION_SECRET = process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
 
 function normalizeEmail(v) {
@@ -40,10 +38,10 @@ function verifySessionToken(token) {
   return jwt.verify(token, SESSION_SECRET)
 }
 
-async function getActiveMembership(email) {
+async function getActiveMembershipByEmail(email) {
   const { data, error } = await supabaseAdmin
     .from('memberships')
-    .select('plan,status,end_date,created_at')
+    .select('id,email,user_id,plan,status,end_date,created_at')
     .eq('email', email)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -52,27 +50,27 @@ async function getActiveMembership(email) {
 
   if (error) throw new Error(error.message)
   if (!data) return null
-
   if (data.end_date && new Date(data.end_date) < new Date()) return null
+  if (!data.user_id) throw new Error('memberships.user_id is NULL for this member (required).')
   return data
 }
 
-async function countActiveSessions(email) {
+async function countActiveSessions(userId) {
   const { count, error } = await supabaseAdmin
     .from('member_sessions')
-    .select('sid', { count: 'exact', head: true })
-    .eq('email', email)
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
     .is('revoked_at', null)
 
   if (error) throw new Error(error.message)
   return Number(count || 0)
 }
 
-async function findSession(email, deviceId) {
+async function findSession(userId, deviceId) {
   const { data, error } = await supabaseAdmin
     .from('member_sessions')
-    .select('*')
-    .eq('email', email)
+    .select('id')
+    .eq('user_id', userId)
     .eq('device_id', deviceId)
     .is('revoked_at', null)
     .maybeSingle()
@@ -81,57 +79,52 @@ async function findSession(email, deviceId) {
   return data || null
 }
 
-async function upsertSession({ email, deviceId, ua }) {
-  const existing = await findSession(email, deviceId)
+async function upsertSession({ userId, deviceId }) {
+  const existing = await findSession(userId, deviceId)
   if (existing) {
     const up = await supabaseAdmin
       .from('member_sessions')
-      .update({ last_seen_at: nowIso(), user_agent: ua || existing.user_agent || null })
-      .eq('sid', existing.sid)
-
+      .update({ last_seen: nowIso() })
+      .eq('id', existing.id)
     if (up.error) throw new Error(up.error.message)
-    return { sid: existing.sid }
+    return { id: existing.id }
   }
 
-  const active = await countActiveSessions(email)
-  if (active >= MAX_DEVICES) {
-    return { denied: true, code: 'DEVICE_LIMIT' }
-  }
+  const active = await countActiveSessions(userId)
+  if (active >= MAX_DEVICES) return { denied: true }
 
-  const sid = crypto.randomUUID()
-  const ins = await supabaseAdmin.from('member_sessions').insert({
-    sid,
-    email,
-    device_id: deviceId,
-    user_agent: ua || null,
-    created_at: nowIso(),
-    last_seen_at: nowIso(),
-    revoked_at: null,
-  })
+  const ins = await supabaseAdmin
+    .from('member_sessions')
+    .insert({
+      user_id: userId,
+      device_id: deviceId,
+      created_at: nowIso(),
+      last_seen: nowIso(),
+      revoked_at: null,
+    })
+    .select('id')
+    .maybeSingle()
 
   if (ins.error) throw new Error(ins.error.message)
-  return { sid }
+  return { id: ins.data?.id }
 }
 
-async function revokeOtherSessions(email, keepDeviceId) {
+async function revokeOtherSessions(userId, keepDeviceId) {
   const up = await supabaseAdmin
     .from('member_sessions')
     .update({ revoked_at: nowIso() })
-    .eq('email', email)
+    .eq('user_id', userId)
     .is('revoked_at', null)
     .neq('device_id', keepDeviceId)
 
   if (up.error) throw new Error(up.error.message)
-
-  const active = await countActiveSessions(email)
-  return active
+  return await countActiveSessions(userId)
 }
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
   try {
-    // ---------------- GET: session info (requires token)
     if (req.method === 'GET') {
       const auth = String(req.headers.authorization || '')
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
@@ -151,12 +144,12 @@ export default async function handler(req, res) {
 
       const email = normalizeEmail(payload?.email)
       const deviceId = clean(payload?.deviceId)
-      if (!email || !deviceId) {
+      const userId = clean(payload?.userId)
+      if (!email || !deviceId || !userId) {
         return res.status(401).json({ ok: false, code: 'SESSION_INVALID', error: 'Invalid session' })
       }
 
-      // ensure still active in DB
-      const session = await findSession(email, deviceId)
+      const session = await findSession(userId, deviceId)
       if (!session) {
         return res.status(401).json({
           ok: false,
@@ -166,24 +159,16 @@ export default async function handler(req, res) {
         })
       }
 
-      // touch last seen
-      await supabaseAdmin
-        .from('member_sessions')
-        .update({ last_seen_at: nowIso() })
-        .eq('sid', session.sid)
+      await supabaseAdmin.from('member_sessions').update({ last_seen: nowIso() }).eq('id', session.id)
 
-      const active = await countActiveSessions(email)
+      const active = await countActiveSessions(userId)
       return res.status(200).json({ ok: true, email, active, max: MAX_DEVICES })
     }
 
-    // ---------------- POST: start/revoke
-    if (req.method !== 'POST') {
-      return res.status(405).json({ ok: false, error: 'Method not allowed' })
-    }
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
     const action = String(req.body?.action || 'start').trim().toLowerCase()
 
-    // revoke others requires auth
     if (action === 'revoke_others') {
       const auth = String(req.headers.authorization || '')
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
@@ -201,11 +186,11 @@ export default async function handler(req, res) {
         })
       }
 
-      const email = normalizeEmail(payload?.email)
+      const userId = clean(payload?.userId)
       const deviceId = clean(payload?.deviceId)
-      if (!email || !deviceId) return res.status(401).json({ ok: false, error: 'Invalid session' })
+      if (!userId || !deviceId) return res.status(401).json({ ok: false, error: 'Invalid session' })
 
-      const session = await findSession(email, deviceId)
+      const session = await findSession(userId, deviceId)
       if (!session) {
         return res.status(401).json({
           ok: false,
@@ -215,33 +200,22 @@ export default async function handler(req, res) {
         })
       }
 
-      const active = await revokeOtherSessions(email, deviceId)
+      const active = await revokeOtherSessions(userId, deviceId)
       return res.status(200).json({ ok: true, active, max: MAX_DEVICES })
     }
 
-    // start session
     const email = normalizeEmail(req.body?.email)
     const deviceId = clean(req.body?.deviceId)
-    const ua = clean(req.body?.ua || req.headers['user-agent'] || '')
 
-    if (!email || !isValidEmail(email)) {
-      return res.status(400).json({ ok: false, error: 'Invalid email' })
-    }
-    if (!deviceId || deviceId.length < 8) {
-      return res.status(400).json({ ok: false, error: 'Missing deviceId' })
-    }
+    if (!email || !isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
+    if (!deviceId || deviceId.length < 8) return res.status(400).json({ ok: false, error: 'Missing deviceId' })
 
-    // must be a valid member
-    const member = await getActiveMembership(email)
+    const member = await getActiveMembershipByEmail(email)
     if (!member) {
-      return res.status(403).json({
-        ok: false,
-        code: 'NOT_MEMBER',
-        error: 'No active membership found.',
-      })
+      return res.status(403).json({ ok: false, code: 'NOT_MEMBER', error: 'No active membership found.' })
     }
 
-    const up = await upsertSession({ email, deviceId, ua })
+    const up = await upsertSession({ userId: member.user_id, deviceId })
     if (up?.denied) {
       return res.status(403).json({
         ok: false,
@@ -256,22 +230,17 @@ export default async function handler(req, res) {
       })
     }
 
-    const active = await countActiveSessions(email)
+    const active = await countActiveSessions(member.user_id)
 
     const token = signSession({
-      email,
-      deviceId,
-      sid: up.sid,
       v: 1,
+      email,
+      userId: member.user_id,
+      deviceId,
+      sessionId: up.id,
     })
 
-    return res.status(200).json({
-      ok: true,
-      token,
-      email,
-      active,
-      max: MAX_DEVICES,
-    })
+    return res.status(200).json({ ok: true, token, email, active, max: MAX_DEVICES })
   } catch (e) {
     console.error('member/session error:', e)
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })

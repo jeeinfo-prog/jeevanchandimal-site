@@ -12,6 +12,9 @@ function normalizeEmail(v) {
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
+function clean(v) {
+  return String(v || '').trim()
+}
 function cleanLower(v) {
   return String(v || '').trim().toLowerCase()
 }
@@ -32,33 +35,24 @@ function verifySessionFromReq(req) {
   const auth = String(req.headers.authorization || '')
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
   if (!token) return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
-
-  if (!SESSION_SECRET) {
-    return { ok: false, code: 'SERVER_MISCONFIG', error: 'Missing MEMBER_SESSION_SECRET' }
-  }
+  if (!SESSION_SECRET) return { ok: false, code: 'SERVER_MISCONFIG', error: 'Missing MEMBER_SESSION_SECRET' }
 
   try {
     const payload = jwt.verify(token, SESSION_SECRET)
-    return { ok: true, payload, token }
+    return { ok: true, payload }
   } catch {
-    return {
-      ok: false,
-      code: 'SESSION_INVALID',
-      error: 'Session expired. Please sign in again.',
-      cinematic: cinematicKickMessage(),
-    }
+    return { ok: false, code: 'SESSION_INVALID', error: 'Session expired. Please sign in again.', cinematic: cinematicKickMessage() }
   }
 }
 
-async function ensureActiveSession(email, deviceId) {
+async function ensureActiveSession(userId, deviceId) {
   const { data, error } = await supabaseAdmin
     .from('member_sessions')
-    .select('sid')
-    .eq('email', email)
+    .select('id')
+    .eq('user_id', userId)
     .eq('device_id', deviceId)
     .is('revoked_at', null)
     .maybeSingle()
-
   if (error) throw new Error(error.message)
   return !!data
 }
@@ -68,106 +62,93 @@ function resolveTierTermFromMembershipRow(memberRow) {
   if (planRaw === 'monthly') return { tier: 'basic', term: 'monthly' }
   if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
   if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
-
-  if (['basic', 'pro', 'elite'].includes(planRaw)) {
-    const end = memberRow?.end_date || null
-    if (!end) return { tier: planRaw, term: 'monthly' }
-
-    const diffDays = Math.round((new Date(end).getTime() - Date.now()) / 86400000)
-    if (diffDays > 3000) return { tier: planRaw, term: 'lifetime' }
-    if (diffDays > 300) return { tier: planRaw, term: 'yearly' }
-    return { tier: planRaw, term: 'monthly' }
-  }
-
+  if (['basic', 'pro', 'elite'].includes(planRaw)) return { tier: planRaw, term: 'monthly' }
   return { tier: 'pro', term: 'monthly' }
 }
 
-function limitForTier(tier) {
-  const t = cleanLower(tier)
-  if (t === 'basic') return 20
-  if (t === 'pro') return 75
-  if (t === 'elite') return 200
-  return 75
-}
-
-function cycleKey(term, now = new Date()) {
-  const t = cleanLower(term)
-  const yyyy = now.getUTCFullYear()
-  const mm = String(now.getUTCMonth() + 1).padStart(2, '0')
-  if (t === 'yearly') return `${yyyy}`
-  if (t === 'lifetime') return `LIFE`
-  return `${yyyy}-${mm}`
-}
-
 async function resolveObjectKeyFromPhotos(photoId, format) {
-  const pid = String(photoId || '').trim()
+  const pid = clean(photoId)
   if (!pid) return null
-
-  const fmt = normalizeFormat(format)
 
   const { data: p, error } = await supabaseAdmin
     .from('photos')
-    .select('id,original_key,original_raw_key,original_jpg_key')
+    .select('id,original_jpg_key,original_raw_key,original_key,original_filename')
     .eq('id', pid)
     .maybeSingle()
 
   if (error) throw new Error(error.message)
   if (!p) return null
 
+  const fmt = normalizeFormat(format)
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
-  return p.original_jpg_key || p.original_key ? String(p.original_jpg_key || p.original_key) : null
+  return String(p.original_jpg_key || p.original_key || '')
 }
 
-async function safeInsertOrder(payload) {
-  const attempt = async (obj) => supabaseAdmin.from('orders').insert(obj).select('*').maybeSingle()
+async function incrementMonthlyUsedCAS(memberRow) {
+  const id = memberRow.id
+  const used = Number(memberRow.monthly_download_used ?? 0)
+  const limit = Number(memberRow.monthly_download_limit ?? 0)
 
-  let r = await attempt(payload)
-  if (!r.error) return r.data
+  if (limit > 0 && used >= limit) return { ok: false, used, limit, remaining: 0 }
 
-  const msg = String(r.error.message || '').toLowerCase()
-  if (msg.includes('does not exist') && msg.includes('column')) {
-    const ultra = {
-      id: payload.id,
-      code: payload.code,
-      email: payload.email,
-      status: payload.status,
-      paid_at: payload.paid_at,
-      amount: payload.amount,
-      currency: payload.currency,
-      order_kind: payload.order_kind,
-      photo_id: payload.photo_id,
-    }
-    const r2 = await attempt(ultra)
-    if (!r2.error) return r2.data
-    throw new Error(r2.error.message)
+  const nextUsed = used + 1
+
+  const { data, error } = await supabaseAdmin
+    .from('memberships')
+    .update({ monthly_download_used: nextUsed })
+    .eq('id', id)
+    .eq('monthly_download_used', used)
+    .select('monthly_download_used,monthly_download_limit,billing_cycle_end')
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  if (!data) {
+    const { data: fresh, error: fErr } = await supabaseAdmin
+      .from('memberships')
+      .select('id,monthly_download_used,monthly_download_limit,billing_cycle_end')
+      .eq('id', id)
+      .maybeSingle()
+    if (fErr) throw new Error(fErr.message)
+    return await incrementMonthlyUsedCAS({ ...memberRow, ...fresh })
   }
 
-  throw new Error(r.error.message)
+  const finalUsed = Number(data.monthly_download_used ?? nextUsed)
+  const finalLimit = Number(data.monthly_download_limit ?? limit)
+  const remaining = Math.max(0, finalLimit - finalUsed)
+
+  return { ok: true, used: finalUsed, limit: finalLimit, remaining, reset_at: data.billing_cycle_end || null }
 }
 
-async function ensureMemberOrder(email, tier, term) {
-  const code = `MEMBER_${cycleKey(term)}_${email}`
+async function ensureMemberOrder(email, tier, term, membershipRow) {
+  // Keep your existing ORD_ format so download_tokens.order_id stays consistent
+  const code = `ORD_MEMBER_${membershipRow?.id}_${email}`.slice(0, 180)
+
   const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
   if (!existing.error && existing.data) return existing.data
 
-  const id = crypto.randomUUID()
   const payload = {
-    id,
+    id: crypto.randomUUID(),
     code,
-    email,
     status: 'PAID',
-    paid_at: new Date().toISOString(),
+    email,
     amount: 0,
     currency: 'LKR',
+    paid_at: new Date().toISOString(),
     order_kind: 'membership',
     photo_id: 'membership',
-    delivery_object_key: 'membership',
+
+    // keep fields compatible with your existing structure
     license: cleanLower(tier),
     format: cleanLower(term),
-    download_limit: limitForTier(tier),
-    download_count: 0,
+
+    download_limit: Number(membershipRow?.monthly_download_limit ?? 0),
+    download_count: Number(membershipRow?.monthly_download_used ?? 0),
   }
-  return await safeInsertOrder(payload)
+
+  const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
+  if (ins.error) throw new Error(ins.error.message)
+  return ins.data
 }
 
 export default async function handler(req, res) {
@@ -179,7 +160,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
   try {
-    const photoId = String(req.body?.photoId || '').trim()
+    const photoId = clean(req.body?.photoId)
     const email = normalizeEmail(req.body?.email)
     const requestedFormat = normalizeFormat(req.body?.format)
 
@@ -190,8 +171,10 @@ export default async function handler(req, res) {
     if (!sess.ok) return res.status(401).json(sess)
 
     const tokenEmail = normalizeEmail(sess.payload?.email)
-    const deviceId = String(sess.payload?.deviceId || '').trim()
-    if (!tokenEmail || tokenEmail !== email || !deviceId) {
+    const deviceId = clean(sess.payload?.deviceId)
+    const userId = clean(sess.payload?.userId)
+
+    if (!tokenEmail || tokenEmail !== email || !deviceId || !userId) {
       return res.status(401).json({
         ok: false,
         code: 'SESSION_MISMATCH',
@@ -200,7 +183,7 @@ export default async function handler(req, res) {
       })
     }
 
-    const activeSession = await ensureActiveSession(email, deviceId)
+    const activeSession = await ensureActiveSession(userId, deviceId)
     if (!activeSession) {
       return res.status(401).json({
         ok: false,
@@ -212,7 +195,7 @@ export default async function handler(req, res) {
 
     const { data: member, error: mErr } = await supabaseAdmin
       .from('memberships')
-      .select('plan,status,end_date,created_at')
+      .select('id,email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle_end')
       .eq('email', email)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -221,11 +204,7 @@ export default async function handler(req, res) {
 
     if (mErr) return res.status(500).json({ ok: false, error: mErr.message })
     if (!member) return res.status(403).json({ ok: false, error: 'Not a member' })
-
-    const endDate = member.end_date || null
-    if (endDate && new Date(endDate) < new Date()) {
-      return res.status(403).json({ ok: false, error: 'Membership expired' })
-    }
+    if (member.end_date && new Date(member.end_date) < new Date()) return res.status(403).json({ ok: false, error: 'Membership expired' })
 
     const { tier, term } = resolveTierTermFromMembershipRow(member)
 
@@ -236,42 +215,44 @@ export default async function handler(req, res) {
     const objectKey = await resolveObjectKeyFromPhotos(photoId, format)
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
-    const memberOrder = await ensureMemberOrder(email, tier, term)
-
-    const used = Number(memberOrder?.download_count ?? 0)
-    const limit = Number(memberOrder?.download_limit ?? limitForTier(tier))
-    const remaining = Math.max(0, limit - used)
-
-    if (remaining <= 0) {
+    // ✅ quota update
+    const quota = await incrementMonthlyUsedCAS(member)
+    if (!quota.ok) {
       return res.status(403).json({
         ok: false,
         error: 'Monthly download limit reached.',
         tier,
         term,
-        used,
-        limit,
+        used: quota.used,
+        limit: quota.limit,
         remaining: 0,
+        reset_at: member.billing_cycle_end || null,
       })
     }
+
+    // ✅ keep orders row in sync + create a stable "order_id text" value
+    const order = await ensureMemberOrder(email, tier, term, {
+      ...member,
+      monthly_download_used: quota.used,
+    })
+
+    // ✅ download_tokens.order_id is TEXT and expects "ORD_*"
+    const orderIdText = String(order?.id || order?.code || `ORD_MEMBER_${member.id}_${email}`)
 
     const jti = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
     const insTok = await supabaseAdmin.from('download_tokens').insert({
       jti,
-      order_id: memberOrder.id,
+      order_id: orderIdText,
       expires_at: expiresAt.toISOString(),
     })
-
-    if (insTok.error) {
-      console.error('download_tokens insert failed:', insTok.error.message)
-      return res.status(500).json({ ok: false, error: insTok.error.message })
-    }
+    if (insTok.error) return res.status(500).json({ ok: false, error: insTok.error.message })
 
     const token = createDownloadToken(
       {
         jti,
-        orderId: memberOrder.id,
+        orderId: orderIdText,
         photoId,
         format,
         objectKey,
@@ -287,9 +268,10 @@ export default async function handler(req, res) {
       tier,
       term,
       type: format,
-      used,
-      limit,
-      remaining,
+      used: quota.used,
+      limit: quota.limit,
+      remaining: quota.remaining,
+      reset_at: quota.reset_at || member.billing_cycle_end || null,
       url: `/api/download?token=${encodeURIComponent(token)}`,
     })
   } catch (e) {
