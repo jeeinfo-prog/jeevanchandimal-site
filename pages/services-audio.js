@@ -3,7 +3,7 @@ import Head from 'next/head'
 
 import { useTranslations } from 'next-intl'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import ServiceAudioHero from '../components/service-audio-hero'
 import IntroductionAudioServices from '../components/introduction-audio-services'
 import SelectedAudioWork from '../components/selected-audio-work'
@@ -11,7 +11,7 @@ import WhatIDoAudioServices from '../components/what-i-do-audio-services'
 import HowIApproachAudio from '../components/how-i-approach-audio'
 import WhoItsForAudio from '../components/who-its-for-audio'
 import ServicesAudioFinalCTA from '../components/services-audio-final-cta'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 const ServicesAudio = (props) => {
   return (

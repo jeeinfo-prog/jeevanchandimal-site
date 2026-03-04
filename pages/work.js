@@ -1,14 +1,14 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import WorkHero from '../components/work-hero'
 import HomeWork01 from '../components/home-work-01'
 import Photography from '../components/photography'
 import FilmVideoProduction from '../components/film-video-production'
 import AIAnimation from '../components/ai-animation'
 import SoundDesign from '../components/sound-design'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 const Work = () => {
   return (

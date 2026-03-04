@@ -3,7 +3,7 @@ import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import WorkPhotographyHero from '../components/work-photography-hero'
 import WorkPhotographySection from '../components/work-photography'
 import WorkCinematicGallery from '../components/work-cinematic-gallery'
@@ -11,7 +11,7 @@ import WorkPhotographyEditorial from '../components/work-photography-editorial'
 import WorkPhotographyPersonalProjects from '../components/work-photography-personal-projects'
 import WorkStockPreview from '../components/work-stock-preview'
 import WorkPhotographyEndNote from '../components/work-photography-end-note'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function WorkPhotography() {
   // ✅ Swap later: /public/work/photography/hero.jpg (or keep as is)

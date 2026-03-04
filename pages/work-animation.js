@@ -2,7 +2,7 @@
 import React from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import WorkAnimationHero from '../components/work-animation-hero'
 import Animations from '../components/animations'
 import Work2DAnimation from '../components/work-2d-animation'
@@ -11,7 +11,7 @@ import WorkMotionGraphics from '../components/work-motion-graphics'
 import WorkPresentationNote from '../components/work-presentation-note'
 import AIAnimation from '../components/ai-animation'
 import WorkAnimationEndNote from '../components/work-animation-end-note'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function WorkAnimation() {
   // ✅ swap later: /public/work/animation/hero.jpg

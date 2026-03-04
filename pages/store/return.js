@@ -4,8 +4,8 @@ import React from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 
-import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
-import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNavi from '../../components/layout/jeevan-chandimal-navi'
+import JeevanChandimalNewFooter from '../../components/layout/jeevan-chandimal-new-footer'
 
 const PAID_STATUSES = new Set(['PAID', 'SUCCESS', 'COMPLETED', 'CONFIRMED', '2'])
 const FAIL_STATUSES = new Set(['FAILED', 'CANCELED', 'CANCELLED', 'EXPIRED', '-1', '-2', '-3'])

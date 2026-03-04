@@ -2,14 +2,14 @@
 import React from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import WorkAudioHero from '../components/work-audio-hero'
 import AudioProduction from '../components/audio-production'
 import SoundDesign2 from '../components/sound-design-2'
 import Music from '../components/music'
 import VoiceWork from '../components/voice-work'
 import WorkAudioEndNote from '../components/work-audio-end-note'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function WorkAudio() {
   // ✅ Swap later with your own image in /public/work/audio/

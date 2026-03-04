@@ -1,3 +1,4 @@
+// components/sound-design.js
 import React, { Fragment } from 'react'
 import Link from 'next/link'
 import PropTypes from 'prop-types'

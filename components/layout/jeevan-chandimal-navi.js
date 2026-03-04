@@ -1,9 +1,9 @@
-// components/jeevan-chandimal-navi.js
+// components/layout/jeevan-chandimal-navi.js
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import PropTypes from 'prop-types'
-import { readCart } from '../lib/cart'
+import { readCart } from '../../lib/cart'
 
 const NAV = {
   work: [

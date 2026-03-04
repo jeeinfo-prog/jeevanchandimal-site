@@ -1,7 +1,7 @@
 // pages/license.js
 import React from 'react'
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 import LegalSeo from '../components/LegalSeo'
 
 export default function License() {

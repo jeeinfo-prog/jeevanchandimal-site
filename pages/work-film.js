@@ -1,7 +1,7 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import WorkFilmHero from '../components/work-film-hero'
 import FilmCategories from '../components/film-categories'
 import WorkFilmProduction from '../components/work-film-production'
@@ -11,7 +11,7 @@ import WorkFilmMusicVideo from '../components/work-film-music-video'
 import WorkFilmShortFilm from '../components/work-film-short-film'
 import SelectedFilmWork from '../components/selected-film-work'
 import WorkFilmEndNote from '../components/work-film-end-note'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 function getSiteUrl() {
   const v = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_BASE_URL

@@ -3,13 +3,13 @@ import Head from 'next/head'
 
 import { useTranslations } from 'next-intl'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import ServicesHero from '../components/services-hero'
 import ServiceIntro from '../components/service-intro'
 import OurServices from '../components/our-services'
 import Process01 from '../components/process-01'
 import ServicesFinalCTA from '../components/services-final-cta'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 const Services = (props) => {
   return (

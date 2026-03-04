@@ -1,7 +1,7 @@
 import React from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import JeevanChandimalNew from '../components/jeevan-chandimal-new'
 import MyStoryNew from '../components/my-story-new'
 import ACinematicApproach from '../components/a-cinematic-approach'
@@ -13,7 +13,7 @@ import Availability from '../components/availability'
 import SkillsOverview from '../components/skills-overview'
 import BehindTheScenes01 from '../components/behind-the-scenes-01'
 import ClosingStatement from '../components/closing-statement'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 const About = () => {
   return (

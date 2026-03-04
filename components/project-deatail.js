@@ -1,192 +1,165 @@
-import React, { Fragment } from 'react'
-
-import { DataProvider } from '@teleporthq/react-components'
+// components/project-deatail.js
+import React, { Fragment, useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const ProjectDeatail = (props) => {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+
+    async function run() {
+      try {
+        setLoading(true)
+        const res = await fetch('/api/rest-api-data-b1593897', {
+          headers: { 'Content-Type': 'application/json' },
+        })
+        const json = await res.json()
+        const d = json?.data || null
+        if (alive) setData(d)
+      } catch (e) {
+        if (alive) setData(null)
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+
+    run()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const item = Array.isArray(data) ? data?.[0] : null
+
+  const featuredMediaId = item?.featured_media
+  const projectType = item?.acf?.project_type
+  const titleRendered = item?.title?.rendered
+  const shortDesc = item?.acf?.short_desc
+
   return (
     <>
       <div className="project-deatail-thq-layout349-elm thq-section-padding">
         <div className="thq-section-max-width thq-flex-column project-deatail-thq-max-width-elm">
-          <DataProvider
-            fetchData={() =>
-              fetch('/api/rest-api-data-b1593897', {
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              })
-                .then((res) => res.json())
-                .then((response) => response?.data)
-            }
-            resourceDefinition={{
-              type: 'external-data-source',
-              dataSourceId: 'b1593897-6386-4fb2-98e7-00672fcc4a9a',
-              tableName: 'data',
-              dataSourceType: 'rest-api',
-            }}
-            name={'SingleProject_data_data'}
-            renderSuccess={(SingleProject_data_data) => (
-              <>
-                <Fragment>
-                  <img
-                    alt={props.featureImageAlt}
-                    src={props.featureImageSrc}
-                    id={SingleProject_data_data?.[0]?.featured_media}
-                    className="thq-img-ratio-4-3"
-                  />
-                </Fragment>
-              </>
-            )}
-            persistDataDuringLoading={true}
-          />
+          {/* Feature image */}
+          <Fragment>
+            <img
+              alt={props.featureImageAlt}
+              src={props.featureImageSrc}
+              data-featured-media={featuredMediaId || ''}
+              className="thq-img-ratio-4-3"
+            />
+          </Fragment>
+
           <div className="thq-flex-column">
-            <DataProvider
-              resourceDefinition={{
-                type: 'external-data-source',
-                dataSourceId: 'b1593897-6386-4fb2-98e7-00672fcc4a9a',
-                tableName: 'data',
-                dataSourceType: 'rest-api',
-              }}
-              name={'SingleProject_data_data'}
-              renderSuccess={(SingleProject_data_data) => (
-                <>
-                  <Fragment>
-                    <span
-                      id={SingleProject_data_data?.[0]?.acf?.project_type}
-                      className="project-deatail-thq-type-elm thq-body-small"
-                    >
-                      {props.feature1Slogan ?? (
-                        <Fragment>
-                          <span className="project-deatail-text1">
-                            Capturing Moments, Creating Stories
-                          </span>
-                        </Fragment>
-                      )}
-                    </span>
-                  </Fragment>
-                </>
-              )}
-            />
-            <DataProvider
-              resourceDefinition={{
-                type: 'external-data-source',
-                dataSourceId: 'b1593897-6386-4fb2-98e7-00672fcc4a9a',
-                tableName: 'data',
-                dataSourceType: 'rest-api',
-              }}
-              name={'SingleProject_data_data'}
-              renderSuccess={(SingleProject_data_data) => (
-                <>
-                  <Fragment>
-                    <h2
-                      id={SingleProject_data_data?.[0]?.title?.rendered}
-                      className="project-deatail-thq-title-elm thq-heading-2"
-                    >
-                      {props.feature1Title ?? (
-                        <Fragment>
-                          <span className="project-deatail-text2">
-                            End-to-End Visual Production
-                          </span>
-                        </Fragment>
-                      )}
-                    </h2>
-                  </Fragment>
-                </>
-              )}
-            />
-            <DataProvider
-              fetchData={() =>
-                fetch('/api/rest-api-data-b1593897', {
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                })
-                  .then((res) => res.json())
-                  .then((response) => response?.data)
-              }
-              resourceDefinition={{
-                type: 'external-data-source',
-                dataSourceId: 'b1593897-6386-4fb2-98e7-00672fcc4a9a',
-                tableName: 'data',
-                dataSourceType: 'rest-api',
-              }}
-              name={'SingleProject_data_data'}
-              renderSuccess={(SingleProject_data_data) => (
-                <>
-                  <Fragment>
-                    <p
-                      id={SingleProject_data_data?.[0]?.acf?.short_desc}
-                      className="project-deatail-thq-short-desc-elm thq-body-large"
-                    >
-                      {props.feature1Description ?? (
-                        <Fragment>
-                          <span className="project-deatail-text3">
-                            Experience the power of visual storytelling through
-                            our carefully crafted projects that bring clarity,
-                            mood, and narrative presence to life.
-                          </span>
-                        </Fragment>
-                      )}
-                    </p>
-                  </Fragment>
-                </>
-              )}
-              persistDataDuringLoading={true}
-            />
+            {/* Project type / slogan */}
+            <Fragment>
+              <span className="project-deatail-thq-type-elm thq-body-small">
+                {projectType ||
+                  props.feature1Slogan || (
+                    <Fragment>
+                      <span className="project-deatail-text1">
+                        Capturing Moments, Creating Stories
+                      </span>
+                    </Fragment>
+                  )}
+              </span>
+            </Fragment>
+
+            {/* Title */}
+            <Fragment>
+              <h2 className="project-deatail-thq-title-elm thq-heading-2">
+                {titleRendered ||
+                  props.feature1Title || (
+                    <Fragment>
+                      <span className="project-deatail-text2">
+                        End-to-End Visual Production
+                      </span>
+                    </Fragment>
+                  )}
+              </h2>
+            </Fragment>
+
+            {/* Short description */}
+            <Fragment>
+              <p className="project-deatail-thq-short-desc-elm thq-body-large">
+                {shortDesc ||
+                  props.feature1Description || (
+                    <Fragment>
+                      <span className="project-deatail-text3">
+                        Experience the power of visual storytelling through our
+                        carefully crafted projects that bring clarity, mood, and
+                        narrative presence to life.
+                      </span>
+                    </Fragment>
+                  )}
+              </p>
+            </Fragment>
+
+            {/* Optional: tiny loading indicator (doesn't change layout) */}
+            {loading && (
+              <div className="project-deatail-loading thq-body-small">
+                Loading…
+              </div>
+            )}
           </div>
         </div>
       </div>
-      <style jsx>
-        {`
-          .project-deatail-thq-layout349-elm {
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
+
+      <style jsx>{`
+        .project-deatail-thq-layout349-elm {
+          width: 100%;
+          height: auto;
+          display: flex;
+          overflow: hidden;
+          position: relative;
+          align-items: center;
+          flex-shrink: 0;
+          flex-direction: column;
+        }
+        .project-deatail-thq-type-elm {
+          align-self: center;
+          text-align: center;
+        }
+        .project-deatail-thq-title-elm {
+          align-self: center;
+          text-align: center;
+        }
+        .project-deatail-thq-short-desc-elm {
+          align-self: center;
+          text-align: center;
+        }
+        .project-deatail-loading {
+          margin-top: 10px;
+          opacity: 0.7;
+          text-align: center;
+        }
+        .project-deatail-text1 {
+          display: inline-block;
+        }
+        .project-deatail-text2 {
+          display: inline-block;
+        }
+        .project-deatail-text3 {
+          display: inline-block;
+        }
+        @media (max-width: 991px) {
+          .project-deatail-thq-max-width-elm {
             flex-direction: column;
           }
-          .project-deatail-thq-type-elm {
-            align-self: center;
-            text-align: center;
+        }
+        @media (max-width: 767px) {
+          .project-deatail-thq-max-width-elm {
+            width: 100%;
           }
-          .project-deatail-thq-title-elm {
-            align-self: center;
-            text-align: center;
+        }
+        @media (max-width: 479px) {
+          .project-deatail-thq-max-width-elm {
+            padding: var(--dl-layout-space-oneandhalfunits);
           }
-          .project-deatail-thq-short-desc-elm {
-            align-self: center;
-            text-align: center;
-          }
-          .project-deatail-text1 {
-            display: inline-block;
-          }
-          .project-deatail-text2 {
-            display: inline-block;
-          }
-          .project-deatail-text3 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .project-deatail-thq-max-width-elm {
-              flex-direction: column;
-            }
-          }
-          @media (max-width: 767px) {
-            .project-deatail-thq-max-width-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 479px) {
-            .project-deatail-thq-max-width-elm {
-              padding: var(--dl-layout-space-oneandhalfunits);
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }

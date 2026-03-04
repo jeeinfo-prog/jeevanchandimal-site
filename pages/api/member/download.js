@@ -2,7 +2,7 @@
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
-import { createDownloadToken } from '../../../lib/secureDownload'
+import { createDownloadToken } from '@/lib/secureDownload'
 
 const SESSION_SECRET = process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
 

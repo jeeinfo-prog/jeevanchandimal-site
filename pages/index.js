@@ -2,14 +2,14 @@
 import React from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import HomePageHero from '../components/home-page-hero'
 import HomeIntro from '../components/home-intro'
 import SelectedWork from '../components/selected-work'
 import HomeWork01 from '../components/home-work-01'
 import Process01 from '../components/process-01'
 import HomeFinalCTA from '../components/home-final-cta'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function Home() {
   // ✅ Later you can just replace this file in /public/home/

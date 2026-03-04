@@ -2,7 +2,7 @@
 import React from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import ServiceAnimationHero from '../components/service-animation-hero'
 import IntroductionAnimationServices from '../components/introduction-animation-services'
 import SelectedMotionWork from '../components/selected-motion-work'
@@ -10,7 +10,7 @@ import WhatIDoAnimationServices from '../components/what-i-do-animation-services
 import HowIApproachMotion from '../components/how-i-approach-motion'
 import WhoItsForAnimation from '../components/who-its-for-animation'
 import ServicesAnimationFinalCTA from '../components/services-animation-final-cta'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function ServicesAnimation() {
   // ✅ Replace later with your own image in /public/services/animation/

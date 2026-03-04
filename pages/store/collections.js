@@ -3,8 +3,8 @@ import React from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 
-import JeevanChandimalNavi from '../../components/jeevan-chandimal-navi'
-import JeevanChandimalNewFooter from '../../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNavi from '../../components/layout/jeevan-chandimal-navi'
+import JeevanChandimalNewFooter from '../../components/layout/jeevan-chandimal-new-footer'
 
 export default function StoreCollections() {
   const [loading, setLoading] = React.useState(true)

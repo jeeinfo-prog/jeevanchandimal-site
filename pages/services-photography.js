@@ -2,7 +2,7 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
 
-import JeevanChandimalNavi from '../components/jeevan-chandimal-navi'
+import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import ServicePhotographyHero from '../components/service-photography-hero'
 import IntroductionPhotographyServices from '../components/introduction-photography-services'
 import SelectedPhotography from '../components/selected-photography'
@@ -10,7 +10,7 @@ import WhatIDoPhotographyServices from '../components/what-i-do-photography-serv
 import HowIApproachPhotography from '../components/how-i-approach-photography'
 import WhoItsForPhotography from '../components/who-its-for-photography'
 import PhotographyServicesFinalCTA from '../components/photography-services-final-cta'
-import JeevanChandimalNewFooter from '../components/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function ServicesPhotography() {
   // ✅ Background image in /public/services/heroser.jpg
