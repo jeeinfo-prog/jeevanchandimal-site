@@ -2,15 +2,14 @@
 // ✅ Final: commit auth header, folder picker attrs, dark UI,
 // auto description + smart tags, queue with progress + concurrency,
 // compatible with FINAL create-upload.js + commit.js
+//
+// ✅ Build-safe fix:
+// - Do NOT create Supabase client at module scope (Next build/SSR runs this file).
+// - Create it lazily on the client only (inside useEffect), then use supabaseRef.current everywhere.
 
 import React from 'react'
 import Head from 'next/head'
 import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
 
 // ---------------- helpers ----------------
 function fmtMB(bytes) {
@@ -224,6 +223,10 @@ const COLLECTION_TAGS = [
 ]
 
 export default function AdminUploadPage() {
+  // ✅ Supabase client (client-only, build-safe)
+  const supabaseRef = React.useRef(null)
+  const [supabaseReady, setSupabaseReady] = React.useState(false)
+
   // Auth
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -357,21 +360,54 @@ export default function AdminUploadPage() {
     if (Number.isFinite(lkr) && lkr > 0) setPriceLkr(lkr)
   }, [priceUsd, fxUsdToLkr, autoLkrFromUsd])
 
+  // ✅ Create Supabase client on client only (prevents next build crash)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+      if (!url || !key) {
+        log('❌ Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
+        setSupabaseReady(false)
+        supabaseRef.current = null
+        return
+      }
+
+      supabaseRef.current = createClient(url, key)
+      setSupabaseReady(true)
+    } catch (e) {
+      log(`❌ Supabase init failed: ${e?.message || 'unknown error'}`)
+      setSupabaseReady(false)
+      supabaseRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Session
   React.useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data?.session || null))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    if (!supabaseReady || !supabaseRef.current) return
+
+    supabaseRef.current.auth.getSession().then(({ data }) => setSession(data?.session || null))
+    const { data: sub } = supabaseRef.current.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => sub?.subscription?.unsubscribe?.()
-  }, [])
+  }, [supabaseReady])
 
   // Admin check
   React.useEffect(() => {
     async function checkAdmin() {
+      if (!supabaseReady || !supabaseRef.current) {
+        setIsAdmin(false)
+        return
+      }
+
       if (!session?.user?.id) {
         setIsAdmin(false)
         return
       }
-      const { data, error } = await supabase
+
+      const { data, error } = await supabaseRef.current
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
@@ -388,13 +424,14 @@ export default function AdminUploadPage() {
     }
     checkAdmin()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.id])
+  }, [session?.user?.id, supabaseReady])
 
   async function signIn() {
     setBusy(true)
     setLogs([])
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (!supabaseReady || !supabaseRef.current) throw new Error('Supabase not ready')
+      const { error } = await supabaseRef.current.auth.signInWithPassword({ email, password })
       if (error) throw error
       log('✅ Signed in')
     } catch (e) {
@@ -407,7 +444,8 @@ export default function AdminUploadPage() {
   async function signOut() {
     setBusy(true)
     try {
-      await supabase.auth.signOut()
+      if (!supabaseReady || !supabaseRef.current) throw new Error('Supabase not ready')
+      await supabaseRef.current.auth.signOut()
       setIsAdmin(false)
       setQueue([])
       setPaused(false)
@@ -571,7 +609,8 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(createResp)
-      if (!createResp.ok) throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
+      if (!createResp.ok)
+        throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
 
       photoId = json.photoId
       uploadUrl = json.uploadUrl
@@ -607,7 +646,8 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(commitResp)
-      if (!commitResp.ok) throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
+      if (!commitResp.ok)
+        throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
 
       log('✅ Done: commit complete')
       log(`thumbUrl: ${json?.thumb_url || json?.thumbUrl || json?.photo?.thumb_url || '(none)'}`)
@@ -681,7 +721,13 @@ export default function AdminUploadPage() {
                 return
               }
 
-              setItem(it.id, { status: 'ERROR', error: msg, errorType: e?._type || 'UNKNOWN', speedBps: 0, etaSec: 0 })
+              setItem(it.id, {
+                status: 'ERROR',
+                error: msg,
+                errorType: e?._type || 'UNKNOWN',
+                speedBps: 0,
+                etaSec: 0,
+              })
               log(`❌ Failed: ${it.file.name} — ${msg}`)
             }
           })
@@ -721,11 +767,29 @@ export default function AdminUploadPage() {
           Folder upload + auto title + smart tags + auto description + manual editor + secure commit.
         </p>
 
-        {!session ? (
+        {!supabaseReady ? (
+          <div className="card" style={{ marginTop: 18, padding: 16, borderRadius: 14 }}>
+            <h3 style={{ marginTop: 0 }}>Supabase</h3>
+            <p style={{ margin: 0, opacity: 0.85 }}>
+              Supabase client is not ready. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+            </p>
+          </div>
+        ) : !session ? (
           <div className="card" style={{ marginTop: 18, padding: 16, borderRadius: 14 }}>
             <h3 style={{ marginTop: 0 }}>Login</h3>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" style={{ width: '100%', padding: 10, marginBottom: 10 }} />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" style={{ width: '100%', padding: 10, marginBottom: 10 }} />
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              style={{ width: '100%', padding: 10, marginBottom: 10 }}
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              style={{ width: '100%', padding: 10, marginBottom: 10 }}
+            />
             <button onClick={signIn} disabled={busy} style={{ padding: '10px 14px' }}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
@@ -775,28 +839,56 @@ export default function AdminUploadPage() {
 
                 <label style={{ fontSize: 13 }}>
                   USD:
-                  <input type="number" value={priceUsd} onChange={(e) => setPriceUsd(e.target.value)} style={{ width: 90, marginLeft: 8 }} disabled={busy} />
+                  <input
+                    type="number"
+                    value={priceUsd}
+                    onChange={(e) => setPriceUsd(e.target.value)}
+                    style={{ width: 90, marginLeft: 8 }}
+                    disabled={busy}
+                  />
                 </label>
 
                 <label style={{ fontSize: 13 }}>
                   LKR:
-                  <input type="number" value={priceLkr} onChange={(e) => setPriceLkr(e.target.value)} style={{ width: 110, marginLeft: 8 }} disabled={busy} />
+                  <input
+                    type="number"
+                    value={priceLkr}
+                    onChange={(e) => setPriceLkr(e.target.value)}
+                    style={{ width: 110, marginLeft: 8 }}
+                    disabled={busy}
+                  />
                 </label>
 
-                <button type="button" onClick={applyBulkPresetToQueued} disabled={busy || queue.length === 0} style={{ padding: '8px 12px' }}>
+                <button
+                  type="button"
+                  onClick={applyBulkPresetToQueued}
+                  disabled={busy || queue.length === 0}
+                  style={{ padding: '8px 12px' }}
+                >
                   Apply to queued
                 </button>
               </div>
 
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
                 <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
-                  <input type="checkbox" checked={autoLkrFromUsd} onChange={(e) => setAutoLkrFromUsd(e.target.checked)} disabled={busy} />
+                  <input
+                    type="checkbox"
+                    checked={autoLkrFromUsd}
+                    onChange={(e) => setAutoLkrFromUsd(e.target.checked)}
+                    disabled={busy}
+                  />
                   Auto LKR from USD
                 </label>
 
                 <label style={{ fontSize: 13, opacity: 0.9 }}>
                   FX (1 USD → LKR):
-                  <input type="number" value={fxUsdToLkr} onChange={(e) => setFxUsdToLkr(e.target.value)} style={{ width: 110, marginLeft: 8 }} disabled={busy || !autoLkrFromUsd} />
+                  <input
+                    type="number"
+                    value={fxUsdToLkr}
+                    onChange={(e) => setFxUsdToLkr(e.target.value)}
+                    style={{ width: 110, marginLeft: 8 }}
+                    disabled={busy || !autoLkrFromUsd}
+                  />
                 </label>
 
                 <div style={{ fontSize: 12, opacity: 0.7 }}>
@@ -808,7 +900,13 @@ export default function AdminUploadPage() {
                 <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 8 }}>Quick add a tag to queued:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {COLLECTION_TAGS.map((t) => (
-                    <button key={t} type="button" onClick={() => applyBulkTag(t)} disabled={busy || queue.length === 0} className="pill">
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => applyBulkTag(t)}
+                      disabled={busy || queue.length === 0}
+                      className="pill"
+                    >
                       {t}
                     </button>
                   ))}
@@ -818,12 +916,22 @@ export default function AdminUploadPage() {
 
             <div style={{ marginTop: 14, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
               <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
-                <input type="checkbox" checked={keepFolderStructure} onChange={(e) => setKeepFolderStructure(e.target.checked)} disabled={busy} />
+                <input
+                  type="checkbox"
+                  checked={keepFolderStructure}
+                  onChange={(e) => setKeepFolderStructure(e.target.checked)}
+                  disabled={busy}
+                />
                 Keep folder structure
               </label>
 
               <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
-                <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} disabled={busy} />
+                <input
+                  type="checkbox"
+                  checked={autoStart}
+                  onChange={(e) => setAutoStart(e.target.checked)}
+                  disabled={busy}
+                />
                 Auto-start
               </label>
 
@@ -933,7 +1041,15 @@ export default function AdminUploadPage() {
 
                   <div style={{ display: 'grid', gap: 10 }}>
                     {queue.map((it) => (
-                      <div key={it.id} className="card" style={{ padding: 12, borderRadius: 14, background: 'rgba(255,255,255,0.02)' }}>
+                      <div
+                        key={it.id}
+                        className="card"
+                        style={{
+                          padding: 12,
+                          borderRadius: 14,
+                          background: 'rgba(255,255,255,0.02)',
+                        }}
+                      >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                           <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {it.file.name}
@@ -949,7 +1065,12 @@ export default function AdminUploadPage() {
                             <span style={{ opacity: 0.9 }}>{it.status === 'ERROR' ? 'ERROR' : it.status}</span>
 
                             {it.status === 'DONE' && it.photoId && (
-                              <a href={`/store/${it.photoId}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, textDecoration: 'underline', opacity: 0.9 }}>
+                              <a
+                                href={`/store/${it.photoId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ fontSize: 11, textDecoration: 'underline', opacity: 0.9 }}
+                              >
                                 Open in Store
                               </a>
                             )}
@@ -974,8 +1095,17 @@ export default function AdminUploadPage() {
                             <strong>Description:</strong>
                             <textarea
                               value={it?.meta?.description || ''}
-                              onChange={(e) => setItem(it.id, { meta: { ...(it.meta || {}), description: e.target.value } })}
-                              style={{ width: '100%', marginTop: 4, padding: 8, fontSize: 12, minHeight: 70, resize: 'vertical' }}
+                              onChange={(e) =>
+                                setItem(it.id, { meta: { ...(it.meta || {}), description: e.target.value } })
+                              }
+                              style={{
+                                width: '100%',
+                                marginTop: 4,
+                                padding: 8,
+                                fontSize: 12,
+                                minHeight: 70,
+                                resize: 'vertical',
+                              }}
                               placeholder="Short description for buyers"
                               disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
                             />
@@ -986,7 +1116,9 @@ export default function AdminUploadPage() {
                             <input
                               type="text"
                               value={normalizeTags(it?.meta?.tags || []).join(', ')}
-                              onChange={(e) => setItem(it.id, { meta: { ...(it.meta || {}), tags: normalizeTags(e.target.value) } })}
+                              onChange={(e) =>
+                                setItem(it.id, { meta: { ...(it.meta || {}), tags: normalizeTags(e.target.value) } })
+                              }
                               style={{ width: '100%', marginTop: 4, padding: 6, fontSize: 12 }}
                               placeholder="nature, travel, fineart"
                               disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
@@ -1017,19 +1149,45 @@ export default function AdminUploadPage() {
                           </div>
 
                           <div style={{ marginTop: 8 }}>
-                            <strong>Preset:</strong> {it?.meta?.licensePreset || licensePreset} • LKR {it?.meta?.priceLkr ?? priceLkr} • USD{' '}
-                            {it?.meta?.priceUsd ?? priceUsd}
+                            <strong>Preset:</strong> {it?.meta?.licensePreset || licensePreset} • LKR{' '}
+                            {it?.meta?.priceLkr ?? priceLkr} • USD {it?.meta?.priceUsd ?? priceUsd}
                           </div>
                         </div>
 
-                        <div style={{ marginTop: 8, height: 7, background: 'rgba(245,244,244,0.12)', borderRadius: 999, overflow: 'hidden' }}>
-                          <div style={{ width: `${it.progress || 0}%`, height: '100%', background: 'rgba(245,244,244,0.65)', transition: 'width 120ms linear' }} />
+                        <div
+                          style={{
+                            marginTop: 8,
+                            height: 7,
+                            background: 'rgba(245,244,244,0.12)',
+                            borderRadius: 999,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${it.progress || 0}%`,
+                              height: '100%',
+                              background: 'rgba(245,244,244,0.65)',
+                              transition: 'width 120ms linear',
+                            }}
+                          />
                         </div>
 
-                        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12, opacity: 0.85 }}>
+                        <div
+                          style={{
+                            marginTop: 6,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                            fontSize: 12,
+                            opacity: 0.85,
+                          }}
+                        >
                           <div>
                             {it.status === 'UPLOADING'
-                              ? `${it.progress || 0}% • ${fmtMB(it.loaded || 0)}/${fmtMB(it.total || it.file.size)} MB`
+                              ? `${it.progress || 0}% • ${fmtMB(it.loaded || 0)}/${fmtMB(
+                                  it.total || it.file.size
+                                )} MB`
                               : it.status === 'COMMITTING'
                               ? '100% • Committing…'
                               : it.status === 'DONE'
