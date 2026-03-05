@@ -14,7 +14,6 @@ import WorkAnimationEndNote from '../components/work-animation-end-note'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function WorkAnimation() {
-  // ✅ swap later: /public/work/animation/hero.jpg
   const HERO_BG = '/work/animation/hero.jpg'
 
   return (
@@ -30,13 +29,12 @@ export default function WorkAnimation() {
           property="og:description"
           content="Motion created with clarity, rhythm, and purpose. Animation and movement used to enhance visual storytelling."
         />
-        {/* ✅ Replace with your hosted OG image later */}
         <meta property="og:image" content="https://www.jeevanchandimal.com/work/animation/og.jpg" />
         <link rel="canonical" href="https://www.jeevanchandimal.com/work-animation" />
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background */}
+        {/* Cinematic background */}
         <div className="heroBg" aria-hidden="true">
           <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
@@ -151,7 +149,7 @@ export default function WorkAnimation() {
             />
           </section>
 
-          {/* AI + Animation */}
+          {/* AI */}
           <section className="section">
             <AIAnimation
               heading1="AI & Animation"
@@ -189,20 +187,22 @@ export default function WorkAnimation() {
           width: 100%;
           min-height: 100vh;
           position: relative;
-
           overflow-x: hidden;
           overflow-y: visible;
-
           background: #0b0b0b;
           color: #f5f4f4;
         }
 
-        /* ========= CINEMATIC BACKGROUND ========= */
+        /* CINEMATIC BACKGROUND */
+
         .heroBg {
           position: fixed;
           inset: 0;
           z-index: 0;
           pointer-events: none;
+
+          /* align background below navbar */
+          top: var(--jc-nav-h);
         }
 
         .heroBgImg {
@@ -211,8 +211,6 @@ export default function WorkAnimation() {
           background-size: cover;
           background-position: center;
           background-repeat: no-repeat;
-
-          /* slightly sharper for motion page */
           filter: saturate(0.92) contrast(1.08) brightness(0.72);
           transform: scale(1.02);
         }
@@ -242,7 +240,8 @@ export default function WorkAnimation() {
           background-size: 240px 240px;
         }
 
-        /* ========= LAYOUT ========= */
+        /* LAYOUT */
+
         .main {
           position: relative;
           z-index: 1;
@@ -251,7 +250,8 @@ export default function WorkAnimation() {
           flex-direction: column;
           align-items: center;
 
-          padding-top: 72px; /* space for navbar */
+          /* important: spacing handled globally */
+          padding-top: 0;
         }
 
         .section {
@@ -262,12 +262,6 @@ export default function WorkAnimation() {
 
         .section :global(> *) {
           width: 100%;
-        }
-
-        @media (min-width: 1200px) {
-          .heroBgImg {
-            filter: saturate(0.95) contrast(1.1) brightness(0.7);
-          }
         }
 
         @media (prefers-reduced-motion: reduce) {
