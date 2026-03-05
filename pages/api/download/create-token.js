@@ -3,6 +3,50 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createDownloadToken } from '@/lib/secureDownload'
 
+/* ---------------- security: tiny best-effort rate limit ----------------
+   NOTE: In serverless this is best-effort (memory resets), but it still helps.
+------------------------------------------------------------------------- */
+
+const RL_WINDOW_MS = 60_000 // 1 min
+const RL_MAX = 30 // 30 req/min per IP
+
+const rl = globalThis.__jc_rl_create_token || new Map()
+globalThis.__jc_rl_create_token = rl
+
+function getIp(req) {
+  const xf = req.headers['x-forwarded-for']
+  if (typeof xf === 'string' && xf.trim()) return xf.split(',')[0].trim()
+  return (
+    String(req.headers['x-real-ip'] || '').trim() ||
+    String(req.socket?.remoteAddress || '').trim() ||
+    'unknown'
+  )
+}
+
+function rateLimit(req, res) {
+  const ip = getIp(req)
+  const now = Date.now()
+  const key = `ct:${ip}`
+
+  const cur = rl.get(key) || { n: 0, resetAt: now + RL_WINDOW_MS }
+  if (now > cur.resetAt) {
+    cur.n = 0
+    cur.resetAt = now + RL_WINDOW_MS
+  }
+  cur.n += 1
+  rl.set(key, cur)
+
+  res.setHeader('X-RateLimit-Limit', String(RL_MAX))
+  res.setHeader('X-RateLimit-Remaining', String(Math.max(0, RL_MAX - cur.n)))
+  res.setHeader('X-RateLimit-Reset', String(Math.ceil(cur.resetAt / 1000)))
+
+  if (cur.n > RL_MAX) {
+    res.status(429).json({ ok: false, error: 'Too many requests' })
+    return false
+  }
+  return true
+}
+
 /* ---------------- helpers ---------------- */
 
 function limitForLicense(license) {
@@ -28,10 +72,12 @@ function normalizeEmail(v) {
 }
 
 function getBaseUrl(req) {
-  // Prefer explicit base if you set it (recommended for Vercel)
   const explicit =
-    String(process.env.WEBHOOK_BASE_URL || process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || '').trim() ||
-    String(process.env.NEXT_PUBLIC_SITE_URL || '').trim()
+    String(
+      process.env.WEBHOOK_BASE_URL ||
+        process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL ||
+        ''
+    ).trim() || String(process.env.NEXT_PUBLIC_SITE_URL || '').trim()
 
   if (explicit) return explicit.replace(/\/+$/, '')
 
@@ -46,7 +92,13 @@ function isUuid(v) {
   )
 }
 
-// Resolve correct R2 key from photos table (single-photo orders + fallback for cart items)
+function isCartCode(v) {
+  const s = String(v || '').trim()
+  // adjust if your code format differs
+  return /^CART_[A-Za-z0-9._-]{6,120}$/.test(s)
+}
+
+// Resolve correct R2 key from photos table
 async function resolveObjectKeyFromPhotos(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid || !isUuid(pid)) return null
@@ -71,7 +123,9 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
 function fallbackObjectKeyFromPhotoId(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) return null
-  return format === 'raw' ? `photos/original/${pid}.zip` : `photos/original/${pid}.jpg`
+  return format === 'raw'
+    ? `photos/original/${pid}.zip`
+    : `photos/original/${pid}.jpg`
 }
 
 // For single-photo order row: ensure delivery_object_key is correct
@@ -81,7 +135,6 @@ async function ensureObjectKeyForSingleOrder(order) {
 
   let objectKey = order?.delivery_object_key ? String(order.delivery_object_key).trim() : ''
 
-  // If missing, try resolve from photos
   if (!objectKey) {
     const resolved = await resolveObjectKeyFromPhotos(photoId, order?.format)
     if (resolved) {
@@ -93,7 +146,6 @@ async function ensureObjectKeyForSingleOrder(order) {
 
       if (u.error) console.error('delivery_object_key update failed:', u.error.message)
     } else {
-      // final fallback
       objectKey = fallbackObjectKeyFromPhotoId(photoId, normalizeFormat(order?.format)) || ''
     }
   }
@@ -111,7 +163,13 @@ function makeCartItemLabel(item, idx) {
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  // ✅ rate limit first
+  if (!rateLimit(req, res)) return
+
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST')
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  }
 
   try {
     const body = req.body || {}
@@ -122,13 +180,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Missing orderId or code' })
     }
 
+    if (orderId && !isUuid(orderId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid orderId' })
+    }
+    if (code && !isCartCode(code)) {
+      return res.status(400).json({ ok: false, error: 'Invalid code' })
+    }
+
     const base = getBaseUrl(req)
-    const expiresMinutes = 60
+    if (!base) return res.status(500).json({ ok: false, error: 'Missing site base URL' })
+
+    // ✅ keep TTL modest (short-lived links reduce abuse)
+    const expiresMinutes = 30
     const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
 
+    // ✅ cap cart items to prevent giant token batches
+    const MAX_CART_ITEMS = 24
+
     /* =========================================================
-       ✅ CART (NEW DESIGN): one order row where orders.code = CART_...
-          items are in orders.items (JSONB)
+       ✅ CART: one row orders.code = CART_..., items in orders.items (JSONB)
     ========================================================= */
     if (code) {
       const { data: cartOrder, error } = await supabaseAdmin
@@ -145,17 +215,27 @@ export default async function handler(req, res) {
       }
 
       const itemsArr = Array.isArray(cartOrder.items) ? cartOrder.items : []
-      if (itemsArr.length === 0) {
-        return res.status(400).json({ ok: false, error: 'Cart has no items' })
+      if (itemsArr.length === 0) return res.status(400).json({ ok: false, error: 'Cart has no items' })
+      if (itemsArr.length > MAX_CART_ITEMS) {
+        return res.status(400).json({ ok: false, error: `Cart too large (max ${MAX_CART_ITEMS})` })
       }
 
       // Ensure download_limit exists on the cart order
-      // (0 unlimited if any commercial, 5 if any editorial, else 3)
       const licenses = itemsArr.map((it) => normalizeLicense(it?.license))
-      const desiredLimit = licenses.includes('commercial') ? 0 : licenses.includes('editorial') ? 5 : 3
+      const desiredLimit = licenses.includes('commercial')
+        ? 0
+        : licenses.includes('editorial')
+          ? 5
+          : 3
 
-      if (cartOrder.download_limit == null || Number(cartOrder.download_limit) !== Number(desiredLimit)) {
-        const u = await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', cartOrder.id)
+      if (
+        cartOrder.download_limit == null ||
+        Number(cartOrder.download_limit) !== Number(desiredLimit)
+      ) {
+        const u = await supabaseAdmin
+          .from('orders')
+          .update({ download_limit: desiredLimit })
+          .eq('id', cartOrder.id)
         if (u.error) console.error('cart download_limit update failed:', u.error.message)
       }
 
@@ -163,18 +243,18 @@ export default async function handler(req, res) {
 
       const outItems = []
 
+      // ✅ issue at most MAX_CART_ITEMS tokens per call
       for (let i = 0; i < itemsArr.length; i++) {
         const it = itemsArr[i] || {}
         const photoId = String(it.photoId || it.photo_id || '').trim()
-        if (!photoId) continue
+        if (!photoId || !isUuid(photoId)) continue
 
         const fmt = normalizeFormat(it.format)
         const lic = normalizeLicense(it.license)
 
-        // Prefer objectKey stored in item from checkout-cart.js
+        // Prefer objectKey stored in item
         let objectKey = String(it.objectKey || it.object_key || '').trim()
 
-        // If missing, resolve from photos table, then fallback
         if (!objectKey) {
           try {
             objectKey = (await resolveObjectKeyFromPhotos(photoId, fmt)) || ''
@@ -187,9 +267,10 @@ export default async function handler(req, res) {
 
         const jti = crypto.randomUUID()
 
+        // ✅ store token id server-side (lets you revoke/track)
         const ins = await supabaseAdmin.from('download_tokens').insert({
           jti,
-          order_id: cartOrder.id, // ✅ all tokens tie to the ONE cart order row
+          order_id: cartOrder.id,
           expires_at: expiresAt.toISOString(),
         })
 
@@ -200,6 +281,7 @@ export default async function handler(req, res) {
 
         const ext = fmt === 'raw' ? 'zip' : 'jpg'
 
+        // NOTE: keep your existing createDownloadToken signature.
         const token = createDownloadToken(
           {
             jti,
@@ -211,7 +293,7 @@ export default async function handler(req, res) {
             filename: `${photoId}.${ext}`,
             license: lic,
           },
-          '1h'
+          '30m'
         )
 
         outItems.push({
@@ -225,7 +307,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, error: 'No downloadable items found for this cart' })
       }
 
-      return res.status(200).json({ ok: true, items: outItems, expiresAt: expiresAt.toISOString() })
+      return res.status(200).json({
+        ok: true,
+        items: outItems,
+        expiresAt: expiresAt.toISOString(),
+      })
     }
 
     /* =========================================================
@@ -245,9 +331,10 @@ export default async function handler(req, res) {
     }
 
     const objectKey = await ensureObjectKeyForSingleOrder(order)
-    if (!objectKey) return res.status(400).json({ ok: false, error: 'Missing delivery_object_key (cannot resolve)' })
+    if (!objectKey) {
+      return res.status(400).json({ ok: false, error: 'Missing delivery_object_key (cannot resolve)' })
+    }
 
-    // Ensure download_limit exists
     if (order.download_limit == null) {
       const desired = limitForLicense(order.license)
       const u = await supabaseAdmin.from('orders').update({ download_limit: desired }).eq('id', order.id)
@@ -277,7 +364,7 @@ export default async function handler(req, res) {
         filename: `${order.photo_id}.${ext}`,
         license: normalizeLicense(order.license),
       },
-      '1h'
+      '30m'
     )
 
     const url = `${base}/api/download?token=${encodeURIComponent(token)}`

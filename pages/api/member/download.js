@@ -4,7 +4,52 @@ import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { createDownloadToken } from '@/lib/secureDownload'
 
-const SESSION_SECRET = process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
+const SESSION_SECRET =
+  process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
+
+/* ---------------- security: best-effort rate limit ---------------- */
+
+const RL_WINDOW_MS = 60_000
+const RL_MAX = 30
+
+const rl = globalThis.__jc_rl_member_download || new Map()
+globalThis.__jc_rl_member_download = rl
+
+function getIp(req) {
+  const xf = req.headers['x-forwarded-for']
+  if (typeof xf === 'string' && xf.trim()) return xf.split(',')[0].trim()
+  return (
+    String(req.headers['x-real-ip'] || '').trim() ||
+    String(req.socket?.remoteAddress || '').trim() ||
+    'unknown'
+  )
+}
+
+function rateLimit(req, res) {
+  const ip = getIp(req)
+  const now = Date.now()
+  const key = `md:${ip}`
+
+  const cur = rl.get(key) || { n: 0, resetAt: now + RL_WINDOW_MS }
+  if (now > cur.resetAt) {
+    cur.n = 0
+    cur.resetAt = now + RL_WINDOW_MS
+  }
+  cur.n += 1
+  rl.set(key, cur)
+
+  res.setHeader('X-RateLimit-Limit', String(RL_MAX))
+  res.setHeader('X-RateLimit-Remaining', String(Math.max(0, RL_MAX - cur.n)))
+  res.setHeader('X-RateLimit-Reset', String(Math.ceil(cur.resetAt / 1000)))
+
+  if (cur.n > RL_MAX) {
+    res.status(429).json({ ok: false, error: 'Too many requests' })
+    return false
+  }
+  return true
+}
+
+/* ---------------- helpers ---------------- */
 
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
@@ -22,6 +67,13 @@ function normalizeFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
 
+function isExpired(date) {
+  if (!date) return false
+  const t = new Date(date).getTime()
+  if (!Number.isFinite(t)) return false
+  return t < Date.now()
+}
+
 function cinematicKickMessage() {
   return {
     title: 'Session closed',
@@ -34,10 +86,16 @@ function cinematicKickMessage() {
 function verifySessionFromReq(req) {
   const auth = String(req.headers.authorization || '')
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-  if (!token) return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
+  if (!token) {
+    return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
+  }
 
   if (!SESSION_SECRET) {
-    return { ok: false, code: 'SERVER_MISCONFIG', error: 'Missing MEMBER_SESSION_SECRET' }
+    return {
+      ok: false,
+      code: 'SERVER_MISCONFIG',
+      error: 'Missing MEMBER_SESSION_SECRET',
+    }
   }
 
   try {
@@ -90,7 +148,6 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
 
   const fmt = normalizeFormat(format)
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
-
   return String(p.original_jpg_key || p.original_key || '')
 }
 
@@ -113,7 +170,6 @@ async function incrementMonthlyUsedCAS(memberRow) {
 
   if (error) throw new Error(error.message)
 
-  // CAS lost → retry once with fresh row
   if (!data) {
     const { data: fresh, error: fErr } = await supabaseAdmin
       .from('memberships')
@@ -126,22 +182,32 @@ async function incrementMonthlyUsedCAS(memberRow) {
 
   const finalUsed = Number(data.monthly_download_used ?? nextUsed)
   const finalLimit = Number(data.monthly_download_limit ?? limit)
-  const remaining = Math.max(0, finalLimit - finalUsed)
+  const remaining = finalLimit === 0 ? 0 : Math.max(0, finalLimit - finalUsed)
 
-  return { ok: true, used: finalUsed, limit: finalLimit, remaining, reset_at: data.billing_cycle_end || null }
+  return {
+    ok: true,
+    used: finalUsed,
+    limit: finalLimit,
+    remaining,
+    reset_at: data.billing_cycle_end || null,
+  }
 }
 
 async function ensureMemberOrder(email, tier, term, memberRow, quotaUsed) {
-  // Stable per membership per cycle (prevents infinite orders)
   const cycle = memberRow?.billing_cycle_end
     ? `CYC_${String(memberRow.billing_cycle_end).slice(0, 10)}`
-    : `CYC_${new Date().toISOString().slice(0, 7)}` // YYYY-MM
+    : `CYC_${new Date().toISOString().slice(0, 7)}`
+
   const code = `MEMBER_${cycle}_${email}`.slice(0, 180)
 
-  const existing = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
+  const existing = await supabaseAdmin
+    .from('orders')
+    .select('*')
+    .eq('code', code)
+    .maybeSingle()
+
   if (!existing.error && existing.data) return existing.data
 
-  // Your DB uses ORD_* as orders.id (string)
   const id = `ORD_${Date.now()}_${crypto.randomBytes(10).toString('hex')}`
 
   const payload = {
@@ -159,7 +225,7 @@ async function ensureMemberOrder(email, tier, term, memberRow, quotaUsed) {
     order_kind: 'membership',
     download_count: Number(quotaUsed ?? memberRow?.monthly_download_used ?? 0),
     download_limit: Number(memberRow?.monthly_download_limit ?? 0),
-    items: '[]',
+    items: [], // ✅ JSONB array (not a string)
   }
 
   const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
@@ -168,20 +234,30 @@ async function ensureMemberOrder(email, tier, term, memberRow, quotaUsed) {
 }
 
 export default async function handler(req, res) {
+  // ✅ rate limit first
+  if (!rateLimit(req, res)) return
+
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
   res.setHeader('Pragma', 'no-cache')
   res.setHeader('Expires', '0')
   res.setHeader('Surrogate-Control', 'no-store')
 
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST')
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
+  }
 
   try {
     const photoId = clean(req.body?.photoId)
     const email = normalizeEmail(req.body?.email)
     const requestedFormat = normalizeFormat(req.body?.format)
 
-    if (!photoId || !email) return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
-    if (!isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
+    if (!photoId || !email) {
+      return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ ok: false, error: 'Invalid email' })
+    }
 
     const sess = verifySessionFromReq(req)
     if (!sess.ok) return res.status(401).json(sess)
@@ -224,7 +300,9 @@ export default async function handler(req, res) {
     if (!member) return res.status(403).json({ ok: false, error: 'Not a member' })
     if (!member.user_id) return res.status(500).json({ ok: false, error: 'Membership missing user_id' })
 
-    if (member.end_date && new Date(member.end_date) < new Date()) {
+    // ✅ consistent expiry logic: billing_cycle_end OR end_date
+    const endsAt = member.billing_cycle_end || member.end_date || null
+    if (endsAt && isExpired(endsAt)) {
       return res.status(403).json({ ok: false, error: 'Membership expired' })
     }
 
@@ -237,7 +315,7 @@ export default async function handler(req, res) {
     const objectKey = await resolveObjectKeyFromPhotos(photoId, format)
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
-    // ✅ Quota update (atomic-ish via CAS)
+    // ✅ quota update (CAS)
     const quota = await incrementMonthlyUsedCAS(member)
     if (!quota.ok) {
       return res.status(403).json({
@@ -252,22 +330,20 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ Create/ensure an ORD_* order (so download_tokens.order_id stays TEXT as expected)
+    // ✅ Create/ensure an ORD_* order
     const order = await ensureMemberOrder(email, tier, term, member, quota.used)
     const orderIdText = String(order?.id || '')
-
     if (!orderIdText) return res.status(500).json({ ok: false, error: 'Could not create member order' })
 
-    // ✅ Record token (download_tokens expects: jti text, order_id text, expires_at timestamptz)
+    // ✅ Record token
     const jti = crypto.randomUUID()
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000) // ✅ shorter TTL
 
     const insTok = await supabaseAdmin.from('download_tokens').insert({
       jti,
       order_id: orderIdText,
       expires_at: expiresAt.toISOString(),
     })
-
     if (insTok.error) return res.status(500).json({ ok: false, error: insTok.error.message })
 
     const token = createDownloadToken(
@@ -280,8 +356,9 @@ export default async function handler(req, res) {
         guestEmail: email,
         filename: `${photoId}.${ext}`,
         license: 'membership',
+        membership: true, // ✅ explicit
       },
-      '1h'
+      '30m'
     )
 
     return res.status(200).json({
