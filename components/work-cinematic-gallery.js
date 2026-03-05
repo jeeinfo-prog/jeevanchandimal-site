@@ -126,11 +126,11 @@ const WorkCinematicGallery = (props) => {
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
   // ✅ cinematic header hero image
-  const hero =
-    props.heroImageSrc ||
-    items?.[0]?.src ||
-    staticFallback?.[0]?.src ||
-    '/work/photography/cg-01.jpg'
+  const hero = useMemo(() => {
+  if (props.heroImageSrc) return props.heroImageSrc
+  if (items?.[0]?.src) return items[0].src
+  return staticFallback?.[0]?.src || '/work/photography/cg-01.jpg'
+}, [items, props.heroImageSrc, staticFallback])
 
   return (
     <>
