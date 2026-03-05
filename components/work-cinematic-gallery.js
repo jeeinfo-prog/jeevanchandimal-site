@@ -23,10 +23,16 @@ const WorkCinematicGallery = (props) => {
 
   // ✅ prevent setState after unmount
   const mountedRef = useRef(true)
+
+  // ✅ abort in-flight requests + ignore stale results
+  const abortRef = useRef(null)
+  const reqIdRef = useRef(0)
+
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      if (abortRef.current) abortRef.current.abort()
     }
   }, [])
 
@@ -52,13 +58,33 @@ const WorkCinematicGallery = (props) => {
     setItems(staticFallback)
   }
 
+  // ✅ helper to bust CDN/browser cache
+  function withCacheBust(url) {
+    const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+    u.searchParams.set('_t', String(Date.now()))
+    return u.pathname + u.search
+  }
+
   // 🔹 Fetch random images from API (supports strings or objects)
   async function loadRandom() {
     if (!props.apiEndpoint) return
+
+    // cancel any previous fetch
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    const myReqId = ++reqIdRef.current
+
     try {
       setLoading(true)
-      const res = await fetch(props.apiEndpoint, {
+
+      const endpoint = withCacheBust(props.apiEndpoint)
+
+      const res = await fetch(endpoint, {
         headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
@@ -83,6 +109,7 @@ const WorkCinematicGallery = (props) => {
         .filter((x) => x?.src && typeof x.src === 'string')
 
       if (!mountedRef.current) return
+      if (myReqId !== reqIdRef.current) return // stale response guard
 
       if (normalized.length) {
         setItems(normalized)
@@ -91,17 +118,32 @@ const WorkCinematicGallery = (props) => {
       }
     } catch (e) {
       if (!mountedRef.current) return
+      if (e?.name === 'AbortError') return
       if (props.fallbackToStaticOnError) setStatic()
     } finally {
       if (mountedRef.current) setLoading(false)
     }
   }
 
-  // 🔹 initial load
+  // 🔹 initial load (and when endpoint changes)
   useEffect(() => {
     if (props.apiEndpoint) loadRandom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.apiEndpoint])
+
+  // ✅ refresh when user returns to the tab (helps when you upload new photos)
+  useEffect(() => {
+    if (!props.refreshOnFocus) return
+    if (typeof window === 'undefined') return
+
+    const onFocus = () => {
+      if (props.apiEndpoint) loadRandom()
+    }
+
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.refreshOnFocus, props.apiEndpoint])
 
   // 🔹 shuffle mode
   useEffect(() => {
@@ -126,11 +168,13 @@ const WorkCinematicGallery = (props) => {
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
   // ✅ cinematic header hero image
+  // Important: use heroImageSrc ONLY if user actually passes it (truthy).
+  // Default is undefined now, so hero will follow items[0] when API loads.
   const hero = useMemo(() => {
-  if (props.heroImageSrc) return props.heroImageSrc
-  if (items?.[0]?.src) return items[0].src
-  return staticFallback?.[0]?.src || '/work/photography/cg-01.jpg'
-}, [items, props.heroImageSrc, staticFallback])
+    if (props.heroImageSrc) return props.heroImageSrc
+    if (items?.[0]?.src) return items[0].src
+    return staticFallback?.[0]?.src || '/work/photography/cg-01.jpg'
+  }, [items, props.heroImageSrc, staticFallback])
 
   return (
     <>
@@ -488,9 +532,9 @@ const WorkCinematicGallery = (props) => {
         }
 
         .tile:hover .img {
-  transform: scale(1.07);
-  filter: saturate(1.02) contrast(1.05) brightness(1);
-}
+          transform: scale(1.07);
+          filter: saturate(1.02) contrast(1.05) brightness(1);
+        }
 
         .shade {
           position: absolute;
@@ -698,8 +742,9 @@ WorkCinematicGallery.defaultProps = {
   content1: undefined,
   rootClassName: '',
 
-  // ✅ optional hero background image for header
-  heroImageSrc: '/work/photography/cg-01.jpg',
+  // ✅ IMPORTANT: do NOT set a real default image here,
+  // otherwise hero will never follow loaded items.
+  heroImageSrc: undefined,
 
   apiEndpoint: '/api/gallery/random?limit=12',
   storeHref: '/store',
@@ -707,6 +752,9 @@ WorkCinematicGallery.defaultProps = {
   shuffle: false,
   fallbackToStaticOnError: true,
   fallbackToStaticOnEmpty: true,
+
+  // ✅ new: refresh when tab gains focus
+  refreshOnFocus: true,
 }
 
 WorkCinematicGallery.propTypes = {
@@ -722,6 +770,8 @@ WorkCinematicGallery.propTypes = {
   shuffle: PropTypes.bool,
   fallbackToStaticOnError: PropTypes.bool,
   fallbackToStaticOnEmpty: PropTypes.bool,
+
+  refreshOnFocus: PropTypes.bool,
 }
 
 export default WorkCinematicGallery
