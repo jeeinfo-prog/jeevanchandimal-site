@@ -1,3 +1,5 @@
+// pages/_app.js
+
 import '../styles/style.css'
 
 import Head from 'next/head'
@@ -23,7 +25,7 @@ export default function MyApp({ Component, pageProps }) {
   return (
     <NextIntlProvider messages={pageProps?.messages}>
       <GlobalProvider>
-        {/* ✅ Site-wide structured data */}
+        {/* ✅ Global meta + structured data */}
         <Head>
           {/* Organization */}
           <script
@@ -53,7 +55,24 @@ export default function MyApp({ Component, pageProps }) {
           />
         </Head>
 
-        {/* ✅ Legal layout injection */}
+        {/* ✅ Global navbar spacing fix */}
+        <style jsx global>{`
+          :root {
+            --jc-nav-h: 70px;
+          }
+
+          body {
+            padding-top: var(--jc-nav-h);
+          }
+
+          @media (max-width: 900px) {
+            :root {
+              --jc-nav-h: 78px;
+            }
+          }
+        `}</style>
+
+        {/* ✅ Legal pages only show nav + footer */}
         {isLegalPage && <JeevanChandimalNavi />}
 
         <Component {...pageProps} />
