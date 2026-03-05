@@ -1,4 +1,3 @@
-// pages/work.js
 import React, { Fragment } from 'react'
 import Head from 'next/head'
 
@@ -15,7 +14,6 @@ const Work = () => {
   return (
     <>
       <div className="work-container">
-        {/* ✅ cinematic overlays */}
         <div className="topVignette" />
         <div className="grain" />
 
@@ -29,7 +27,6 @@ const Work = () => {
 
         <JeevanChandimalNavi rootClassName="jeevan-chandimal-naviroot-class-name7" />
 
-        {/* ✅ HERO (no extra top gap now) */}
         <WorkHero
           action3={
             <Fragment>
@@ -38,7 +35,9 @@ const Work = () => {
           }
           content1={
             <Fragment>
-              <span className="work-text28">Explore each discipline as a focused body of work.</span>
+              <span className="work-text28">
+                Explore each discipline as a focused body of work.
+              </span>
             </Fragment>
           }
           heading1={
@@ -104,12 +103,16 @@ const Work = () => {
           }
           feature3Description={
             <Fragment>
-              <span className="work-text40">Movement crafted with clarity, rhythm, and intent.</span>
+              <span className="work-text40">
+                Movement crafted with clarity, rhythm, and intent.
+              </span>
             </Fragment>
           }
           feature4Description={
             <Fragment>
-              <span className="work-text41">Still imagery with cinematic depth and atmosphere.</span>
+              <span className="work-text41">
+                Still imagery with cinematic depth and atmosphere.
+              </span>
             </Fragment>
           }
           rootClassName="home-work01root-class-name"
@@ -146,8 +149,8 @@ const Work = () => {
           content1={
             <Fragment>
               <span className="work-text46">
-                Explore our range of services including film production, audio production, animation
-                &amp; graphics, and photography.
+                Explore our range of services including film production, audio production,
+                animation &amp; graphics, and photography.
               </span>
             </Fragment>
           }
@@ -196,7 +199,8 @@ const Work = () => {
           flex-direction: column;
           background: #0a0a0a;
           position: relative;
-          overflow: hidden;
+          overflow-x: hidden;
+          overflow-y: visible;
         }
 
         /* ================= CINEMATIC BACKGROUND ================= */
@@ -249,8 +253,44 @@ const Work = () => {
           z-index: 1;
         }
 
+        /* ================= HERO FIX ================= */
+
+        .work-container :global(.work-heroroot-class-name) {
+          position: relative;
+          z-index: 2;
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+          border-radius: 0 !important;
+          overflow: visible !important;
+        }
+
+        .work-container :global(.work-heroroot-class-name.thq-section-padding) {
+          padding-top: 0 !important;
+          border-radius: 0 !important;
+        }
+
+        .work-container :global(.work-heroroot-class-name *) {
+          border-top-left-radius: 0 !important;
+          border-top-right-radius: 0 !important;
+        }
+
+        .work-container :global(.work-heroroot-class-name section),
+        .work-container :global(.work-heroroot-class-name .thq-section-padding),
+        .work-container :global(.work-heroroot-class-name .thq-section-max-width),
+        .work-container :global(.work-heroroot-class-name .thq-card),
+        .work-container :global(.work-heroroot-class-name .thq-image-card),
+        .work-container :global(.work-heroroot-class-name .hero),
+        .work-container :global(.work-heroroot-class-name .container),
+        .work-container :global(.work-heroroot-class-name .work-hero-container),
+        .work-container :global(.work-heroroot-class-name .work-hero-thq-hero-banner) {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+          border-top-left-radius: 0 !important;
+          border-top-right-radius: 0 !important;
+        }
+
         /* ================= SECTION RHYTHM ================= */
-        /* ✅ Apply spacing only AFTER the first section/hero */
+
         .work-container :global(section) {
           position: relative;
           z-index: 2;
@@ -276,7 +316,6 @@ const Work = () => {
           opacity: 0.6;
         }
 
-        /* keep text spans working */
         .work-container span {
           display: inline-block;
         }
