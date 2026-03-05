@@ -488,7 +488,10 @@ export default function JeevanChandimalNavi(props) {
                 <span className="pill pillAccent">
                   {memberTier}
                   {memberRemaining !== null ? (
-                    <span className="pillBadge" aria-label={`Remaining downloads: ${memberRemaining}`}>
+                    <span
+                      className="pillBadge"
+                      aria-label={`Remaining downloads: ${memberRemaining}`}
+                    >
                       {memberRemaining}
                     </span>
                   ) : null}
@@ -706,6 +709,18 @@ export default function JeevanChandimalNavi(props) {
       </header>
 
       <style jsx>{`
+        :global(:root) {
+          /* ✅ Global fixed-nav height used by pages to offset content */
+          --jc-nav-h: 70px;
+        }
+
+        @media (max-width: 520px) {
+          :global(:root) {
+            /* ✅ Slightly taller on small screens (spacing + wrapping safe) */
+            --jc-nav-h: 78px;
+          }
+        }
+
         .navWrap {
           position: fixed;
           top: 0;
