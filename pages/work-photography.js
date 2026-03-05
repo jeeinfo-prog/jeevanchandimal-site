@@ -30,7 +30,10 @@ export default function WorkPhotography() {
           property="og:description"
           content="Cinematic photography shaped with intention—editorial, commercial, and personal projects."
         />
-        <meta property="og:image" content="https://www.jeevanchandimal.com/work/og-photography.jpg" />
+        <meta
+          property="og:image"
+          content="https://www.jeevanchandimal.com/work/og-photography.jpg"
+        />
         <link rel="canonical" href="https://www.jeevanchandimal.com/work-photography" />
       </Head>
 
@@ -45,15 +48,14 @@ export default function WorkPhotography() {
         <JeevanChandimalNavi />
 
         <main className="main">
-          
           {/* HERO (your existing component) */}
           <section className="section">
-            <div className="block">
+            <div className="block heroBlock">
               <WorkPhotographyHero />
             </div>
           </section>
 
-          {/* TOP INTRO (adds structure + luxury spacing) */}
+          {/* TOP INTRO */}
           <section className="section topIntro">
             <div className="panel thq-section-max-width">
               <div className="kicker">Work</div>
@@ -83,15 +85,14 @@ export default function WorkPhotography() {
             </div>
           </section>
 
-          
-          {/* SECTION (your fixed section) */}
+          {/* SECTION */}
           <section className="section">
             <div className="block">
               <WorkPhotographySection />
             </div>
           </section>
 
-          {/* GALLERY (anchor + framing) */}
+          {/* GALLERY */}
           <section className="section" id="gallery">
             <div className="block">
               <div className="sectionHead thq-section-max-width">
@@ -199,6 +200,9 @@ export default function WorkPhotography() {
           inset: 0;
           z-index: 0;
           pointer-events: none;
+
+          /* ✅ optional: keep bg starting below navbar */
+          top: var(--jc-nav-h);
         }
 
         .heroBgImg {
@@ -244,7 +248,9 @@ export default function WorkPhotography() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-top: 72px; /* space for sticky nav */
+
+          /* ✅ IMPORTANT: remove double navbar spacing (handled globally) */
+          padding-top: 0;
         }
 
         .section {
@@ -258,6 +264,11 @@ export default function WorkPhotography() {
           display: flex;
           flex-direction: column;
           gap: 18px;
+        }
+
+        /* slightly tighten the hero block so it sits nicely under nav */
+        .heroBlock {
+          margin-top: 0;
         }
 
         /* ========= TOP INTRO PANEL ========= */
