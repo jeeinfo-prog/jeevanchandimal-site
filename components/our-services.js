@@ -1,7 +1,5 @@
 import React, { Fragment } from 'react'
-
 import PropTypes from 'prop-types'
-import { useTranslations } from 'next-intl'
 
 const OurServices = (props) => {
   return (
@@ -15,12 +13,16 @@ const OurServices = (props) => {
               </Fragment>
             )}
           </h2>
+
           <div className="our-services-thq-row-elm thq-grid-auto-300">
+            {/* 1 */}
             <div className="our-services-thq-feature1-elm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 alt={props.feature1ImageAlt}
                 src={props.feature1ImageSrc}
                 className="thq-img-ratio-4-3"
+                loading="lazy"
               />
               <div className="our-services-thq-content-elm1 thq-flex-column">
                 <div className="our-services-thq-section-title-elm1 thq-flex-column">
@@ -44,7 +46,7 @@ const OurServices = (props) => {
                   </span>
                 </div>
                 <div className="our-services-thq-action-elm1 thq-flex-row">
-                  <button className="thq-button-flat">
+                  <button className="thq-button-flat" type="button">
                     <span className="thq-body-small">
                       {props.feature1Button ?? (
                         <Fragment>
@@ -59,11 +61,15 @@ const OurServices = (props) => {
                 </div>
               </div>
             </div>
+
+            {/* 2 */}
             <div className="our-services-thq-feature2-elm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 alt={props.feature2ImageAlt}
                 src={props.feature2ImageSrc}
                 className="thq-img-ratio-4-3"
+                loading="lazy"
               />
               <div className="our-services-thq-content-elm2 thq-flex-column">
                 <div className="our-services-thq-section-title-elm2 thq-flex-column">
@@ -87,7 +93,7 @@ const OurServices = (props) => {
                   </span>
                 </div>
                 <div className="our-services-thq-action-elm2 thq-flex-row">
-                  <button className="thq-button-flat">
+                  <button className="thq-button-flat" type="button">
                     <span className="thq-body-small">
                       {props.feature2Button ?? (
                         <Fragment>
@@ -102,11 +108,15 @@ const OurServices = (props) => {
                 </div>
               </div>
             </div>
+
+            {/* 3 */}
             <div className="our-services-thq-feature3-elm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 alt={props.feature3ImageAlt}
                 src={props.feature3ImageSrc}
                 className="thq-img-ratio-4-3"
+                loading="lazy"
               />
               <div className="our-services-thq-content-elm3 thq-flex-column">
                 <div className="our-services-thq-section-title-elm3 thq-flex-column">
@@ -130,7 +140,7 @@ const OurServices = (props) => {
                   </span>
                 </div>
                 <div className="our-services-thq-action-elm3 thq-flex-row">
-                  <button className="thq-button-flat">
+                  <button className="thq-button-flat" type="button">
                     <span className="thq-body-small">
                       {props.feature3Button ?? (
                         <Fragment>
@@ -147,11 +157,15 @@ const OurServices = (props) => {
                 </div>
               </div>
             </div>
+
+            {/* 4 */}
             <div className="our-services-thq-feature4-elm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 alt={props.feature4ImageAlt}
                 src={props.feature4ImageSrc}
                 className="thq-img-ratio-4-3"
+                loading="lazy"
               />
               <div className="our-services-thq-content-elm4 thq-flex-column">
                 <div className="our-services-thq-section-title-elm4 thq-flex-column">
@@ -166,14 +180,14 @@ const OurServices = (props) => {
                     {props.feature4Description ?? (
                       <Fragment>
                         <span className="our-services-text16">
-                          Motion that supports narrative and mood.
+                          Still imagery guided by light, atmosphere, and emotion.
                         </span>
                       </Fragment>
                     )}
                   </span>
                 </div>
                 <div className="our-services-thq-action-elm4 thq-flex-row">
-                  <button className="thq-button-flat">
+                  <button className="thq-button-flat" type="button">
                     <span className="thq-body-small">
                       {props.feature4Button ?? (
                         <Fragment>
@@ -190,9 +204,11 @@ const OurServices = (props) => {
                 </div>
               </div>
             </div>
+            {/* end */}
           </div>
         </div>
       </div>
+
       <style jsx>
         {`
           .our-services-thq-layout301-elm {
@@ -414,51 +430,60 @@ const OurServices = (props) => {
 }
 
 OurServices.defaultProps = {
-  feature1ImageAlt: 'Film Production Image',
-  feature3ImageSrc: '/JC/jeevan%20chandimal_0000_layer%2023-600w.jpg',
-  feature1Button: undefined,
-  feature1ImageSrc: '/JC/jeeva%20chandimal%20-%201_0002_viveza%203-600w.jpg',
-  feature2ImageSrc: '/JC/jeeva%20chandimal%20-%201_0004_layer%201-600w.jpg',
   sectionTitle: undefined,
-  feature4ImageSrc: '/JC/jeevan-chandimal-600w.jpg',
+
+  // ✅ Use local public/services/oser-01..04
+  feature1ImageSrc: '/services/oser-01.jpg',
+  feature1ImageAlt: 'Film Production Image',
+  feature1Title: undefined,
   feature1Description: undefined,
-  feature3Title: undefined,
-  feature3ImageAlt: 'Animation & Graphics Image',
+  feature1Button: undefined,
+
+  feature2ImageSrc: '/services/oser-02.jpg',
+  feature2ImageAlt: 'Audio Production Image',
+  feature2Title: undefined,
+  feature2Description: undefined,
   feature2Button: undefined,
+
+  feature3ImageSrc: '/services/oser-03.jpg',
+  feature3ImageAlt: 'Animation & Motion Image',
+  feature3Title: undefined,
+  feature3Description: undefined,
+  feature3Button: undefined,
+
+  feature4ImageSrc: '/services/oser-04.jpg',
+  feature4ImageAlt: 'Photography Image',
   feature4Title: undefined,
   feature4Description: undefined,
   feature4Button: undefined,
-  feature1Title: undefined,
-  feature4ImageAlt: 'Photography Image',
-  feature2Title: undefined,
-  feature2ImageAlt: 'Audio Production Image',
-  feature2Description: undefined,
-  feature3Description: undefined,
-  feature3Button: undefined,
 }
 
 OurServices.propTypes = {
-  feature1ImageAlt: PropTypes.string,
-  feature3ImageSrc: PropTypes.string,
-  feature1Button: PropTypes.element,
-  feature1ImageSrc: PropTypes.string,
-  feature2ImageSrc: PropTypes.string,
   sectionTitle: PropTypes.element,
-  feature4ImageSrc: PropTypes.string,
+
+  feature1ImageAlt: PropTypes.string,
+  feature1ImageSrc: PropTypes.string,
+  feature1Title: PropTypes.element,
   feature1Description: PropTypes.element,
-  feature3Title: PropTypes.element,
-  feature3ImageAlt: PropTypes.string,
+  feature1Button: PropTypes.element,
+
+  feature2ImageAlt: PropTypes.string,
+  feature2ImageSrc: PropTypes.string,
+  feature2Title: PropTypes.element,
+  feature2Description: PropTypes.element,
   feature2Button: PropTypes.element,
+
+  feature3ImageAlt: PropTypes.string,
+  feature3ImageSrc: PropTypes.string,
+  feature3Title: PropTypes.element,
+  feature3Description: PropTypes.element,
+  feature3Button: PropTypes.element,
+
+  feature4ImageAlt: PropTypes.string,
+  feature4ImageSrc: PropTypes.string,
   feature4Title: PropTypes.element,
   feature4Description: PropTypes.element,
   feature4Button: PropTypes.element,
-  feature1Title: PropTypes.element,
-  feature4ImageAlt: PropTypes.string,
-  feature2Title: PropTypes.element,
-  feature2ImageAlt: PropTypes.string,
-  feature2Description: PropTypes.element,
-  feature3Description: PropTypes.element,
-  feature3Button: PropTypes.element,
 }
 
 export default OurServices
