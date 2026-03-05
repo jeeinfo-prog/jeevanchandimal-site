@@ -13,7 +13,7 @@ import PhotographyServicesFinalCTA from '../components/photography-services-fina
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function ServicesPhotography() {
-  // ✅ Background image in /public/services/heroser.jpg
+
   const HERO_BG = '/services/heroser.jpg'
 
   return (
@@ -22,22 +22,27 @@ export default function ServicesPhotography() {
         <title>
           Services-Photography - Jeevan Chandimal | Filmmaker & Visual Storyteller
         </title>
+
         <meta
           name="description"
-          content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound. Cinematic work shaped with intention and restraint."
-        />
-        <meta
-          property="og:title"
-          content="Services-Photography - Jeevan Chandimal | Filmmaker &amp; Visual Storyteller"
-        />
-        <meta
-          property="og:description"
           content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound."
         />
+
+        <meta
+          property="og:title"
+          content="Services-Photography - Jeevan Chandimal"
+        />
+
+        <meta
+          property="og:description"
+          content="Cinematic photography services shaped with intention and restraint."
+        />
+
         <meta
           property="og:image"
           content="https://www.jeevanchandimal.com/services/og.jpg"
         />
+
         <link
           rel="canonical"
           href="https://www.jeevanchandimal.com/services-photography"
@@ -45,7 +50,8 @@ export default function ServicesPhotography() {
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background */}
+
+        {/* Cinematic Background */}
         <div className="heroBg" aria-hidden="true">
           <div
             className="heroBgImg"
@@ -56,99 +62,14 @@ export default function ServicesPhotography() {
           <div className="heroBgGlow" />
         </div>
 
-        <JeevanChandimalNavi
-          link1={
-            <Fragment>
-              <span className="t">Home</span>
-            </Fragment>
-          }
-          link2={
-            <Fragment>
-              <span className="t">Work</span>
-            </Fragment>
-          }
-          link3={
-            <Fragment>
-              <span className="t">Services</span>
-            </Fragment>
-          }
-          link4={
-            <Fragment>
-              <span className="t">Store</span>
-            </Fragment>
-          }
-          link5={
-            <Fragment>
-              <span className="t">Membership</span>
-            </Fragment>
-          }
-          link51={
-            <Fragment>
-              <span className="t">About</span>
-            </Fragment>
-          }
-          text16={
-            <Fragment>
-              <span className="t">Work</span>
-            </Fragment>
-          }
-          text17={
-            <Fragment>
-              <span className="t">Film</span>
-            </Fragment>
-          }
-          text18={
-            <Fragment>
-              <span className="t">Audio</span>
-            </Fragment>
-          }
-          text19={
-            <Fragment>
-              <span className="t">Animation</span>
-            </Fragment>
-          }
-          link511={
-            <Fragment>
-              <span className="t">Contact</span>
-            </Fragment>
-          }
-          text161={
-            <Fragment>
-              <span className="t">Services</span>
-            </Fragment>
-          }
-          text171={
-            <Fragment>
-              <span className="t">Film Production</span>
-            </Fragment>
-          }
-          text181={
-            <Fragment>
-              <span className="t">Audio Production</span>
-            </Fragment>
-          }
-          text191={
-            <Fragment>
-              <span className="t">Photography</span>
-            </Fragment>
-          }
-          text192={
-            <Fragment>
-              <span className="t">Animation &amp; Motion</span>
-            </Fragment>
-          }
-          text1911={
-            <Fragment>
-              <span className="t">Photography</span>
-            </Fragment>
-          }
-          rootClassName="jeevan-chandimal-naviroot-class-name19"
-        />
+        <JeevanChandimalNavi rootClassName="jeevan-chandimal-naviroot-class-name19" />
 
         <main className="main">
-          {/* ✅ HERO (PLACED LIKE work-photography.js: section -> block -> component) */}
+
+          {/* HERO */}
           <section className="section">
             <div className="block">
+
               <ServicePhotographyHero
                 action3={
                   <Fragment>
@@ -158,8 +79,7 @@ export default function ServicesPhotography() {
                 content1={
                   <Fragment>
                     <span className="t">
-                      Photography approached as storytelling — crafted with cinematic
-                      intent and emotional clarity.
+                      Photography approached as storytelling — crafted with cinematic intent.
                     </span>
                   </Fragment>
                 }
@@ -172,32 +92,21 @@ export default function ServicesPhotography() {
                 }
                 rootClassName="service-photography-heroroot-class-name"
               />
+
             </div>
           </section>
 
           {/* INTRO */}
           <section className="section">
             <IntroductionPhotographyServices
-              feature1Title={
-                <Fragment>
-                  <span className="t">Introduction</span>
-                </Fragment>
-              }
+              feature1Title={<Fragment><span className="t">Introduction</span></Fragment>}
               rootClassName="introduction-photography-servicesroot-class-name"
               feature1Description={
                 <Fragment>
                   <span className="t">
-                    <span>
-                      Photography is where my visual language began. I approach still
-                      images the same way I approach film — with attention to light,
-                      composition, and the feeling a moment carries.
-                    </span>
-                    <br />
-                    <span>
-                      Each photograph is created to stand on its own, while also fitting
-                      naturally into larger visual narratives for editorial, commercial,
-                      and artistic use.
-                    </span>
+                    Photography is where my visual language began. I approach still
+                    images the same way I approach film — with attention to light,
+                    composition, and atmosphere.
                   </span>
                 </Fragment>
               }
@@ -210,8 +119,7 @@ export default function ServicesPhotography() {
               content1={
                 <Fragment>
                   <span className="t">
-                    A curated selection of editorial, cinematic, and fine-art photography —
-                    focused on atmosphere, texture, and detail.
+                    A curated selection of editorial, cinematic, and fine-art photography.
                   </span>
                 </Fragment>
               }
@@ -227,129 +135,22 @@ export default function ServicesPhotography() {
           {/* WHAT I DO */}
           <section className="section">
             <WhatIDoPhotographyServices
-              sectionTitle={
-                <Fragment>
-                  <span className="t">What I Do</span>
-                </Fragment>
-              }
-              feature1Title={
-                <Fragment>
-                  <span className="t">Cinematic &amp; Editorial Photography</span>
-                </Fragment>
-              }
-              feature2Title={
-                <Fragment>
-                  <span className="t">Nature &amp; Wildlife</span>
-                </Fragment>
-              }
-              feature3Title={
-                <Fragment>
-                  <span className="t">Landscape &amp; Travel</span>
-                </Fragment>
-              }
-              feature4Title={
-                <Fragment>
-                  <span className="t">Black &amp; White Fine Art</span>
-                </Fragment>
-              }
+              sectionTitle={<Fragment><span className="t">What I Do</span></Fragment>}
               rootClassName="what-i-do-photography-servicesroot-class-name"
-              feature1Button={
-                <Fragment>
-                  <span className="t">Learn More</span>
-                </Fragment>
-              }
-              feature2Button={
-                <Fragment>
-                  <span className="t">Discover More</span>
-                </Fragment>
-              }
-              feature3Button={
-                <Fragment>
-                  <span className="t">Explore Now</span>
-                </Fragment>
-              }
-              feature4Button={
-                <Fragment>
-                  <span className="t">View Portfolio</span>
-                </Fragment>
-              }
-              feature1Description={
-                <Fragment>
-                  <span className="t">
-                    Story-driven imagery created with intention and visual depth.
-                  </span>
-                </Fragment>
-              }
-              feature2Description={
-                <Fragment>
-                  <span className="t">
-                    Quiet, patient observations of the natural world, captured with
-                    respect and realism.
-                  </span>
-                </Fragment>
-              }
-              feature3Description={
-                <Fragment>
-                  <span className="t">
-                    Expansive scenes that convey scale, mood, and a sense of place.
-                  </span>
-                </Fragment>
-              }
-              feature4Description={
-                <Fragment>
-                  <span className="t">
-                    Timeless compositions focused on light, form, and emotion.
-                  </span>
-                </Fragment>
-              }
             />
           </section>
 
-          {/* HOW I APPROACH */}
+          {/* APPROACH */}
           <section className="section">
             <HowIApproachPhotography
-              feature1Title={
-                <Fragment>
-                  <span className="t">How I Approach Photography</span>
-                </Fragment>
-              }
               rootClassName="how-i-approach-photographyroot-class-name"
-              feature1Description={
-                <Fragment>
-                  <span className="t">
-                    <span>
-                      I look for moments that feel honest and unforced. Light, timing,
-                      and stillness matter more than spectacle.
-                    </span>
-                    <br />
-                    <span>
-                      Whether working in controlled environments or in the field, the
-                      goal is always the same — to create images that feel considered,
-                      immersive, and lasting.
-                    </span>
-                  </span>
-                </Fragment>
-              }
             />
           </section>
 
           {/* WHO IT'S FOR */}
           <section className="section">
             <WhoItsForPhotography
-              content1={
-                <Fragment>
-                  <span className="t">
-                    I work with brands, agencies, filmmakers, and individuals who value
-                    craft, atmosphere, and intentional storytelling — and who see film as
-                    more than just content.
-                  </span>
-                </Fragment>
-              }
-              heading1={
-                <Fragment>
-                  <span className="t">Who It’s For</span>
-                </Fragment>
-              }
+              heading1={<Fragment><span className="t">Who It’s For</span></Fragment>}
               rootClassName="who-its-for-photographyroot-class-name"
             />
           </section>
@@ -357,152 +158,137 @@ export default function ServicesPhotography() {
           {/* FINAL CTA */}
           <section className="section">
             <PhotographyServicesFinalCTA
-              action2={
-                <Fragment>
-                  <span className="t">Create Together</span>
-                </Fragment>
-              }
-              content1={
-                <Fragment>
-                  <span className="t">
-                    Let’s create something with clarity, atmosphere, and purpose.
-                  </span>
-                </Fragment>
-              }
-              heading1={
-                <Fragment>
-                  <span className="t">
-                    Looking for imagery with depth and intention?
-                  </span>
-                </Fragment>
-              }
               rootClassName="photography-services-final-ct-aroot-class-name"
             />
           </section>
 
           <JeevanChandimalNewFooter rootClassName="jeevan-chandimal-new-footerroot-class-name18" />
+
         </main>
       </div>
 
       <style jsx>{`
+
         :global(html),
-        :global(body) {
-          height: 100%;
+        :global(body){
+          height:100%;
         }
 
-        :global(body) {
-          overflow-x: hidden;
+        :global(body){
+          overflow-x:hidden;
         }
 
-        .page {
-          width: 100%;
-          min-height: 100vh;
-          position: relative;
-          overflow-x: hidden;
-          overflow-y: visible;
-          background: #0b0b0b;
-          color: #f5f4f4;
+        .page{
+          width:100%;
+          min-height:100vh;
+          position:relative;
+          overflow-x:hidden;
+          overflow-y:visible;
+          background:#0b0b0b;
+          color:#f5f4f4;
         }
 
-        /* ========= CINEMATIC BACKGROUND ========= */
-        .heroBg {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          pointer-events: none;
+        /* Cinematic background */
+
+        .heroBg{
+          position:fixed;
+          inset:0;
+          z-index:0;
+          pointer-events:none;
+
+          /* align background under navbar */
+          top:var(--jc-nav-h);
         }
 
-        .heroBgImg {
-          position: absolute;
-          inset: 0;
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          filter: saturate(0.95) contrast(1.06) brightness(0.78);
-          transform: scale(1.02);
+        .heroBgImg{
+          position:absolute;
+          inset:0;
+          background-size:cover;
+          background-position:center;
+          background-repeat:no-repeat;
+          filter:saturate(.95) contrast(1.06) brightness(.78);
+          transform:scale(1.02);
         }
 
-        .heroBgVignette {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(
+        .heroBgVignette{
+          position:absolute;
+          inset:0;
+          background:
+            radial-gradient(
               80% 60% at 50% 20%,
-              rgba(0, 0, 0, 0.12),
-              rgba(0, 0, 0, 0.72)
+              rgba(0,0,0,.12),
+              rgba(0,0,0,.72)
             ),
             linear-gradient(
               180deg,
-              rgba(10, 10, 10, 0.2) 0%,
-              rgba(10, 10, 10, 0.68) 55%,
-              rgba(10, 10, 10, 0.92) 100%
+              rgba(10,10,10,.2) 0%,
+              rgba(10,10,10,.68) 55%,
+              rgba(10,10,10,.92) 100%
             );
         }
 
-        .heroBgGlow {
-          position: absolute;
-          inset: -18%;
-          background: radial-gradient(
+        .heroBgGlow{
+          position:absolute;
+          inset:-18%;
+          background:radial-gradient(
             40% 32% at 22% 28%,
-            rgba(37, 195, 226, 0.12),
-            rgba(37, 195, 226, 0) 62%
+            rgba(37,195,226,.12),
+            rgba(37,195,226,0) 62%
           );
-          filter: blur(14px);
-          opacity: 0.9;
+          filter:blur(14px);
+          opacity:.9;
         }
 
-        .heroBgGrain {
-          position: absolute;
-          inset: 0;
-          opacity: 0.08;
-          mix-blend-mode: overlay;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-          background-size: 240px 240px;
+        .heroBgGrain{
+          position:absolute;
+          inset:0;
+          opacity:.08;
+          mix-blend-mode:overlay;
+          background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size:240px 240px;
         }
 
-        /* ========= LAYOUT (match work-photography.js rhythm) ========= */
-        .main {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding-top: 72px; /* ✅ space for sticky nav */
+        /* Layout */
+
+        .main{
+          position:relative;
+          z-index:1;
+          width:100%;
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+
+          /* spacing handled globally */
+          padding-top:0;
         }
 
-        .section {
-          width: 100%;
-          display: flex;
-          justify-content: center;
+        .section{
+          width:100%;
+          display:flex;
+          justify-content:center;
         }
 
-        /* ✅ this is what makes the hero “sit” correctly under nav */
-        .block {
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
+        .block{
+          width:100%;
+          display:flex;
+          flex-direction:column;
+          gap:18px;
         }
 
-        .section :global(> *) {
-          width: 100%;
+        .section :global(> *){
+          width:100%;
         }
 
-        .t {
-          display: inline-block;
+        .t{
+          display:inline-block;
         }
 
-        @media (min-width: 1200px) {
-          .heroBgImg {
-            filter: saturate(0.98) contrast(1.08) brightness(0.76);
+        @media (prefers-reduced-motion:reduce){
+          .heroBgImg{
+            transform:none;
           }
         }
 
-        @media (prefers-reduced-motion: reduce) {
-          .heroBgImg {
-            transform: none;
-          }
-        }
       `}</style>
     </>
   )
