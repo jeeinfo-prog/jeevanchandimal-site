@@ -3,13 +3,12 @@
 // auto description + smart tags, queue with progress + concurrency,
 // compatible with FINAL create-upload.js + commit.js
 //
-// ✅ Build-safe fix:
-// - Do NOT create Supabase client at module scope (Next build/SSR runs this file).
+// ✅ Build-safe + perf:
+// - Do NOT import Supabase SDK at module scope (keeps this page lighter).
 // - Create it lazily on the client only (inside useEffect), then use supabaseRef.current everywhere.
 
 import React from 'react'
 import Head from 'next/head'
-import { createClient } from '@supabase/supabase-js'
 
 // ---------------- helpers ----------------
 function fmtMB(bytes) {
@@ -223,7 +222,7 @@ const COLLECTION_TAGS = [
 ]
 
 export default function AdminUploadPage() {
-  // ✅ Supabase client (client-only, build-safe)
+  // ✅ Supabase client (client-only)
   const supabaseRef = React.useRef(null)
   const [supabaseReady, setSupabaseReady] = React.useState(false)
 
@@ -360,27 +359,43 @@ export default function AdminUploadPage() {
     if (Number.isFinite(lkr) && lkr > 0) setPriceLkr(lkr)
   }, [priceUsd, fxUsdToLkr, autoLkrFromUsd])
 
-  // ✅ Create Supabase client on client only (prevents next build crash)
+  // ✅ Lazy-load Supabase SDK on client only (reduces initial bundle)
   React.useEffect(() => {
-    if (typeof window === 'undefined') return
+    let cancelled = false
 
-    try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    async function init() {
+      if (typeof window === 'undefined') return
 
-      if (!url || !key) {
-        log('❌ Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
-        setSupabaseReady(false)
-        supabaseRef.current = null
-        return
+      try {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+        if (!url || !key) {
+          log('❌ Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
+          if (!cancelled) {
+            setSupabaseReady(false)
+            supabaseRef.current = null
+          }
+          return
+        }
+
+        const mod = await import('@supabase/supabase-js')
+        if (cancelled) return
+
+        supabaseRef.current = mod.createClient(url, key)
+        setSupabaseReady(true)
+      } catch (e) {
+        log(`❌ Supabase init failed: ${e?.message || 'unknown error'}`)
+        if (!cancelled) {
+          setSupabaseReady(false)
+          supabaseRef.current = null
+        }
       }
+    }
 
-      supabaseRef.current = createClient(url, key)
-      setSupabaseReady(true)
-    } catch (e) {
-      log(`❌ Supabase init failed: ${e?.message || 'unknown error'}`)
-      setSupabaseReady(false)
-      supabaseRef.current = null
+    init()
+    return () => {
+      cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
