@@ -722,12 +722,14 @@ export default function JeevanChandimalNavi(props) {
         }
 
         .navWrap {
-  position: fixed;
-  top: 0;
-  z-index: 9999;
-  width: 100%;
-  height: var(--jc-nav-h);   /* ⭐ CLS prevention */
-  contain: layout;           /* ⭐ browser layout optimization */
+          position: fixed;
+          top: 0;
+          z-index: 9999;
+          width: 100%;
+          background: rgba(34, 34, 34, 0.72);
+          backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(245, 244, 244, 0.08);
+        }
 
         .navShell {
           max-width: var(--dl-layout-size-maxwidth);
