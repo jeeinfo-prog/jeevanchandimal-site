@@ -1,20 +1,45 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
-
-import { useTranslations } from 'next-intl'
+import dynamic from 'next/dynamic'
 
 import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import ServiceFilmHero from '../components/service-film-hero'
-import IntroductionFilmServices from '../components/introduction-film-services'
-import SelectedFilmWork from '../components/selected-film-work'
-import WhatIDoFilmServices from '../components/what-i-do-film-services'
-import HowIApproachFilm from '../components/how-i-approach-film'
-import ServiceFilmProcess from '../components/service-film-process'
-import WhoItsForFilm from '../components/who-its-for-film'
-import ServicesFilmFinalCTA from '../components/services-film-final-cta'
-import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
+const JeevanChandimalNewFooter = dynamic(
+  () => import('../components/layout/jeevan-chandimal-new-footer'),
+  { loading: () => <div style={{ minHeight: 220 }} /> }
+)
 
-const ServicesFilmProduction = (props) => {
+// ✅ Lazy-load heavier sections (reduces initial JS)
+const IntroductionFilmServices = dynamic(
+  () => import('../components/introduction-film-services'),
+  { loading: () => <div style={{ minHeight: 160 }} /> }
+)
+
+const SelectedFilmWork = dynamic(() => import('../components/selected-film-work'), {
+  loading: () => <div style={{ minHeight: 240 }} />,
+})
+
+const WhatIDoFilmServices = dynamic(() => import('../components/what-i-do-film-services'), {
+  loading: () => <div style={{ minHeight: 220 }} />,
+})
+
+const HowIApproachFilm = dynamic(() => import('../components/how-i-approach-film'), {
+  loading: () => <div style={{ minHeight: 180 }} />,
+})
+
+const ServiceFilmProcess = dynamic(() => import('../components/service-film-process'), {
+  loading: () => <div style={{ minHeight: 200 }} />,
+})
+
+const WhoItsForFilm = dynamic(() => import('../components/who-its-for-film'), {
+  loading: () => <div style={{ minHeight: 180 }} />,
+})
+
+const ServicesFilmFinalCTA = dynamic(() => import('../components/services-film-final-cta'), {
+  loading: () => <div style={{ minHeight: 140 }} />,
+})
+
+const ServicesFilmProduction = () => {
   return (
     <>
       <div className="services-film-production-container">
@@ -44,6 +69,7 @@ const ServicesFilmProduction = (props) => {
             href="https://firm-these-stork-6nk3lv.teleporthq.app/services-film-production"
           />
         </Head>
+
         <JeevanChandimalNavi
           link1={
             <Fragment>
@@ -67,9 +93,7 @@ const ServicesFilmProduction = (props) => {
           }
           link5={
             <Fragment>
-              <span className="services-film-production-text14">
-                Membership
-              </span>
+              <span className="services-film-production-text14">Membership</span>
             </Fragment>
           }
           link51={
@@ -144,6 +168,7 @@ const ServicesFilmProduction = (props) => {
           }
           rootClassName="jeevan-chandimal-naviroot-class-name11"
         ></JeevanChandimalNavi>
+
         <ServiceFilmHero
           action3={
             <Fragment>
@@ -168,6 +193,7 @@ const ServicesFilmProduction = (props) => {
             </Fragment>
           }
         ></ServiceFilmHero>
+
         <IntroductionFilmServices
           feature1Title={
             <Fragment>
@@ -195,6 +221,7 @@ const ServicesFilmProduction = (props) => {
             </Fragment>
           }
         ></IntroductionFilmServices>
+
         <SelectedFilmWork
           content1={
             <Fragment>
@@ -213,6 +240,7 @@ const ServicesFilmProduction = (props) => {
           }
           rootClassName="selected-film-workroot-class-name"
         ></SelectedFilmWork>
+
         <WhatIDoFilmServices
           sectionTitle={
             <Fragment>
@@ -308,6 +336,7 @@ const ServicesFilmProduction = (props) => {
             </Fragment>
           }
         ></WhatIDoFilmServices>
+
         <HowIApproachFilm
           feature1Title={
             <Fragment>
@@ -333,6 +362,7 @@ const ServicesFilmProduction = (props) => {
             </Fragment>
           }
         ></HowIApproachFilm>
+
         <ServiceFilmProcess
           feature3Title={
             <Fragment>
@@ -400,6 +430,7 @@ const ServicesFilmProduction = (props) => {
             </Fragment>
           }
         ></ServiceFilmProcess>
+
         <WhoItsForFilm
           content1={
             <Fragment>
@@ -418,6 +449,7 @@ const ServicesFilmProduction = (props) => {
             </Fragment>
           }
         ></WhoItsForFilm>
+
         <ServicesFilmFinalCTA
           action2={
             <Fragment>
@@ -442,6 +474,7 @@ const ServicesFilmProduction = (props) => {
             </Fragment>
           }
         ></ServicesFilmFinalCTA>
+
         <JeevanChandimalNewFooter
           link11={
             <Fragment>
@@ -554,6 +587,7 @@ const ServicesFilmProduction = (props) => {
           rootClassName="jeevan-chandimal-new-footerroot-class-name12"
         ></JeevanChandimalNewFooter>
       </div>
+
       <style jsx>
         {`
           .services-film-production-container {
@@ -564,216 +598,76 @@ const ServicesFilmProduction = (props) => {
             flex-direction: column;
             justify-content: flex-start;
           }
-          .services-film-production-text10 {
-            display: inline-block;
-          }
-          .services-film-production-text11 {
-            display: inline-block;
-          }
-          .services-film-production-text12 {
-            display: inline-block;
-          }
-          .services-film-production-text13 {
-            display: inline-block;
-          }
-          .services-film-production-text14 {
-            display: inline-block;
-          }
-          .services-film-production-text15 {
-            display: inline-block;
-          }
-          .services-film-production-text16 {
-            display: inline-block;
-          }
-          .services-film-production-text17 {
-            display: inline-block;
-          }
-          .services-film-production-text18 {
-            display: inline-block;
-          }
-          .services-film-production-text19 {
-            display: inline-block;
-          }
-          .services-film-production-text20 {
-            display: inline-block;
-          }
-          .services-film-production-text21 {
-            display: inline-block;
-          }
-          .services-film-production-text22 {
-            display: inline-block;
-          }
-          .services-film-production-text23 {
-            display: inline-block;
-          }
-          .services-film-production-text24 {
-            display: inline-block;
-          }
-          .services-film-production-text25 {
-            display: inline-block;
-          }
-          .services-film-production-text26 {
-            display: inline-block;
-          }
-          .services-film-production-text27 {
-            display: inline-block;
-          }
-          .services-film-production-text28 {
-            display: inline-block;
-          }
-          .services-film-production-text29 {
-            display: inline-block;
-          }
-          .services-film-production-text30 {
-            display: inline-block;
-          }
-          .services-film-production-text31 {
-            display: inline-block;
-          }
-          .services-film-production-text35 {
-            display: inline-block;
-          }
-          .services-film-production-text36 {
-            display: inline-block;
-          }
-          .services-film-production-text37 {
-            display: inline-block;
-          }
-          .services-film-production-text38 {
-            display: inline-block;
-          }
-          .services-film-production-text39 {
-            display: inline-block;
-          }
-          .services-film-production-text40 {
-            display: inline-block;
-          }
-          .services-film-production-text41 {
-            display: inline-block;
-          }
-          .services-film-production-text42 {
-            display: inline-block;
-          }
-          .services-film-production-text43 {
-            display: inline-block;
-          }
-          .services-film-production-text44 {
-            display: inline-block;
-          }
-          .services-film-production-text45 {
-            display: inline-block;
-          }
-          .services-film-production-text46 {
-            display: inline-block;
-          }
-          .services-film-production-text47 {
-            display: inline-block;
-          }
-          .services-film-production-text48 {
-            display: inline-block;
-          }
-          .services-film-production-text49 {
-            display: inline-block;
-          }
-          .services-film-production-text50 {
-            display: inline-block;
-          }
-          .services-film-production-text51 {
-            display: inline-block;
-          }
-          .services-film-production-text55 {
-            display: inline-block;
-          }
-          .services-film-production-text56 {
-            display: inline-block;
-          }
-          .services-film-production-text57 {
-            display: inline-block;
-          }
-          .services-film-production-text58 {
-            display: inline-block;
-          }
-          .services-film-production-text59 {
-            display: inline-block;
-          }
-          .services-film-production-text60 {
-            display: inline-block;
-          }
-          .services-film-production-text61 {
-            display: inline-block;
-          }
-          .services-film-production-text62 {
-            display: inline-block;
-          }
-          .services-film-production-text63 {
-            display: inline-block;
-          }
-          .services-film-production-text64 {
-            display: inline-block;
-          }
-          .services-film-production-text65 {
-            display: inline-block;
-          }
-          .services-film-production-text66 {
-            display: inline-block;
-          }
-          .services-film-production-text67 {
-            display: inline-block;
-          }
-          .services-film-production-text68 {
-            display: inline-block;
-          }
-          .services-film-production-text69 {
-            display: inline-block;
-          }
-          .services-film-production-text70 {
-            display: inline-block;
-          }
-          .services-film-production-text71 {
-            display: inline-block;
-          }
-          .services-film-production-text72 {
-            display: inline-block;
-          }
-          .services-film-production-text73 {
-            display: inline-block;
-          }
-          .services-film-production-text74 {
-            display: inline-block;
-          }
-          .services-film-production-text75 {
-            display: inline-block;
-          }
-          .services-film-production-text76 {
-            display: inline-block;
-          }
-          .services-film-production-text77 {
-            display: inline-block;
-          }
-          .services-film-production-text78 {
-            display: inline-block;
-          }
-          .services-film-production-text79 {
-            display: inline-block;
-          }
-          .services-film-production-text80 {
-            display: inline-block;
-          }
-          .services-film-production-text81 {
-            display: inline-block;
-          }
-          .services-film-production-text82 {
-            display: inline-block;
-          }
-          .services-film-production-text83 {
-            display: inline-block;
-          }
-          .services-film-production-text84 {
-            display: inline-block;
-          }
-          .services-film-production-text85 {
-            display: inline-block;
-          }
+          .services-film-production-text10,
+          .services-film-production-text11,
+          .services-film-production-text12,
+          .services-film-production-text13,
+          .services-film-production-text14,
+          .services-film-production-text15,
+          .services-film-production-text16,
+          .services-film-production-text17,
+          .services-film-production-text18,
+          .services-film-production-text19,
+          .services-film-production-text20,
+          .services-film-production-text21,
+          .services-film-production-text22,
+          .services-film-production-text23,
+          .services-film-production-text24,
+          .services-film-production-text25,
+          .services-film-production-text26,
+          .services-film-production-text27,
+          .services-film-production-text28,
+          .services-film-production-text29,
+          .services-film-production-text30,
+          .services-film-production-text31,
+          .services-film-production-text35,
+          .services-film-production-text36,
+          .services-film-production-text37,
+          .services-film-production-text38,
+          .services-film-production-text39,
+          .services-film-production-text40,
+          .services-film-production-text41,
+          .services-film-production-text42,
+          .services-film-production-text43,
+          .services-film-production-text44,
+          .services-film-production-text45,
+          .services-film-production-text46,
+          .services-film-production-text47,
+          .services-film-production-text48,
+          .services-film-production-text49,
+          .services-film-production-text50,
+          .services-film-production-text51,
+          .services-film-production-text55,
+          .services-film-production-text56,
+          .services-film-production-text57,
+          .services-film-production-text58,
+          .services-film-production-text59,
+          .services-film-production-text60,
+          .services-film-production-text61,
+          .services-film-production-text62,
+          .services-film-production-text63,
+          .services-film-production-text64,
+          .services-film-production-text65,
+          .services-film-production-text66,
+          .services-film-production-text67,
+          .services-film-production-text68,
+          .services-film-production-text69,
+          .services-film-production-text70,
+          .services-film-production-text71,
+          .services-film-production-text72,
+          .services-film-production-text73,
+          .services-film-production-text74,
+          .services-film-production-text75,
+          .services-film-production-text76,
+          .services-film-production-text77,
+          .services-film-production-text78,
+          .services-film-production-text79,
+          .services-film-production-text80,
+          .services-film-production-text81,
+          .services-film-production-text82,
+          .services-film-production-text83,
+          .services-film-production-text84,
+          .services-film-production-text85,
           .services-film-production-text86 {
             display: inline-block;
           }
