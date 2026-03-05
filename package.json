@@ -29,6 +29,7 @@
     "node": "20.x"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.1.6",
     "@types/react": "19.2.14",
     "ts-prune": "^0.10.3",
     "typescript": "^5.9.3"
