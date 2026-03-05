@@ -4,435 +4,545 @@ import PropTypes from 'prop-types'
 const OurServices = (props) => {
   return (
     <>
-      <div className="our-services-thq-layout301-elm thq-section-padding">
-        <div className="our-services-thq-max-width-elm thq-section-max-width">
-          <h2 className="our-services-thq-text-elm thq-heading-2">
-            {props.sectionTitle ?? (
-              <Fragment>
-                <span className="our-services-text11">Our Services</span>
-              </Fragment>
-            )}
-          </h2>
+      <section
+        className={`osWrap thq-section-padding ${props.rootClassName || ''}`}
+      >
+        <div className="osMax thq-section-max-width">
+          {/* ===== header (luxury cinematic like WID) ===== */}
+          <header className="osHead">
+            <div className="osKickerRow">
+              <span className="osKicker">SERVICES</span>
+              <span className="osLine" />
+            </div>
 
-          <div className="our-services-thq-row-elm thq-grid-auto-300">
-            {/* 1 */}
-            <div className="our-services-thq-feature1-elm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt={props.feature1ImageAlt}
-                src={props.feature1ImageSrc}
-                className="thq-img-ratio-4-3"
-                loading="lazy"
-              />
-              <div className="our-services-thq-content-elm1 thq-flex-column">
-                <div className="our-services-thq-section-title-elm1 thq-flex-column">
-                  <h3 className="our-services-thq-title1-elm thq-heading-3">
-                    {props.feature1Title ?? (
-                      <Fragment>
-                        <span className="our-services-text18">
-                          Film Production
-                        </span>
-                      </Fragment>
-                    )}
-                  </h3>
-                  <span className="our-services-thq-description1-elm thq-body-small">
-                    {props.feature1Description ?? (
-                      <Fragment>
-                        <span className="our-services-text12">
-                          Stories shaped through image, motion, &amp; sound.
-                        </span>
-                      </Fragment>
-                    )}
+            <h2 className="osTitle thq-heading-2">
+              {props.sectionTitle ?? (
+                <Fragment>
+                  <span className="t">Our Services</span>
+                </Fragment>
+              )}
+            </h2>
+
+            <p className="osIntro thq-body-large">
+              {props.sectionDescription ?? (
+                <Fragment>
+                  <span className="t">
+                    Four disciplines — built with atmosphere, precision, and
+                    cinematic restraint.
                   </span>
+                </Fragment>
+              )}
+            </p>
+
+            <div className="osDivider" aria-hidden="true" />
+          </header>
+
+          {/* ===== grid ===== */}
+          <div className="osGrid">
+            {/* 1 */}
+            <article className="osCard">
+              <div className="osMedia" aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="osImg"
+                  src={props.feature1ImageSrc}
+                  alt={props.feature1ImageAlt}
+                  loading="lazy"
+                />
+                <div className="osVignette" />
+                <div className="osGlow" />
+                <div className="osGrain" />
+              </div>
+
+              <div className="osInner">
+                <div className="osTop">
+                  <span className="osChip">01</span>
+                  <span className="osChipLabel">FILM</span>
                 </div>
-                <div className="our-services-thq-action-elm1 thq-flex-row">
-                  <button className="thq-button-flat" type="button">
+
+                <h3 className="osH3 thq-heading-3">
+                  {props.feature1Title ?? (
+                    <Fragment>
+                      <span className="t">Film Production</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <p className="osP thq-body-small">
+                  {props.feature1Description ?? (
+                    <Fragment>
+                      <span className="t">
+                        Stories shaped through image, motion, &amp; sound — with
+                        clarity and mood.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+
+                <div className="osAction">
+                  <button className="osBtn" type="button">
                     <span className="thq-body-small">
                       {props.feature1Button ?? (
                         <Fragment>
-                          <span className="our-services-text10">View Work</span>
+                          <span className="t">View Work</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
+                    <svg viewBox="0 0 1024 1024" className="osIcon" aria-hidden="true">
                       <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
                     </svg>
                   </button>
                 </div>
               </div>
-            </div>
+            </article>
 
             {/* 2 */}
-            <div className="our-services-thq-feature2-elm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt={props.feature2ImageAlt}
-                src={props.feature2ImageSrc}
-                className="thq-img-ratio-4-3"
-                loading="lazy"
-              />
-              <div className="our-services-thq-content-elm2 thq-flex-column">
-                <div className="our-services-thq-section-title-elm2 thq-flex-column">
-                  <strong className="our-services-thq-title2-elm thq-heading-3">
-                    {props.feature2Title ?? (
-                      <Fragment>
-                        <span className="our-services-text19">
-                          Audio Production
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="our-services-thq-description2-elm thq-body-small">
-                    {props.feature2Description ?? (
-                      <Fragment>
-                        <span className="our-services-text20">
-                          Sound designed to complete the story.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
+            <article className="osCard">
+              <div className="osMedia" aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="osImg"
+                  src={props.feature2ImageSrc}
+                  alt={props.feature2ImageAlt}
+                  loading="lazy"
+                />
+                <div className="osVignette" />
+                <div className="osGlow" />
+                <div className="osGrain" />
+              </div>
+
+              <div className="osInner">
+                <div className="osTop">
+                  <span className="osChip">02</span>
+                  <span className="osChipLabel">AUDIO</span>
                 </div>
-                <div className="our-services-thq-action-elm2 thq-flex-row">
-                  <button className="thq-button-flat" type="button">
+
+                <h3 className="osH3 thq-heading-3">
+                  {props.feature2Title ?? (
+                    <Fragment>
+                      <span className="t">Audio Production</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <p className="osP thq-body-small">
+                  {props.feature2Description ?? (
+                    <Fragment>
+                      <span className="t">
+                        Sound designed to complete the story — texture, space,
+                        emotion.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+
+                <div className="osAction">
+                  <button className="osBtn" type="button">
                     <span className="thq-body-small">
                       {props.feature2Button ?? (
                         <Fragment>
-                          <span className="our-services-text14">Explore</span>
+                          <span className="t">Explore</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
+                    <svg viewBox="0 0 1024 1024" className="osIcon" aria-hidden="true">
                       <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
                     </svg>
                   </button>
                 </div>
               </div>
-            </div>
+            </article>
 
             {/* 3 */}
-            <div className="our-services-thq-feature3-elm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt={props.feature3ImageAlt}
-                src={props.feature3ImageSrc}
-                className="thq-img-ratio-4-3"
-                loading="lazy"
-              />
-              <div className="our-services-thq-content-elm3 thq-flex-column">
-                <div className="our-services-thq-section-title-elm3 thq-flex-column">
-                  <strong className="our-services-thq-title3-elm thq-heading-3">
-                    {props.feature3Title ?? (
-                      <Fragment>
-                        <span className="our-services-text13">
-                          Animation &amp; Motion
-                        </span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="our-services-thq-description3-elm thq-body-small">
-                    {props.feature3Description ?? (
-                      <Fragment>
-                        <span className="our-services-text21">
-                          Motion that supports narrative and mood.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
+            <article className="osCard">
+              <div className="osMedia" aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="osImg"
+                  src={props.feature3ImageSrc}
+                  alt={props.feature3ImageAlt}
+                  loading="lazy"
+                />
+                <div className="osVignette" />
+                <div className="osGlow" />
+                <div className="osGrain" />
+              </div>
+
+              <div className="osInner">
+                <div className="osTop">
+                  <span className="osChip">03</span>
+                  <span className="osChipLabel">MOTION</span>
                 </div>
-                <div className="our-services-thq-action-elm3 thq-flex-row">
-                  <button className="thq-button-flat" type="button">
+
+                <h3 className="osH3 thq-heading-3">
+                  {props.feature3Title ?? (
+                    <Fragment>
+                      <span className="t">Animation &amp; Motion</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <p className="osP thq-body-small">
+                  {props.feature3Description ?? (
+                    <Fragment>
+                      <span className="t">
+                        Motion that supports narrative and mood — refined,
+                        deliberate, clean.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+
+                <div className="osAction">
+                  <button className="osBtn" type="button">
                     <span className="thq-body-small">
                       {props.feature3Button ?? (
                         <Fragment>
-                          <span className="our-services-text22">
-                            Start a Project
-                          </span>
+                          <span className="t">Start a Project</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
+                    <svg viewBox="0 0 1024 1024" className="osIcon" aria-hidden="true">
                       <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
                     </svg>
                   </button>
                 </div>
               </div>
-            </div>
+            </article>
 
             {/* 4 */}
-            <div className="our-services-thq-feature4-elm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt={props.feature4ImageAlt}
-                src={props.feature4ImageSrc}
-                className="thq-img-ratio-4-3"
-                loading="lazy"
-              />
-              <div className="our-services-thq-content-elm4 thq-flex-column">
-                <div className="our-services-thq-section-title-elm4 thq-flex-column">
-                  <strong className="our-services-thq-title4-elm thq-heading-3">
-                    {props.feature4Title ?? (
-                      <Fragment>
-                        <span className="our-services-text15">Photography</span>
-                      </Fragment>
-                    )}
-                  </strong>
-                  <span className="our-services-thq-description4-elm thq-body-small">
-                    {props.feature4Description ?? (
-                      <Fragment>
-                        <span className="our-services-text16">
-                          Still imagery guided by light, atmosphere, and emotion.
-                        </span>
-                      </Fragment>
-                    )}
-                  </span>
+            <article className="osCard">
+              <div className="osMedia" aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="osImg"
+                  src={props.feature4ImageSrc}
+                  alt={props.feature4ImageAlt}
+                  loading="lazy"
+                />
+                <div className="osVignette" />
+                <div className="osGlow" />
+                <div className="osGrain" />
+              </div>
+
+              <div className="osInner">
+                <div className="osTop">
+                  <span className="osChip">04</span>
+                  <span className="osChipLabel">PHOTO</span>
                 </div>
-                <div className="our-services-thq-action-elm4 thq-flex-row">
-                  <button className="thq-button-flat" type="button">
+
+                <h3 className="osH3 thq-heading-3">
+                  {props.feature4Title ?? (
+                    <Fragment>
+                      <span className="t">Photography</span>
+                    </Fragment>
+                  )}
+                </h3>
+
+                <p className="osP thq-body-small">
+                  {props.feature4Description ?? (
+                    <Fragment>
+                      <span className="t">
+                        Still imagery guided by light, atmosphere, and emotion —
+                        crafted with restraint.
+                      </span>
+                    </Fragment>
+                  )}
+                </p>
+
+                <div className="osAction">
+                  <button className="osBtn" type="button">
                     <span className="thq-body-small">
                       {props.feature4Button ?? (
                         <Fragment>
-                          <span className="our-services-text17">
-                            See Portfolio
-                          </span>
+                          <span className="t">See Portfolio</span>
                         </Fragment>
                       )}
                     </span>
-                    <svg viewBox="0 0 1024 1024" className="thq-icon-small">
+                    <svg viewBox="0 0 1024 1024" className="osIcon" aria-hidden="true">
                       <path d="M426 256l256 256-256 256-60-60 196-196-196-196z"></path>
                     </svg>
                   </button>
                 </div>
               </div>
-            </div>
-            {/* end */}
+            </article>
           </div>
         </div>
-      </div>
+      </section>
 
-      <style jsx>
-        {`
-          .our-services-thq-layout301-elm {
-            gap: var(--dl-layout-space-fiveunits);
-            width: 100%;
-            height: auto;
-            display: flex;
-            overflow: hidden;
-            position: relative;
-            align-items: center;
-            flex-shrink: 0;
-            flex-direction: column;
+      <style jsx>{`
+        .osWrap {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .osMax {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        /* ===== header ===== */
+        .osHead {
+          width: 100%;
+          max-width: 920px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .osKickerRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .osKicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.78);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+          white-space: nowrap;
+        }
+
+        .osLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .osTitle {
+          margin: 0;
+          line-height: 1.1;
+          text-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+        }
+
+        .osIntro {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.84);
+          line-height: 1.7;
+          max-width: 72ch;
+        }
+
+        .osDivider {
+          width: 100%;
+          height: 1px;
+          margin-top: 6px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.12),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0.12)
+          );
+        }
+
+        /* ===== grid ===== */
+        .osGrid {
+          width: 100%;
+          display: grid;
+          gap: 14px;
+          grid-template-columns: repeat(12, 1fr);
+        }
+
+        .osCard {
+          grid-column: span 3;
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+          min-height: 420px;
+          transform: translateZ(0);
+        }
+
+        /* ===== image layer ===== */
+        .osMedia {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .osImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.03);
+          filter: brightness(0.78) contrast(1.08) saturate(1.02);
+        }
+
+        .osVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              70% 60% at 35% 20%,
+              rgba(0, 0, 0, 0.08),
+              rgba(0, 0, 0, 0.82)
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.25) 0%,
+              rgba(0, 0, 0, 0.62) 55%,
+              rgba(0, 0, 0, 0.86) 100%
+            );
+        }
+
+        .osGlow {
+          position: absolute;
+          inset: -18%;
+          background: radial-gradient(
+            40% 32% at 22% 28%,
+            rgba(120, 166, 255, 0.12),
+            rgba(120, 166, 255, 0) 62%
+          );
+          filter: blur(14px);
+          opacity: 0.9;
+        }
+
+        .osGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        /* ===== content ===== */
+        .osInner {
+          position: relative;
+          z-index: 2;
+          height: 100%;
+          padding: 18px 16px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          justify-content: flex-end;
+        }
+
+        .osTop {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 2px;
+        }
+
+        .osChip {
+          font-size: 12px;
+          letter-spacing: 0.28em;
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.14);
+          background: rgba(0, 0, 0, 0.35);
+          color: rgba(245, 244, 244, 0.92);
+        }
+
+        .osChipLabel {
+          font-size: 11px;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.7);
+        }
+
+        .osH3 {
+          margin: 0;
+          line-height: 1.15;
+          text-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+        }
+
+        .osP {
+          margin: 0;
+          color: rgba(245, 244, 244, 0.84);
+          line-height: 1.7;
+          max-width: 44ch;
+        }
+
+        .osAction {
+          margin-top: 4px;
+          display: flex;
+          justify-content: flex-start;
+        }
+
+        .osBtn {
+          height: 36px;
+          padding: 0 14px 0 16px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid rgba(245, 244, 244, 0.16);
+          background: rgba(0, 0, 0, 0.22);
+          color: rgba(245, 244, 244, 0.92);
+          cursor: pointer;
+          text-decoration: none;
+          transition: transform 180ms ease, border-color 180ms ease,
+            background 180ms ease;
+        }
+
+        .osBtn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(120, 166, 255, 0.45);
+          background: rgba(120, 166, 255, 0.08);
+        }
+
+        .osIcon {
+          width: 18px;
+          height: 18px;
+          fill: currentColor;
+          opacity: 0.9;
+        }
+
+        .t {
+          display: inline-block;
+        }
+
+        @media (max-width: 991px) {
+          .osCard {
+            grid-column: span 6;
+            min-height: 380px;
+          }
+        }
+
+        @media (max-width: 767px) {
+          .osKickerRow {
             justify-content: center;
           }
-          .our-services-thq-max-width-elm {
-            gap: var(--dl-layout-space-threeunits);
-            display: flex;
-            align-items: center;
-            flex-direction: column;
+          .osLine {
+            display: none;
           }
-          .our-services-thq-text-elm {
+          .osHead {
             text-align: center;
-          }
-          .our-services-thq-row-elm {
-            width: 100%;
-          }
-          .our-services-thq-feature1-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .our-services-thq-content-elm1 {
-            align-self: stretch;
             align-items: center;
           }
-          .our-services-thq-section-title-elm1 {
-            align-self: stretch;
-            align-items: center;
+          .osCard {
+            grid-column: span 12;
+            min-height: 340px;
           }
-          .our-services-thq-title1-elm {
-            text-align: center;
+          .osInner {
+            text-align: left;
           }
-          .our-services-thq-description1-elm {
-            text-align: center;
-          }
-          .our-services-thq-action-elm1 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .our-services-thq-feature2-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .our-services-thq-content-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .our-services-thq-section-title-elm2 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .our-services-thq-title2-elm {
-            text-align: center;
-          }
-          .our-services-thq-description2-elm {
-            text-align: center;
-          }
-          .our-services-thq-action-elm2 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .our-services-thq-feature3-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .our-services-thq-content-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .our-services-thq-section-title-elm3 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .our-services-thq-title3-elm {
-            text-align: center;
-          }
-          .our-services-thq-description3-elm {
-            text-align: center;
-          }
-          .our-services-thq-action-elm3 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .our-services-thq-feature4-elm {
-            gap: var(--dl-layout-space-twounits);
-            flex: 1;
-            width: auto;
-            display: flex;
-            overflow: hidden;
-            max-width: 600px;
-            align-items: flex-start;
-            flex-shrink: 0;
-            flex-direction: column;
-          }
-          .our-services-thq-content-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .our-services-thq-section-title-elm4 {
-            align-self: stretch;
-            align-items: center;
-          }
-          .our-services-thq-title4-elm {
-            text-align: center;
-          }
-          .our-services-thq-description4-elm {
-            text-align: center;
-          }
-          .our-services-thq-action-elm4 {
-            align-self: stretch;
-            align-items: stretch;
-            justify-content: center;
-          }
-          .our-services-text10 {
-            display: inline-block;
-          }
-          .our-services-text11 {
-            display: inline-block;
-          }
-          .our-services-text12 {
-            display: inline-block;
-          }
-          .our-services-text13 {
-            display: inline-block;
-          }
-          .our-services-text14 {
-            display: inline-block;
-          }
-          .our-services-text15 {
-            display: inline-block;
-          }
-          .our-services-text16 {
-            display: inline-block;
-          }
-          .our-services-text17 {
-            display: inline-block;
-          }
-          .our-services-text18 {
-            display: inline-block;
-          }
-          .our-services-text19 {
-            display: inline-block;
-          }
-          .our-services-text20 {
-            display: inline-block;
-          }
-          .our-services-text21 {
-            display: inline-block;
-          }
-          .our-services-text22 {
-            display: inline-block;
-          }
-          @media (max-width: 991px) {
-            .our-services-thq-row-elm {
-              width: auto;
-              align-items: center;
-              flex-direction: column;
-            }
-            .our-services-thq-feature1-elm {
-              width: 100%;
-            }
-            .our-services-thq-feature2-elm {
-              width: 100%;
-            }
-            .our-services-thq-feature3-elm {
-              width: 100%;
-            }
-            .our-services-thq-feature4-elm {
-              width: 100%;
-            }
-          }
-          @media (max-width: 767px) {
-            .our-services-thq-text-elm {
-              text-align: center;
-            }
-          }
-          @media (max-width: 479px) {
-            .our-services-thq-max-width-elm {
-              gap: var(--dl-layout-space-oneandhalfunits);
-            }
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
 
 OurServices.defaultProps = {
+  rootClassName: '',
   sectionTitle: undefined,
+  sectionDescription: undefined,
 
-  // ✅ Use local public/services/oser-01..04
   feature1ImageSrc: '/services/oser-01.jpg',
   feature1ImageAlt: 'Film Production Image',
   feature1Title: undefined,
@@ -459,28 +569,31 @@ OurServices.defaultProps = {
 }
 
 OurServices.propTypes = {
-  sectionTitle: PropTypes.element,
+  rootClassName: PropTypes.string,
 
-  feature1ImageAlt: PropTypes.string,
+  sectionTitle: PropTypes.element,
+  sectionDescription: PropTypes.element,
+
   feature1ImageSrc: PropTypes.string,
+  feature1ImageAlt: PropTypes.string,
   feature1Title: PropTypes.element,
   feature1Description: PropTypes.element,
   feature1Button: PropTypes.element,
 
-  feature2ImageAlt: PropTypes.string,
   feature2ImageSrc: PropTypes.string,
+  feature2ImageAlt: PropTypes.string,
   feature2Title: PropTypes.element,
   feature2Description: PropTypes.element,
   feature2Button: PropTypes.element,
 
-  feature3ImageAlt: PropTypes.string,
   feature3ImageSrc: PropTypes.string,
+  feature3ImageAlt: PropTypes.string,
   feature3Title: PropTypes.element,
   feature3Description: PropTypes.element,
   feature3Button: PropTypes.element,
 
-  feature4ImageAlt: PropTypes.string,
   feature4ImageSrc: PropTypes.string,
+  feature4ImageAlt: PropTypes.string,
   feature4Title: PropTypes.element,
   feature4Description: PropTypes.element,
   feature4Button: PropTypes.element,
