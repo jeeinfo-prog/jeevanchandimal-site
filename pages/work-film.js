@@ -1,17 +1,37 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
+import dynamic from 'next/dynamic'
 
 import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import WorkFilmHero from '../components/work-film-hero'
 import FilmCategories from '../components/film-categories'
 import WorkFilmProduction from '../components/work-film-production'
-import WorkFilmCommercial from '../components/work-film-commercial'
-import WorkFilmDocumentries from '../components/work-film-documentries'
-import WorkFilmMusicVideo from '../components/work-film-music-video'
-import WorkFilmShortFilm from '../components/work-film-short-film'
-import SelectedFilmWork from '../components/selected-film-work'
-import WorkFilmEndNote from '../components/work-film-end-note'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
+
+// ✅ Lazy-load heavier sections (below the fold)
+const WorkFilmCommercial = dynamic(() => import('../components/work-film-commercial'), {
+  loading: () => <div style={{ minHeight: 160 }} />,
+})
+
+const WorkFilmDocumentries = dynamic(() => import('../components/work-film-documentries'), {
+  loading: () => <div style={{ minHeight: 160 }} />,
+})
+
+const WorkFilmMusicVideo = dynamic(() => import('../components/work-film-music-video'), {
+  loading: () => <div style={{ minHeight: 160 }} />,
+})
+
+const WorkFilmShortFilm = dynamic(() => import('../components/work-film-short-film'), {
+  loading: () => <div style={{ minHeight: 160 }} />,
+})
+
+const SelectedFilmWork = dynamic(() => import('../components/selected-film-work'), {
+  loading: () => <div style={{ minHeight: 240 }} />,
+})
+
+const WorkFilmEndNote = dynamic(() => import('../components/work-film-end-note'), {
+  loading: () => <div style={{ minHeight: 120 }} />,
+})
 
 function getSiteUrl() {
   const v = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_BASE_URL
@@ -75,7 +95,10 @@ const WorkFilm = () => {
         </div>
 
         {/* COMMERCIAL (wf-02) */}
-        <section className="backdropSection" style={{ backgroundImage: 'url(/work/film/wf-02.jpg)' }}>
+        <section
+          className="backdropSection"
+          style={{ backgroundImage: 'url(/work/film/wf-02.jpg)' }}
+        >
           <div className="backdropOverlay" />
           <div className="backdropInner">
             <WorkFilmCommercial />
@@ -83,7 +106,10 @@ const WorkFilm = () => {
         </section>
 
         {/* DOCUMENTARY (wf-03) */}
-        <section className="backdropSection" style={{ backgroundImage: 'url(/work/film/wf-03.jpg)' }}>
+        <section
+          className="backdropSection"
+          style={{ backgroundImage: 'url(/work/film/wf-03.jpg)' }}
+        >
           <div className="backdropOverlay" />
           <div className="backdropInner">
             <WorkFilmDocumentries />
@@ -91,7 +117,10 @@ const WorkFilm = () => {
         </section>
 
         {/* MUSIC VIDEO (wf-04) */}
-        <section className="backdropSection" style={{ backgroundImage: 'url(/work/film/wf-04.jpg)' }}>
+        <section
+          className="backdropSection"
+          style={{ backgroundImage: 'url(/work/film/wf-04.jpg)' }}
+        >
           <div className="backdropOverlay" />
           <div className="backdropInner">
             <WorkFilmMusicVideo />
@@ -99,7 +128,10 @@ const WorkFilm = () => {
         </section>
 
         {/* SHORT FILMS (wf-05) */}
-        <section className="backdropSection" style={{ backgroundImage: 'url(/work/film/wf-05.jpg)' }}>
+        <section
+          className="backdropSection"
+          style={{ backgroundImage: 'url(/work/film/wf-05.jpg)' }}
+        >
           <div className="backdropOverlay" />
           <div className="backdropInner">
             <WorkFilmShortFilm />
@@ -107,7 +139,10 @@ const WorkFilm = () => {
         </section>
 
         {/* SELECTED WORK (wf-06) */}
-        <section className="backdropSection" style={{ backgroundImage: 'url(/work/film/wf-06.jpg)' }}>
+        <section
+          className="backdropSection"
+          style={{ backgroundImage: 'url(/work/film/wf-06.jpg)' }}
+        >
           <div className="backdropOverlay soft" />
           <div className="backdropInner">
             <SelectedFilmWork />
