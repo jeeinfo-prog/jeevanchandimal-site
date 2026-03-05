@@ -12,21 +12,28 @@ const WorkStockPreview = (props) => {
     []
   )
 
-  const [items, setItems] = useState(() =>
+  const makeStaticItems = () =>
     staticFallback.map((src, i) => ({
       src,
       alt: `Stock preview ${i + 1}`,
       href: props.storeHref || '/store',
     }))
-  )
+
+  const [items, setItems] = useState(() => makeStaticItems())
   const [loading, setLoading] = useState(false)
 
   // ✅ prevent setState after unmount
   const mountedRef = useRef(true)
+
+  // ✅ abort in-flight requests + ignore stale results
+  const abortRef = useRef(null)
+  const reqIdRef = useRef(0)
+
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      if (abortRef.current) abortRef.current.abort()
     }
   }, [])
 
@@ -50,23 +57,39 @@ const WorkStockPreview = (props) => {
     )
 
   function setStaticItems() {
-    setItems(
-      staticFallback.map((src, i) => ({
-        src,
-        alt: `Stock preview ${i + 1}`,
-        href: props.storeHref || '/store',
-      }))
+    setItems(makeStaticItems())
+  }
+
+  // ✅ helper to bust CDN/browser cache
+  function withCacheBust(url) {
+    const u = new URL(
+      url,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
     )
+    u.searchParams.set('_t', String(Date.now()))
+    return u.pathname + u.search
   }
 
   // ✅ Load from store (API)
   async function loadRandom() {
     if (!props.apiEndpoint) return
+
+    // cancel any previous fetch
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    const myReqId = ++reqIdRef.current
+
     try {
       setLoading(true)
 
-      const res = await fetch(props.apiEndpoint, {
+      const endpoint = withCacheBust(props.apiEndpoint)
+
+      const res = await fetch(endpoint, {
         headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
@@ -95,6 +118,7 @@ const WorkStockPreview = (props) => {
         .filter((x) => x?.src && typeof x.src === 'string')
 
       if (!mountedRef.current) return
+      if (myReqId !== reqIdRef.current) return // stale response guard
 
       if (normalized.length) {
         setItems(normalized)
@@ -103,43 +127,65 @@ const WorkStockPreview = (props) => {
       }
     } catch (e) {
       if (!mountedRef.current) return
-      if (props.fallbackToStaticOnError) {
-        setStaticItems()
-      }
+      if (e?.name === 'AbortError') return
+      if (props.fallbackToStaticOnError) setStaticItems()
     } finally {
       if (mountedRef.current) setLoading(false)
     }
   }
 
-  // initial
+  // ✅ initial load
   useEffect(() => {
     if (props.apiEndpoint) loadRandom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.apiEndpoint])
 
-  // ✅ Auto refresh (optional)
+  // ✅ refresh when user returns to the tab
+  useEffect(() => {
+    if (!props.refreshOnFocus) return
+    if (typeof window === 'undefined') return
+
+    const onFocus = () => {
+      if (props.apiEndpoint) loadRandom()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.refreshOnFocus, props.apiEndpoint])
+
+  // ✅ auto refresh every X ms (60s default)
   useEffect(() => {
     if (!props.apiEndpoint) return
-    if (!props.autoRefreshMs || props.autoRefreshMs < 5000) return
+    if (!props.autoRefreshInterval || props.autoRefreshInterval < 5000) return
+    if (typeof window === 'undefined') return
 
     const t = setInterval(() => {
       loadRandom()
-    }, props.autoRefreshMs)
+    }, props.autoRefreshInterval)
 
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.apiEndpoint, props.autoRefreshMs])
+  }, [props.apiEndpoint, props.autoRefreshInterval])
+
+  // ✅ hero image (refreshes because it follows items[0] unless explicitly set)
+  const hero = useMemo(() => {
+    if (props.heroImageSrc) return props.heroImageSrc
+    if (items?.[0]?.src) return items[0].src
+    return staticFallback?.[0] || '/work/photography/wsp-01.jpg'
+  }, [props.heroImageSrc, items, staticFallback])
 
   return (
     <>
-      <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
+      <section
+        className={`wrap thq-section-padding ${props.rootClassName || ''}`}
+      >
         <div className="shell thq-section-max-width">
           {/* ===== CINEMATIC HEADER CARD (like AI block) ===== */}
           <header className="hero">
             <div className="heroBg" aria-hidden="true">
               <div
                 className="heroImg"
-                style={{ backgroundImage: `url(${props.heroImageSrc || items?.[0]?.src || staticFallback[0]})` }}
+                style={{ backgroundImage: `url(${hero})` }}
               />
               <div className="heroVignette" />
               <div className="heroGrain" />
@@ -170,14 +216,20 @@ const WorkStockPreview = (props) => {
 
                 <a className="btnPrimary" href={props.storeHref || '/store'}>
                   <span className="thq-body-small">Open Store</span>
-                  <svg viewBox="0 0 1024 1024" className="icon" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 1024 1024"
+                    className="icon"
+                    aria-hidden="true"
+                  >
                     <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
                   </svg>
                 </a>
               </div>
 
               <div className="micro thq-body-small">
-                Curated previews · Licensing-ready · Consistent visual language
+                Curated previews · Licensing-ready · Consistent visual language ·
+                Auto refresh every{' '}
+                {Math.round((props.autoRefreshInterval || 0) / 1000)}s
               </div>
             </div>
           </header>
@@ -494,8 +546,8 @@ WorkStockPreview.defaultProps = {
   heading1: undefined,
   content1: undefined,
 
-  // ✅ cinematic header background (set to any strong frame)
-  heroImageSrc: '/work/photography/wsp-01.jpg',
+  // ✅ IMPORTANT: keep undefined so hero follows items[0] (auto-refresh)
+  heroImageSrc: undefined,
 
   // ✅ Store auto-load
   apiEndpoint: '/api/gallery/random?limit=8',
@@ -503,8 +555,11 @@ WorkStockPreview.defaultProps = {
   // ✅ where each image should link
   storeHref: '/store',
 
-  // ✅ auto update every 60s (set 0 to disable)
-  autoRefreshMs: 60000,
+  // ✅ refresh when tab gains focus
+  refreshOnFocus: true,
+
+  // ✅ auto refresh every 60 seconds (set 0 to disable)
+  autoRefreshInterval: 60000,
 
   fallbackToStaticOnError: true,
   fallbackToStaticOnEmpty: true,
@@ -521,7 +576,8 @@ WorkStockPreview.propTypes = {
   apiEndpoint: PropTypes.string,
   storeHref: PropTypes.string,
 
-  autoRefreshMs: PropTypes.number,
+  refreshOnFocus: PropTypes.bool,
+  autoRefreshInterval: PropTypes.number,
 
   fallbackToStaticOnError: PropTypes.bool,
   fallbackToStaticOnEmpty: PropTypes.bool,
