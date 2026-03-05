@@ -60,7 +60,10 @@ const WorkCinematicGallery = (props) => {
 
   // ✅ helper to bust CDN/browser cache
   function withCacheBust(url) {
-    const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+    const u = new URL(
+      url,
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+    )
     u.searchParams.set('_t', String(Date.now()))
     return u.pathname + u.search
   }
@@ -131,7 +134,7 @@ const WorkCinematicGallery = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.apiEndpoint])
 
-  // ✅ refresh when user returns to the tab (helps when you upload new photos)
+  // ✅ refresh when user returns to the tab
   useEffect(() => {
     if (!props.refreshOnFocus) return
     if (typeof window === 'undefined') return
@@ -144,6 +147,19 @@ const WorkCinematicGallery = (props) => {
     return () => window.removeEventListener('focus', onFocus)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.refreshOnFocus, props.apiEndpoint])
+
+  // ✅ auto refresh every X ms
+  useEffect(() => {
+    if (!props.autoRefreshInterval || !props.apiEndpoint) return
+    if (typeof window === 'undefined') return
+
+    const timer = setInterval(() => {
+      loadRandom()
+    }, props.autoRefreshInterval)
+
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.autoRefreshInterval, props.apiEndpoint])
 
   // 🔹 shuffle mode
   useEffect(() => {
@@ -168,8 +184,8 @@ const WorkCinematicGallery = (props) => {
   const active = activeIdx >= 0 ? items[activeIdx] : null
 
   // ✅ cinematic header hero image
-  // Important: use heroImageSrc ONLY if user actually passes it (truthy).
-  // Default is undefined now, so hero will follow items[0] when API loads.
+  // If heroImageSrc is passed explicitly, use it.
+  // Otherwise follow the newest loaded items[0].
   const hero = useMemo(() => {
     if (props.heroImageSrc) return props.heroImageSrc
     if (items?.[0]?.src) return items[0].src
@@ -178,12 +194,17 @@ const WorkCinematicGallery = (props) => {
 
   return (
     <>
-      <section className={`wrap thq-section-padding ${props.rootClassName || ''}`}>
+      <section
+        className={`wrap thq-section-padding ${props.rootClassName || ''}`}
+      >
         <div className="shell thq-section-max-width">
           {/* ===== CINEMATIC HEADER CARD (bit different) ===== */}
           <header className="hero">
             <div className="heroBg" aria-hidden="true">
-              <div className="heroImg" style={{ backgroundImage: `url(${hero})` }} />
+              <div
+                className="heroImg"
+                style={{ backgroundImage: `url(${hero})` }}
+              />
               <div className="heroVignette" />
               <div className="heroGrain" />
             </div>
@@ -210,7 +231,10 @@ const WorkCinematicGallery = (props) => {
                 )}
 
                 {!!(props.storeHref || active?.href) && (
-                  <a className="btnPrimary" href={props.storeHref || active?.href || '/store'}>
+                  <a
+                    className="btnPrimary"
+                    href={props.storeHref || active?.href || '/store'}
+                  >
                     <span className="thq-body-small">Open Store</span>
                     <svg viewBox="0 0 1024 1024" className="icon">
                       <path d="M426 256l256 256-256 256-60-60 196-196-196-196z" />
@@ -221,6 +245,8 @@ const WorkCinematicGallery = (props) => {
 
               <div className="micro thq-body-small">
                 Tap any frame to preview · Arrow keys to navigate · Esc to close
+                · Auto refresh every{' '}
+                {Math.round((props.autoRefreshInterval || 0) / 1000)}s
               </div>
             </div>
           </header>
@@ -247,7 +273,9 @@ const WorkCinematicGallery = (props) => {
                   />
                   <div className="shade" />
                   <span className="glow" />
-                  <span className="count">{String(idx + 1).padStart(2, '0')}</span>
+                  <span className="count">
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
                 </button>
               ))}
             </div>
@@ -268,7 +296,11 @@ const WorkCinematicGallery = (props) => {
                 </span>
               </div>
 
-              <button className="lbClose" onClick={() => setActiveIdx(-1)} type="button">
+              <button
+                className="lbClose"
+                onClick={() => setActiveIdx(-1)}
+                type="button"
+              >
                 ✕
               </button>
             </div>
@@ -285,11 +317,17 @@ const WorkCinematicGallery = (props) => {
               </button>
 
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="lbImg" src={active.src} alt={active.alt || 'Preview'} />
+              <img
+                className="lbImg"
+                src={active.src}
+                alt={active.alt || 'Preview'}
+              />
 
               <button
                 className="lbNav"
-                onClick={() => setActiveIdx((i) => Math.min(items.length - 1, i + 1))}
+                onClick={() =>
+                  setActiveIdx((i) => Math.min(items.length - 1, i + 1))
+                }
                 disabled={activeIdx === items.length - 1}
                 type="button"
                 aria-label="Next"
@@ -753,8 +791,11 @@ WorkCinematicGallery.defaultProps = {
   fallbackToStaticOnError: true,
   fallbackToStaticOnEmpty: true,
 
-  // ✅ new: refresh when tab gains focus
+  // ✅ refresh when tab gains focus
   refreshOnFocus: true,
+
+  // ✅ auto refresh every 60 seconds
+  autoRefreshInterval: 60000,
 }
 
 WorkCinematicGallery.propTypes = {
@@ -772,6 +813,7 @@ WorkCinematicGallery.propTypes = {
   fallbackToStaticOnEmpty: PropTypes.bool,
 
   refreshOnFocus: PropTypes.bool,
+  autoRefreshInterval: PropTypes.number,
 }
 
 export default WorkCinematicGallery
