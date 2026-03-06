@@ -215,12 +215,12 @@ ContactOffice.defaultProps = {
   location1: undefined,
   location2ImgAlt: 'Studio Image',
   location1ImgAlt: 'Headquarters Image',
-  location2ImgSrc: '/Audio/Studio/46761_107423292651247_2063467_n-1400w.jpg',
+  location2ImgSrc: '/contact/contactstudio-02.jpg',
   content1: undefined,
   heading1: undefined,
   location1Description: undefined,
   location1ImgSrc:
-    'https://images.unsplash.com/photo-1497366811353-6870744d04b2?ixid=M3w5MTMyMXwwfDF8c2VhcmNofDJ8fG9mZmljZXxlbnwwfHx8fDE3Njk0NTYxNjZ8MA&ixlib=rb-4.1.0&w=1400',
+    '/contact/contactoffice-01.jpg',
   location2Description: undefined,
 }
 
