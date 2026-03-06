@@ -9,11 +9,22 @@ const SkillsOverview = (props) => {
 
   return (
     <>
-      <div className="skills-overview-thq-layout300-elm thq-section-padding">
-        <div className="skills-overview-thq-max-width-elm thq-section-max-width">
-          <div className="skills-overview-thq-section-title-elm">
-            <div className="skills-overview-thq-content-elm1">
-              <h2 className="skills-overview-thq-text-elm1 thq-heading-2">
+      <section className={`skills-overview-wrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="skills-overview-max thq-section-max-width">
+          {/* Luxury cinematic title section */}
+          <div className="skillsHeroCard">
+            <div className="skillsHeroBg" aria-hidden="true">
+              <div className="skillsHeroVignette" />
+              <div className="skillsHeroGrain" />
+            </div>
+
+            <div className="skillsHeroInner">
+              <div className="skillsHeroKickerRow">
+                <span className="skillsHeroKicker">SKILLS</span>
+                <span className="skillsHeroLine" />
+              </div>
+
+              <h2 className="skillsHeroTitle thq-heading-2">
                 {props.heading1 ?? (
                   <Fragment>
                     <span>Skills Overview</span>
@@ -21,19 +32,26 @@ const SkillsOverview = (props) => {
                 )}
               </h2>
 
-              <span className="skills-overview-thq-text-elm2 thq-body-large">
+              <p className="skillsHeroCopy thq-body-large">
                 {props.content1 ?? (
                   <Fragment>
                     <span>
-                      From concept to final delivery, I handle the full creative process — ensuring every element works
-                      together as one voice.
+                      From concept to final delivery, I handle the full creative process — ensuring every
+                      element works together as one voice.
                     </span>
                   </Fragment>
                 )}
-              </span>
+              </p>
+
+              <div className="skillsHeroDivider" aria-hidden="true" />
+
+              <div className="skillsHeroMeta thq-body-small">
+                Visual • Motion • Audio • Direction • Story
+              </div>
             </div>
           </div>
 
+          {/* Cards */}
           <div className="skills-overview-thq-content-elm2">
             <div className="skills-overview-thq-row-elm">
               {/* VISUAL */}
@@ -95,12 +113,144 @@ const SkillsOverview = (props) => {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <style jsx>{`
-        /* 🔧 reduced gap between text and cards */
+        .skills-overview-wrap {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+        }
+
+        .skills-overview-max {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 22px;
+        }
+
+        /* cinematic title card */
+        .skillsHeroCard {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(10px);
+        }
+
+        .skillsHeroBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .skillsHeroVignette {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(
+              80% 70% at 50% 15%,
+              rgba(255, 255, 255, 0.05),
+              rgba(0, 0, 0, 0.78)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.82) 0%,
+              rgba(0, 0, 0, 0.35) 50%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+        }
+
+        .skillsHeroGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .skillsHeroInner {
+          position: relative;
+          z-index: 1;
+          padding: 32px 28px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          align-items: center;
+          text-align: center;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+
+        .skillsHeroKickerRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          justify-content: center;
+        }
+
+        .skillsHeroKicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+        }
+
+        .skillsHeroLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .skillsHeroTitle {
+          margin: 0;
+          line-height: 1.15;
+          text-shadow: 0 16px 42px rgba(0, 0, 0, 0.55);
+        }
+
+        .skillsHeroCopy {
+          margin: 0;
+          line-height: 1.8;
+          color: rgba(245, 244, 244, 0.85);
+          max-width: 70ch;
+        }
+
+        .skillsHeroDivider {
+          width: 100%;
+          height: 1px;
+          margin-top: 8px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.12),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0.12)
+          );
+        }
+
+        .skillsHeroMeta {
+          color: rgba(245, 244, 244, 0.6);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          font-size: 12px;
+        }
+
+        /* cards section */
         .skills-overview-thq-content-elm2 {
-          margin-top: var(--dl-layout-space-oneandhalfunits);
+          margin-top: 0;
         }
 
         .skills-overview-thq-row-elm {
@@ -120,11 +270,13 @@ const SkillsOverview = (props) => {
           text-decoration: none !important;
           color: #f5f4f4;
           opacity: 0.92;
-          transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease,
+          transition:
+            transform 220ms ease,
+            box-shadow 220ms ease,
+            border-color 220ms ease,
             background 220ms ease;
         }
 
-        /* hover lift + cyan glow */
         .skillsCard:hover {
           transform: translateY(-3px) scale(1.01);
           border-color: rgba(37, 195, 226, 0.28);
@@ -132,7 +284,6 @@ const SkillsOverview = (props) => {
           background: rgba(255, 255, 255, 0.03);
         }
 
-        /* blue text on hover */
         .menuItem:hover {
           color: #25c3e2 !important;
           opacity: 1;
@@ -183,7 +334,6 @@ const SkillsOverview = (props) => {
           gap: 10px;
         }
 
-        /* hover arrow */
         .hoverArrow {
           position: absolute;
           right: 16px;
@@ -201,6 +351,22 @@ const SkillsOverview = (props) => {
         }
 
         @media (max-width: 767px) {
+          .skills-overview-max {
+            gap: 16px;
+          }
+
+          .skillsHeroInner {
+            padding: 22px 16px 18px;
+          }
+
+          .skillsHeroLine {
+            display: none;
+          }
+
+          .skillsHeroCopy {
+            max-width: 62ch;
+          }
+
           .skills-overview-thq-row-elm {
             flex-direction: column;
           }
@@ -211,9 +377,27 @@ const SkillsOverview = (props) => {
 }
 
 SkillsOverview.defaultProps = {
+  heading1: undefined,
+  content1: undefined,
   feature1ImageSrc: '/JC/jeeva%20chandimal%20-%201_0002_viveza%203-1400w.jpg',
+  feature1ImageAlt: 'Visual work',
   feature2ImageSrc: '/JC/jeevan%20chandimal_0000_layer%2023-1400w.jpg',
+  feature2ImageAlt: 'Motion work',
   feature3ImageSrc: '/JC/jeeva%20chandimal%20-%201_0004_layer%201-1400w.jpg',
+  feature3ImageAlt: 'Audio work',
+  rootClassName: '',
+}
+
+SkillsOverview.propTypes = {
+  heading1: PropTypes.element,
+  content1: PropTypes.element,
+  feature1ImageSrc: PropTypes.string,
+  feature1ImageAlt: PropTypes.string,
+  feature2ImageSrc: PropTypes.string,
+  feature2ImageAlt: PropTypes.string,
+  feature3ImageSrc: PropTypes.string,
+  feature3ImageAlt: PropTypes.string,
+  rootClassName: PropTypes.string,
 }
 
 export default SkillsOverview
