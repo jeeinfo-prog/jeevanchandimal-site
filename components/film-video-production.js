@@ -55,7 +55,7 @@ const FilmVideoProduction = (props) => {
 }
 
 FilmVideoProduction.defaultProps = {
-  video1Src: '/Film/film%20production%2002.mov',
+  video1Src: '/work/film/workfilmandvideo-01.mp4',
   rootClassName: '',
 }
 
