@@ -251,7 +251,7 @@ const ServiceAudioHero = (props) => {
 
 ServiceAudioHero.defaultProps = {
   rootClassName: '',
-  videoSrc: '/services/Audio/seraudio-01.mov',
+  videoSrc: '/services/audio/seraudio-01.mov',
   heading1: undefined,
   content1: undefined,
 
