@@ -366,7 +366,7 @@ SoundDesign.defaultProps = {
   action2: undefined,
   heading1: undefined,
   content1: undefined,
-  videoSrc1: '/Audio/audio%20production%2003.mov',
+  videoSrc1: '/work/worksounddesign-01.mp4',
 }
 
 SoundDesign.propTypes = {
