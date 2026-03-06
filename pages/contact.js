@@ -1,43 +1,44 @@
 import React, { Fragment } from 'react'
 import Head from 'next/head'
 
-import { useTranslations } from 'next-intl'
-
 import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import ContactFormFinal from '../components/contact-form-final'
 import ContactJC from '../components/contact-jc'
 import ContactOffice from '../components/contact-office'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
-const Contact = (props) => {
+const Contact = () => {
   return (
     <>
       <div className="contact-container">
         <Head>
-          <title>
-            Contact - Jeevan Chandimal | Filmmaker & Visual Storyteller
-          </title>
+          <title>Contact - Jeevan Chandimal | Filmmaker & Visual Storyteller</title>
           <meta
             name="description"
-            content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound. Cinematic work shaped with intention and restraint."
+            content="Get in touch with Jeevan Chandimal for film, photography, motion, and audio collaborations. Cinematic work shaped with intention, mood, and restraint."
           />
           <meta
             property="og:title"
-            content="Contact - Jeevan Chandimal | Filmmaker &amp; Visual Storyteller"
+            content="Contact - Jeevan Chandimal | Filmmaker & Visual Storyteller"
           />
           <meta
             property="og:description"
-            content="Jeevan Chandimal is a filmmaker and visual storyteller crafting atmosphere through image, motion, and sound."
+            content="Get in touch with Jeevan Chandimal for film, photography, motion, and audio collaborations."
           />
           <meta
             property="og:image"
-            content="https://aheioqhobo.cloudimg.io/v7/_playground-bucket-v2.teleporthq.io_/1e052279-2879-4d4a-b576-0d545df1baa9/f8b288cf-c33a-4971-b301-c944c3ca6c1f?org_if_sml=1&amp;force_format=original"
+            content="https://aheioqhobo.cloudimg.io/v7/_playground-bucket-v2.teleporthq.io_/1e052279-2879-4d4a-b576-0d545df1baa9/f8b288cf-c33a-4971-b301-c944c3ca6c1f?org_if_sml=1&force_format=original"
           />
-          <link
-            rel="canonical"
-            href="https://firm-these-stork-6nk3lv.teleporthq.app/contact"
-          />
+          <link rel="canonical" href="https://firm-these-stork-6nk3lv.teleporthq.app/contact" />
         </Head>
+
+        <div className="page-bg" aria-hidden="true">
+          <div className="page-vignette" />
+          <div className="page-glow page-glow1" />
+          <div className="page-glow page-glow2" />
+          <div className="page-grain" />
+        </div>
+
         <JeevanChandimalNavi
           link1={
             <Fragment>
@@ -125,138 +126,197 @@ const Contact = (props) => {
             </Fragment>
           }
           rootClassName="jeevan-chandimal-naviroot-class-name4"
-        ></JeevanChandimalNavi>
-        <ContactFormFinal
-          action={
-            <Fragment>
-              <span className="contact-text27">Submit</span>
-            </Fragment>
-          }
-          content1={
-            <Fragment>
-              <span className="contact-text28">
-                Do not hesitate to contact us. We look forward to hearing from
-                you!
-              </span>
-            </Fragment>
-          }
-          content2={
-            <Fragment>
-              <span className="contact-text29">Get in touch with us</span>
-            </Fragment>
-          }
-          heading1={
-            <Fragment>
-              <span className="contact-text30">Contact us</span>
-            </Fragment>
-          }
-        ></ContactFormFinal>
-        <ContactJC
-          link1={
-            <Fragment>
-              <span className="contact-text31">Start Call</span>
-            </Fragment>
-          }
-          email1={
-            <Fragment>
-              <span className="contact-text32">Start new chat</span>
-            </Fragment>
-          }
-          phone1={
-            <Fragment>
-              <span className="contact-text33">New mail</span>
-            </Fragment>
-          }
-          address1={
-            <Fragment>
-              <span className="contact-text34">Kohuwala, Srilanka.</span>
-            </Fragment>
-          }
-          content1={
-            <Fragment>
-              <span className="contact-text35">Watsapp :+94 711735735</span>
-            </Fragment>
-          }
-          content2={
-            <Fragment>
-              <span className="contact-text36">+94 769771394</span>
-            </Fragment>
-          }
-          content3={
-            <Fragment>
-              <span className="contact-text37">info@jeevanchandimal.com</span>
-            </Fragment>
-          }
-          content4={
-            <Fragment>
-              <span className="contact-text38">
-                No. 99, Sunethradevi Road,
-                <span
-                  dangerouslySetInnerHTML={{
-                    __html: ' ',
-                  }}
+        />
+
+        <main className="contact-main">
+          {/* HERO */}
+          <section className="contact-hero thq-section-padding">
+            <div className="contact-hero-max thq-section-max-width">
+              <div className="contact-hero-card">
+                <div className="contact-hero-card-bg" aria-hidden="true">
+                  <div className="contact-hero-card-vignette" />
+                  <div className="contact-hero-card-grain" />
+                </div>
+
+                <div className="contact-hero-inner">
+                  <div className="contact-kicker-row">
+                    <span className="contact-kicker">CONTACT</span>
+                    <span className="contact-kicker-line" />
+                  </div>
+
+                  <h1 className="contact-hero-title">
+                    Let’s build something with mood, clarity, and intention.
+                  </h1>
+
+                  <p className="contact-hero-copy">
+                    Whether it’s a film, a visual campaign, photography, motion, or sound-led work,
+                    this is the place to start the conversation.
+                  </p>
+
+                  <div className="contact-hero-divider" aria-hidden="true" />
+
+                  <div className="contact-hero-meta">
+                    Film • Photography • Motion • Audio • Direction
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* FORM */}
+          <section className="section-shell thq-section-padding">
+            <div className="section-max thq-section-max-width">
+              <div className="section-card">
+                <ContactFormFinal
+                  action={
+                    <Fragment>
+                      <span className="contact-text27">Submit</span>
+                    </Fragment>
+                  }
+                  content1={
+                    <Fragment>
+                      <span className="contact-text28">
+                        Do not hesitate to contact us. We look forward to hearing from you!
+                      </span>
+                    </Fragment>
+                  }
+                  content2={
+                    <Fragment>
+                      <span className="contact-text29">Get in touch with us</span>
+                    </Fragment>
+                  }
+                  heading1={
+                    <Fragment>
+                      <span className="contact-text30">Contact us</span>
+                    </Fragment>
+                  }
                 />
-              </span>
-            </Fragment>
-          }
-          heading1={
-            <Fragment>
-              <span className="contact-text39">Contact Us</span>
-            </Fragment>
-          }
-          heading2={
-            <Fragment>
-              <span className="contact-text40">Phone</span>
-            </Fragment>
-          }
-          heading3={
-            <Fragment>
-              <span className="contact-text41">Email</span>
-            </Fragment>
-          }
-          heading4={
-            <Fragment>
-              <span className="contact-text42">Address</span>
-            </Fragment>
-          }
-        ></ContactJC>
-        <ContactOffice
-          content1={
-            <Fragment>
-              <span className="contact-text43">
-                For inquiries and appointments, please visit us at our
-                headquarters.
-              </span>
-            </Fragment>
-          }
-          heading1={
-            <Fragment>
-              <span className="contact-text44">Contact Us</span>
-            </Fragment>
-          }
-          location1={
-            <Fragment>
-              <span className="contact-text45">Office</span>
-            </Fragment>
-          }
-          location2={
-            <Fragment>
-              <span className="contact-text46">Studio</span>
-            </Fragment>
-          }
-          location1Description={
-            <Fragment>
-              <span className="contact-text47">No. 99, Sunethradevi Road,</span>
-            </Fragment>
-          }
-          location2Description={
-            <Fragment>
-              <span className="contact-text48">
-                No. 99, Sunethradevi Road, Kohuwala, Sri Lanka.
-              </span>
-            </Fragment>
-          }
-        ></ContactOffice>
+              </div>
+            </div>
+          </section>
+
+          {/* DIRECT CONTACT */}
+          <section className="section-shell section-shell-tight">
+            <div className="section-max thq-section-max-width">
+              <div className="section-card">
+                <ContactJC
+                  link1={
+                    <Fragment>
+                      <span className="contact-text31">Start Call</span>
+                    </Fragment>
+                  }
+                  email1={
+                    <Fragment>
+                      <span className="contact-text32">Start new chat</span>
+                    </Fragment>
+                  }
+                  phone1={
+                    <Fragment>
+                      <span className="contact-text33">New mail</span>
+                    </Fragment>
+                  }
+                  address1={
+                    <Fragment>
+                      <span className="contact-text34">Kohuwala, Srilanka.</span>
+                    </Fragment>
+                  }
+                  content1={
+                    <Fragment>
+                      <span className="contact-text35">Watsapp :+94 711735735</span>
+                    </Fragment>
+                  }
+                  content2={
+                    <Fragment>
+                      <span className="contact-text36">+94 769771394</span>
+                    </Fragment>
+                  }
+                  content3={
+                    <Fragment>
+                      <span className="contact-text37">info@jeevanchandimal.com</span>
+                    </Fragment>
+                  }
+                  content4={
+                    <Fragment>
+                      <span className="contact-text38">
+                        No. 99, Sunethradevi Road,
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: ' ',
+                          }}
+                        />
+                      </span>
+                    </Fragment>
+                  }
+                  heading1={
+                    <Fragment>
+                      <span className="contact-text39">Contact Us</span>
+                    </Fragment>
+                  }
+                  heading2={
+                    <Fragment>
+                      <span className="contact-text40">Phone</span>
+                    </Fragment>
+                  }
+                  heading3={
+                    <Fragment>
+                      <span className="contact-text41">Email</span>
+                    </Fragment>
+                  }
+                  heading4={
+                    <Fragment>
+                      <span className="contact-text42">Address</span>
+                    </Fragment>
+                  }
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* OFFICE / STUDIO */}
+          <section className="section-shell section-shell-tight section-shell-last">
+            <div className="section-max thq-section-max-width">
+              <div className="section-card">
+                <ContactOffice
+                  content1={
+                    <Fragment>
+                      <span className="contact-text43">
+                        For inquiries and appointments, please visit us at our headquarters.
+                      </span>
+                    </Fragment>
+                  }
+                  heading1={
+                    <Fragment>
+                      <span className="contact-text44">Contact Us</span>
+                    </Fragment>
+                  }
+                  location1={
+                    <Fragment>
+                      <span className="contact-text45">Office</span>
+                    </Fragment>
+                  }
+                  location2={
+                    <Fragment>
+                      <span className="contact-text46">Studio</span>
+                    </Fragment>
+                  }
+                  location1Description={
+                    <Fragment>
+                      <span className="contact-text47">No. 99, Sunethradevi Road,</span>
+                    </Fragment>
+                  }
+                  location2Description={
+                    <Fragment>
+                      <span className="contact-text48">
+                        No. 99, Sunethradevi Road, Kohuwala, Sri Lanka.
+                      </span>
+                    </Fragment>
+                  }
+                />
+              </div>
+            </div>
+          </section>
+        </main>
+
         <JeevanChandimalNewFooter
           link11={
             <Fragment>
@@ -349,190 +409,366 @@ const Contact = (props) => {
             </Fragment>
           }
           rootClassName="jeevan-chandimal-new-footerroot-class-name7"
-        ></JeevanChandimalNewFooter>
+        />
       </div>
-      <style jsx>
-        {`
-          .contact-container {
-            width: 100%;
-            display: flex;
-            min-height: 100vh;
-            align-items: center;
-            flex-direction: column;
+
+      <style jsx>{`
+        .contact-container {
+          width: 100%;
+          min-height: 100vh;
+          display: flex;
+          position: relative;
+          overflow: hidden;
+          align-items: center;
+          flex-direction: column;
+          background:
+            radial-gradient(circle at top, rgba(37, 195, 226, 0.08), transparent 28%),
+            linear-gradient(180deg, #060606 0%, #0a0a0a 42%, #080808 100%);
+        }
+
+        .page-bg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .page-vignette {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(
+              90% 70% at 50% 0%,
+              rgba(255, 255, 255, 0.03),
+              rgba(0, 0, 0, 0.64)
+            ),
+            linear-gradient(
+              180deg,
+              rgba(0, 0, 0, 0.12) 0%,
+              rgba(0, 0, 0, 0.42) 42%,
+              rgba(0, 0, 0, 0.72) 100%
+            );
+        }
+
+        .page-glow {
+          position: absolute;
+          border-radius: 999px;
+          filter: blur(80px);
+          opacity: 0.22;
+        }
+
+        .page-glow1 {
+          top: 120px;
+          left: -60px;
+          width: 280px;
+          height: 280px;
+          background: rgba(37, 195, 226, 0.18);
+        }
+
+        .page-glow2 {
+          top: 560px;
+          right: -80px;
+          width: 320px;
+          height: 320px;
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        .page-grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.06;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .contact-main {
+          width: 100%;
+          position: relative;
+          z-index: 1;
+        }
+
+        .contact-hero {
+          width: 100%;
+          padding-top: calc(var(--dl-layout-space-fiveunits) + 40px);
+          padding-bottom: var(--dl-layout-space-threeunits);
+          display: flex;
+          justify-content: center;
+        }
+
+        .contact-hero-max {
+          width: 100%;
+        }
+
+        .contact-hero-card {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 26px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.52);
+          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.52);
+          backdrop-filter: blur(12px);
+        }
+
+        .contact-hero-card-bg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .contact-hero-card-vignette {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(
+              80% 72% at 50% 14%,
+              rgba(255, 255, 255, 0.05),
+              rgba(0, 0, 0, 0.78)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.82) 0%,
+              rgba(0, 0, 0, 0.35) 50%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+        }
+
+        .contact-hero-card-grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .contact-hero-inner {
+          position: relative;
+          z-index: 1;
+          max-width: 920px;
+          margin: 0 auto;
+          padding: 38px 32px 30px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          gap: 16px;
+        }
+
+        .contact-kicker-row {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+        }
+
+        .contact-kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+        }
+
+        .contact-kicker-line {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .contact-hero-title {
+          margin: 0;
+          color: #f5f4f4;
+          font-size: clamp(32px, 5vw, 58px);
+          line-height: 1.05;
+          letter-spacing: -0.03em;
+          text-shadow: 0 16px 42px rgba(0, 0, 0, 0.55);
+          max-width: 12ch;
+        }
+
+        .contact-hero-copy {
+          margin: 0;
+          max-width: 64ch;
+          font-size: 16px;
+          line-height: 1.85;
+          color: rgba(245, 244, 244, 0.84);
+        }
+
+        .contact-hero-divider {
+          width: 100%;
+          height: 1px;
+          margin-top: 8px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.12),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0.12)
+          );
+        }
+
+        .contact-hero-meta {
+          color: rgba(245, 244, 244, 0.6);
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          font-size: 12px;
+        }
+
+        .section-shell {
+          width: 100%;
+          position: relative;
+          z-index: 1;
+          padding-top: 0;
+          padding-bottom: var(--dl-layout-space-threeunits);
+        }
+
+        .section-shell-tight {
+          padding-bottom: var(--dl-layout-space-twounits);
+        }
+
+        .section-shell-last {
+          padding-bottom: var(--dl-layout-space-fiveunits);
+        }
+
+        .section-max {
+          width: 100%;
+        }
+
+        .section-card {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 24px;
+          border: 1px solid rgba(245, 244, 244, 0.08);
+          background:
+            linear-gradient(
+              180deg,
+              rgba(255, 255, 255, 0.028),
+              rgba(255, 255, 255, 0.016)
+            );
+          box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
+          backdrop-filter: blur(8px);
+        }
+
+        .section-card :global(.thq-section-padding) {
+          padding-top: 32px !important;
+          padding-bottom: 32px !important;
+        }
+
+        .section-card :global(.thq-section-max-width) {
+          max-width: 100% !important;
+        }
+
+        .contact-text10,
+        .contact-text11,
+        .contact-text12,
+        .contact-text13,
+        .contact-text14,
+        .contact-text15,
+        .contact-text16,
+        .contact-text17,
+        .contact-text18,
+        .contact-text19,
+        .contact-text20,
+        .contact-text21,
+        .contact-text22,
+        .contact-text23,
+        .contact-text24,
+        .contact-text25,
+        .contact-text26,
+        .contact-text27,
+        .contact-text28,
+        .contact-text29,
+        .contact-text30,
+        .contact-text31,
+        .contact-text32,
+        .contact-text33,
+        .contact-text34,
+        .contact-text35,
+        .contact-text36,
+        .contact-text37,
+        .contact-text38,
+        .contact-text39,
+        .contact-text40,
+        .contact-text41,
+        .contact-text42,
+        .contact-text43,
+        .contact-text44,
+        .contact-text45,
+        .contact-text46,
+        .contact-text47,
+        .contact-text48,
+        .contact-text49,
+        .contact-text50,
+        .contact-text51,
+        .contact-text52,
+        .contact-text53,
+        .contact-text54,
+        .contact-text55,
+        .contact-text56,
+        .contact-text57,
+        .contact-text58,
+        .contact-text59,
+        .contact-text60,
+        .contact-text61,
+        .contact-text62,
+        .contact-text63,
+        .contact-text64,
+        .contact-text65,
+        .contact-text66 {
+          display: inline-block;
+        }
+
+        @media (max-width: 991px) {
+          .contact-hero {
+            padding-top: calc(var(--dl-layout-space-fourunits) + 36px);
           }
-          .contact-text10 {
-            display: inline-block;
+
+          .contact-hero-inner {
+            padding: 30px 24px 24px;
           }
-          .contact-text11 {
-            display: inline-block;
+        }
+
+        @media (max-width: 767px) {
+          .contact-hero {
+            padding-top: calc(var(--dl-layout-space-threeunits) + 36px);
+            padding-bottom: var(--dl-layout-space-twounits);
           }
-          .contact-text12 {
-            display: inline-block;
+
+          .contact-kicker-line {
+            display: none;
           }
-          .contact-text13 {
-            display: inline-block;
+
+          .contact-hero-inner {
+            padding: 24px 16px 20px;
           }
-          .contact-text14 {
-            display: inline-block;
+
+          .contact-hero-title {
+            max-width: 100%;
           }
-          .contact-text15 {
-            display: inline-block;
+
+          .contact-hero-copy {
+            max-width: 60ch;
           }
-          .contact-text16 {
-            display: inline-block;
+
+          .section-card {
+            border-radius: 18px;
           }
-          .contact-text17 {
-            display: inline-block;
+
+          .section-card :global(.thq-section-padding) {
+            padding-top: 22px !important;
+            padding-bottom: 22px !important;
           }
-          .contact-text18 {
-            display: inline-block;
-          }
-          .contact-text19 {
-            display: inline-block;
-          }
-          .contact-text20 {
-            display: inline-block;
-          }
-          .contact-text21 {
-            display: inline-block;
-          }
-          .contact-text22 {
-            display: inline-block;
-          }
-          .contact-text23 {
-            display: inline-block;
-          }
-          .contact-text24 {
-            display: inline-block;
-          }
-          .contact-text25 {
-            display: inline-block;
-          }
-          .contact-text26 {
-            display: inline-block;
-          }
-          .contact-text27 {
-            display: inline-block;
-          }
-          .contact-text28 {
-            display: inline-block;
-          }
-          .contact-text29 {
-            display: inline-block;
-          }
-          .contact-text30 {
-            display: inline-block;
-          }
-          .contact-text31 {
-            display: inline-block;
-          }
-          .contact-text32 {
-            display: inline-block;
-          }
-          .contact-text33 {
-            display: inline-block;
-          }
-          .contact-text34 {
-            display: inline-block;
-          }
-          .contact-text35 {
-            display: inline-block;
-          }
-          .contact-text36 {
-            display: inline-block;
-          }
-          .contact-text37 {
-            display: inline-block;
-          }
-          .contact-text38 {
-            display: inline-block;
-          }
-          .contact-text39 {
-            display: inline-block;
-          }
-          .contact-text40 {
-            display: inline-block;
-          }
-          .contact-text41 {
-            display: inline-block;
-          }
-          .contact-text42 {
-            display: inline-block;
-          }
-          .contact-text43 {
-            display: inline-block;
-          }
-          .contact-text44 {
-            display: inline-block;
-          }
-          .contact-text45 {
-            display: inline-block;
-          }
-          .contact-text46 {
-            display: inline-block;
-          }
-          .contact-text47 {
-            display: inline-block;
-          }
-          .contact-text48 {
-            display: inline-block;
-          }
-          .contact-text49 {
-            display: inline-block;
-          }
-          .contact-text50 {
-            display: inline-block;
-          }
-          .contact-text51 {
-            display: inline-block;
-          }
-          .contact-text52 {
-            display: inline-block;
-          }
-          .contact-text53 {
-            display: inline-block;
-          }
-          .contact-text54 {
-            display: inline-block;
-          }
-          .contact-text55 {
-            display: inline-block;
-          }
-          .contact-text56 {
-            display: inline-block;
-          }
-          .contact-text57 {
-            display: inline-block;
-          }
-          .contact-text58 {
-            display: inline-block;
-          }
-          .contact-text59 {
-            display: inline-block;
-          }
-          .contact-text60 {
-            display: inline-block;
-          }
-          .contact-text61 {
-            display: inline-block;
-          }
-          .contact-text62 {
-            display: inline-block;
-          }
-          .contact-text63 {
-            display: inline-block;
-          }
-          .contact-text64 {
-            display: inline-block;
-          }
-          .contact-text65 {
-            display: inline-block;
-          }
-          .contact-text66 {
-            display: inline-block;
-          }
-        `}
-      </style>
+        }
+      `}</style>
     </>
   )
 }
