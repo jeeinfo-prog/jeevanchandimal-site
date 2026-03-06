@@ -5,14 +5,20 @@ import Link from 'next/link'
 const Availability = (props) => {
   return (
     <>
-      <section className="availabilityWrap thq-section-padding">
-        <div className="thq-section-max-width">
-          {/* cinematic divider */}
-          <div className="cineDivider" aria-hidden="true" />
+      <section className={`availability-wrap thq-section-padding ${props.rootClassName || ''}`}>
+        <div className="availability-max thq-section-max-width">
+          <div className="availability-card">
+            <div className="availability-bg" aria-hidden="true">
+              <div className="availability-vignette" />
+              <div className="availability-grain" />
+            </div>
 
-          <div className="availability-thq-container-elm">
-            <div className="availability-thq-content-elm">
-              {/* status badge */}
+            <div className="availability-inner">
+              <div className="availability-kickerRow">
+                <span className="availability-kicker">AVAILABILITY</span>
+                <span className="availability-line" />
+              </div>
+
               <div className="badgeRow">
                 <span className={`availabilityBadge ${props.statusTone || 'toneCyan'}`}>
                   <span className="dot" aria-hidden="true" />
@@ -24,23 +30,23 @@ const Availability = (props) => {
                 </span>
               </div>
 
-              <span className="thq-heading-2">
+              <h2 className="thq-heading-2 availability-title">
                 {props.heading1 ?? (
                   <Fragment>
                     <span className="availability-text17">Availability</span>
                   </Fragment>
                 )}
-              </span>
+              </h2>
 
-              <span className="thq-heading-3">
+              <h3 className="thq-heading-3 availability-subtitle">
                 {props.heading11 ?? (
                   <Fragment>
                     <span className="availability-text15">Available for select projects.</span>
                   </Fragment>
                 )}
-              </span>
+              </h3>
 
-              <p className="thq-body-large">
+              <p className="thq-body-large availability-copy">
                 {props.content1 ?? (
                   <Fragment>
                     <span className="availability-text19">
@@ -49,72 +55,140 @@ const Availability = (props) => {
                   </Fragment>
                 )}
               </p>
-            </div>
 
-            {/* ✅ Single CTA (Next 12 safe Link) */}
-            <div className="availability-thq-actions-elm">
-              <Link href="/contact" passHref legacyBehavior>
-                <a className="availability-cta">
-                  <span className="ctaLabel">
-                    {props.action2 ?? (
-                      <Fragment>
-                        <span className="availability-text18">Contact Me</span>
-                      </Fragment>
-                    )}
-                  </span>
-                  <span className="ctaArrow" aria-hidden="true">
-                    →
-                  </span>
-                </a>
-              </Link>
+              <div className="availability-divider" aria-hidden="true" />
+
+              <div className="availability-bottom">
+                <div className="availability-meta thq-body-small">
+                  Film • Motion • Photography • Audio
+                </div>
+
+                <div className="availability-actions">
+                  <Link href="/contact" passHref legacyBehavior>
+                    <a className="availability-cta">
+                      <span className="ctaLabel">
+                        {props.action2 ?? (
+                          <Fragment>
+                            <span className="availability-text18">Contact Me</span>
+                          </Fragment>
+                        )}
+                      </span>
+                      <span className="ctaArrow" aria-hidden="true">
+                        →
+                      </span>
+                    </a>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       <style jsx>{`
-        .availabilityWrap {
+        .availability-wrap {
           width: 100%;
-          position: relative;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
         }
 
-        .cineDivider {
+        .availability-max {
           width: 100%;
+          display: flex;
+          align-items: center;
+          flex-direction: column;
+        }
+
+        .availability-card {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(10px);
+        }
+
+        .availability-bg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .availability-vignette {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(
+              80% 70% at 50% 15%,
+              rgba(255, 255, 255, 0.05),
+              rgba(0, 0, 0, 0.78)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.82) 0%,
+              rgba(0, 0, 0, 0.35) 50%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+        }
+
+        .availability-grain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .availability-inner {
+          position: relative;
+          z-index: 1;
+          padding: 32px 28px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          align-items: center;
+          text-align: center;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+
+        .availability-kickerRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          justify-content: center;
+        }
+
+        .availability-kicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+        }
+
+        .availability-line {
+          flex: 1;
           height: 1px;
-          margin: 0 0 var(--dl-layout-space-threeunits);
           background: linear-gradient(
             90deg,
-            transparent,
-            rgba(245, 244, 244, 0.12),
-            transparent
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
           );
         }
 
-        .availability-thq-container-elm {
-          gap: var(--dl-layout-space-oneandhalfunits);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .availability-thq-content-elm {
-          gap: var(--dl-layout-space-oneandhalfunits);
-          display: flex;
-          align-items: flex-start;
-          flex-direction: column;
-          max-width: 760px;
-        }
-
-        .availability-thq-actions-elm {
-          flex: 1;
-          display: flex;
-          justify-content: flex-end;
-          align-items: center;
-        }
-
         .badgeRow {
-          display: flex;
           width: 100%;
+          display: flex;
+          justify-content: center;
         }
 
         .availabilityBadge {
@@ -145,6 +219,7 @@ const Availability = (props) => {
           border-color: rgba(37, 195, 226, 0.22);
           color: #25c3e2;
         }
+
         .toneCyan .dot {
           background: #25c3e2;
           box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.12);
@@ -155,6 +230,7 @@ const Availability = (props) => {
           border-color: rgba(255, 193, 7, 0.22);
           color: rgba(255, 193, 7, 0.95);
         }
+
         .toneAmber .dot {
           background: rgba(255, 193, 7, 0.95);
           box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.12);
@@ -165,9 +241,64 @@ const Availability = (props) => {
           border-color: rgba(255, 76, 76, 0.22);
           color: rgba(255, 120, 120, 0.95);
         }
+
         .toneRed .dot {
           background: rgba(255, 120, 120, 0.95);
           box-shadow: 0 0 0 4px rgba(255, 120, 120, 0.12);
+        }
+
+        .availability-title {
+          margin: 0;
+          line-height: 1.15;
+          text-shadow: 0 16px 42px rgba(0, 0, 0, 0.55);
+        }
+
+        .availability-subtitle {
+          margin: 0;
+          line-height: 1.3;
+          color: rgba(245, 244, 244, 0.94);
+        }
+
+        .availability-copy {
+          margin: 0;
+          line-height: 1.8;
+          color: rgba(245, 244, 244, 0.85);
+          max-width: 70ch;
+        }
+
+        .availability-divider {
+          width: 100%;
+          height: 1px;
+          margin-top: 8px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.12),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0.12)
+          );
+        }
+
+        .availability-bottom {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin-top: 6px;
+        }
+
+        .availability-meta {
+          color: rgba(245, 244, 244, 0.6);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          font-size: 12px;
+          text-align: left;
+        }
+
+        .availability-actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
         }
 
         .availability-cta {
@@ -221,14 +352,37 @@ const Availability = (props) => {
         }
 
         @media (max-width: 991px) {
-          .availability-thq-container-elm {
+          .availability-bottom {
             flex-direction: column;
-            align-items: flex-start;
-            gap: var(--dl-layout-space-oneandhalfunits);
+            align-items: center;
+            justify-content: center;
           }
-          .availability-thq-actions-elm {
+
+          .availability-meta {
+            text-align: center;
+          }
+
+          .availability-actions {
+            justify-content: center;
+          }
+        }
+
+        @media (max-width: 767px) {
+          .availability-inner {
+            padding: 22px 16px 18px;
+          }
+
+          .availability-line {
+            display: none;
+          }
+
+          .availability-copy {
+            max-width: 62ch;
+          }
+
+          .availability-cta {
             width: 100%;
-            justify-content: flex-start;
+            justify-content: center;
           }
         }
       `}</style>
@@ -242,7 +396,8 @@ Availability.defaultProps = {
   heading1: undefined,
   content1: undefined,
   statusText: undefined,
-  statusTone: 'toneCyan', // toneCyan | toneAmber | toneRed
+  statusTone: 'toneCyan',
+  rootClassName: '',
 }
 
 Availability.propTypes = {
@@ -252,6 +407,7 @@ Availability.propTypes = {
   content1: PropTypes.element,
   statusText: PropTypes.element,
   statusTone: PropTypes.oneOf(['toneCyan', 'toneAmber', 'toneRed']),
+  rootClassName: PropTypes.string,
 }
 
 export default Availability
