@@ -454,7 +454,7 @@ ContactOffice.defaultProps = {
   location1ImgSrc:
     'https://images.unsplash.com/photo-1497366811353-6870744d04b2',
   location1ImgAlt:'Office',
-  location2ImgSrc:'/Audio/Studio/46761_107423292651247_2063467_n-1400w.jpg',
+  location2ImgSrc:'/contact/contactstudio-02.jpg',
   location2ImgAlt:'Studio'
 }
 
