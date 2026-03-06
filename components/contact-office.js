@@ -1,18 +1,42 @@
-import React, { Fragment } from 'react'
-import PropTypes from 'prop-types'
+import React, { Fragment, useRef } from "react"
+import PropTypes from "prop-types"
 
 const ContactOffice = (props) => {
 
-  const address =
-    'No. 99, Sunethradevi Road, Kohuwala, Sri Lanka'
+  const card1 = useRef(null)
+  const card2 = useRef(null)
 
-  const mapsLink =
-    'https://www.google.com/maps/search/?api=1&query=' +
-    encodeURIComponent(address)
+  const handleMove = (e, ref) => {
+    if (!ref.current) return
+
+    const rect = ref.current.getBoundingClientRect()
+
+    const x = (e.clientX - rect.left) / rect.width
+    const y = (e.clientY - rect.top) / rect.height
+
+    const rotateX = (y - 0.5) * 8
+    const rotateY = (x - 0.5) * -8
+
+    ref.current.style.transform =
+      `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.02)`
+  }
+
+  const resetMove = (ref) => {
+    if (!ref.current) return
+    ref.current.style.transform = "perspective(900px) rotateX(0) rotateY(0)"
+  }
+
+  const maps =
+    "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent(
+      "No. 99, Sunethradevi Road, Kohuwala, Sri Lanka"
+    )
 
   return (
     <>
-      <section className={`co-wrap ${props.rootClassName || ''}`}>
+      <section className={`co-wrap ${props.rootClassName || ""}`}>
+
+        {/* HEADER */}
 
         <div className="co-head">
 
@@ -46,33 +70,38 @@ const ContactOffice = (props) => {
 
         <div className="co-gallery">
 
-          <div className="co-imageCard">
-
+          <div
+            className="co-imageCard"
+            ref={card1}
+            onMouseMove={(e)=>handleMove(e,card1)}
+            onMouseLeave={()=>resetMove(card1)}
+          >
             <img
               src={props.location1ImgSrc}
               alt={props.location1ImgAlt}
               className="co-image"
             />
 
-            <div className="co-overlay"/>
-
+            <div className="co-light"/>
           </div>
 
 
-          <div className="co-imageCard">
-
+          <div
+            className="co-imageCard"
+            ref={card2}
+            onMouseMove={(e)=>handleMove(e,card2)}
+            onMouseLeave={()=>resetMove(card2)}
+          >
             <img
               src={props.location2ImgSrc}
               alt={props.location2ImgAlt}
               className="co-image"
             />
 
-            <div className="co-overlay"/>
-
+            <div className="co-light"/>
           </div>
 
         </div>
-
 
 
         {/* LOCATION CARDS */}
@@ -102,7 +131,7 @@ const ContactOffice = (props) => {
             </p>
 
             <a
-              href={mapsLink}
+              href={maps}
               target="_blank"
               rel="noopener noreferrer"
               className="co-button"
@@ -137,7 +166,7 @@ const ContactOffice = (props) => {
             </p>
 
             <a
-              href={mapsLink}
+              href={maps}
               target="_blank"
               rel="noopener noreferrer"
               className="co-button"
@@ -158,18 +187,16 @@ const ContactOffice = (props) => {
         width:100%;
         display:flex;
         flex-direction:column;
-        gap:32px;
+        gap:34px;
       }
-
 
       .co-head{
         display:flex;
         flex-direction:column;
         align-items:center;
         text-align:center;
-        gap:14px;
+        gap:12px;
       }
-
 
       .co-kickerRow{
         width:100%;
@@ -179,45 +206,36 @@ const ContactOffice = (props) => {
         gap:12px;
       }
 
-
       .co-kicker{
         font-size:12px;
         letter-spacing:.24em;
         text-transform:uppercase;
         color:rgba(245,244,244,.7);
-
         padding:6px 12px;
         border-radius:999px;
-
-        border:1px solid rgba(245,244,244,.12);
-        background:rgba(0,0,0,.35);
+        border:1px solid rgba(255,255,255,.15);
+        background:rgba(0,0,0,.3);
       }
-
 
       .co-line{
         flex:1;
         height:1px;
         background:linear-gradient(
           90deg,
-          rgba(245,244,244,.18),
-          rgba(245,244,244,0)
+          rgba(255,255,255,.18),
+          rgba(255,255,255,0)
         );
       }
-
 
       .co-title{
         margin:0;
         color:#f5f4f4;
-        line-height:1.1;
-        letter-spacing:-0.02em;
-
-        text-shadow:0 20px 60px rgba(0,0,0,.6);
+        text-shadow:0 24px 70px rgba(0,0,0,.65);
       }
-
 
       .co-copy{
         margin:0;
-        color:rgba(245,244,244,.82);
+        color:rgba(245,244,244,.8);
         line-height:1.8;
         max-width:64ch;
       }
@@ -228,52 +246,36 @@ const ContactOffice = (props) => {
       .co-gallery{
         display:grid;
         grid-template-columns:repeat(2,1fr);
-        gap:22px;
+        gap:24px;
       }
-
 
       .co-imageCard{
 
         position:relative;
+
         overflow:hidden;
 
-        border-radius:26px;
+        border-radius:28px;
 
-        border:1px solid rgba(255,255,255,.06);
+        border:1px solid rgba(255,255,255,.08);
 
         background:rgba(255,255,255,.02);
 
+        transition:transform .4s ease;
+
         box-shadow:
-          0 20px 60px rgba(0,0,0,.45);
+        0 30px 80px rgba(0,0,0,.55);
 
       }
-
 
       .co-image{
-
         width:100%;
-        height:320px;
-
+        height:340px;
         object-fit:cover;
-
-        transform:scale(1);
-
-        transition:
-          transform .6s ease,
-          filter .6s ease;
-
+        transition:transform .6s ease;
       }
 
-
-      .co-imageCard:hover .co-image{
-
-        transform:scale(1.05);
-        filter:contrast(1.05) saturate(1.1);
-
-      }
-
-
-      .co-overlay{
+      .co-light{
 
         position:absolute;
         inset:0;
@@ -281,8 +283,8 @@ const ContactOffice = (props) => {
         background:
         radial-gradient(
           60% 60% at 50% 30%,
-          rgba(255,255,255,.05),
-          rgba(0,0,0,.5)
+          rgba(255,255,255,.08),
+          rgba(0,0,0,.6)
         );
 
         pointer-events:none;
@@ -293,23 +295,20 @@ const ContactOffice = (props) => {
       /* LOCATION CARDS */
 
       .co-locations{
-
         display:grid;
         grid-template-columns:repeat(2,1fr);
-        gap:22px;
-
+        gap:24px;
       }
-
 
       .co-locationCard{
 
-        padding:26px 24px;
+        padding:28px 24px;
 
-        border-radius:24px;
+        border-radius:26px;
 
-        backdrop-filter:blur(10px);
+        backdrop-filter:blur(12px);
 
-        border:1px solid rgba(255,255,255,.06);
+        border:1px solid rgba(255,255,255,.08);
 
         background:
         linear-gradient(
@@ -319,7 +318,7 @@ const ContactOffice = (props) => {
         );
 
         box-shadow:
-          0 18px 48px rgba(0,0,0,.35);
+        0 22px 60px rgba(0,0,0,.45);
 
         display:flex;
         flex-direction:column;
@@ -329,18 +328,13 @@ const ContactOffice = (props) => {
 
       }
 
-
       .co-locationCard:hover{
 
-        transform:translateY(-3px);
+        transform:translateY(-4px);
 
-        border-color:rgba(37,195,226,.22);
-
-        box-shadow:
-        0 26px 70px rgba(0,0,0,.5);
+        border-color:rgba(37,195,226,.25);
 
       }
-
 
       .co-badge{
 
@@ -369,27 +363,20 @@ const ContactOffice = (props) => {
 
       }
 
-
       .co-locationTitle{
         margin:0;
         color:#f5f4f4;
       }
 
-
       .co-locationCopy{
-
         margin:0;
-
-        color:rgba(245,244,244,.82);
-
+        color:rgba(245,244,244,.8);
         line-height:1.8;
-
       }
-
 
       .co-button{
 
-        margin-top:8px;
+        margin-top:10px;
 
         width:fit-content;
 
@@ -415,7 +402,6 @@ const ContactOffice = (props) => {
 
       }
 
-
       .co-button:hover{
 
         color:#25c3e2;
@@ -425,7 +411,6 @@ const ContactOffice = (props) => {
         transform:translateY(-1px);
 
       }
-
 
       @media (max-width:767px){
 
@@ -443,33 +428,18 @@ const ContactOffice = (props) => {
   )
 }
 
-ContactOffice.defaultProps = {
-  heading1: undefined,
-  content1: undefined,
-  location1: undefined,
-  location2: undefined,
-  location1Description: undefined,
-  location2Description: undefined,
-  rootClassName: '',
-  location1ImgSrc:
-    'https://images.unsplash.com/photo-1497366811353-6870744d04b2',
-  location1ImgAlt:'Office',
-  location2ImgSrc:'/contact/contactstudio-02.jpg',
-  location2ImgAlt:'Studio'
-}
-
-ContactOffice.propTypes = {
-  heading1: PropTypes.element,
-  content1: PropTypes.element,
-  location1: PropTypes.element,
-  location2: PropTypes.element,
-  location1Description: PropTypes.element,
-  location2Description: PropTypes.element,
-  rootClassName: PropTypes.string,
-  location1ImgSrc: PropTypes.string,
-  location1ImgAlt: PropTypes.string,
-  location2ImgSrc: PropTypes.string,
-  location2ImgAlt: PropTypes.string
+ContactOffice.propTypes={
+  heading1:PropTypes.element,
+  content1:PropTypes.element,
+  location1:PropTypes.element,
+  location2:PropTypes.element,
+  location1Description:PropTypes.element,
+  location2Description:PropTypes.element,
+  rootClassName:PropTypes.string,
+  location1ImgSrc:PropTypes.string,
+  location1ImgAlt:PropTypes.string,
+  location2ImgSrc:PropTypes.string,
+  location2ImgAlt:PropTypes.string
 }
 
 export default ContactOffice
