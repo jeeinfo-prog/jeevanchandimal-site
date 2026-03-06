@@ -5,34 +5,51 @@ const Work2DAnimation = (props) => {
   return (
     <>
       <section className="wa2dSection thq-section-padding">
-        {/* cinematic glass layer */}
         <div className="panel" aria-hidden="true" />
-        <div className="grain" aria-hidden="true" />
 
         <div className="wrap thq-section-max-width thq-flex-column">
-          {/* header */}
-          <header className="titleRow">
-            <div className="titleCol">
-              <div className="kicker">2D</div>
-              <h2 className="thq-heading-2 title">
-                {props.sectionTitle ?? (
-                  <Fragment>
-                    <span>2D Animation</span>
-                  </Fragment>
-                )}
-              </h2>
+          {/* luxury cinematic curved title box */}
+          <header className="titleShell">
+            <div className="titleBg" aria-hidden="true">
+              <div className="titleVignette" />
+              <div className="titleGlow" />
+              <div className="titleGrain" />
             </div>
 
-            <p className="thq-body-large desc">
-              {props.sectionDescription ?? (
-                <Fragment>
-                  <span>
-                    Flat and illustrative animation developed with structure and pacing in mind.
-                    Movement is clean, purposeful, and aligned with narrative flow.
-                  </span>
-                </Fragment>
-              )}
-            </p>
+            <div className="titleInner">
+              <div className="titleCol">
+                <div className="kickerRow">
+                  <span className="kicker">2D</span>
+                  <span className="kickerLine" />
+                </div>
+
+                <h2 className="thq-heading-2 title">
+                  {props.sectionTitle ?? (
+                    <Fragment>
+                      <span>2D Animation</span>
+                    </Fragment>
+                  )}
+                </h2>
+
+                <div className="titleDivider" aria-hidden="true" />
+
+                <div className="titleMeta thq-body-small">
+                  Rhythm • Structure • Clarity
+                </div>
+              </div>
+
+              <p className="thq-body-large desc">
+                {props.sectionDescription ?? (
+                  <Fragment>
+                    <span>
+                      Flat and illustrative animation developed with structure
+                      and pacing in mind. Movement is clean, purposeful, and
+                      aligned with narrative flow.
+                    </span>
+                  </Fragment>
+                )}
+              </p>
+            </div>
           </header>
 
           {/* cards */}
@@ -46,7 +63,6 @@ const Work2DAnimation = (props) => {
                   className="img"
                   loading="lazy"
                 />
-                <div className="mediaOverlay" aria-hidden="true" />
               </div>
               <div className="cardBody">
                 <h3 className="thq-heading-3 cardTitle">
@@ -59,7 +75,10 @@ const Work2DAnimation = (props) => {
                 <span className="thq-body-small cardText">
                   {props.feature1Description ?? (
                     <Fragment>
-                      <span>Movement designed around meaning—clear beats, clean intention.</span>
+                      <span>
+                        Movement designed around meaning—clear beats, clean
+                        intention.
+                      </span>
                     </Fragment>
                   )}
                 </span>
@@ -75,7 +94,6 @@ const Work2DAnimation = (props) => {
                   className="img"
                   loading="lazy"
                 />
-                <div className="mediaOverlay" aria-hidden="true" />
               </div>
               <div className="cardBody">
                 <h3 className="thq-heading-3 cardTitle">
@@ -88,7 +106,9 @@ const Work2DAnimation = (props) => {
                 <span className="thq-body-small cardText">
                   {props.feature2Description ?? (
                     <Fragment>
-                      <span>Controlled pacing that supports edit, tone, and emotion.</span>
+                      <span>
+                        Controlled pacing that supports edit, tone, and emotion.
+                      </span>
                     </Fragment>
                   )}
                 </span>
@@ -104,7 +124,6 @@ const Work2DAnimation = (props) => {
                   className="img"
                   loading="lazy"
                 />
-                <div className="mediaOverlay" aria-hidden="true" />
               </div>
               <div className="cardBody">
                 <h3 className="thq-heading-3 cardTitle">
@@ -117,7 +136,10 @@ const Work2DAnimation = (props) => {
                 <span className="thq-body-small cardText">
                   {props.feature3Description ?? (
                     <Fragment>
-                      <span>Design that integrates with film and photography—never distracts.</span>
+                      <span>
+                        Design that integrates with film and photography—never
+                        distracts.
+                      </span>
                     </Fragment>
                   )}
                 </span>
@@ -166,25 +188,15 @@ const Work2DAnimation = (props) => {
           pointer-events: none;
           background: radial-gradient(
               80% 65% at 50% 0%,
-              rgba(255, 255, 255, 0.06),
+              rgba(255, 255, 255, 0.05),
               rgba(0, 0, 0, 0) 55%
             ),
             linear-gradient(
               180deg,
               rgba(0, 0, 0, 0.12) 0%,
               rgba(0, 0, 0, 0) 46%,
-              rgba(0, 0, 0, 0.38) 100%
+              rgba(0, 0, 0, 0.28) 100%
             );
-        }
-
-        .grain {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          opacity: 0.07;
-          mix-blend-mode: overlay;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-          background-size: 240px 240px;
         }
 
         .wrap {
@@ -195,44 +207,142 @@ const Work2DAnimation = (props) => {
           align-items: center;
         }
 
-        .titleRow {
+        /* curved corners box behind title */
+        .titleShell {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 26px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.56);
+          box-shadow: 0 30px 110px rgba(0, 0, 0, 0.58);
+          backdrop-filter: blur(10px);
+        }
+
+        .titleBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .titleVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              72% 62% at 18% 18%,
+              rgba(255, 255, 255, 0.06),
+              rgba(255, 255, 255, 0) 58%
+            ),
+            linear-gradient(
+              135deg,
+              rgba(255, 255, 255, 0.03) 0%,
+              rgba(0, 0, 0, 0.18) 46%,
+              rgba(0, 0, 0, 0.5) 100%
+            );
+        }
+
+        .titleGlow {
+          position: absolute;
+          inset: -20%;
+          background: radial-gradient(
+            38% 34% at 18% 24%,
+            rgba(160, 196, 255, 0.14),
+            rgba(160, 196, 255, 0) 65%
+          );
+          filter: blur(22px);
+          opacity: 0.95;
+        }
+
+        .titleGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.06;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .titleInner {
           width: 100%;
           max-width: 980px;
+          position: relative;
+          z-index: 1;
           display: grid;
-          grid-template-columns: 1fr 1.2fr;
-          gap: 18px;
+          grid-template-columns: 1fr 1.12fr;
+          gap: 22px;
           align-items: end;
+          padding: 30px 28px 24px;
         }
 
         .titleCol {
           display: flex;
           flex-direction: column;
           gap: 10px;
+          align-items: flex-start;
+        }
+
+        .kickerRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
 
         .kicker {
           width: fit-content;
           font-size: 12px;
-          letter-spacing: 0.22em;
+          letter-spacing: 0.24em;
           text-transform: uppercase;
-          color: rgba(245, 244, 244, 0.68);
+          color: rgba(245, 244, 244, 0.72);
           padding: 6px 10px;
           border-radius: 999px;
           border: 1px solid rgba(245, 244, 244, 0.12);
-          background: rgba(0, 0, 0, 0.25);
+          background: rgba(0, 0, 0, 0.22);
           backdrop-filter: blur(10px);
+        }
+
+        .kickerLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
         }
 
         .title {
           margin: 0;
           line-height: 1.08;
-          text-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+          text-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
         }
 
         .desc {
           margin: 0;
-          color: rgba(245, 244, 244, 0.82);
-          line-height: 1.7;
+          color: rgba(245, 244, 244, 0.84);
+          line-height: 1.75;
+          max-width: 62ch;
+          text-align: left;
+        }
+
+        .titleDivider {
+          width: 100%;
+          max-width: 420px;
+          height: 1px;
+          margin-top: 4px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.14),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0)
+          );
+        }
+
+        .titleMeta {
+          color: rgba(245, 244, 244, 0.6);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          font-size: 12px;
         }
 
         .grid {
@@ -250,7 +360,8 @@ const Work2DAnimation = (props) => {
           border: 1px solid rgba(245, 244, 244, 0.1);
           box-shadow: 0 18px 55px rgba(0, 0, 0, 0.42);
           transform: translateY(0);
-          transition: transform 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+          transition: transform 260ms ease, border-color 260ms ease,
+            box-shadow 260ms ease;
         }
 
         .card:hover {
@@ -264,7 +375,7 @@ const Work2DAnimation = (props) => {
           width: 100%;
           aspect-ratio: 4 / 3;
           overflow: hidden;
-          background: rgba(0, 0, 0, 0.35);
+          background: rgba(0, 0, 0, 0.08);
         }
 
         .img {
@@ -272,26 +383,13 @@ const Work2DAnimation = (props) => {
           height: 100%;
           object-fit: cover;
           transform: scale(1.03);
-          filter: saturate(0.92) contrast(1.05) brightness(0.78);
-          transition: transform 420ms ease, filter 420ms ease;
+          transition: transform 420ms ease;
           display: block;
+          filter: none;
         }
 
         .card:hover .img {
           transform: scale(1.08);
-          filter: saturate(0.98) contrast(1.08) brightness(0.82);
-        }
-
-        .mediaOverlay {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: radial-gradient(
-              85% 65% at 50% 20%,
-              rgba(0, 0, 0, 0.08),
-              rgba(0, 0, 0, 0.62)
-            ),
-            linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.75));
         }
 
         .cardBody {
@@ -352,14 +450,25 @@ const Work2DAnimation = (props) => {
         }
 
         @media (max-width: 991px) {
-          .titleRow {
+          .titleInner {
             grid-template-columns: 1fr;
             align-items: start;
-            max-width: 920px;
+          }
+
+          .title {
+            max-width: 100%;
           }
         }
 
         @media (max-width: 767px) {
+          .titleInner {
+            padding: 22px 16px 18px;
+          }
+
+          .kickerLine {
+            display: none;
+          }
+
           .grid {
             grid-template-columns: 1fr;
           }
@@ -369,11 +478,13 @@ const Work2DAnimation = (props) => {
           .wrap {
             gap: var(--dl-layout-space-oneandhalfunits);
           }
+
           .actions {
             width: 100%;
             flex-direction: column;
             align-items: stretch;
           }
+
           .btnPrimary,
           .btnGhost {
             width: 100%;
