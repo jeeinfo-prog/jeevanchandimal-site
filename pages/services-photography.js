@@ -471,8 +471,29 @@ export default function ServicesPhotography() {
 }
 
 .heroBlock {
-  margin-top: 0;
+  margin-top: -2px;
   padding-top: 0;
+}
+
+.section:first-of-type {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.section:first-of-type > .block {
+  margin-top: -2px !important;
+  padding-top: 0 !important;
+}
+
+:global(.service-photography-heroroot-class-name) {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+:global(.jeevan-chandimal-naviroot-class-name19) {
+  margin-bottom: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
 }
 
         .introSection {
