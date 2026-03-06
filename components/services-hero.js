@@ -295,7 +295,7 @@ ServicesHero.defaultProps = {
   content1: undefined,
 
   // ✅ background
-  videoSrc: '/Audio/audio%20production%2003.mov',
+  videoSrc: '/services/serviceshero-01.mp4',
   image1Src: '', // optional fallback image
   image1Alt: 'Services hero background',
 
