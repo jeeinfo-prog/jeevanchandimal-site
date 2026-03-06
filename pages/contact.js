@@ -164,7 +164,7 @@ const Contact = () => {
 
           <section className="section-shell thq-section-padding">
             <div className="section-max thq-section-max-width">
-              <div className="section-card">
+              <div className="section-card section-card-form">
                 <ContactFormFinal
                   videoSrc="/JC/jeevan%20chandimal%20logo.mp4"
                   action={
@@ -196,7 +196,7 @@ const Contact = () => {
 
           <section className="section-shell section-shell-tight">
             <div className="section-max thq-section-max-width">
-              <div className="section-card">
+              <div className="section-card section-card-narrow">
                 <ContactJC
                   link1={
                     <Fragment>
@@ -265,7 +265,7 @@ const Contact = () => {
 
           <section className="section-shell section-shell-tight section-shell-last">
             <div className="section-max thq-section-max-width">
-              <div className="section-card">
+              <div className="section-card section-card-narrow">
                 <ContactOffice
                   content1={
                     <Fragment>
@@ -632,7 +632,6 @@ const Contact = () => {
 
         .section-card {
           width: 100%;
-          max-width: 1180px;
           margin: 0 auto;
           position: relative;
           overflow: hidden;
@@ -645,6 +644,18 @@ const Contact = () => {
           );
           box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
           backdrop-filter: blur(8px);
+
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+
+        .section-card-form {
+          max-width: 1180px;
+        }
+
+        .section-card-narrow {
+          max-width: 980px;
         }
 
         .section-card :global(.thq-section-padding) {
@@ -657,6 +668,19 @@ const Contact = () => {
         .section-card :global(.thq-section-max-width) {
           max-width: 100% !important;
           width: 100% !important;
+          margin: 0 auto !important;
+        }
+
+        .section-card :global(.cjc-wrap),
+        .section-card :global(.co-wrap) {
+          width: 100% !important;
+          max-width: 900px !important;
+          margin: 0 auto !important;
+        }
+
+        .section-card :global(.cff-wrap) {
+          width: 100% !important;
+          max-width: 100% !important;
           margin: 0 auto !important;
         }
 
@@ -727,6 +751,15 @@ const Contact = () => {
 
           .contact-hero-inner {
             padding: 30px 24px 24px;
+          }
+
+          .section-card-narrow {
+            max-width: 100%;
+          }
+
+          .section-card :global(.cjc-wrap),
+          .section-card :global(.co-wrap) {
+            max-width: 100% !important;
           }
         }
 
