@@ -129,7 +129,6 @@ const Contact = () => {
         />
 
         <main className="contact-main">
-          {/* HERO */}
           <section className="contact-hero thq-section-padding">
             <div className="contact-hero-max thq-section-max-width">
               <div className="contact-hero-card">
@@ -163,7 +162,6 @@ const Contact = () => {
             </div>
           </section>
 
-          {/* FORM */}
           <section className="section-shell thq-section-padding">
             <div className="section-max thq-section-max-width">
               <div className="section-card">
@@ -195,7 +193,6 @@ const Contact = () => {
             </div>
           </section>
 
-          {/* DIRECT CONTACT */}
           <section className="section-shell section-shell-tight">
             <div className="section-max thq-section-max-width">
               <div className="section-card">
@@ -237,19 +234,12 @@ const Contact = () => {
                   }
                   content4={
                     <Fragment>
-                      <span className="contact-text38">
-                        No. 99, Sunethradevi Road,
-                        <span
-                          dangerouslySetInnerHTML={{
-                            __html: ' ',
-                          }}
-                        />
-                      </span>
+                      <span className="contact-text38">No. 99, Sunethradevi Road,</span>
                     </Fragment>
                   }
                   heading1={
                     <Fragment>
-                      <span className="contact-text39">Contact Us</span>
+                      <span className="contact-text39">Direct Contact</span>
                     </Fragment>
                   }
                   heading2={
@@ -272,7 +262,6 @@ const Contact = () => {
             </div>
           </section>
 
-          {/* OFFICE / STUDIO */}
           <section className="section-shell section-shell-tight section-shell-last">
             <div className="section-max thq-section-max-width">
               <div className="section-card">
@@ -286,7 +275,7 @@ const Contact = () => {
                   }
                   heading1={
                     <Fragment>
-                      <span className="contact-text44">Contact Us</span>
+                      <span className="contact-text44">Visit the Space</span>
                     </Fragment>
                   }
                   location1={
@@ -301,7 +290,7 @@ const Contact = () => {
                   }
                   location1Description={
                     <Fragment>
-                      <span className="contact-text47">No. 99, Sunethradevi Road,</span>
+                      <span className="contact-text47">No. 99, Sunethradevi Road, Kohuwala.</span>
                     </Fragment>
                   }
                   location2Description={
@@ -578,11 +567,7 @@ const Contact = () => {
         .contact-kicker-line {
           flex: 1;
           height: 1px;
-          background: linear-gradient(
-            90deg,
-            rgba(245, 244, 244, 0.18),
-            rgba(245, 244, 244, 0)
-          );
+          background: linear-gradient(90deg, rgba(245, 244, 244, 0.18), rgba(245, 244, 244, 0));
         }
 
         .contact-hero-title {
@@ -640,20 +625,23 @@ const Contact = () => {
 
         .section-max {
           width: 100%;
+          display: flex;
+          justify-content: center;
         }
 
         .section-card {
           width: 100%;
+          max-width: 1180px;
+          margin: 0 auto;
           position: relative;
           overflow: hidden;
           border-radius: 24px;
           border: 1px solid rgba(245, 244, 244, 0.08);
-          background:
-            linear-gradient(
-              180deg,
-              rgba(255, 255, 255, 0.028),
-              rgba(255, 255, 255, 0.016)
-            );
+          background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.028),
+            rgba(255, 255, 255, 0.016)
+          );
           box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
           backdrop-filter: blur(8px);
         }
@@ -661,10 +649,14 @@ const Contact = () => {
         .section-card :global(.thq-section-padding) {
           padding-top: 32px !important;
           padding-bottom: 32px !important;
+          padding-left: 32px !important;
+          padding-right: 32px !important;
         }
 
         .section-card :global(.thq-section-max-width) {
           max-width: 100% !important;
+          width: 100% !important;
+          margin: 0 auto !important;
         }
 
         .contact-text10,
@@ -766,6 +758,8 @@ const Contact = () => {
           .section-card :global(.thq-section-padding) {
             padding-top: 22px !important;
             padding-bottom: 22px !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
           }
         }
       `}</style>
