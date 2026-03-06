@@ -64,7 +64,8 @@ const BehindTheScenes01 = (props) => {
       new Promise((resolve) => {
         const img = new window.Image()
         img.decoding = 'async'
-        img.onload = () => resolve({ w: img.naturalWidth || 0, h: img.naturalHeight || 0, ok: true })
+        img.onload = () =>
+          resolve({ w: img.naturalWidth || 0, h: img.naturalHeight || 0, ok: true })
         img.onerror = () => resolve({ w: 0, h: 0, ok: false })
         img.src = src
       })
@@ -101,9 +102,12 @@ const BehindTheScenes01 = (props) => {
 
   const heroItem = items[heroIndex]
 
-  // ✅ below grid: exactly 6 images (excluding hero)
+  // below grid: exactly 6 images (excluding hero)
   const gridItems = useMemo(() => {
-    const withOriginalIndex = items.map((it, originalIndex) => ({ ...it, originalIndex }))
+    const withOriginalIndex = items.map((it, originalIndex) => ({
+      ...it,
+      originalIndex,
+    }))
     const rest = withOriginalIndex.filter((it) => it.originalIndex !== heroIndex)
     return rest.slice(0, 6)
   }, [items, heroIndex])
@@ -112,26 +116,45 @@ const BehindTheScenes01 = (props) => {
     <>
       <section className="btsWrap thq-section-padding">
         <div className="btsMax thq-section-max-width">
-          <header className="btsTitle">
-            <h2 className="btsH2 thq-heading-2">
-              {props.heading1 ?? (
-                <Fragment>
-                  <span>Behind the Scenes</span>
-                </Fragment>
-              )}
-            </h2>
+          <header className="btsTitleShell">
+            <div className="btsTitleBg" aria-hidden="true">
+              <div className="btsTitleVignette" />
+              <div className="btsTitleGrain" />
+            </div>
 
-            <p className="btsP thq-body-large">
-              {props.content1 ?? (
-                <Fragment>
-                  <span>
-                    Most of the magic happens where the camera isn’t pointed — shaping light, building sound layers,
-                    refining motion frame by frame. The process is hands-on, detail-driven, and focused on turning ideas
-                    into crafted visual experiences.
-                  </span>
-                </Fragment>
-              )}
-            </p>
+            <div className="btsTitleInner">
+              <div className="btsKickerRow">
+                <span className="btsKicker">PROCESS</span>
+                <span className="btsKickerLine" />
+              </div>
+
+              <h2 className="btsH2 thq-heading-2">
+                {props.heading1 ?? (
+                  <Fragment>
+                    <span>Behind the Scenes</span>
+                  </Fragment>
+                )}
+              </h2>
+
+              <p className="btsP thq-body-large">
+                {props.content1 ?? (
+                  <Fragment>
+                    <span>
+                      Most of the magic happens where the camera isn’t pointed —
+                      shaping light, building sound layers, refining motion frame
+                      by frame. The process is hands-on, detail-driven, and
+                      focused on turning ideas into crafted visual experiences.
+                    </span>
+                  </Fragment>
+                )}
+              </p>
+
+              <div className="btsDivider" aria-hidden="true" />
+
+              <div className="btsMeta thq-body-small">
+                Process • Craft • Atmosphere • Detail
+              </div>
+            </div>
           </header>
 
           <div className="btsLayout">
@@ -144,7 +167,12 @@ const BehindTheScenes01 = (props) => {
                 aria-label="Open BTS hero preview"
               >
                 <div className="heroCard">
-                  <img src={heroItem.src} alt={heroItem.alt || ''} className="heroImg" loading="eager" />
+                  <img
+                    src={heroItem.src}
+                    alt={heroItem.alt || ''}
+                    className="heroImg"
+                    loading="eager"
+                  />
                   <div className="heroOverlay" />
                   <div className="heroMeta">
                     <span className="heroTag">BEHIND THE SCENES</span>
@@ -154,7 +182,7 @@ const BehindTheScenes01 = (props) => {
               </button>
             )}
 
-            {/* ✅ 6 IMAGES GRID (2 rows × 3 columns) */}
+            {/* 6 IMAGES GRID */}
             <div className="grid6">
               {gridItems.map((it) => (
                 <button
@@ -165,7 +193,12 @@ const BehindTheScenes01 = (props) => {
                   aria-label={`Open ${it.alt || 'BTS image'} preview`}
                 >
                   <div className="card">
-                    <img src={it.src} alt={it.alt || ''} className="gridImg" loading="lazy" />
+                    <img
+                      src={it.src}
+                      alt={it.alt || ''}
+                      className="gridImg"
+                      loading="lazy"
+                    />
                     <div className="overlay" />
                     <div className="meta">
                       <span className="tag">BTS</span>
@@ -181,8 +214,18 @@ const BehindTheScenes01 = (props) => {
 
       {/* LIGHTBOX */}
       {lightboxOpen && (
-        <div className="lbOverlay" role="dialog" aria-modal="true" aria-label="Image preview">
-          <button type="button" className="lbBackdrop" onClick={close} aria-label="Close preview" />
+        <div
+          className="lbOverlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
+          <button
+            type="button"
+            className="lbBackdrop"
+            onClick={close}
+            aria-label="Close preview"
+          />
 
           <div className="lbShell">
             <div className="lbTop">
@@ -193,23 +236,42 @@ const BehindTheScenes01 = (props) => {
                 </span>
               </div>
 
-              <button type="button" className="lbClose" onClick={close} aria-label="Close">
+              <button
+                type="button"
+                className="lbClose"
+                onClick={close}
+                aria-label="Close"
+              >
                 ✕
               </button>
             </div>
 
             <div className="lbBody">
-              <button type="button" className="lbNav left" onClick={prev} aria-label="Previous">
+              <button
+                type="button"
+                className="lbNav left"
+                onClick={prev}
+                aria-label="Previous"
+              >
                 ‹
               </button>
 
               <div className="lbFrame">
-                <img src={items[activeIndex]?.src} alt={items[activeIndex]?.alt || ''} className="lbImg" />
+                <img
+                  src={items[activeIndex]?.src}
+                  alt={items[activeIndex]?.alt || ''}
+                  className="lbImg"
+                />
                 <div className="lbGrain" />
                 <div className="lbVignette" />
               </div>
 
-              <button type="button" className="lbNav right" onClick={next} aria-label="Next">
+              <button
+                type="button"
+                className="lbNav right"
+                onClick={next}
+                aria-label="Next"
+              >
                 ›
               </button>
             </div>
@@ -235,31 +297,131 @@ const BehindTheScenes01 = (props) => {
           gap: var(--dl-layout-space-threeunits);
         }
 
-        .btsTitle {
-          max-width: 860px;
-          margin: 0 auto;
-          text-align: center;
+        /* ===== LUXURY TITLE SECTION ===== */
+        .btsTitleShell {
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+          border-radius: 22px;
+          border: 1px solid rgba(245, 244, 244, 0.1);
+          background: rgba(12, 12, 12, 0.55);
+          box-shadow: 0 26px 90px rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(10px);
+        }
+
+        .btsTitleBg {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .btsTitleVignette {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              80% 70% at 50% 15%,
+              rgba(255, 255, 255, 0.05),
+              rgba(0, 0, 0, 0.78)
+            ),
+            linear-gradient(
+              90deg,
+              rgba(0, 0, 0, 0.82) 0%,
+              rgba(0, 0, 0, 0.35) 50%,
+              rgba(0, 0, 0, 0.82) 100%
+            );
+        }
+
+        .btsTitleGrain {
+          position: absolute;
+          inset: 0;
+          opacity: 0.07;
+          mix-blend-mode: overlay;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+          background-size: 240px 240px;
+        }
+
+        .btsTitleInner {
+          position: relative;
+          z-index: 1;
+          padding: 32px 28px 24px;
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 14px;
+          align-items: center;
+          text-align: center;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+
+        .btsKickerRow {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          justify-content: center;
+        }
+
+        .btsKicker {
+          font-size: 12px;
+          letter-spacing: 0.24em;
+          text-transform: uppercase;
+          color: rgba(245, 244, 244, 0.72);
+          padding: 6px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(245, 244, 244, 0.12);
+          background: rgba(0, 0, 0, 0.22);
+        }
+
+        .btsKickerLine {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.18),
+            rgba(245, 244, 244, 0)
+          );
         }
 
         .btsH2 {
           letter-spacing: -0.02em;
+          margin: 0;
+          line-height: 1.15;
+          text-shadow: 0 16px 42px rgba(0, 0, 0, 0.55);
         }
 
         .btsP {
           opacity: 0.92;
-          line-height: 1.7;
+          line-height: 1.8;
           margin: 0;
+          color: rgba(245, 244, 244, 0.85);
+          max-width: 70ch;
+        }
+
+        .btsDivider {
+          width: 100%;
+          height: 1px;
+          margin-top: 8px;
+          background: linear-gradient(
+            90deg,
+            rgba(245, 244, 244, 0.12),
+            rgba(245, 244, 244, 0.04),
+            rgba(245, 244, 244, 0.12)
+          );
+        }
+
+        .btsMeta {
+          color: rgba(245, 244, 244, 0.6);
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          font-size: 12px;
         }
 
         .btsLayout {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--dl-layout-space-oneandhalfunits); /* ✅ same gap as grid */
-}
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: var(--dl-layout-space-oneandhalfunits);
+        }
 
         /* ===== HERO ===== */
         .heroBtn {
@@ -295,7 +457,11 @@ const BehindTheScenes01 = (props) => {
           pointer-events: none;
           position: absolute;
           inset: 0;
-          background: radial-gradient(70% 70% at 50% 25%, rgba(255, 255, 255, 0.08), transparent 60%),
+          background: radial-gradient(
+              70% 70% at 50% 25%,
+              rgba(255, 255, 255, 0.08),
+              transparent 60%
+            ),
             linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.75));
           opacity: 0.95;
         }
@@ -343,7 +509,7 @@ const BehindTheScenes01 = (props) => {
           outline-offset: 2px;
         }
 
-        /* ===== GRID 6 (aligned) ===== */
+        /* ===== GRID ===== */
         .grid6 {
           width: 100%;
           display: grid;
@@ -370,7 +536,7 @@ const BehindTheScenes01 = (props) => {
 
         .gridImg {
           width: 100%;
-          height: 230px; /* ✅ aligned cards */
+          height: 230px;
           object-fit: cover;
           display: block;
           transform: scale(1.02);
@@ -383,7 +549,11 @@ const BehindTheScenes01 = (props) => {
           pointer-events: none;
           position: absolute;
           inset: 0;
-          background: radial-gradient(80% 70% at 50% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
+          background: radial-gradient(
+              80% 70% at 50% 30%,
+              rgba(255, 255, 255, 0.06),
+              transparent 60%
+            ),
             linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.55));
           opacity: 0.85;
           transition: opacity 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -548,7 +718,11 @@ const BehindTheScenes01 = (props) => {
           pointer-events: none;
           position: absolute;
           inset: 0;
-          background: radial-gradient(70% 65% at 50% 45%, transparent 0%, rgba(0, 0, 0, 0.55) 78%),
+          background: radial-gradient(
+              70% 65% at 50% 45%,
+              transparent 0%,
+              rgba(0, 0, 0, 0.55) 78%
+            ),
             linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.35));
           opacity: 0.9;
         }
@@ -596,15 +770,19 @@ const BehindTheScenes01 = (props) => {
           .grid6 {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
+
           .gridImg {
             height: 220px;
           }
+
           .heroImg {
             height: clamp(300px, 58vw, 420px);
           }
+
           .lbBody {
             grid-template-columns: 44px 1fr 44px;
           }
+
           .lbNav {
             width: 44px;
             height: 44px;
@@ -613,23 +791,40 @@ const BehindTheScenes01 = (props) => {
         }
 
         @media (max-width: 767px) {
+          .btsTitleInner {
+            padding: 22px 16px 18px;
+          }
+
+          .btsKickerLine {
+            display: none;
+          }
+
+          .btsP {
+            max-width: 62ch;
+          }
+
           .grid6 {
             grid-template-columns: 1fr;
           }
+
           .gridImg {
             height: 260px;
           }
+
           .heroMeta {
             flex-direction: column;
             align-items: flex-start;
           }
+
           .heroImg {
             height: 320px;
           }
+
           .lbFooter {
             flex-direction: column;
             align-items: flex-start;
           }
+
           .lbAlt {
             max-width: 100%;
           }
