@@ -190,7 +190,7 @@ const WorkPhotographyHero = (props) => {
 }
 
 WorkPhotographyHero.defaultProps = {
-  videoSrc: '/Photography/Video/photography%2001.mov',
+  videoSrc: '/work/Photography/workphotography-01.mov',
   content1: undefined,
   heading1: undefined,
 }
