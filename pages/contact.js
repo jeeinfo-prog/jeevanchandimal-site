@@ -476,6 +476,9 @@ const Contact = () => {
           width: 100%;
           position: relative;
           z-index: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
 
         .contact-hero {
@@ -614,6 +617,8 @@ const Contact = () => {
           z-index: 1;
           padding-top: 0;
           padding-bottom: var(--dl-layout-space-threeunits);
+          display: flex;
+          justify-content: center;
         }
 
         .section-shell-tight {
@@ -626,8 +631,11 @@ const Contact = () => {
 
         .section-max {
           width: 100%;
+          max-width: 1280px;
+          margin: 0 auto;
           display: flex;
           justify-content: center;
+          align-items: center;
         }
 
         .section-card {
@@ -644,7 +652,6 @@ const Contact = () => {
           );
           box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
           backdrop-filter: blur(8px);
-
           display: flex;
           justify-content: center;
           align-items: center;
@@ -656,6 +663,7 @@ const Contact = () => {
 
         .section-card-narrow {
           max-width: 980px;
+          width: min(980px, 100%);
         }
 
         .section-card :global(.thq-section-padding) {
@@ -668,20 +676,33 @@ const Contact = () => {
         .section-card :global(.thq-section-max-width) {
           max-width: 100% !important;
           width: 100% !important;
-          margin: 0 auto !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
         }
 
         .section-card :global(.cjc-wrap),
         .section-card :global(.co-wrap) {
-          width: 100% !important;
+          width: min(900px, 100%) !important;
           max-width: 900px !important;
-          margin: 0 auto !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+          align-self: center !important;
         }
 
         .section-card :global(.cff-wrap) {
           width: 100% !important;
           max-width: 100% !important;
-          margin: 0 auto !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+
+        .section-card :global(.cjc-head),
+        .section-card :global(.co-head),
+        .section-card :global(.cjc-grid),
+        .section-card :global(.co-gallery),
+        .section-card :global(.co-locations) {
+          margin-left: auto !important;
+          margin-right: auto !important;
         }
 
         .contact-text10,
