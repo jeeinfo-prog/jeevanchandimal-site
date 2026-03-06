@@ -37,7 +37,7 @@ export default function ServicesPhotography() {
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background (FULL BLEED behind navbar — fixes the tiny gap) */}
+        {/* ✅ Cinematic background (FULL BLEED behind navbar) */}
         <div className="heroBg" aria-hidden="true">
           <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
@@ -135,9 +135,9 @@ export default function ServicesPhotography() {
         />
 
         <main className="main">
-          {/* ✅ HERO (section -> block -> component) */}
-          <section className="section">
-            <div className="block">
+          {/* ✅ HERO (NO GAP): we remove main padding-top and apply it ONLY as inner spacing here */}
+          <section className="section heroSection">
+            <div className="block heroFix">
               <ServicePhotographyHero
                 action3={
                   <Fragment>
@@ -369,6 +369,7 @@ export default function ServicesPhotography() {
 
         :global(body) {
           overflow-x: hidden;
+          margin: 0; /* ✅ avoid any UA margin */
         }
 
         .page {
@@ -384,7 +385,7 @@ export default function ServicesPhotography() {
         /* ========= CINEMATIC BACKGROUND ========= */
         .heroBg {
           position: fixed;
-          inset: 0; /* ✅ important: cover behind navbar (removes tiny gap/band) */
+          inset: 0; /* ✅ must cover behind navbar */
           z-index: 0;
           pointer-events: none;
         }
@@ -444,16 +445,18 @@ export default function ServicesPhotography() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-top: 72px; /* ✅ space for fixed nav */
+
+          /* ✅ IMPORTANT: remove global padding-top (this is what creates the visible “gap”) */
+          padding-top: 0;
         }
 
         .section {
           width: 100%;
           display: flex;
           justify-content: center;
+          margin: 0; /* ✅ prevent any default section margins */
         }
 
-        /* ✅ hero wrapper */
         .block {
           width: 100%;
           display: flex;
@@ -461,9 +464,10 @@ export default function ServicesPhotography() {
           gap: 18px;
         }
 
-        /* ✅ kill any accidental top margin from the first section */
-        .main :global(section:first-of-type) {
-          margin-top: 0 !important;
+        /* ✅ THIS is the fix:
+           we push hero content down for the fixed navbar WITHOUT creating a separate gap band */
+        .heroFix {
+          padding-top: 72px; /* navbar height */
         }
 
         .section :global(> *) {
