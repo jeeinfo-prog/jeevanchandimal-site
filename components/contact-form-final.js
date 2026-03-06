@@ -2,10 +2,15 @@ import React, { Fragment } from 'react'
 import PropTypes from 'prop-types'
 
 const ContactFormFinal = (props) => {
+  // time-trap: record when form first rendered
+  const [formStartTs] = React.useState(() => Date.now())
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+
   return (
     <>
       <section className={`cff-wrap ${props.rootClassName || ''}`}>
         <div className="cff-shell">
+          {/* LEFT: cinematic video */}
           <div className="cff-media">
             <div className="cff-mediaFrame">
               <div className="cff-mediaBg" aria-hidden="true">
@@ -13,14 +18,19 @@ const ContactFormFinal = (props) => {
                 <div className="cff-mediaGrain" />
               </div>
 
-              <img
-                alt={props.imageAlt}
-                src={props.imageSrc}
-                className="cff-image"
+              <video
+                src={props.videoSrc}
+                loop
+                muted
+                autoPlay
+                playsInline
+                poster="https://play.teleporthq.io/static/svg/videoposter.svg"
+                className="cff-video"
               />
             </div>
           </div>
 
+          {/* RIGHT: premium form panel */}
           <div className="cff-panel">
             <div className="cff-kickerRow">
               <span className="cff-kicker">GET IN TOUCH</span>
@@ -55,46 +65,121 @@ const ContactFormFinal = (props) => {
 
             <div className="cff-divider" aria-hidden="true" />
 
-            <form className="cff-form">
+            <form
+              className="cff-form"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (isSubmitting) return
+
+                const form = e.currentTarget
+
+                const data = {
+                  name: form['contact-form-3-name']?.value || '',
+                  email: form['contact-form-3-email']?.value || '',
+                  message: form['contact-form-3-message']?.value || '',
+                  company: form['company']?.value || '',
+                  formStartTs,
+                }
+
+                try {
+                  setIsSubmitting(true)
+
+                  const res = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                  })
+
+                  if (res.ok) {
+                    alert('Message sent successfully!')
+                    form.reset()
+                  } else {
+                    const err = await res.json().catch(() => null)
+                    alert(err?.message || 'Something went wrong. Please try again.')
+                  }
+                } catch (error) {
+                  alert('Something went wrong. Please try again.')
+                } finally {
+                  setIsSubmitting(false)
+                }
+              }}
+            >
+              {/* honeypot */}
+              <input
+                type="text"
+                name="company"
+                tabIndex="-1"
+                autoComplete="off"
+                aria-hidden="true"
+                className="cff-honeypot"
+              />
+
               <div className="cff-field">
-                <label className="cff-label">Name</label>
+                <label htmlFor="contact-form-3-name" className="cff-label">
+                  Name
+                </label>
                 <input
                   type="text"
+                  id="contact-form-3-name"
+                  name="contact-form-3-name"
                   placeholder="Your name"
                   className="cff-input"
+                  required
                 />
               </div>
 
               <div className="cff-field">
-                <label className="cff-label">Email</label>
+                <label htmlFor="contact-form-3-email" className="cff-label">
+                  Email
+                </label>
                 <input
                   type="email"
+                  id="contact-form-3-email"
+                  name="contact-form-3-email"
                   placeholder="Your email"
                   className="cff-input"
+                  required
                 />
               </div>
 
               <div className="cff-field">
-                <label className="cff-label">Message</label>
+                <label htmlFor="contact-form-3-message" className="cff-label">
+                  Message
+                </label>
                 <textarea
+                  id="contact-form-3-message"
+                  name="contact-form-3-message"
+                  rows="5"
                   placeholder="Tell me about your project"
                   className="cff-textarea"
-                  rows="5"
+                  required
                 />
               </div>
 
-              <label className="cff-checkRow">
-                <input type="checkbox" className="cff-checkbox" />
+              <label className="cff-checkRow" htmlFor="contact-form-3-check">
+                <input
+                  type="checkbox"
+                  id="contact-form-3-check"
+                  name="contact-form-3-check"
+                  className="cff-checkbox"
+                  required
+                />
                 <span className="cff-checkText">I accept the Terms</span>
               </label>
 
-              <button type="submit" className="cff-button">
+              <button
+                type="submit"
+                className="cff-button"
+                disabled={isSubmitting}
+              >
                 <span className="cff-buttonText">
-                  {props.action ?? (
-                    <Fragment>
-                      <span className="contact-form-final-text4">Submit</span>
-                    </Fragment>
-                  )}
+                  {isSubmitting
+                    ? 'Sending...'
+                    : props.action ?? (
+                        <Fragment>
+                          <span className="contact-form-final-text4">Submit</span>
+                        </Fragment>
+                      )}
                 </span>
                 <span className="cff-arrow" aria-hidden="true">
                   →
@@ -167,7 +252,7 @@ const ContactFormFinal = (props) => {
           background-size: 240px 240px;
         }
 
-        .cff-image {
+        .cff-video {
           position: absolute;
           inset: 0;
           width: 100%;
@@ -252,6 +337,7 @@ const ContactFormFinal = (props) => {
           flex-direction: column;
           gap: 14px;
           margin-top: 2px;
+          position: relative;
         }
 
         .cff-field {
@@ -352,10 +438,11 @@ const ContactFormFinal = (props) => {
             transform 180ms ease,
             border-color 180ms ease,
             background 180ms ease,
-            box-shadow 180ms ease;
+            box-shadow 180ms ease,
+            opacity 180ms ease;
         }
 
-        .cff-button:hover {
+        .cff-button:hover:not(:disabled) {
           transform: translateY(-1px);
           border-color: rgba(37, 195, 226, 0.55);
           background: linear-gradient(
@@ -366,10 +453,26 @@ const ContactFormFinal = (props) => {
           box-shadow: 0 16px 28px rgba(0, 0, 0, 0.34);
         }
 
+        .cff-button:disabled {
+          opacity: 0.72;
+          cursor: wait;
+        }
+
         .cff-arrow {
           color: #25c3e2;
           font-size: 14px;
           line-height: 1;
+        }
+
+        .cff-honeypot {
+          position: absolute;
+          left: -5000px;
+          top: auto;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          opacity: 0;
+          pointer-events: none;
         }
 
         .contact-form-final-text1,
@@ -421,8 +524,7 @@ ContactFormFinal.defaultProps = {
   content2: undefined,
   action: undefined,
   rootClassName: '',
-  imageSrc: '/contact/contact-hero.jpg',
-  imageAlt: 'Contact cinematic visual',
+  videoSrc: '/JC/jeevan%20chandimal%20logo.mp4',
 }
 
 ContactFormFinal.propTypes = {
@@ -431,8 +533,7 @@ ContactFormFinal.propTypes = {
   content2: PropTypes.element,
   action: PropTypes.element,
   rootClassName: PropTypes.string,
-  imageSrc: PropTypes.string,
-  imageAlt: PropTypes.string,
+  videoSrc: PropTypes.string,
 }
 
 export default ContactFormFinal

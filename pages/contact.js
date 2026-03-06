@@ -12,14 +12,14 @@ const Contact = () => {
     <>
       <div className="contact-container">
         <Head>
-          <title>Contact - Jeevan Chandimal | Filmmaker & Visual Storyteller</title>
+          <title>Contact - Jeevan Chandimal | Filmmaker &amp; Visual Storyteller</title>
           <meta
             name="description"
             content="Get in touch with Jeevan Chandimal for film, photography, motion, and audio collaborations. Cinematic work shaped with intention, mood, and restraint."
           />
           <meta
             property="og:title"
-            content="Contact - Jeevan Chandimal | Filmmaker & Visual Storyteller"
+            content="Contact - Jeevan Chandimal | Filmmaker &amp; Visual Storyteller"
           />
           <meta
             property="og:description"
@@ -166,6 +166,7 @@ const Contact = () => {
             <div className="section-max thq-section-max-width">
               <div className="section-card">
                 <ContactFormFinal
+                  videoSrc="/JC/jeevan%20chandimal%20logo.mp4"
                   action={
                     <Fragment>
                       <span className="contact-text27">Submit</span>
