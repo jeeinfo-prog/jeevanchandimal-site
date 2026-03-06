@@ -271,9 +271,9 @@ export default function ServicesAnimation() {
         }
 
         .heroBlock {
-          margin-top: 0;
-          padding-top: 0;
-        }
+  margin-top: -2px;
+  padding-top: 0;
+}
 
         /* ✅ if the seam is coming from nav bottom border/shadow */
         :global(.jeevan-chandimal-naviroot-class-name21) {
