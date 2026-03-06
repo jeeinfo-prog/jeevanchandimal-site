@@ -13,6 +13,8 @@ import ServicesAnimationFinalCTA from '../components/services-animation-final-ct
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function ServicesAnimation() {
+  // ✅ Replace later with your own image in /public/services/animation/
+  // Example: /public/services/animation/heroani.jpg
   const HERO_BG = '/services/animation/heroani.jpg'
 
   return (
@@ -41,7 +43,7 @@ export default function ServicesAnimation() {
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background */}
+        {/* ✅ Cinematic background (swap image later in /public/services/animation/) */}
         <div className="heroBg" aria-hidden="true">
           <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
@@ -236,8 +238,8 @@ export default function ServicesAnimation() {
           flex-direction: column;
           align-items: center;
 
-          /* ✅ keep hero BELOW fixed nav (safe fallback) */
-          padding-top: var(--jc-nav-h, 72px);
+          /* ✅ hero stays below nav but overlaps to kill 1–2px seam */
+          padding-top: calc(var(--jc-nav-h, 72px) - 2px);
           margin-top: 0;
         }
 
@@ -262,14 +264,22 @@ export default function ServicesAnimation() {
           padding: 0;
         }
 
-        /* ✅ kill the tiny 1px seam under the navbar */
+        /* ✅ lock hero to the top of main (no extra spacing) */
         .heroSection {
           margin-top: 0 !important;
           padding-top: 0 !important;
         }
+
         .heroBlock {
-          margin-top: -2px;
+          margin-top: 0;
           padding-top: 0;
+        }
+
+        /* ✅ if the seam is coming from nav bottom border/shadow */
+        :global(.jeevan-chandimal-naviroot-class-name21) {
+          margin-bottom: 0 !important;
+          border-bottom: 0 !important;
+          box-shadow: none !important;
         }
 
         /* ========= REMOVE HERO CORNER CURVES ========= */
@@ -284,7 +294,6 @@ export default function ServicesAnimation() {
           border-radius: 0 !important;
         }
 
-        /* (optional) if hero uses overflow hidden to create rounded corners */
         :global(.service-animation-heroroot-class-name) {
           overflow: visible !important;
         }
