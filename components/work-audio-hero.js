@@ -245,7 +245,7 @@ const WorkAudioHero = (props) => {
 WorkAudioHero.defaultProps = {
   action3: undefined,
   heading1: undefined,
-  videoSrc: '/Audio/audio%20production%2003.mov',
+  videoSrc: 'work/audio/workaudio-01.mov',
   rootClassName: '',
   textinputPlaceholder: 'Create together',
   content1: undefined,
