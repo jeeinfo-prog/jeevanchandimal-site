@@ -662,9 +662,9 @@ const Contact = () => {
         }
 
         .section-card-narrow {
-          max-width: 980px;
-          width: min(980px, 100%);
-        }
+  max-width: 1180px;
+  width: 100%;
+}
 
         .section-card :global(.thq-section-padding) {
           padding-top: 32px !important;
@@ -681,13 +681,12 @@ const Contact = () => {
         }
 
         .section-card :global(.cjc-wrap),
-        .section-card :global(.co-wrap) {
-          width: min(900px, 100%) !important;
-          max-width: 900px !important;
-          margin-left: auto !important;
-          margin-right: auto !important;
-          align-self: center !important;
-        }
+.section-card :global(.co-wrap) {
+  width: 100% !important;
+  max-width: 1180px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
 
         .section-card :global(.cff-wrap) {
           width: 100% !important;
