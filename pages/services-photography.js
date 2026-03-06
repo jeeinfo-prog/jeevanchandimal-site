@@ -388,14 +388,11 @@ export default function ServicesPhotography() {
 
         /* ========= CINEMATIC BACKGROUND ========= */
         .heroBg {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          pointer-events: none;
-
-          /* ✅ same behavior as work-photography.js */
-          top: var(--jc-nav-h);
-        }
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
 
         .heroBgImg {
           position: absolute;
@@ -446,39 +443,37 @@ export default function ServicesPhotography() {
 
         /* ========= LAYOUT ========= */
         .main {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--jc-nav-h);
+  margin-top: 0;
+}
 
-          /* ✅ avoid double navbar spacing */
-          padding-top: 0;
-          margin-top: 0;
-        }
+.section {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+}
 
-        .section {
-          width: 100%;
-          display: flex;
-          justify-content: center;
-          margin: 0;
-          padding: 0;
-        }
+.block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+}
 
-        .block {
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-          margin: 0;
-          padding: 0;
-        }
-
-        .heroBlock {
-          margin-top: 0;
-          padding-top: 0;
-        }
+.heroBlock {
+  margin-top: 0;
+  padding-top: 0;
+}
 
         .introSection {
           padding-top: 10px;
