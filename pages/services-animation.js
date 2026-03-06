@@ -13,8 +13,6 @@ import ServicesAnimationFinalCTA from '../components/services-animation-final-ct
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function ServicesAnimation() {
-  // ✅ Replace later with your own image in /public/services/animation/
-  // Example: /public/services/animation/heroani.jpg
   const HERO_BG = '/services/animation/heroani.jpg'
 
   return (
@@ -43,7 +41,6 @@ export default function ServicesAnimation() {
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background (swap image later in /public/services/animation/) */}
         <div className="heroBg" aria-hidden="true">
           <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
@@ -53,7 +50,6 @@ export default function ServicesAnimation() {
         <JeevanChandimalNavi rootClassName="jeevan-chandimal-naviroot-class-name21" />
 
         <main className="main">
-          {/* ✅ HERO */}
           <section className="section heroSection">
             <div className="block heroBlock">
               <ServiceAnimationHero
@@ -72,7 +68,6 @@ export default function ServicesAnimation() {
             </div>
           </section>
 
-          {/* INTRO */}
           <section className="section">
             <IntroductionAnimationServices
               feature1Title="Introduction"
@@ -94,7 +89,6 @@ export default function ServicesAnimation() {
             />
           </section>
 
-          {/* SELECTED WORK */}
           <section className="section">
             <SelectedMotionWork
               heading1="Selected Motion Work"
@@ -103,7 +97,6 @@ export default function ServicesAnimation() {
             />
           </section>
 
-          {/* WHAT I DO */}
           <section className="section">
             <WhatIDoAnimationServices
               sectionTitle="What I Do"
@@ -123,7 +116,6 @@ export default function ServicesAnimation() {
             />
           </section>
 
-          {/* APPROACH */}
           <section className="section">
             <HowIApproachMotion
               feature1Title="How I Approach Motion"
@@ -141,7 +133,6 @@ export default function ServicesAnimation() {
             />
           </section>
 
-          {/* WHO IT'S FOR */}
           <section className="section">
             <WhoItsForAnimation
               heading1="Who It’s For"
@@ -150,7 +141,6 @@ export default function ServicesAnimation() {
             />
           </section>
 
-          {/* FINAL CTA */}
           <section className="section">
             <ServicesAnimationFinalCTA
               heading1="Have a story that needs movement?"
@@ -174,6 +164,7 @@ export default function ServicesAnimation() {
 
         :global(body) {
           overflow-x: hidden;
+          background: #0b0b0b;
         }
 
         .page {
@@ -237,9 +228,7 @@ export default function ServicesAnimation() {
           display: flex;
           flex-direction: column;
           align-items: center;
-
-          /* ✅ hero stays below nav but overlaps to kill 1–2px seam */
-          padding-top: calc(var(--jc-nav-h, 72px) - 2px);
+          padding-top: var(--jc-nav-h, 72px);
           margin-top: 0;
         }
 
@@ -264,38 +253,52 @@ export default function ServicesAnimation() {
           padding: 0;
         }
 
-        /* ✅ lock hero to the top of main (no extra spacing) */
+        /* ========= HERO SEAM FIX ========= */
         .heroSection {
+          margin-top: -4px !important;
+          padding-top: 0 !important;
+          position: relative;
+          z-index: 2;
+        }
+
+        .heroBlock {
           margin-top: 0 !important;
           padding-top: 0 !important;
         }
 
-        .heroBlock {
-  margin-top: -2px;
-  padding-top: 0;
-}
-
-        /* ✅ if the seam is coming from nav bottom border/shadow */
-        :global(.jeevan-chandimal-naviroot-class-name21) {
-          margin-bottom: 0 !important;
-          border-bottom: 0 !important;
+        /* remove any possible line from nav */
+        :global(.jeevan-chandimal-naviroot-class-name21),
+        :global(.jeevan-chandimal-naviroot-class-name21 *),
+        :global(.jeevan-chandimal-naviroot-class-name21 *::before),
+        :global(.jeevan-chandimal-naviroot-class-name21 *::after) {
           box-shadow: none !important;
         }
 
-        /* ========= REMOVE HERO CORNER CURVES ========= */
+        :global(.jeevan-chandimal-naviroot-class-name21) {
+          margin-bottom: 0 !important;
+          border-bottom: 0 !important;
+        }
+
+        /* remove hero top gap + corner curves */
         :global(.service-animation-heroroot-class-name),
-        :global(.service-animation-heroroot-class-name *),
+        :global(.service-animation-heroroot-class-name > *),
         :global(.service-animation-heroroot-class-name .thq-section-max-width),
         :global(.service-animation-heroroot-class-name .thq-card),
         :global(.service-animation-heroroot-class-name .thq-hero),
         :global(.service-animation-heroroot-class-name .hero),
         :global(.service-animation-heroroot-class-name .container),
-        :global(.service-animation-heroroot-class-name .content) {
+        :global(.service-animation-heroroot-class-name .content),
+        :global(.service-animation-heroroot-class-name .hero-content),
+        :global(.service-animation-heroroot-class-name .hero-image),
+        :global(.service-animation-heroroot-class-name .hero-media) {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+          border-top: 0 !important;
           border-radius: 0 !important;
         }
 
         :global(.service-animation-heroroot-class-name) {
-          overflow: visible !important;
+          overflow: hidden !important;
         }
 
         @media (min-width: 1200px) {
