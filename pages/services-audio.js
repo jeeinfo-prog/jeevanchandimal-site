@@ -15,7 +15,7 @@ import ServicesAudioFinalCTA from '../components/services-audio-final-cta'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 const ServicesAudio = (props) => {
-  // (kept for compatibility if you later add any translated strings)
+  // keep (even if unused) to match your setup
   useTranslations?.()
 
   return (
@@ -39,10 +39,7 @@ const ServicesAudio = (props) => {
             property="og:image"
             content="https://aheioqhobo.cloudimg.io/v7/_playground-bucket-v2.teleporthq.io_/1e052279-2879-4d4a-b576-0d545df1baa9/f8b288cf-c33a-4971-b301-c944c3ca6c1f?org_if_sml=1&amp;force_format=original"
           />
-          <link
-            rel="canonical"
-            href="https://www.jeevanchandimal.com/services-audio"
-          />
+          <link rel="canonical" href="https://www.jeevanchandimal.com/services-audio" />
         </Head>
 
         <JeevanChandimalNavi
@@ -134,9 +131,12 @@ const ServicesAudio = (props) => {
           rootClassName="jeevan-chandimal-naviroot-class-name20"
         />
 
+        {/* ✅ THIS is the important part: ensures hero starts BELOW the nav */}
+        <div className="navSpacer" aria-hidden="true" />
+
         <main className="main">
-          {/* ✅ HERO (overlap slightly to eliminate the 1–2px seam under nav) */}
-          <section className="section heroSection">
+          {/* HERO */}
+          <section className="section">
             <div className="block heroBlock">
               <ServiceAudioHero
                 action3={
@@ -192,7 +192,7 @@ const ServicesAudio = (props) => {
             />
           </section>
 
-          {/* SELECTED AUDIO */}
+          {/* SELECTED AUDIO WORK */}
           <section className="section">
             <SelectedAudioWork
               content1={
@@ -300,7 +300,7 @@ const ServicesAudio = (props) => {
             />
           </section>
 
-          {/* APPROACH */}
+          {/* HOW I APPROACH */}
           <section className="section">
             <HowIApproachAudio
               feature1Title={
@@ -488,7 +488,13 @@ const ServicesAudio = (props) => {
           overflow-y: visible;
         }
 
-        /* ========= LAYOUT ========= */
+        /* ✅ the key: create physical space for a fixed/sticky nav */
+        .navSpacer {
+          height: var(--jc-nav-h, 72px);
+          width: 100%;
+          flex: 0 0 auto;
+        }
+
         .main {
           position: relative;
           z-index: 1;
@@ -496,10 +502,7 @@ const ServicesAudio = (props) => {
           display: flex;
           flex-direction: column;
           align-items: center;
-
-          /* ✅ keep content below fixed nav */
-          padding-top: calc(var(--jc-nav-h, 72px) - 2px);
-          margin-top: 0;
+          padding-top: 0;
         }
 
         .section {
@@ -519,31 +522,10 @@ const ServicesAudio = (props) => {
           padding: 0;
         }
 
-        /* ✅ seam killer */
-        .heroSection {
-          margin-top: -4px !important;
-          padding-top: 0 !important;
-        }
-
         .heroBlock {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
+          margin-top: 0;
         }
 
-        /* ✅ if seam is from nav border/shadow */
-        :global(.jeevan-chandimal-naviroot-class-name20),
-        :global(.jeevan-chandimal-naviroot-class-name20 *),
-        :global(.jeevan-chandimal-naviroot-class-name20 *::before),
-        :global(.jeevan-chandimal-naviroot-class-name20 *::after) {
-          box-shadow: none !important;
-        }
-
-        :global(.jeevan-chandimal-naviroot-class-name20) {
-          margin-bottom: 0 !important;
-          border-bottom: 0 !important;
-        }
-
-        /* reduce random TeleportHQ inline-block spans */
         .t {
           display: inline-block;
         }
