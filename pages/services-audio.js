@@ -14,7 +14,8 @@ import WhoItsForAudio from '../components/who-its-for-audio'
 import ServicesAudioFinalCTA from '../components/services-audio-final-cta'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
-const ServicesAudio = () => {
+const ServicesAudio = (props) => {
+  // keep (even if unused) to match your setup
   useTranslations?.()
 
   return (
@@ -130,8 +131,12 @@ const ServicesAudio = () => {
           rootClassName="jeevan-chandimal-naviroot-class-name20"
         />
 
+        {/* ✅ THIS is the important part: ensures hero starts BELOW the nav */}
+        <div className="navSpacer" aria-hidden="true" />
+
         <main className="main">
-          <section className="section heroSection">
+          {/* HERO */}
+          <section className="section">
             <div className="block heroBlock">
               <ServiceAudioHero
                 action3={
@@ -160,6 +165,7 @@ const ServicesAudio = () => {
             </div>
           </section>
 
+          {/* INTRO */}
           <section className="section">
             <IntroductionAudioServices
               feature1Title={
@@ -186,6 +192,7 @@ const ServicesAudio = () => {
             />
           </section>
 
+          {/* SELECTED AUDIO WORK */}
           <section className="section">
             <SelectedAudioWork
               content1={
@@ -208,6 +215,7 @@ const ServicesAudio = () => {
             />
           </section>
 
+          {/* WHAT I DO */}
           <section className="section">
             <WhatIDoAudioServices
               sectionTitle={
@@ -292,6 +300,7 @@ const ServicesAudio = () => {
             />
           </section>
 
+          {/* HOW I APPROACH */}
           <section className="section">
             <HowIApproachAudio
               feature1Title={
@@ -318,6 +327,7 @@ const ServicesAudio = () => {
             />
           </section>
 
+          {/* WHO IT'S FOR */}
           <section className="section">
             <WhoItsForAudio
               content1={
@@ -337,6 +347,7 @@ const ServicesAudio = () => {
             />
           </section>
 
+          {/* FINAL CTA */}
           <section className="section">
             <ServicesAudioFinalCTA
               action2={
@@ -477,6 +488,13 @@ const ServicesAudio = () => {
           overflow-y: visible;
         }
 
+        /* ✅ the key: create physical space for a fixed/sticky nav */
+        .navSpacer {
+          height: var(--jc-nav-h, 72px);
+          width: 100%;
+          flex: 0 0 auto;
+        }
+
         .main {
           position: relative;
           z-index: 1;
@@ -484,8 +502,7 @@ const ServicesAudio = () => {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-top: var(--jc-nav-h, 72px);
-          margin-top: 0;
+          padding-top: 0;
         }
 
         .section {
@@ -505,56 +522,12 @@ const ServicesAudio = () => {
           padding: 0;
         }
 
-        .heroSection {
-          margin-top: -2px !important;
-          padding-top: 0 !important;
-        }
-
         .heroBlock {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
-        }
-
-        :global(.service-audio-heroroot-class-name),
-        :global(.service-audio-heroroot-class-name > *),
-        :global(.service-audio-heroroot-class-name .hero),
-        :global(.service-audio-heroroot-class-name .container),
-        :global(.service-audio-heroroot-class-name .content),
-        :global(.service-audio-heroroot-class-name .thq-section-padding),
-        :global(.service-audio-heroroot-class-name .thq-section-max-width),
-        :global(.service-audio-heroroot-class-name .thq-flex-column),
-        :global(.service-audio-heroroot-class-name .thq-column),
-        :global(.service-audio-heroroot-class-name .thq-content),
-        :global(.service-audio-heroroot-class-name .thq-hero) {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
-          border-top: 0 !important;
-        }
-
-        :global(.service-audio-heroroot-class-name) {
-          transform: translateY(-12px);
-        }
-
-        :global(.jeevan-chandimal-naviroot-class-name20),
-        :global(.jeevan-chandimal-naviroot-class-name20 *),
-        :global(.jeevan-chandimal-naviroot-class-name20 *::before),
-        :global(.jeevan-chandimal-naviroot-class-name20 *::after) {
-          box-shadow: none !important;
-        }
-
-        :global(.jeevan-chandimal-naviroot-class-name20) {
-          margin-bottom: 0 !important;
-          border-bottom: 0 !important;
+          margin-top: 0;
         }
 
         .t {
           display: inline-block;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          :global(.service-audio-heroroot-class-name) {
-            transform: translateY(-12px);
-          }
         }
       `}</style>
     </>
