@@ -246,7 +246,7 @@ WorkFilmHero.defaultProps = {
   content1: undefined,
   textinputPlaceholder: 'Create together',
   action3: undefined,
-  videoSrc2: '/Film/film%20production%2002.mov',
+  videoSrc2: 'work/film/workfilm-01.mov',
 }
 
 WorkFilmHero.propTypes = {
