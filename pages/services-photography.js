@@ -36,7 +36,7 @@ export default function ServicesPhotography() {
       </Head>
 
       <div className="page">
-        {/* Background behind navbar + hero */}
+        {/* ✅ Background starts below navbar */}
         <div className="heroBg" aria-hidden="true">
           <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
@@ -44,101 +44,98 @@ export default function ServicesPhotography() {
           <div className="heroBgGlow" />
         </div>
 
-        {/* Fixed navbar */}
-        <div className="navWrap">
-          <JeevanChandimalNavi
-            link1={
-              <Fragment>
-                <span className="t">Home</span>
-              </Fragment>
-            }
-            link2={
-              <Fragment>
-                <span className="t">Work</span>
-              </Fragment>
-            }
-            link3={
-              <Fragment>
-                <span className="t">Services</span>
-              </Fragment>
-            }
-            link4={
-              <Fragment>
-                <span className="t">Store</span>
-              </Fragment>
-            }
-            link5={
-              <Fragment>
-                <span className="t">Membership</span>
-              </Fragment>
-            }
-            link51={
-              <Fragment>
-                <span className="t">About</span>
-              </Fragment>
-            }
-            text16={
-              <Fragment>
-                <span className="t">Work</span>
-              </Fragment>
-            }
-            text17={
-              <Fragment>
-                <span className="t">Film</span>
-              </Fragment>
-            }
-            text18={
-              <Fragment>
-                <span className="t">Audio</span>
-              </Fragment>
-            }
-            text19={
-              <Fragment>
-                <span className="t">Animation</span>
-              </Fragment>
-            }
-            link511={
-              <Fragment>
-                <span className="t">Contact</span>
-              </Fragment>
-            }
-            text161={
-              <Fragment>
-                <span className="t">Services</span>
-              </Fragment>
-            }
-            text171={
-              <Fragment>
-                <span className="t">Film Production</span>
-              </Fragment>
-            }
-            text181={
-              <Fragment>
-                <span className="t">Audio Production</span>
-              </Fragment>
-            }
-            text191={
-              <Fragment>
-                <span className="t">Photography</span>
-              </Fragment>
-            }
-            text192={
-              <Fragment>
-                <span className="t">Animation &amp; Motion</span>
-              </Fragment>
-            }
-            text1911={
-              <Fragment>
-                <span className="t">Photography</span>
-              </Fragment>
-            }
-            rootClassName="jeevan-chandimal-naviroot-class-name19"
-          />
-        </div>
+        <JeevanChandimalNavi
+          link1={
+            <Fragment>
+              <span className="t">Home</span>
+            </Fragment>
+          }
+          link2={
+            <Fragment>
+              <span className="t">Work</span>
+            </Fragment>
+          }
+          link3={
+            <Fragment>
+              <span className="t">Services</span>
+            </Fragment>
+          }
+          link4={
+            <Fragment>
+              <span className="t">Store</span>
+            </Fragment>
+          }
+          link5={
+            <Fragment>
+              <span className="t">Membership</span>
+            </Fragment>
+          }
+          link51={
+            <Fragment>
+              <span className="t">About</span>
+            </Fragment>
+          }
+          text16={
+            <Fragment>
+              <span className="t">Work</span>
+            </Fragment>
+          }
+          text17={
+            <Fragment>
+              <span className="t">Film</span>
+            </Fragment>
+          }
+          text18={
+            <Fragment>
+              <span className="t">Audio</span>
+            </Fragment>
+          }
+          text19={
+            <Fragment>
+              <span className="t">Animation</span>
+            </Fragment>
+          }
+          link511={
+            <Fragment>
+              <span className="t">Contact</span>
+            </Fragment>
+          }
+          text161={
+            <Fragment>
+              <span className="t">Services</span>
+            </Fragment>
+          }
+          text171={
+            <Fragment>
+              <span className="t">Film Production</span>
+            </Fragment>
+          }
+          text181={
+            <Fragment>
+              <span className="t">Audio Production</span>
+            </Fragment>
+          }
+          text191={
+            <Fragment>
+              <span className="t">Photography</span>
+            </Fragment>
+          }
+          text192={
+            <Fragment>
+              <span className="t">Animation &amp; Motion</span>
+            </Fragment>
+          }
+          text1911={
+            <Fragment>
+              <span className="t">Photography</span>
+            </Fragment>
+          }
+          rootClassName="jeevan-chandimal-naviroot-class-name19"
+        />
 
         <main className="main">
           {/* HERO */}
-          <section className="section heroSection">
+          <section className="section">
             <div className="block heroBlock">
               <ServicePhotographyHero
                 action3={
@@ -165,7 +162,7 @@ export default function ServicesPhotography() {
           </section>
 
           {/* INTRO */}
-          <section className="section">
+          <section className="section introSection">
             <IntroductionPhotographyServices
               feature1Title={
                 <Fragment>
@@ -263,7 +260,9 @@ export default function ServicesPhotography() {
               }
               feature1Description={
                 <Fragment>
-                  <span className="t">Story-driven imagery created with intention and visual depth.</span>
+                  <span className="t">
+                    Story-driven imagery created with intention and visual depth.
+                  </span>
                 </Fragment>
               }
               feature2Description={
@@ -347,7 +346,9 @@ export default function ServicesPhotography() {
               }
               content1={
                 <Fragment>
-                  <span className="t">Let’s create something with clarity, atmosphere, and purpose.</span>
+                  <span className="t">
+                    Let’s create something with clarity, atmosphere, and purpose.
+                  </span>
                 </Fragment>
               }
               heading1={
@@ -367,13 +368,12 @@ export default function ServicesPhotography() {
         :global(html),
         :global(body) {
           height: 100%;
-          margin: 0;
-          padding: 0;
         }
 
         :global(body) {
           overflow-x: hidden;
-          background: #0b0b0b;
+          margin: 0;
+          padding: 0;
         }
 
         .page {
@@ -386,12 +386,15 @@ export default function ServicesPhotography() {
           color: #f5f4f4;
         }
 
-        /* ========= BACKGROUND ========= */
+        /* ========= CINEMATIC BACKGROUND ========= */
         .heroBg {
           position: fixed;
           inset: 0;
           z-index: 0;
           pointer-events: none;
+
+          /* ✅ same behavior as work-photography.js */
+          top: var(--jc-nav-h);
         }
 
         .heroBgImg {
@@ -441,15 +444,6 @@ export default function ServicesPhotography() {
           background-size: 240px 240px;
         }
 
-        /* ========= NAV ========= */
-        .navWrap {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          z-index: 30;
-        }
-
         /* ========= LAYOUT ========= */
         .main {
           position: relative;
@@ -458,7 +452,9 @@ export default function ServicesPhotography() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding-top: 0; /* removed gap */
+
+          /* ✅ avoid double navbar spacing */
+          padding-top: 0;
           margin-top: 0;
         }
 
@@ -470,47 +466,30 @@ export default function ServicesPhotography() {
           padding: 0;
         }
 
-        .heroSection {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
-        }
-
         .block {
           width: 100%;
           display: flex;
           flex-direction: column;
-          gap: 0;
+          gap: 18px;
           margin: 0;
           padding: 0;
         }
 
         .heroBlock {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
+          margin-top: 0;
+          padding-top: 0;
+        }
+
+        .introSection {
+          padding-top: 10px;
+        }
+
+        .section :global(> *) {
+          width: 100%;
         }
 
         .t {
           display: inline-block;
-        }
-
-        /* ========= HARD RESET FOR FIRST HERO AREA ========= */
-        .main > .section:first-child {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
-        }
-
-        .main > .section:first-child > .block {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
-        }
-
-        :global(.service-photography-heroroot-class-name) {
-          margin-top: 0 !important;
-          padding-top: 0 !important;
-        }
-
-        :global(.service-photography-heroroot-class-name > *) {
-          margin-top: 0 !important;
         }
 
         @media (min-width: 1200px) {
