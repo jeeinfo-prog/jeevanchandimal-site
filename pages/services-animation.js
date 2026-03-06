@@ -13,8 +13,6 @@ import ServicesAnimationFinalCTA from '../components/services-animation-final-ct
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function ServicesAnimation() {
-  // ✅ Replace later with your own image in /public/services/animation/
-  // Example: /public/services/animation/heroani.jpg
   const HERO_BG = '/services/animation/heroani.jpg'
 
   return (
@@ -43,7 +41,7 @@ export default function ServicesAnimation() {
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background (swap image later in /public/services/animation/) */}
+        {/* ✅ Cinematic background */}
         <div className="heroBg" aria-hidden="true">
           <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
@@ -53,9 +51,9 @@ export default function ServicesAnimation() {
         <JeevanChandimalNavi rootClassName="jeevan-chandimal-naviroot-class-name21" />
 
         <main className="main">
-          {/* ✅ HERO (PLACED LIKE work-photography.js: section -> block -> component) */}
-          <section className="section">
-            <div className="block">
+          {/* ✅ HERO */}
+          <section className="section heroSection">
+            <div className="block heroBlock">
               <ServiceAnimationHero
                 heading1="Motion designed with clarity, rhythm, and intent."
                 content1={
@@ -134,9 +132,7 @@ export default function ServicesAnimation() {
                     decision.
                   </span>
                   <br />
-                  <span>
-                    Animation is used to strengthen the story — never to overwhelm it.
-                  </span>
+                  <span>Animation is used to strengthen the story — never to overwhelm it.</span>
                 </>
               }
               rootClassName="how-i-approach-motionroot-class-name"
@@ -170,6 +166,8 @@ export default function ServicesAnimation() {
         :global(html),
         :global(body) {
           height: 100%;
+          margin: 0;
+          padding: 0;
         }
 
         :global(body) {
@@ -180,11 +178,8 @@ export default function ServicesAnimation() {
           width: 100%;
           min-height: 100vh;
           position: relative;
-
-          /* ✅ allow sticky/fixed navbar */
           overflow-x: hidden;
           overflow-y: visible;
-
           background: #0b0b0b;
           color: #f5f4f4;
         }
@@ -241,30 +236,57 @@ export default function ServicesAnimation() {
           flex-direction: column;
           align-items: center;
 
-          padding-top: 72px; /* ✅ space for fixed navbar */
+          /* ✅ keep hero BELOW fixed nav (safe fallback) */
+          padding-top: var(--jc-nav-h, 72px);
+          margin-top: 0;
         }
 
         .section {
           width: 100%;
           display: flex;
           justify-content: center;
+          margin: 0;
+          padding: 0;
         }
 
         .section :global(> *) {
           width: 100%;
         }
 
-        /* ✅ matches work-photography.js rhythm (fixes hero placement) */
         .block {
           width: 100%;
           display: flex;
           flex-direction: column;
           gap: 18px;
+          margin: 0;
+          padding: 0;
         }
 
-        /* subtle depth separation between blocks */
-        .section :global(.thq-section-padding) {
-          position: relative;
+        /* ✅ kill the tiny 1px seam under the navbar */
+        .heroSection {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
+        .heroBlock {
+          margin-top: -2px;
+          padding-top: 0;
+        }
+
+        /* ========= REMOVE HERO CORNER CURVES ========= */
+        :global(.service-animation-heroroot-class-name),
+        :global(.service-animation-heroroot-class-name *),
+        :global(.service-animation-heroroot-class-name .thq-section-max-width),
+        :global(.service-animation-heroroot-class-name .thq-card),
+        :global(.service-animation-heroroot-class-name .thq-hero),
+        :global(.service-animation-heroroot-class-name .hero),
+        :global(.service-animation-heroroot-class-name .container),
+        :global(.service-animation-heroroot-class-name .content) {
+          border-radius: 0 !important;
+        }
+
+        /* (optional) if hero uses overflow hidden to create rounded corners */
+        :global(.service-animation-heroroot-class-name) {
+          overflow: visible !important;
         }
 
         @media (min-width: 1200px) {
