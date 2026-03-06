@@ -13,7 +13,6 @@ import PhotographyServicesFinalCTA from '../components/photography-services-fina
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 export default function ServicesPhotography() {
-  // ✅ Background image in /public/services/heroser.jpg
   const HERO_BG = '/services/heroser.jpg'
 
   return (
@@ -37,7 +36,7 @@ export default function ServicesPhotography() {
       </Head>
 
       <div className="page">
-        {/* ✅ Cinematic background (FULL BLEED behind navbar) */}
+        {/* Background behind navbar + hero */}
         <div className="heroBg" aria-hidden="true">
           <div className="heroBgImg" style={{ backgroundImage: `url(${HERO_BG})` }} />
           <div className="heroBgVignette" />
@@ -45,99 +44,102 @@ export default function ServicesPhotography() {
           <div className="heroBgGlow" />
         </div>
 
-        <JeevanChandimalNavi
-          link1={
-            <Fragment>
-              <span className="t">Home</span>
-            </Fragment>
-          }
-          link2={
-            <Fragment>
-              <span className="t">Work</span>
-            </Fragment>
-          }
-          link3={
-            <Fragment>
-              <span className="t">Services</span>
-            </Fragment>
-          }
-          link4={
-            <Fragment>
-              <span className="t">Store</span>
-            </Fragment>
-          }
-          link5={
-            <Fragment>
-              <span className="t">Membership</span>
-            </Fragment>
-          }
-          link51={
-            <Fragment>
-              <span className="t">About</span>
-            </Fragment>
-          }
-          text16={
-            <Fragment>
-              <span className="t">Work</span>
-            </Fragment>
-          }
-          text17={
-            <Fragment>
-              <span className="t">Film</span>
-            </Fragment>
-          }
-          text18={
-            <Fragment>
-              <span className="t">Audio</span>
-            </Fragment>
-          }
-          text19={
-            <Fragment>
-              <span className="t">Animation</span>
-            </Fragment>
-          }
-          link511={
-            <Fragment>
-              <span className="t">Contact</span>
-            </Fragment>
-          }
-          text161={
-            <Fragment>
-              <span className="t">Services</span>
-            </Fragment>
-          }
-          text171={
-            <Fragment>
-              <span className="t">Film Production</span>
-            </Fragment>
-          }
-          text181={
-            <Fragment>
-              <span className="t">Audio Production</span>
-            </Fragment>
-          }
-          text191={
-            <Fragment>
-              <span className="t">Photography</span>
-            </Fragment>
-          }
-          text192={
-            <Fragment>
-              <span className="t">Animation &amp; Motion</span>
-            </Fragment>
-          }
-          text1911={
-            <Fragment>
-              <span className="t">Photography</span>
-            </Fragment>
-          }
-          rootClassName="jeevan-chandimal-naviroot-class-name19"
-        />
+        {/* Fixed navbar */}
+        <div className="navWrap">
+          <JeevanChandimalNavi
+            link1={
+              <Fragment>
+                <span className="t">Home</span>
+              </Fragment>
+            }
+            link2={
+              <Fragment>
+                <span className="t">Work</span>
+              </Fragment>
+            }
+            link3={
+              <Fragment>
+                <span className="t">Services</span>
+              </Fragment>
+            }
+            link4={
+              <Fragment>
+                <span className="t">Store</span>
+              </Fragment>
+            }
+            link5={
+              <Fragment>
+                <span className="t">Membership</span>
+              </Fragment>
+            }
+            link51={
+              <Fragment>
+                <span className="t">About</span>
+              </Fragment>
+            }
+            text16={
+              <Fragment>
+                <span className="t">Work</span>
+              </Fragment>
+            }
+            text17={
+              <Fragment>
+                <span className="t">Film</span>
+              </Fragment>
+            }
+            text18={
+              <Fragment>
+                <span className="t">Audio</span>
+              </Fragment>
+            }
+            text19={
+              <Fragment>
+                <span className="t">Animation</span>
+              </Fragment>
+            }
+            link511={
+              <Fragment>
+                <span className="t">Contact</span>
+              </Fragment>
+            }
+            text161={
+              <Fragment>
+                <span className="t">Services</span>
+              </Fragment>
+            }
+            text171={
+              <Fragment>
+                <span className="t">Film Production</span>
+              </Fragment>
+            }
+            text181={
+              <Fragment>
+                <span className="t">Audio Production</span>
+              </Fragment>
+            }
+            text191={
+              <Fragment>
+                <span className="t">Photography</span>
+              </Fragment>
+            }
+            text192={
+              <Fragment>
+                <span className="t">Animation &amp; Motion</span>
+              </Fragment>
+            }
+            text1911={
+              <Fragment>
+                <span className="t">Photography</span>
+              </Fragment>
+            }
+            rootClassName="jeevan-chandimal-naviroot-class-name19"
+          />
+        </div>
 
         <main className="main">
-          {/* ✅ HERO (NO GAP): we remove main padding-top and apply it ONLY as inner spacing here */}
+          {/* HERO */}
           <section className="section heroSection">
-            <div className="block heroFix">
+            <div className="block heroBlock">
               <ServicePhotographyHero
                 action3={
                   <Fragment>
@@ -365,11 +367,13 @@ export default function ServicesPhotography() {
         :global(html),
         :global(body) {
           height: 100%;
+          margin: 0;
+          padding: 0;
         }
 
         :global(body) {
           overflow-x: hidden;
-          margin: 0; /* ✅ avoid any UA margin */
+          background: #0b0b0b;
         }
 
         .page {
@@ -382,10 +386,10 @@ export default function ServicesPhotography() {
           color: #f5f4f4;
         }
 
-        /* ========= CINEMATIC BACKGROUND ========= */
+        /* ========= BACKGROUND ========= */
         .heroBg {
           position: fixed;
-          inset: 0; /* ✅ must cover behind navbar */
+          inset: 0;
           z-index: 0;
           pointer-events: none;
         }
@@ -437,6 +441,15 @@ export default function ServicesPhotography() {
           background-size: 240px 240px;
         }
 
+        /* ========= NAV ========= */
+        .navWrap {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          z-index: 30;
+        }
+
         /* ========= LAYOUT ========= */
         .main {
           position: relative;
@@ -445,37 +458,59 @@ export default function ServicesPhotography() {
           display: flex;
           flex-direction: column;
           align-items: center;
-
-          /* ✅ IMPORTANT: remove global padding-top (this is what creates the visible “gap”) */
-          padding-top: 0;
+          padding-top: 0; /* removed gap */
+          margin-top: 0;
         }
 
         .section {
           width: 100%;
           display: flex;
           justify-content: center;
-          margin: 0; /* ✅ prevent any default section margins */
+          margin: 0;
+          padding: 0;
+        }
+
+        .heroSection {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
         }
 
         .block {
           width: 100%;
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 0;
+          margin: 0;
+          padding: 0;
         }
 
-        /* ✅ THIS is the fix:
-           we push hero content down for the fixed navbar WITHOUT creating a separate gap band */
-        .heroFix {
-          padding-top: 72px; /* navbar height */
-        }
-
-        .section :global(> *) {
-          width: 100%;
+        .heroBlock {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
         }
 
         .t {
           display: inline-block;
+        }
+
+        /* ========= HARD RESET FOR FIRST HERO AREA ========= */
+        .main > .section:first-child {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
+
+        .main > .section:first-child > .block {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
+
+        :global(.service-photography-heroroot-class-name) {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
+
+        :global(.service-photography-heroroot-class-name > *) {
+          margin-top: 0 !important;
         }
 
         @media (min-width: 1200px) {
