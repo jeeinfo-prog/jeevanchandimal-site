@@ -262,7 +262,7 @@ ServicePhotographyHero.defaultProps = {
   heading1: undefined,
   content1: undefined,
   action3: undefined,
-  videoSrc: '/Photography/Video/photography%2001.mov',
+  videoSrc: '/services/photography/servicesphotographyhero-01.mov',
 
   primaryHref: '/work-photography',
   secondaryHref: '/contact',
