@@ -161,11 +161,12 @@ const ContactOffice = (props) => {
 
       <style jsx>{`
         .co-wrap {
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          gap: 34px;
-        }
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
 
         .co-head {
           display: flex;
@@ -218,10 +219,11 @@ const ContactOffice = (props) => {
         }
 
         .co-gallery {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 24px;
-        }
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
 
         .co-imageCard {
           --mx: 50%;
@@ -243,13 +245,13 @@ const ContactOffice = (props) => {
         }
 
         .co-image {
-          width: 100%;
-          height: 340px;
-          object-fit: cover;
-          display: block;
-          transform: scale(1);
-          transition: transform 0.6s ease, filter 0.6s ease;
-        }
+  width: 100%;
+  height: 380px;
+  object-fit: cover;
+  display: block;
+  transform: scale(1);
+  transition: transform 0.6s ease, filter 0.6s ease;
+}
 
         .co-imageCard:hover .co-image {
           transform: scale(1.05);
@@ -323,27 +325,31 @@ const ContactOffice = (props) => {
         }
 
         .co-locations {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 24px;
-        }
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
 
         .co-locationCard {
-          padding: 28px 24px;
-          border-radius: 26px;
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.04),
-            rgba(255, 255, 255, 0.015)
-          );
-          box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-          transition: all 0.25s ease;
-        }
+  width: 100%;
+  min-height: 176px;
+  padding: 28px 24px;
+  border-radius: 26px;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.015)
+  );
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  transition: all 0.25s ease;
+}
 
         .co-locationCard:hover {
           transform: translateY(-4px);

@@ -779,8 +779,11 @@ const Contact = () => {
 
           .section-card :global(.cjc-wrap),
           .section-card :global(.co-wrap) {
-            max-width: 100% !important;
-          }
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
         }
 
         @media (max-width: 767px) {
