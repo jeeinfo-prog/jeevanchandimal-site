@@ -54,15 +54,19 @@ function rateLimit(req, res) {
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
 }
+
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
+
 function clean(v) {
   return String(v || '').trim()
 }
+
 function cleanLower(v) {
   return String(v || '').trim().toLowerCase()
 }
+
 function normalizeFormat(v) {
   return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
@@ -86,6 +90,7 @@ function cinematicKickMessage() {
 function verifySessionFromReq(req) {
   const auth = String(req.headers.authorization || '')
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+
   if (!token) {
     return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
   }
@@ -126,10 +131,18 @@ async function ensureActiveSession(userId, deviceId) {
 
 function resolveTierTermFromMembershipRow(memberRow) {
   const planRaw = cleanLower(memberRow?.plan)
-  if (planRaw === 'monthly') return { tier: 'basic', term: 'monthly' }
+
+  // ✅ current mapping
+  if (planRaw === 'monthly') return { tier: 'pro', term: 'monthly' }
+
+  // legacy / alternate mappings
   if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
   if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
-  if (['basic', 'pro', 'elite'].includes(planRaw)) return { tier: planRaw, term: 'monthly' }
+
+  if (['basic', 'pro', 'elite'].includes(planRaw)) {
+    return { tier: planRaw, term: 'monthly' }
+  }
+
   return { tier: 'pro', term: 'monthly' }
 }
 
@@ -156,7 +169,9 @@ async function incrementMonthlyUsedCAS(memberRow) {
   const used = Number(memberRow.monthly_download_used ?? 0)
   const limit = Number(memberRow.monthly_download_limit ?? 0)
 
-  if (limit > 0 && used >= limit) return { ok: false, used, limit, remaining: 0 }
+  if (limit > 0 && used >= limit) {
+    return { ok: false, used, limit, remaining: 0 }
+  }
 
   const nextUsed = used + 1
 
@@ -164,7 +179,7 @@ async function incrementMonthlyUsedCAS(memberRow) {
     .from('memberships')
     .update({ monthly_download_used: nextUsed })
     .eq('id', id)
-    .eq('monthly_download_used', used) // CAS
+    .eq('monthly_download_used', used)
     .select('monthly_download_used,monthly_download_limit,billing_cycle_end')
     .maybeSingle()
 
@@ -176,6 +191,7 @@ async function incrementMonthlyUsedCAS(memberRow) {
       .select('id,monthly_download_used,monthly_download_limit,billing_cycle_end')
       .eq('id', id)
       .maybeSingle()
+
     if (fErr) throw new Error(fErr.message)
     return await incrementMonthlyUsedCAS({ ...memberRow, ...fresh })
   }
@@ -225,7 +241,7 @@ async function ensureMemberOrder(email, tier, term, memberRow, quotaUsed) {
     order_kind: 'membership',
     download_count: Number(quotaUsed ?? memberRow?.monthly_download_used ?? 0),
     download_limit: Number(memberRow?.monthly_download_limit ?? 0),
-    items: [], // ✅ JSONB array (not a string)
+    items: [],
   }
 
   const ins = await supabaseAdmin.from('orders').insert(payload).select('*').maybeSingle()
@@ -234,7 +250,6 @@ async function ensureMemberOrder(email, tier, term, memberRow, quotaUsed) {
 }
 
 export default async function handler(req, res) {
-  // ✅ rate limit first
   if (!rateLimit(req, res)) return
 
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
@@ -255,6 +270,7 @@ export default async function handler(req, res) {
     if (!photoId || !email) {
       return res.status(400).json({ ok: false, error: 'Missing photoId or email' })
     }
+
     if (!isValidEmail(email)) {
       return res.status(400).json({ ok: false, error: 'Invalid email' })
     }
@@ -298,9 +314,10 @@ export default async function handler(req, res) {
 
     if (mErr) return res.status(500).json({ ok: false, error: mErr.message })
     if (!member) return res.status(403).json({ ok: false, error: 'Not a member' })
-    if (!member.user_id) return res.status(500).json({ ok: false, error: 'Membership missing user_id' })
+    if (!member.user_id) {
+      return res.status(500).json({ ok: false, error: 'Membership missing user_id' })
+    }
 
-    // ✅ consistent expiry logic: billing_cycle_end OR end_date
     const endsAt = member.billing_cycle_end || member.end_date || null
     if (endsAt && isExpired(endsAt)) {
       return res.status(403).json({ ok: false, error: 'Membership expired' })
@@ -315,7 +332,6 @@ export default async function handler(req, res) {
     const objectKey = await resolveObjectKeyFromPhotos(photoId, format)
     if (!objectKey) return res.status(404).json({ ok: false, error: 'File not found' })
 
-    // ✅ quota update (CAS)
     const quota = await incrementMonthlyUsedCAS(member)
     if (!quota.ok) {
       return res.status(403).json({
@@ -330,21 +346,24 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ Create/ensure an ORD_* order
     const order = await ensureMemberOrder(email, tier, term, member, quota.used)
     const orderIdText = String(order?.id || '')
-    if (!orderIdText) return res.status(500).json({ ok: false, error: 'Could not create member order' })
+    if (!orderIdText) {
+      return res.status(500).json({ ok: false, error: 'Could not create member order' })
+    }
 
-    // ✅ Record token
     const jti = crypto.randomUUID()
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000) // ✅ shorter TTL
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
 
     const insTok = await supabaseAdmin.from('download_tokens').insert({
       jti,
       order_id: orderIdText,
       expires_at: expiresAt.toISOString(),
     })
-    if (insTok.error) return res.status(500).json({ ok: false, error: insTok.error.message })
+
+    if (insTok.error) {
+      return res.status(500).json({ ok: false, error: insTok.error.message })
+    }
 
     const token = createDownloadToken(
       {
@@ -356,7 +375,7 @@ export default async function handler(req, res) {
         guestEmail: email,
         filename: `${photoId}.${ext}`,
         license: 'membership',
-        membership: true, // ✅ explicit
+        membership: true,
       },
       '30m'
     )

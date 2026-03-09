@@ -7,8 +7,36 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
+const STORAGE_MEMBER_TOKEN_KEY = 'jc_member_token'
+const STORAGE_MEMBER_DEVICE_KEY = 'jc_member_device_id'
+
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
+}
+
+function getOrCreateDeviceId() {
+  if (typeof window === 'undefined') return ''
+
+  let deviceId = String(window.localStorage.getItem(STORAGE_MEMBER_DEVICE_KEY) || '').trim()
+  if (deviceId && deviceId.length >= 8) return deviceId
+
+  deviceId = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+  window.localStorage.setItem(STORAGE_MEMBER_DEVICE_KEY, deviceId)
+  return deviceId
+}
+
+function readMemberToken() {
+  if (typeof window === 'undefined') return ''
+  return String(window.localStorage.getItem(STORAGE_MEMBER_TOKEN_KEY) || '').trim()
+}
+
+function writeMemberToken(token) {
+  if (typeof window === 'undefined') return
+  if (!token) {
+    window.localStorage.removeItem(STORAGE_MEMBER_TOKEN_KEY)
+    return
+  }
+  window.localStorage.setItem(STORAGE_MEMBER_TOKEN_KEY, String(token))
 }
 
 export default function MemberAccess() {
@@ -41,10 +69,71 @@ export default function MemberAccess() {
           return
         }
 
-        const r = await fetch(`/api/member/status?email=${encodeURIComponent(clean)}`, {
-          headers: { 'Cache-Control': 'no-store' },
+        const deviceId = getOrCreateDeviceId()
+        let token = readMemberToken()
+
+        async function fetchStatus(activeToken) {
+          const r = await fetch(`/api/member/status?email=${encodeURIComponent(clean)}`, {
+            headers: {
+              Authorization: `Bearer ${activeToken}`,
+              'Cache-Control': 'no-store',
+            },
+          })
+          const j = await r.json().catch(() => null)
+          return { r, j }
+        }
+
+        // 1) Try existing token first
+        if (token) {
+          const { r, j } = await fetchStatus(token)
+
+          if (!alive) return
+
+          if (r.ok && j?.ok) {
+            const isMember = Boolean(j.member)
+            setStatus({
+              member: isMember,
+              tier: j.tier || null,
+              term: j.term || null,
+              ends_at: j.ends_at || null,
+            })
+
+            if (isMember) {
+              router.replace('/store')
+            }
+            return
+          }
+
+          // Clear invalid/revoked token and start fresh session
+          writeMemberToken('')
+          token = ''
+        }
+
+        // 2) Start or restore session
+        const sessionRes = await fetch('/api/member/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: clean,
+            deviceId,
+          }),
         })
-        const j = await r.json().catch(() => null)
+
+        const sessionJson = await sessionRes.json().catch(() => null)
+
+        if (!alive) return
+
+        if (!sessionRes.ok || !sessionJson?.ok || !sessionJson?.token) {
+          setError(sessionJson?.error || 'Failed to start member session.')
+          setStatus({ member: false, tier: null, term: null, ends_at: null })
+          return
+        }
+
+        token = String(sessionJson.token)
+        writeMemberToken(token)
+
+        // 3) Check protected member status with fresh token
+        const { r, j } = await fetchStatus(token)
 
         if (!alive) return
 
@@ -62,13 +151,13 @@ export default function MemberAccess() {
           ends_at: j.ends_at || null,
         })
 
-        // ✅ if active member -> send them to Store for now
         if (isMember) {
           router.replace('/store')
         }
       } catch (e) {
         if (!alive) return
         setError(e?.message || 'Something went wrong.')
+        setStatus({ member: false, tier: null, term: null, ends_at: null })
       } finally {
         if (!alive) return
         setLoading(false)

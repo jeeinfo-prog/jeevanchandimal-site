@@ -11,11 +11,14 @@ import { addToCart } from '../../lib/cart'
 
 const PLACEHOLDER = '/placeholder.png'
 
-/* ================== currency defaults ================== */
+/* ================== storage ================== */
 const STORAGE_CCY_KEY = 'jc_currency_v1'
 const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
+const STORAGE_MEMBER_TOKEN_KEY = 'jc_member_token'
+const STORAGE_MEMBER_DEVICE_KEY = 'jc_member_device_id'
 const DEFAULT_CURRENCY = 'USD'
 
+/* ================== helpers ================== */
 function safeJsonParse(v, fallback) {
   try {
     return JSON.parse(v)
@@ -47,14 +50,39 @@ function readUsdLkrRate() {
   const raw = window.localStorage.getItem(STORAGE_FX_LOCK_KEY)
   const lock = safeJsonParse(raw, null)
 
-  // support a few shapes:
-  // { usdLkr: 310.12, lockedAt: 123... }
-  // { rate: 310.12, ... }
-  // { usd_lkr: 310.12, ... }
   const v = lock?.usdLkr ?? lock?.rate ?? lock?.usd_lkr ?? null
   const n = Number(v)
   if (!Number.isFinite(n) || n <= 0) return null
   return n
+}
+
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
+}
+
+function getOrCreateDeviceId() {
+  if (typeof window === 'undefined') return ''
+
+  let deviceId = String(window.localStorage.getItem(STORAGE_MEMBER_DEVICE_KEY) || '').trim()
+  if (deviceId && deviceId.length >= 8) return deviceId
+
+  deviceId = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+  window.localStorage.setItem(STORAGE_MEMBER_DEVICE_KEY, deviceId)
+  return deviceId
+}
+
+function readMemberToken() {
+  if (typeof window === 'undefined') return ''
+  return String(window.localStorage.getItem(STORAGE_MEMBER_TOKEN_KEY) || '').trim()
+}
+
+function writeMemberToken(token) {
+  if (typeof window === 'undefined') return
+  if (!token) {
+    window.localStorage.removeItem(STORAGE_MEMBER_TOKEN_KEY)
+    return
+  }
+  window.localStorage.setItem(STORAGE_MEMBER_TOKEN_KEY, String(token))
 }
 
 const PRICES = {
@@ -93,7 +121,6 @@ function getUnitPrice({ currency, license, format, usdLkrRate }) {
   const baseUsd = PRICES?.USD?.[lic]?.[fmt] != null ? Number(PRICES.USD[lic][fmt]) : 0
   if (ccy === 'USD') return baseUsd
 
-  // ✅ LKR adjusted from USD * rate (if available); fallback to static LKR table
   if (usdLkrRate != null && Number.isFinite(Number(usdLkrRate)) && Number(usdLkrRate) > 0) {
     return round2(baseUsd * Number(usdLkrRate))
   }
@@ -109,15 +136,11 @@ export default function StoreIndex() {
   const [photos, setPhotos] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
-  const [origin, setOrigin] = React.useState('') // ✅ for normalizing relative URLs
+  const [origin, setOrigin] = React.useState('')
 
-  // ✅ Default currency = USD (persisted)
   const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
-
-  // ✅ FX rate (optional) used to adjust LKR from USD
   const [usdLkrRate, setUsdLkrRate] = React.useState(null)
 
-  // ✅ Member status (store-wide badge/CTA)
   const [member, setMember] = React.useState({
     loading: true,
     email: '',
@@ -135,17 +158,15 @@ export default function StoreIndex() {
     if (typeof window === 'undefined') return
     const c = readCurrency()
     setCurrency(c)
-    writeCurrency(c) // ensure stored (defaults to USD)
+    writeCurrency(c)
     setUsdLkrRate(readUsdLkrRate())
   }, [])
 
-  // ✅ Check membership once (non-breaking)
+  /* ================== member bootstrap + status ================== */
   React.useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const savedEmail = String(window.localStorage.getItem('user_email') || '')
-      .trim()
-      .toLowerCase()
+    const savedEmail = normalizeEmail(window.localStorage.getItem('user_email') || '')
 
     if (!savedEmail) {
       setMember({ loading: false, email: '', isMember: false, plan: '', end_date: null })
@@ -154,37 +175,136 @@ export default function StoreIndex() {
 
     let alive = true
 
-    async function check() {
+    async function bootstrapAndCheckMember() {
       try {
-        setMember({ loading: true, email: savedEmail, isMember: false, plan: '', end_date: null })
-
-        const r = await fetch(`/api/member/status?email=${encodeURIComponent(savedEmail)}`, {
-          headers: { 'Cache-Control': 'no-store' },
+        setMember({
+          loading: true,
+          email: savedEmail,
+          isMember: false,
+          plan: '',
+          end_date: null,
         })
-        const j = await r.json().catch(() => null)
+
+        const deviceId = getOrCreateDeviceId()
+
+        let token = readMemberToken()
+
+        // Try status with existing token first if available
+        if (token) {
+          const existingStatusRes = await fetch(
+            `/api/member/status?email=${encodeURIComponent(savedEmail)}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Cache-Control': 'no-store',
+              },
+            }
+          )
+
+          const existingStatusJson = await existingStatusRes.json().catch(() => null)
+
+          if (!alive) return
+
+          if (existingStatusRes.ok && existingStatusJson?.ok) {
+            const isMember = Boolean(existingStatusJson.member)
+            const plan = isMember ? String(existingStatusJson.tier || '') : ''
+            const end_date = isMember ? existingStatusJson.ends_at || null : null
+
+            setMember({
+              loading: false,
+              email: savedEmail,
+              isMember,
+              plan,
+              end_date,
+            })
+            return
+          }
+
+          // invalid/revoked token -> clear and continue with fresh session
+          writeMemberToken('')
+          token = ''
+        }
+
+        // Start/restore member session
+        const sessionRes = await fetch('/api/member/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: savedEmail,
+            deviceId,
+          }),
+        })
+
+        const sessionJson = await sessionRes.json().catch(() => null)
 
         if (!alive) return
 
-        const ok = Boolean(j?.ok)
-        const isMember = ok ? Boolean(j?.member) : false
-        const plan = isMember ? String(j?.plan || '') : ''
-        const end_date = isMember ? j?.end_date || null : null
+        if (!sessionRes.ok || !sessionJson?.ok || !sessionJson?.token) {
+          setMember({
+            loading: false,
+            email: savedEmail,
+            isMember: false,
+            plan: '',
+            end_date: null,
+          })
+          return
+        }
 
-        setMember({ loading: false, email: savedEmail, isMember, plan, end_date })
+        token = String(sessionJson.token)
+        writeMemberToken(token)
+
+        const statusRes = await fetch(`/api/member/status?email=${encodeURIComponent(savedEmail)}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-store',
+          },
+        })
+
+        const statusJson = await statusRes.json().catch(() => null)
+
+        if (!alive) return
+
+        if (!statusRes.ok || !statusJson?.ok) {
+          setMember({
+            loading: false,
+            email: savedEmail,
+            isMember: false,
+            plan: '',
+            end_date: null,
+          })
+          return
+        }
+
+        const isMember = Boolean(statusJson.member)
+        const plan = isMember ? String(statusJson.tier || '') : ''
+        const end_date = isMember ? statusJson.ends_at || null : null
+
+        setMember({
+          loading: false,
+          email: savedEmail,
+          isMember,
+          plan,
+          end_date,
+        })
       } catch {
         if (!alive) return
-        // ✅ fail-safe: store still works
-        setMember({ loading: false, email: savedEmail, isMember: false, plan: '', end_date: null })
+        setMember({
+          loading: false,
+          email: savedEmail,
+          isMember: false,
+          plan: '',
+          end_date: null,
+        })
       }
     }
 
-    check()
+    bootstrapAndCheckMember()
+
     return () => {
       alive = false
     }
   }, [])
 
-  // ✅ Read q or tag from URL on load
   React.useEffect(() => {
     if (!router.isReady) return
     const q = typeof router.query.q === 'string' ? router.query.q : ''
@@ -230,7 +350,7 @@ export default function StoreIndex() {
         })
 
         setPhotos(normalized)
-      } catch (e) {
+      } catch {
         if (!alive) return
         setError('Failed to load photos')
         setPhotos([])
@@ -240,7 +360,6 @@ export default function StoreIndex() {
       }
     }
 
-    // only run once we know origin (so URLs normalize correctly)
     if (origin) run()
 
     return () => {
@@ -296,14 +415,12 @@ export default function StoreIndex() {
               aria-label="Search photos"
             />
 
-            {/* ✅ Next-safe Link */}
             <Link href="/store/collections" legacyBehavior>
               <a className="collectionsLink">Browse Collections →</a>
             </Link>
           </div>
         </header>
 
-        {/* ✅ Member Access bar (non-breaking) */}
         <div className="memberBar">
           <div className="memberLeft">
             <div className="memberTitle">Member Access</div>
@@ -418,14 +535,11 @@ export default function StoreIndex() {
                           ))}
                         </div>
 
-                        {/* ✅ Price hidden on store grid (premium feel) */}
                         <div className="hint">Licensing available • View details →</div>
 
-                        {/* ✅ Add to Cart (compact) */}
                         <div
                           className="cartBox"
                           onClick={(e) => {
-                            // stop Link navigation
                             e.preventDefault()
                             e.stopPropagation()
                           }}
@@ -524,7 +638,6 @@ export default function StoreIndex() {
           transform: translateY(-1px);
         }
 
-        /* ✅ Member bar */
         .memberBar {
           margin: 14px 0 18px;
           border: 1px solid rgba(245, 244, 244, 0.12);
@@ -847,7 +960,7 @@ function CartMini({ photo, currency, setCurrency, usdLkrRate }) {
           value={ccy}
           onChange={(e) => {
             const next = String(e.target.value || '').toUpperCase() === 'LKR' ? 'LKR' : 'USD'
-            setCurrency(next) // persists via parent
+            setCurrency(next)
           }}
         >
           <option value="USD">USD</option>
@@ -856,7 +969,6 @@ function CartMini({ photo, currency, setCurrency, usdLkrRate }) {
       </div>
 
       <div className="row2">
-        {/* ✅ No price on store grid */}
         <button
           className="btn"
           type="button"
