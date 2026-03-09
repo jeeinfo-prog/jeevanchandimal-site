@@ -89,10 +89,9 @@ export default function JeevanChandimalNavi(props) {
     const getCount = () => {
       try {
         const cart = readCart()
-        const count = Array.isArray(cart?.items)
+        return Array.isArray(cart?.items)
           ? cart.items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
           : 0
-        return count
       } catch {
         return 0
       }
@@ -162,6 +161,7 @@ export default function JeevanChandimalNavi(props) {
           if (r.status === 401) {
             window.localStorage.removeItem('member_tier')
             window.localStorage.removeItem('member_remaining')
+            window.localStorage.removeItem(STORAGE_MEMBER_TOKEN_KEY)
           }
           setMemberTier('')
           setMemberRemaining(null)
@@ -190,7 +190,7 @@ export default function JeevanChandimalNavi(props) {
           window.localStorage.removeItem('member_remaining')
         }
       } catch {
-        // keep cached badge if fetch fails
+        // keep cached state on temporary failures
       }
     }
 
@@ -213,13 +213,32 @@ export default function JeevanChandimalNavi(props) {
     }
   }, [router.asPath])
 
-  const logout = () => {
+  const logout = async () => {
     try {
+      const token = String(window.localStorage.getItem(STORAGE_MEMBER_TOKEN_KEY) || '').trim()
+
+      if (token) {
+        try {
+          await fetch('/api/member/session', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ action: 'logout' }),
+          })
+        } catch {
+          // ignore server logout failures; still clear local state
+        }
+      }
+
       window.localStorage.removeItem('user_email')
       window.localStorage.removeItem('member_tier')
       window.localStorage.removeItem('member_remaining')
       window.localStorage.removeItem(STORAGE_MEMBER_TOKEN_KEY)
-      window.localStorage.removeItem(STORAGE_MEMBER_DEVICE_KEY)
+      // ✅ keep device id so same browser stays same device
+      // window.localStorage.removeItem(STORAGE_MEMBER_DEVICE_KEY)
+
       window.dispatchEvent(new Event('jc_member_updated'))
     } catch {}
 
@@ -470,6 +489,7 @@ export default function JeevanChandimalNavi(props) {
             <Link href="/about" legacyBehavior>
               <a className={`navLink ${activeClass('/about')}`}>About</a>
             </Link>
+
             <Link href="/contact" legacyBehavior>
               <a className={`navLink ${activeClass('/contact')}`}>Contact</a>
             </Link>
@@ -679,6 +699,7 @@ export default function JeevanChandimalNavi(props) {
                   About
                 </a>
               </Link>
+
               <Link href="/contact" legacyBehavior>
                 <a className={`mLink ${activeClass('/contact')}`} onClick={closeAll}>
                   Contact
@@ -859,6 +880,7 @@ export default function JeevanChandimalNavi(props) {
         .menu.show {
           display: flex;
         }
+
         @keyframes dropIn {
           from {
             opacity: 0;
@@ -1016,6 +1038,7 @@ export default function JeevanChandimalNavi(props) {
           inset: 0;
           z-index: 10000;
         }
+
         .mBackdrop {
           position: fixed;
           inset: 0;
@@ -1026,6 +1049,7 @@ export default function JeevanChandimalNavi(props) {
           cursor: pointer;
           z-index: 0;
         }
+
         .mPanel {
           position: fixed;
           top: 0;
@@ -1041,6 +1065,7 @@ export default function JeevanChandimalNavi(props) {
           animation: slideIn 180ms ease forwards;
           z-index: 1;
         }
+
         @keyframes slideIn {
           from {
             transform: translateX(12px);
@@ -1058,14 +1083,17 @@ export default function JeevanChandimalNavi(props) {
           justify-content: space-between;
           gap: 12px;
         }
+
         .mBrand {
           display: inline-flex;
           align-items: center;
           text-decoration: none !important;
         }
+
         .mLogo {
           height: 40px;
         }
+
         .mClose {
           border: 1px solid rgba(245, 244, 244, 0.14);
           background: rgba(255, 255, 255, 0.04);
@@ -1083,6 +1111,7 @@ export default function JeevanChandimalNavi(props) {
           flex-direction: column;
           gap: 10px;
         }
+
         .mLink {
           color: #f5f4f4;
           text-decoration: none !important;
@@ -1095,6 +1124,7 @@ export default function JeevanChandimalNavi(props) {
           align-items: center;
           justify-content: space-between;
         }
+
         .mLink:hover {
           opacity: 1;
           background: rgba(255, 255, 255, 0.06);
@@ -1110,6 +1140,7 @@ export default function JeevanChandimalNavi(props) {
           transform: rotate(-90deg);
           transition: transform 0.16s ease;
         }
+
         .mChev.open {
           transform: rotate(0deg);
         }
@@ -1138,6 +1169,7 @@ export default function JeevanChandimalNavi(props) {
           flex-direction: column;
           gap: 8px;
         }
+
         .mSubLink {
           color: rgba(245, 244, 244, 0.92);
           text-decoration: none !important;
@@ -1146,6 +1178,7 @@ export default function JeevanChandimalNavi(props) {
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(245, 244, 244, 0.06);
         }
+
         .mSubLink:hover {
           background: rgba(255, 255, 255, 0.06);
         }
@@ -1173,6 +1206,7 @@ export default function JeevanChandimalNavi(props) {
           text-align: left;
           opacity: 0.92;
         }
+
         .mLogout:hover {
           opacity: 1;
           background: rgba(255, 255, 255, 0.07);

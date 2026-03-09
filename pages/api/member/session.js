@@ -44,7 +44,7 @@ function verifySessionToken(token) {
 async function getActiveMembershipByEmail(email) {
   const { data, error } = await supabaseAdmin
     .from('memberships')
-    .select('id,email,user_id,plan,status,end_date,created_at,billing_cycle_end')
+    .select('id,email,user_id,plan,status,end_date,billing_cycle_end,created_at')
     .eq('email', email)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -78,7 +78,7 @@ async function countActiveSessions(userId) {
 async function findSession(userId, deviceId) {
   const { data, error } = await supabaseAdmin
     .from('member_sessions')
-    .select('id')
+    .select('id,user_id,device_id,revoked_at')
     .eq('user_id', userId)
     .eq('device_id', deviceId)
     .is('revoked_at', null)
@@ -93,58 +93,38 @@ async function touchSession(sessionId) {
     .from('member_sessions')
     .update({ last_seen: nowIso() })
     .eq('id', sessionId)
-    .select('id')
-    .maybeSingle()
 
   if (up.error) throw new Error(up.error.message)
-  return up.data?.id || sessionId
 }
 
-async function upsertSession({ userId, deviceId }) {
-  const timestamp = nowIso()
-
-  // 1) Fast path: existing active session for this device
-  const existing = await findSession(userId, deviceId)
-  if (existing) {
-    await touchSession(existing.id)
-    return { id: existing.id }
-  }
-
-  // 2) Device limit check before insert
-  const active = await countActiveSessions(userId)
-  if (active >= MAX_DEVICES) return { denied: true }
-
-  // 3) Try insert
+async function createSession({ userId, deviceId }) {
   const ins = await supabaseAdmin
     .from('member_sessions')
     .insert({
       user_id: userId,
       device_id: deviceId,
-      created_at: timestamp,
-      last_seen: timestamp,
+      created_at: nowIso(),
+      last_seen: nowIso(),
       revoked_at: null,
     })
     .select('id')
     .maybeSingle()
 
-  if (!ins.error) {
-    return { id: ins.data?.id }
+  if (ins.error) throw new Error(ins.error.message)
+  return { id: ins.data?.id }
+}
+
+async function upsertSession({ userId, deviceId }) {
+  const existing = await findSession(userId, deviceId)
+  if (existing) {
+    await touchSession(existing.id)
+    return { id: existing.id, reused: true }
   }
 
-  // 4) Recover gracefully from race condition duplicate insert
-  const isDuplicate =
-    ins.error.code === '23505' ||
-    String(ins.error.message || '').toLowerCase().includes('duplicate key value')
+  const active = await countActiveSessions(userId)
+  if (active >= MAX_DEVICES) return { denied: true }
 
-  if (isDuplicate) {
-    const raced = await findSession(userId, deviceId)
-    if (raced) {
-      await touchSession(raced.id)
-      return { id: raced.id }
-    }
-  }
-
-  throw new Error(ins.error.message)
+  return await createSession({ userId, deviceId })
 }
 
 async function revokeOtherSessions(userId, keepDeviceId) {
@@ -157,6 +137,17 @@ async function revokeOtherSessions(userId, keepDeviceId) {
 
   if (up.error) throw new Error(up.error.message)
   return await countActiveSessions(userId)
+}
+
+async function revokeCurrentSession(userId, deviceId) {
+  const up = await supabaseAdmin
+    .from('member_sessions')
+    .update({ revoked_at: nowIso() })
+    .eq('user_id', userId)
+    .eq('device_id', deviceId)
+    .is('revoked_at', null)
+
+  if (up.error) throw new Error(up.error.message)
 }
 
 export default async function handler(req, res) {
@@ -216,6 +207,30 @@ export default async function handler(req, res) {
 
     const action = String(req.body?.action || 'start').trim().toLowerCase()
 
+    if (action === 'logout') {
+      const auth = String(req.headers.authorization || '')
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+      if (!token) {
+        return res.status(401).json({ ok: false, code: 'NO_SESSION', error: 'No session' })
+      }
+
+      let payload
+      try {
+        payload = verifySessionToken(token)
+      } catch {
+        return res.status(200).json({ ok: true })
+      }
+
+      const userId = clean(payload?.userId)
+      const deviceId = clean(payload?.deviceId)
+
+      if (userId && deviceId) {
+        await revokeCurrentSession(userId, deviceId)
+      }
+
+      return res.status(200).json({ ok: true })
+    }
+
     if (action === 'revoke_others') {
       const auth = String(req.headers.authorization || '')
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
@@ -237,6 +252,7 @@ export default async function handler(req, res) {
 
       const userId = clean(payload?.userId)
       const deviceId = clean(payload?.deviceId)
+
       if (!userId || !deviceId) {
         return res.status(401).json({ ok: false, error: 'Invalid session' })
       }
