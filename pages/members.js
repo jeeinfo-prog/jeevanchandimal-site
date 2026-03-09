@@ -12,6 +12,7 @@ const STORAGE_SESSION = 'jc_member_token'
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
+
 function normalizeEmail(v) {
   return String(v || '').trim().toLowerCase()
 }
@@ -37,7 +38,9 @@ function useRevealOnScroll() {
     if (typeof window === 'undefined') return
     const els = Array.from(document.querySelectorAll('[data-reveal]'))
     if (!els.length) return
+
     els.forEach((el) => el.classList.add('revealInit'))
+
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -49,6 +52,7 @@ function useRevealOnScroll() {
       },
       { threshold: 0.16 }
     )
+
     els.forEach((el) => io.observe(el))
     return () => io.disconnect()
   }, [])
@@ -71,7 +75,7 @@ function getOrCreateDeviceId() {
 
 function readSessionToken() {
   if (typeof window === 'undefined') return ''
-  return String(window.localStorage.getItem(STORAGE_SESSION) || '')
+  return String(window.localStorage.getItem(STORAGE_SESSION) || '').trim()
 }
 
 function writeSessionToken(token) {
@@ -96,8 +100,9 @@ export default function Members() {
   const [format, setFormat] = React.useState('jpg')
 
   const [deviceInfo, setDeviceInfo] = React.useState({ active: 0, max: 2 })
-
   const [overlay, setOverlay] = React.useState(null)
+
+  const accessLockRef = React.useRef(false)
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return
@@ -118,6 +123,15 @@ export default function Members() {
     return fetch(url, { ...init, headers, cache: 'no-store' })
   }
 
+  function clearMemberClientState() {
+    writeSessionToken('')
+    try {
+      window.localStorage.removeItem('member_tier')
+      window.localStorage.removeItem('member_remaining')
+      window.dispatchEvent(new Event('jc_member_updated'))
+    } catch {}
+  }
+
   function handleSessionError(j) {
     const cinematic = j?.cinematic
     if (cinematic?.title || cinematic?.body) {
@@ -134,12 +148,7 @@ export default function Members() {
       })
     }
 
-    writeSessionToken('')
-    try {
-      window.localStorage.removeItem('member_tier')
-      window.localStorage.removeItem('member_remaining')
-      window.dispatchEvent(new Event('jc_member_updated'))
-    } catch {}
+    clearMemberClientState()
   }
 
   async function startSession(cleanEmail) {
@@ -210,7 +219,7 @@ export default function Members() {
 
     if (!r.ok || !d?.ok) {
       if (r.status === 401) handleSessionError(d)
-      return { ok: false, error: d?.error || 'Not a member.' }
+      return { ok: false, code: d?.code || '', error: d?.error || 'Not a member.' }
     }
 
     const isMember = Boolean(d?.member)
@@ -231,7 +240,43 @@ export default function Members() {
     return { ok: true, tier, used, limit, remaining }
   }
 
+  function persistBadge(status) {
+    try {
+      const tierUpper = normalizeTierUpper(status.tier)
+      if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
+
+      if (Number.isFinite(Number(status.remaining))) {
+        window.localStorage.setItem('member_remaining', String(Number(status.remaining)))
+      } else {
+        window.localStorage.removeItem('member_remaining')
+      }
+
+      window.dispatchEvent(new Event('jc_member_updated'))
+    } catch {}
+  }
+
+  async function ensureValidSessionAndStatus(cleanEmail) {
+    let token = readSessionToken()
+
+    if (token) {
+      const existing = await refreshMemberStatus(cleanEmail)
+      if (existing.ok) return existing
+
+      clearMemberClientState()
+      token = ''
+    }
+
+    const sess = await startSession(cleanEmail)
+    if (!sess.ok) return { ok: false, error: sess.error || 'Could not start session.' }
+
+    return await refreshMemberStatus(cleanEmail)
+  }
+
   async function checkMembership() {
+    if (accessLockRef.current) return
+
+    accessLockRef.current = true
+
     try {
       setError('')
       setOverlay(null)
@@ -249,61 +294,44 @@ export default function Members() {
       setChecking(true)
       setMember(null)
 
-      const sess = await startSession(clean)
-      if (!sess.ok) {
-        setChecking(false)
-        setError(sess.error || 'Could not start session.')
-        return
-      }
+      const status = await ensureValidSessionAndStatus(clean)
 
-      const status = await refreshMemberStatus(clean)
       if (!status.ok) {
-        setChecking(false)
         setError(status.error || 'Not a member.')
         return
       }
 
       setMember(status)
-      setChecking(false)
-
-      try {
-        const tierUpper = normalizeTierUpper(status.tier)
-        if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
-
-        if (Number.isFinite(Number(status.remaining))) {
-          window.localStorage.setItem('member_remaining', String(Number(status.remaining)))
-        } else {
-          window.localStorage.removeItem('member_remaining')
-        }
-
-        window.dispatchEvent(new Event('jc_member_updated'))
-      } catch {}
+      persistBadge(status)
 
       await loadDeviceInfo()
-      loadLibrary()
+      await loadLibrary()
     } catch (e) {
-      setChecking(false)
       setError(e?.message || 'Something went wrong.')
+    } finally {
+      setChecking(false)
+      accessLockRef.current = false
     }
   }
 
   async function loadLibrary() {
     try {
       setPhotosLoading(true)
-      const r = await fetch('/api/store/photos?t=' + Date.now(), { cache: 'no-store' })
+      const r = await fetch(`/api/store/photos?t=${Date.now()}`, { cache: 'no-store' })
       const j = await r.json().catch(() => null)
       const list = Array.isArray(j?.photos) ? j.photos : []
       setPhotos(list)
-      setPhotosLoading(false)
     } catch {
-      setPhotosLoading(false)
       setPhotos([])
+    } finally {
+      setPhotosLoading(false)
     }
   }
 
   const filteredPhotos = React.useMemo(() => {
     const q = String(query || '').trim().toLowerCase()
     if (!q) return photos
+
     return (photos || []).filter((p) => {
       const t = String(p?.title || '').toLowerCase()
       const tags = Array.isArray(p?.tags) ? p.tags.join(' ').toLowerCase() : ''
@@ -340,45 +368,33 @@ export default function Members() {
       const j = await r.json().catch(() => ({}))
 
       if (!r.ok || !j?.ok) {
-        setDownloadingId('')
         if (r.status === 401) handleSessionError(j)
         else setError(j?.error || 'Download failed.')
         return
       }
 
-      setDownloadingId('')
+      const nextStatus = {
+        ok: true,
+        tier: j?.tier || member?.tier || 'pro',
+        used: Number(j?.used ?? member?.used ?? 0),
+        limit: Number(j?.limit ?? member?.limit ?? 0),
+        remaining: Number(
+          j?.remaining ??
+            Math.max(
+              0,
+              Number(j?.limit ?? member?.limit ?? 0) - Number(j?.used ?? member?.used ?? 0)
+            )
+        ),
+      }
 
-      setMember((prev) => {
-        if (!prev) return prev
-        const nextTier = j?.tier || prev.tier
-        const nextUsed = Number(j?.used ?? prev.used ?? 0)
-        const nextLimit = Number(j?.limit ?? prev.limit ?? 0)
-        const nextRemaining = Number(j?.remaining ?? Math.max(0, nextLimit - nextUsed))
-        return {
-          ...prev,
-          ok: true,
-          tier: nextTier,
-          used: nextUsed,
-          limit: nextLimit,
-          remaining: nextRemaining,
-        }
-      })
-
-      try {
-        const tierUpper = normalizeTierUpper(j?.tier || member?.tier)
-        if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
-
-        if (Number.isFinite(Number(j?.remaining))) {
-          window.localStorage.setItem('member_remaining', String(Number(j.remaining)))
-        }
-
-        window.dispatchEvent(new Event('jc_member_updated'))
-      } catch {}
+      setMember((prev) => ({ ...(prev || {}), ...nextStatus }))
+      persistBadge(nextStatus)
 
       if (j?.url) window.location.href = j.url
     } catch (e) {
-      setDownloadingId('')
       setError(e?.message || 'Something went wrong.')
+    } finally {
+      setDownloadingId('')
     }
   }
 
@@ -600,11 +616,7 @@ export default function Members() {
                   return (
                     <div className="card" key={id}>
                       <div className="thumb">
-                        {thumb ? (
-                          <img src={thumb} alt={title} />
-                        ) : (
-                          <div className="thumbFallback">Preview</div>
-                        )}
+                        {thumb ? <img src={thumb} alt={title} /> : <div className="thumbFallback">Preview</div>}
                       </div>
 
                       <div className="cardBody">
