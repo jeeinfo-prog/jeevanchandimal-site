@@ -5,6 +5,24 @@ import { useRouter } from 'next/router'
 import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
+const STORAGE_MEMBER_TOKEN_KEY = 'jc_member_token'
+const STORAGE_MEMBER_DEVICE_KEY = 'jc_member_device_id'
+
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
+}
+
+function getOrCreateDeviceId() {
+  if (typeof window === 'undefined') return ''
+
+  let id = String(window.localStorage.getItem(STORAGE_MEMBER_DEVICE_KEY) || '').trim()
+  if (id) return id
+
+  id = `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
+  window.localStorage.setItem(STORAGE_MEMBER_DEVICE_KEY, id)
+  return id
+}
+
 export default function LoginPage() {
   const router = useRouter()
 
@@ -17,7 +35,9 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
 
-    if (!email || !password) {
+    const cleanEmail = normalizeEmail(email)
+
+    if (!cleanEmail || !password) {
       setError('Please enter email and password')
       return
     }
@@ -25,28 +45,57 @@ export default function LoginPage() {
     try {
       setLoading(true)
 
-      const res = await fetch('/api/auth/signin', {
+      const authRes = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: cleanEmail, password }),
       })
 
-      const data = await res.json()
+      const authData = await authRes.json().catch(() => ({}))
 
-      if (!res.ok || !data.ok) {
-        setError(data?.error || 'Login failed')
+      if (!authRes.ok || !authData?.ok) {
+        setError(authData?.error || 'Login failed')
         setLoading(false)
         return
       }
 
-      // ✅ store email for navbar + membership
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem('user_email', data.user.email)
+        window.localStorage.setItem('user_email', cleanEmail)
       }
 
-      // optional: store plan if your API returns it later
-      if (data?.plan && typeof window !== 'undefined') {
-        window.localStorage.setItem('member_plan', data.plan)
+      const deviceId = getOrCreateDeviceId()
+
+      const sessionRes = await fetch('/api/member/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          email: cleanEmail,
+          deviceId,
+        }),
+      })
+
+      const sessionData = await sessionRes.json().catch(() => ({}))
+
+      if (!sessionRes.ok || !sessionData?.ok || !sessionData?.token) {
+        if (sessionData?.code === 'DEVICE_LIMIT' && sessionData?.cinematic?.title) {
+          setError(sessionData.cinematic.title)
+        } else {
+          setError(sessionData?.error || 'Could not start member session')
+        }
+        setLoading(false)
+        return
+      }
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_MEMBER_TOKEN_KEY, sessionData.token)
+
+        if (typeof sessionData.active === 'number' && typeof sessionData.max === 'number') {
+          const remaining = Math.max(0, sessionData.max - sessionData.active)
+          window.localStorage.setItem('member_remaining', String(remaining))
+        }
+
+        window.dispatchEvent(new Event('jc_member_updated'))
       }
 
       router.push('/store')
@@ -90,7 +139,7 @@ export default function LoginPage() {
             required
           />
 
-          {error && <div className="errorBox">{error}</div>}
+          {error ? <div className="errorBox">{error}</div> : null}
 
           <button type="submit" disabled={loading}>
             {loading ? 'Signing in…' : 'Login'}
