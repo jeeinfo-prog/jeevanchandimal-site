@@ -22,9 +22,11 @@ const PRICES = {
   },
 }
 
-/* ================== currency defaults (USD first) ================== */
+/* ================== storage ================== */
 const STORAGE_CCY_KEY = 'jc_currency_v1'
 const STORAGE_FX_LOCK_KEY = 'jc_fx_lock_v1'
+const STORAGE_MEMBER_TOKEN_KEY = 'jc_member_token'
+const STORAGE_MEMBER_DEVICE_KEY = 'jc_member_device_id'
 const DEFAULT_CURRENCY = 'USD'
 
 function safeJsonParse(v, fallback) {
@@ -53,7 +55,6 @@ function writeCurrency(ccy) {
   window.localStorage.setItem(STORAGE_CCY_KEY, c)
 }
 
-// Reads usd->lkr from your FX lock object in cart.js
 function readUsdLkrRate() {
   if (typeof window === 'undefined') return null
   const raw = window.localStorage.getItem(STORAGE_FX_LOCK_KEY)
@@ -64,6 +65,31 @@ function readUsdLkrRate() {
   return n
 }
 
+function getOrCreateDeviceId() {
+  if (typeof window === 'undefined') return ''
+
+  let deviceId = String(window.localStorage.getItem(STORAGE_MEMBER_DEVICE_KEY) || '').trim()
+  if (deviceId && deviceId.length >= 8) return deviceId
+
+  deviceId = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+  window.localStorage.setItem(STORAGE_MEMBER_DEVICE_KEY, deviceId)
+  return deviceId
+}
+
+function readMemberToken() {
+  if (typeof window === 'undefined') return ''
+  return String(window.localStorage.getItem(STORAGE_MEMBER_TOKEN_KEY) || '').trim()
+}
+
+function writeMemberToken(token) {
+  if (typeof window === 'undefined') return
+  if (!token) {
+    window.localStorage.removeItem(STORAGE_MEMBER_TOKEN_KEY)
+    return
+  }
+  window.localStorage.setItem(STORAGE_MEMBER_TOKEN_KEY, String(token))
+}
+
 function getUnitPrice({ currency, license, format, usdLkrRate }) {
   const ccy = String(currency || '').toUpperCase() === 'LKR' ? 'LKR' : 'USD'
   const lic = String(license || '').trim().toLowerCase()
@@ -72,12 +98,10 @@ function getUnitPrice({ currency, license, format, usdLkrRate }) {
   const baseUsd = PRICES?.USD?.[lic]?.[fmt] != null ? Number(PRICES.USD[lic][fmt]) : 0
   if (ccy === 'USD') return baseUsd
 
-  // ✅ LKR derived from USD × locked rate (preferred)
   if (usdLkrRate != null && Number.isFinite(Number(usdLkrRate)) && Number(usdLkrRate) > 0) {
     return round2(baseUsd * Number(usdLkrRate))
   }
 
-  // fallback if no rate exists
   const fallbackLkr = PRICES?.LKR?.[lic]?.[fmt] != null ? Number(PRICES.LKR[lic][fmt]) : 0
   return fallbackLkr
 }
@@ -193,7 +217,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [error, setError] = React.useState(initialError || '')
   const [photo, setPhoto] = React.useState(initialPhoto)
 
-  // ✅ default currency USD + persisted currency + reads FX lock rate
   const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
   const [usdLkrRate, setUsdLkrRate] = React.useState(null)
 
@@ -201,14 +224,12 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const [format, setFormat] = React.useState('jpg')
   const [isCheckingOut, setIsCheckingOut] = React.useState(false)
 
-  const [variant] = React.useState('standard') // for preview API
+  const [variant] = React.useState('standard')
   const [naturalDims, setNaturalDims] = React.useState({ w: null, h: null })
 
-  // watermark controls
   const [wmOn, setWmOn] = React.useState(true)
   const [wmOpacity, setWmOpacity] = React.useState(0.08)
 
-  // zoom modal
   const [zoomOpen, setZoomOpen] = React.useState(false)
   const [zoom, setZoom] = React.useState(1)
   const [pan, setPan] = React.useState({ x: 0, y: 0 })
@@ -216,7 +237,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const panStart = React.useRef({ x: 0, y: 0 })
   const panOrigin = React.useRef({ x: 0, y: 0 })
 
-  // ✅ Pointer-based pan (mouse + touch)
   const activePointerId = React.useRef(null)
 
   function onPointerDownPan(e) {
@@ -250,37 +270,30 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     activePointerId.current = null
   }
 
-  // checkout fields
   const [email, setEmail] = React.useState('')
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
   const [agreed, setAgreed] = React.useState(false)
 
-  // related
   const [similar, setSimilar] = React.useState([])
   const [recommended, setRecommended] = React.useState([])
   const [relLoading, setRelLoading] = React.useState(false)
 
-  // membership
   const [memberLoading, setMemberLoading] = React.useState(false)
   const [isMember, setIsMember] = React.useState(false)
   const [memberPlan, setMemberPlan] = React.useState(null)
-  const memberTimer = React.useRef(null)
 
-  // ✅ cart ui
   const [cartQty, setCartQty] = React.useState(1)
   const [cartMsg, setCartMsg] = React.useState('')
 
-  // ✅ load currency + fx lock on mount
   React.useEffect(() => {
     if (typeof window === 'undefined') return
     const c = readCurrency()
     setCurrency(c)
-    writeCurrency(c) // ensure stored default exists
+    writeCurrency(c)
     setUsdLkrRate(readUsdLkrRate())
   }, [])
 
-  // preview
   const previewSrc = photo?.id
     ? `/api/photo/${encodeURIComponent(photo.id)}/preview?variant=${encodeURIComponent(variant)}`
     : ''
@@ -289,12 +302,10 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   const firstTag = (photo?.tags || []).find(Boolean) || ''
   const rawAvailable = photo?.rawAvailable !== false
 
-  // force jpg if raw not available
   React.useEffect(() => {
     if (photo && rawAvailable === false && format === 'raw') setFormat('jpg')
   }, [photo, rawAvailable, format])
 
-  // prefill email
   React.useEffect(() => {
     if (typeof window === 'undefined') return
     try {
@@ -333,7 +344,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomOpen])
 
-  // client refresh (for navigation)
   React.useEffect(() => {
     if (!router.isReady || !id) return
     if (photo?.id && photo.id === id) return
@@ -378,10 +388,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return () => {
       alive = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, id])
 
-  // load EXIF (original bytes + dims)
   React.useEffect(() => {
     if (!photo?.id) return
 
@@ -436,7 +444,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
   }, [photo?.id])
 
-  // related
   React.useEffect(() => {
     if (!photo?.id) return
 
@@ -479,11 +486,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
   }, [photo?.id])
 
-  // membership check (debounced)
   function validEmailQuick(v) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
   }
 
+  /* ================== member bootstrap + status ================== */
   React.useEffect(() => {
     const em = String(email || '').trim().toLowerCase()
 
@@ -491,36 +498,91 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
       setIsMember(false)
       setMemberPlan(null)
       setMemberLoading(false)
-      if (memberTimer.current) clearTimeout(memberTimer.current)
       return
     }
 
-    if (memberTimer.current) clearTimeout(memberTimer.current)
+    let alive = true
 
-    memberTimer.current = setTimeout(async () => {
+    async function bootstrapAndCheckMember() {
       try {
         setMemberLoading(true)
-        const r = await fetch(`/api/membership/check?email=${encodeURIComponent(em)}`, {
-          headers: { 'Cache-Control': 'no-store' },
+
+        const deviceId = getOrCreateDeviceId()
+        let token = readMemberToken()
+
+        async function fetchStatus(activeToken) {
+          const r = await fetch(`/api/member/status?email=${encodeURIComponent(em)}`, {
+            headers: {
+              Authorization: `Bearer ${activeToken}`,
+              'Cache-Control': 'no-store',
+            },
+          })
+          const j = await r.json().catch(() => null)
+          return { r, j }
+        }
+
+        if (token) {
+          const { r, j } = await fetchStatus(token)
+          if (!alive) return
+
+          if (r.ok && j?.ok) {
+            const active = Boolean(j.member)
+            setIsMember(active)
+            setMemberPlan(active ? j?.tier || null : null)
+            return
+          }
+
+          writeMemberToken('')
+          token = ''
+        }
+
+        const sessionRes = await fetch('/api/member/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: em,
+            deviceId,
+          }),
         })
-        const j = await r.json().catch(() => null)
-        if (j?.ok && j?.member) {
-          setIsMember(true)
-          setMemberPlan(j?.plan || null)
-        } else {
+
+        const sessionJson = await sessionRes.json().catch(() => null)
+        if (!alive) return
+
+        if (!sessionRes.ok || !sessionJson?.ok || !sessionJson?.token) {
           setIsMember(false)
           setMemberPlan(null)
+          return
         }
+
+        token = String(sessionJson.token)
+        writeMemberToken(token)
+
+        const { r, j } = await fetchStatus(token)
+        if (!alive) return
+
+        if (!r.ok || !j?.ok) {
+          setIsMember(false)
+          setMemberPlan(null)
+          return
+        }
+
+        const active = Boolean(j.member)
+        setIsMember(active)
+        setMemberPlan(active ? j?.tier || null : null)
       } catch {
+        if (!alive) return
         setIsMember(false)
         setMemberPlan(null)
       } finally {
+        if (!alive) return
         setMemberLoading(false)
       }
-    }, 450)
+    }
+
+    bootstrapAndCheckMember()
 
     return () => {
-      if (memberTimer.current) clearTimeout(memberTimer.current)
+      alive = false
     }
   }, [email])
 
@@ -536,13 +598,45 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     try {
       setIsCheckingOut(true)
 
+      let token = readMemberToken()
+      const deviceId = getOrCreateDeviceId()
+
+      if (!token) {
+        const sessionRes = await fetch('/api/member/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: em,
+            deviceId,
+          }),
+        })
+
+        const sessionJson = await sessionRes.json().catch(() => null)
+
+        if (!sessionRes.ok || !sessionJson?.ok || !sessionJson?.token) {
+          alert(sessionJson?.error || 'Please sign in to continue.')
+          return
+        }
+
+        token = String(sessionJson.token)
+        writeMemberToken(token)
+      }
+
       const r = await fetch('/api/member/download', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId: photo.id, email: em }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          photoId: photo.id,
+          email: em,
+          format,
+        }),
       })
 
       const j = await r.json().catch(() => null)
+
       if (!r.ok || !j?.ok || !j?.url) {
         alert(j?.error || 'Member download failed')
         return
@@ -632,7 +726,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     }
   }
 
-  // ✅ Add to Cart handler (uses current selections)
   function addCurrentToCart() {
     if (!photo?.id) return
 
@@ -667,8 +760,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     setCartMsg('Added to cart ✅')
     setTimeout(() => setCartMsg(''), 1200)
   }
-
-  /* ---------------- SEO / OG / JSON-LD ---------------- */
 
   const SITE_URL = 'https://jeevanchandimal.com'
   const canonicalId = photo?.id || id
@@ -759,8 +850,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         }
       : null
 
-  /* ---------------- pricing ---------------- */
-
   const price = getUnitPrice({ currency, license, format, usdLkrRate })
 
   return (
@@ -780,7 +869,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           }
         />
 
-        {/* Open Graph */}
         <meta property="og:title" content={photo?.title || 'Photograph'} />
         <meta
           property="og:description"
@@ -795,7 +883,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         {ogAbs && imgW ? <meta property="og:image:width" content={String(imgW)} /> : null}
         {ogAbs && imgH ? <meta property="og:image:height" content={String(imgH)} /> : null}
 
-        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={photo?.title || 'Photograph'} />
         <meta
@@ -807,13 +894,9 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         />
         {ogAbs ? <meta name="twitter:image" content={ogAbs} /> : null}
 
-        {/* Canonical */}
         <link rel="canonical" href={canonicalUrl} />
-
-        {/* Preload preview (optional) */}
         {photo?.id && previewSrc ? <link rel="preload" as="image" href={previewSrc} /> : null}
 
-        {/* Licensable ImageObject JSON-LD */}
         {imageObjectJsonLd ? (
           <script
             type="application/ld+json"
@@ -826,7 +909,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
 
       <main className="wrap">
         <div className="top">
-          {/* ✅ safest Link across Next versions */}
           <Link href="/store" legacyBehavior>
             <a className="back">← Back to store</a>
           </Link>
@@ -861,7 +943,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         {!loading && !error && photo && (
           <>
             <div className="layout">
-              {/* LEFT IMAGE */}
               <section className="imageCard">
                 <div className="imageFrame" onContextMenu={preventSave}>
                   <button type="button" className="zoomBtn" onClick={openZoom}>
@@ -1036,7 +1117,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 </div>
               </section>
 
-              {/* BUY CARD */}
               <aside className="buyCard">
                 <h1 className="title">{photo.title}</h1>
                 <div className="badgeRow">
@@ -1060,9 +1140,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <span className="badge">💾 ~{rawSizeMB} MB</span>
                   ) : null}
                 </div>
+
                 {isMember ? (
                   <div className="memberBadge">{String(memberPlan || 'member').toUpperCase()}</div>
                 ) : null}
+
                 <p className="sub">
                   {isMember ? 'Download included with your membership' : 'Choose license + format'}
                 </p>
@@ -1180,7 +1262,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                   </>
                 )}
 
-                {/* MEMBERSHIP DOWNLOAD */}
                 {memberLoading ? (
                   <p className="fine">Checking membership…</p>
                 ) : isMember ? (
@@ -1236,7 +1317,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                       <span className="small">Instant digital download</span>
                     </div>
 
-                    {/* ✅ ADD TO CART UI (added, everything else unchanged) */}
                     <div className="cartRow">
                       <div className="cartLeft">
                         <span className="cartLabel">Qty</span>
@@ -1321,7 +1401,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               </aside>
             </div>
 
-            {/* SIMILAR */}
             <section className="relBlock">
               <div className="relHead">
                 <h2>Similar images</h2>
@@ -1343,7 +1422,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
                       <a className="relCard">
                         <div className="relThumb">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
@@ -1364,7 +1442,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               )}
             </section>
 
-            {/* RECOMMENDED */}
             <section className="relBlock">
               <div className="relHead">
                 <h2>Recommended for you</h2>
@@ -1383,7 +1460,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                     <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
                       <a className="relCard">
                         <div className="relThumb">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
                           {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                         </div>
@@ -1402,7 +1478,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           </>
         )}
 
-        {/* ZOOM OVERLAY */}
         {zoomOpen && (
           <div className="zoomOverlay" onContextMenu={preventSave}>
             <div className="zoomTop">
@@ -1442,7 +1517,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
               onPointerLeave={endPointerPan}
               onContextMenu={preventSave}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewSrc || photo?.previewUrl || photo?.thumbUrl}
                 alt={photo?.title || 'Preview'}
@@ -1549,7 +1623,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           -webkit-touch-callout: none;
         }
 
-        /* ✅ Explicit desktop behavior */
         .mainImg {
           display: block;
           -webkit-touch-callout: none;
@@ -1680,12 +1753,8 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           display: flex;
           flex-direction: column;
           gap: 14px;
-
-          /* ✅ no internal scroll */
           overflow: visible;
           max-height: none;
-
-          /* ✅ keep it visible while scrolling (optional) */
           position: sticky;
           top: 18px;
           align-self: start;
@@ -1817,7 +1886,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           opacity: 0.85;
         }
 
-        /* ✅ cart ui styles (added) */
         .cartRow {
           display: flex;
           gap: 10px;
@@ -1995,7 +2063,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           overflow: hidden;
           background: rgba(255, 255, 255, 0.02);
           display: grid;
-
           transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
         }
 
@@ -2016,7 +2083,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           height: 100%;
           object-fit: cover;
           display: block;
-
           transition: transform 220ms ease;
         }
 
@@ -2054,7 +2120,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           overflow: hidden;
         }
 
-        /* Zoom modal */
         .zoomOverlay {
           position: fixed;
           inset: 0;
@@ -2098,7 +2163,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           overflow: hidden;
           display: grid;
           place-items: center;
-
           touch-action: none;
           -webkit-user-select: none;
           user-select: none;
@@ -2109,7 +2173,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           max-height: none;
           width: auto;
           height: auto;
-
           pointer-events: none;
           -webkit-user-drag: none;
           -webkit-touch-callout: none;
@@ -2133,7 +2196,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
           inset: 0;
         }
 
-        /* ✅ Mobile: FORCE hide the real <img> so only background preview shows */
         @media (max-width: 991px) {
           .imageFrame img.mainImg {
             display: none !important;
@@ -2156,17 +2218,11 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
   )
 }
 
-/**
- * ✅ SSR initial load (optional but recommended)
- * Uses server-side Supabase without bundling keys to client.
- */
 export async function getServerSideProps(ctx) {
   try {
     const id = String(ctx?.params?.id || '').trim()
     if (!id) return { props: { initialPhoto: null, initialError: 'Missing photo id' } }
 
-    // require inside SSR only
-    // eslint-disable-next-line global-require
     const { supabaseAdmin } = require('../../lib/supabaseAdmin')
 
     const { data, error } = await supabaseAdmin
