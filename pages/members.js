@@ -6,8 +6,8 @@ import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 const STORAGE_EMAIL_KEY = 'user_email'
-const STORAGE_DEVICE_ID = 'jc_device_id_v1'
-const STORAGE_SESSION = 'jc_member_session_v1'
+const STORAGE_DEVICE_ID = 'jc_member_device_id'
+const STORAGE_SESSION = 'jc_member_token'
 
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
@@ -30,15 +30,6 @@ function normalizeTierUpper(v) {
   if (x === 'pro') return 'PRO'
   if (x === 'elite') return 'ELITE'
   return ''
-}
-
-function safeJson(v, fallback) {
-  try {
-    const x = JSON.parse(v)
-    return x ?? fallback
-  } catch {
-    return fallback
-  }
 }
 
 function useRevealOnScroll() {
@@ -67,10 +58,13 @@ function getOrCreateDeviceId() {
   if (typeof window === 'undefined') return ''
   const existing = window.localStorage.getItem(STORAGE_DEVICE_ID)
   if (existing && existing.length > 8) return existing
+
   const id =
-    (globalThis.crypto?.randomUUID?.() || `dev_${Date.now()}_${Math.random().toString(16).slice(2)}`)
+    (globalThis.crypto?.randomUUID?.() ||
+      `dev_${Date.now()}_${Math.random().toString(16).slice(2)}`)
       .toString()
       .slice(0, 64)
+
   window.localStorage.setItem(STORAGE_DEVICE_ID, id)
   return id
 }
@@ -103,8 +97,7 @@ export default function Members() {
 
   const [deviceInfo, setDeviceInfo] = React.useState({ active: 0, max: 2 })
 
-  // Cinematic overlay message
-  const [overlay, setOverlay] = React.useState(null) // {title, body, hint}
+  const [overlay, setOverlay] = React.useState(null)
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return
@@ -113,6 +106,7 @@ export default function Members() {
   }, [])
 
   const canRaw = String(member?.tier || '').toLowerCase() === 'elite'
+
   React.useEffect(() => {
     if (!canRaw && format === 'raw') setFormat('jpg')
   }, [canRaw, format])
@@ -150,6 +144,7 @@ export default function Members() {
 
   async function startSession(cleanEmail) {
     const deviceId = getOrCreateDeviceId()
+
     const r = await fetch('/api/member/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -158,11 +153,11 @@ export default function Members() {
         action: 'start',
         email: cleanEmail,
         deviceId,
-        ua: typeof navigator !== 'undefined' ? navigator.userAgent : '',
       }),
     })
 
     const j = await r.json().catch(() => ({}))
+
     if (!r.ok || !j?.ok) {
       if (j?.cinematic) setOverlay(j.cinematic)
       return { ok: false, error: j?.error || 'Could not start session.' }
@@ -176,10 +171,12 @@ export default function Members() {
   async function loadDeviceInfo() {
     const r = await authedFetch('/api/member/session')
     const j = await r.json().catch(() => ({}))
+
     if (!r.ok || !j?.ok) {
       if (r.status === 401) handleSessionError(j)
       return
     }
+
     setDeviceInfo({ active: Number(j.active || 0), max: Number(j.max || 2) })
   }
 
@@ -191,6 +188,7 @@ export default function Members() {
         cache: 'no-store',
         body: JSON.stringify({ action: 'revoke_others' }),
       })
+
       const j = await r.json().catch(() => ({}))
 
       if (!r.ok || !j?.ok) {
@@ -215,7 +213,7 @@ export default function Members() {
       return { ok: false, error: d?.error || 'Not a member.' }
     }
 
-    const isMember = !!d?.member
+    const isMember = Boolean(d?.member)
     if (!isMember) return { ok: false, error: 'No active membership found.' }
 
     const tier = d?.tier || 'pro'
@@ -244,12 +242,13 @@ export default function Members() {
         return
       }
 
-      if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_EMAIL_KEY, clean)
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_EMAIL_KEY, clean)
+      }
 
       setChecking(true)
       setMember(null)
 
-      // ✅ Step 1: start session (enforces max devices)
       const sess = await startSession(clean)
       if (!sess.ok) {
         setChecking(false)
@@ -257,7 +256,6 @@ export default function Members() {
         return
       }
 
-      // ✅ Step 2: refresh status (requires session)
       const status = await refreshMemberStatus(clean)
       if (!status.ok) {
         setChecking(false)
@@ -268,7 +266,6 @@ export default function Members() {
       setMember(status)
       setChecking(false)
 
-      // ✅ update nav badge
       try {
         const tierUpper = normalizeTierUpper(status.tier)
         if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
@@ -357,10 +354,16 @@ export default function Members() {
         const nextUsed = Number(j?.used ?? prev.used ?? 0)
         const nextLimit = Number(j?.limit ?? prev.limit ?? 0)
         const nextRemaining = Number(j?.remaining ?? Math.max(0, nextLimit - nextUsed))
-        return { ...prev, tier: nextTier, used: nextUsed, limit: nextLimit, remaining: nextRemaining }
+        return {
+          ...prev,
+          ok: true,
+          tier: nextTier,
+          used: nextUsed,
+          limit: nextLimit,
+          remaining: nextRemaining,
+        }
       })
 
-      // update nav badge
       try {
         const tierUpper = normalizeTierUpper(j?.tier || member?.tier)
         if (tierUpper) window.localStorage.setItem('member_tier', tierUpper)
@@ -388,7 +391,6 @@ export default function Members() {
 
       <JeevanChandimalNavi />
 
-      {/* Cinematic overlay */}
       {overlay ? (
         <div className="overlay">
           <div className="overlayCard">
@@ -435,7 +437,9 @@ export default function Members() {
                     onChange={(e) => {
                       const v = e.target.value
                       setEmail(v)
-                      if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_EMAIL_KEY, v)
+                      if (typeof window !== 'undefined') {
+                        window.localStorage.setItem(STORAGE_EMAIL_KEY, v)
+                      }
                     }}
                     placeholder="you@example.com"
                     inputMode="email"
@@ -491,14 +495,19 @@ export default function Members() {
                       style={{
                         width:
                           member?.ok && member.limit > 0
-                            ? `${Math.min(100, (Number(member.used || 0) / Number(member.limit || 1)) * 100)}%`
+                            ? `${Math.min(
+                                100,
+                                (Number(member.used || 0) / Number(member.limit || 1)) * 100
+                              )}%`
                             : '0%',
                       }}
                     />
                   </div>
 
                   <div className="meterBottom">
-                    <span className="muted">{member?.ok ? `${member.remaining} remaining` : '—'}</span>
+                    <span className="muted">
+                      {member?.ok ? `${member.remaining} remaining` : '—'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -525,7 +534,9 @@ export default function Members() {
                     </button>
                     <button
                       type="button"
-                      className={`pillBtn ${format === 'raw' ? 'active' : ''} ${!canRaw ? 'disabled' : ''}`}
+                      className={`pillBtn ${format === 'raw' ? 'active' : ''} ${
+                        !canRaw ? 'disabled' : ''
+                      }`}
                       onClick={() => {
                         if (!canRaw) return
                         setFormat('raw')
@@ -552,7 +563,9 @@ export default function Members() {
           <section className="library" data-reveal>
             <div className="libHead">
               <h2 className="thq-heading-2">Archive</h2>
-              <p className="thq-body-small muted">Tip: Use search and click download. (Elite can choose RAW.)</p>
+              <p className="thq-body-small muted">
+                Tip: Use search and click download. (Elite can choose RAW.)
+              </p>
             </div>
 
             {photosLoading ? (
@@ -564,7 +577,9 @@ export default function Members() {
             ) : filteredPhotos.length === 0 ? (
               <div className="emptyCard">
                 <h3 className="thq-heading-3">No items loaded</h3>
-                <p className="thq-body-small muted">If no photos appear, click “Try Load Again”.</p>
+                <p className="thq-body-small muted">
+                  If no photos appear, click “Try Load Again”.
+                </p>
                 <div className="emptyActions">
                   <Link href="/store" className="thq-button-filled">
                     Go to Store
@@ -586,7 +601,6 @@ export default function Members() {
                     <div className="card" key={id}>
                       <div className="thumb">
                         {thumb ? (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={thumb} alt={title} />
                         ) : (
                           <div className="thumbFallback">Preview</div>
@@ -597,14 +611,20 @@ export default function Members() {
                         <div className="cardTop">
                           <div className="title">{title}</div>
                           <div className="tags">
-                            {Array.isArray(p?.tags) && p.tags.slice(0, 3).map((t) => (
-                              <span className="tag" key={t}>{t}</span>
-                            ))}
+                            {Array.isArray(p?.tags) &&
+                              p.tags.slice(0, 3).map((t) => (
+                                <span className="tag" key={t}>
+                                  {t}
+                                </span>
+                              ))}
                           </div>
                         </div>
 
                         <div className="cardActions">
-                          <Link href={`/store/${encodeURIComponent(id)}`} className="thq-button-outline smallBtn">
+                          <Link
+                            href={`/store/${encodeURIComponent(id)}`}
+                            className="thq-button-outline smallBtn"
+                          >
                             View
                           </Link>
 
@@ -620,7 +640,9 @@ export default function Members() {
                         </div>
 
                         {!member?.ok ? (
-                          <p className="hint">Enter your email above and click Access to enable downloads.</p>
+                          <p className="hint">
+                            Enter your email above and click Access to enable downloads.
+                          </p>
                         ) : null}
                       </div>
                     </div>
@@ -633,7 +655,9 @@ export default function Members() {
           <section className="support" data-reveal>
             <div className="ctaCard subtle">
               <h3>Need help?</h3>
-              <p className="muted">If you have any issues with membership access or downloads, use the contact page.</p>
+              <p className="muted">
+                If you have any issues with membership access or downloads, use the contact page.
+              </p>
               <Link href="/contact" className="thq-button-filled">
                 Contact
               </Link>
@@ -699,7 +723,6 @@ export default function Members() {
         .pillDot { width: 10px; height: 10px; border-radius: 999px; background: rgba(37, 195, 226, 0.9); box-shadow: 0 0 12px rgba(37, 195, 226, 0.35); }
         .pillText { font-size: 12px; font-weight: 800; opacity: 0.92; }
 
-        /* --- devices --- */
         .deviceStatus { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .devicePill {
           display: inline-flex;
@@ -736,7 +759,6 @@ export default function Members() {
           box-shadow: 0 0 0 3px rgba(37,195,226,0.1);
         }
 
-        /* --- meter --- */
         .meter { display: grid; gap: 8px; }
         .meterTop { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         .meterLabel { font-size: 12px; opacity: 0.85; }
@@ -745,7 +767,6 @@ export default function Members() {
         .fill { height: 100%; border-radius: 999px; background: rgba(37, 195, 226, 0.75); box-shadow: 0 0 18px rgba(37, 195, 226, 0.25); transition: width 240ms ease; }
         .meterBottom { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
 
-        /* --- controls --- */
         .controls { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; }
         .search { width: 100%; border-radius: 12px; border: 1px solid rgba(245, 244, 244, 0.16); background: rgba(0,0,0,0.2); color: #f5f4f4; padding: 12px 14px; outline: none; }
         .search:focus { border-color: rgba(37, 195, 226, 0.65); box-shadow: 0 0 0 4px rgba(37, 195, 226, 0.1); }
@@ -780,7 +801,6 @@ export default function Members() {
         .linkBtn:hover { opacity: 1; border-color: rgba(37, 195, 226, 0.55); box-shadow: 0 0 0 3px rgba(37, 195, 226, 0.1); }
         .linkBtn.subtle { background: rgba(255, 255, 255, 0.02); }
 
-        /* --- library --- */
         .library { margin-top: var(--dl-layout-space-fiveunits); display: grid; gap: 14px; }
         .libHead { display: grid; gap: 6px; max-width: 980px; margin: 0 auto; width: 100%; }
 
@@ -821,7 +841,6 @@ export default function Members() {
         .ctaCard h3 { margin: 0; font-size: 18px; }
         .ctaCard p { margin: 0; line-height: 1.7; }
 
-        /* --- cinematic overlay --- */
         .overlay {
           position: fixed;
           inset: 0;
