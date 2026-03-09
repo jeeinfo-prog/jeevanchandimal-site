@@ -1,4 +1,3 @@
-// components/layout/jeevan-chandimal-navi.js
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -20,12 +19,14 @@ const NAV = {
   ],
 }
 
+const STORAGE_MEMBER_TOKEN_KEY = 'jc_member_token'
+const STORAGE_MEMBER_DEVICE_KEY = 'jc_member_device_id'
+
 function normalizeTier(v) {
   const x = String(v || '').trim().toLowerCase()
   if (x === 'basic') return 'BASIC'
   if (x === 'pro') return 'PRO'
   if (x === 'elite') return 'ELITE'
-  // legacy values sometimes come as monthly/yearly/lifetime — don’t show those as badge
   return ''
 }
 
@@ -43,7 +44,7 @@ export default function JeevanChandimalNavi(props) {
   const [mMembershipOpen, setMMembershipOpen] = useState(false)
 
   const [memberTier, setMemberTier] = useState('')
-  const [memberRemaining, setMemberRemaining] = useState(null) // ✅ countdown number
+  const [memberRemaining, setMemberRemaining] = useState(null)
   const [userEmail, setUserEmail] = useState('')
 
   const [cartNum, setCartNum] = useState(0)
@@ -80,10 +81,8 @@ export default function JeevanChandimalNavi(props) {
     const onRoute = () => closeAll()
     router.events.on('routeChangeStart', onRoute)
     return () => router.events.off('routeChangeStart', onRoute)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router?.events])
 
-  // ✅ Cart badge (no interval)
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -118,17 +117,15 @@ export default function JeevanChandimalNavi(props) {
     }
   }, [])
 
-  // ✅ Membership status refresh (NO manual refresh needed) + ✅ countdown
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const email = window.localStorage.getItem('user_email') || ''
-    setUserEmail(email)
+    const cachedEmail = window.localStorage.getItem('user_email') || ''
+    setUserEmail(cachedEmail)
 
     const cachedTier = normalizeTier(window.localStorage.getItem('member_tier') || '')
     if (cachedTier) setMemberTier(cachedTier)
 
-    // ✅ try load cached remaining
     const cachedRemRaw = window.localStorage.getItem('member_remaining')
     if (cachedRemRaw !== null && cachedRemRaw !== undefined && cachedRemRaw !== '') {
       const n = Number(cachedRemRaw)
@@ -137,7 +134,11 @@ export default function JeevanChandimalNavi(props) {
 
     async function refreshMemberStatus() {
       const e = (window.localStorage.getItem('user_email') || '').trim().toLowerCase()
-      if (!e) {
+      const token = String(window.localStorage.getItem(STORAGE_MEMBER_TOKEN_KEY) || '').trim()
+
+      setUserEmail(e)
+
+      if (!e || !token) {
         setMemberTier('')
         setMemberRemaining(null)
         window.localStorage.removeItem('member_tier')
@@ -146,18 +147,24 @@ export default function JeevanChandimalNavi(props) {
       }
 
       try {
-        // bust cache (prevents 304 UI-staleness)
         const url = `/api/member/status?email=${encodeURIComponent(e)}&t=${Date.now()}`
-        const r = await fetch(url, { cache: 'no-store' })
+        const r = await fetch(url, {
+          cache: 'no-store',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-store',
+          },
+        })
+
         const d = await r.json().catch(() => ({}))
 
-        // accept multiple shapes
-        const isMember = !!(d?.member || d?.ok || d?.active)
-        if (!isMember) {
+        if (!r.ok || !d?.ok || !d?.member) {
+          if (r.status === 401) {
+            window.localStorage.removeItem('member_tier')
+            window.localStorage.removeItem('member_remaining')
+          }
           setMemberTier('')
           setMemberRemaining(null)
-          window.localStorage.removeItem('member_tier')
-          window.localStorage.removeItem('member_remaining')
           return
         }
 
@@ -168,7 +175,6 @@ export default function JeevanChandimalNavi(props) {
           setMemberTier(tier)
           window.localStorage.setItem('member_tier', tier)
 
-          // ✅ countdown from API
           const remaining = Number(d?.remaining)
           if (Number.isFinite(remaining)) {
             setMemberRemaining(remaining)
@@ -188,15 +194,12 @@ export default function JeevanChandimalNavi(props) {
       }
     }
 
-    // initial + route changes
     refreshMemberStatus()
 
-    // refresh when tab becomes active
     const onFocus = () => refreshMemberStatus()
     const onVis = () => {
       if (document.visibilityState === 'visible') refreshMemberStatus()
     }
-    // refresh when members page updates membership
     const onMemberUpdated = () => refreshMemberStatus()
 
     window.addEventListener('focus', onFocus)
@@ -215,7 +218,11 @@ export default function JeevanChandimalNavi(props) {
       window.localStorage.removeItem('user_email')
       window.localStorage.removeItem('member_tier')
       window.localStorage.removeItem('member_remaining')
+      window.localStorage.removeItem(STORAGE_MEMBER_TOKEN_KEY)
+      window.localStorage.removeItem(STORAGE_MEMBER_DEVICE_KEY)
+      window.dispatchEvent(new Event('jc_member_updated'))
     } catch {}
+
     setUserEmail('')
     setMemberTier('')
     setMemberRemaining(null)
@@ -296,20 +303,17 @@ export default function JeevanChandimalNavi(props) {
     <>
       <header className={`navWrap ${props.rootClassName || ''}`}>
         <div className="navShell">
-          {/* left */}
           <Link href="/" legacyBehavior>
             <a className="brand" aria-label="Home">
               <img alt={props.logoAlt} src={props.logoSrc} className="brandLogo" />
             </a>
           </Link>
 
-          {/* center desktop */}
           <nav className="navLinks" aria-label="Primary">
             <Link href="/" legacyBehavior>
               <a className={`navLink ${activeClass('/')}`}>Home</a>
             </Link>
 
-            {/* Work dropdown */}
             <div
               className="drop"
               onMouseEnter={() => {
@@ -357,7 +361,6 @@ export default function JeevanChandimalNavi(props) {
               </div>
             </div>
 
-            {/* Services dropdown */}
             <div
               className="drop"
               onMouseEnter={() => {
@@ -409,7 +412,6 @@ export default function JeevanChandimalNavi(props) {
               <a className={`navLink ${activeClass('/store')}`}>Store</a>
             </Link>
 
-            {/* ✅ Membership dropdown (Option C) */}
             <div
               className="drop"
               onMouseEnter={() => {
@@ -421,7 +423,9 @@ export default function JeevanChandimalNavi(props) {
               onMouseLeave={() => scheduleClose('membership')}
             >
               <div
-                className={`dropToggle ${activeClass('/memberships') || activeClass('/members')}`}
+                className={`dropToggle ${
+                  activeClass('/memberships') || activeClass('/members')
+                }`}
                 role="button"
                 tabIndex={0}
                 aria-haspopup="menu"
@@ -471,7 +475,6 @@ export default function JeevanChandimalNavi(props) {
             </Link>
           </nav>
 
-          {/* right */}
           <div className="navRight">
             <div className="rightGroup">
               <Link href="/cart" legacyBehavior>
@@ -483,7 +486,6 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {/* ✅ Tier badge + countdown */}
               {memberTier ? (
                 <span className="pill pillAccent">
                   {memberTier}
@@ -534,7 +536,6 @@ export default function JeevanChandimalNavi(props) {
           </div>
         </div>
 
-        {/* MOBILE OVERLAY */}
         <div className={`mOverlay ${mobileOpen ? 'show' : ''}`} role="dialog" aria-modal="true">
           <div className="mPanel">
             <div className="mTop">
@@ -583,7 +584,7 @@ export default function JeevanChandimalNavi(props) {
                   </span>
                 </a>
               </Link>
-              {mWorkOpen && (
+              {mWorkOpen ? (
                 <div className="mSub">
                   {workItems.map((it) => (
                     <Link href={it.href} key={it.href} legacyBehavior>
@@ -593,7 +594,7 @@ export default function JeevanChandimalNavi(props) {
                     </Link>
                   ))}
                 </div>
-              )}
+              ) : null}
 
               <Link href="/services" legacyBehavior>
                 <a
@@ -615,7 +616,7 @@ export default function JeevanChandimalNavi(props) {
                   </span>
                 </a>
               </Link>
-              {mServicesOpen && (
+              {mServicesOpen ? (
                 <div className="mSub">
                   {serviceItems.map((it) => (
                     <Link href={it.href} key={it.href} legacyBehavior>
@@ -625,7 +626,7 @@ export default function JeevanChandimalNavi(props) {
                     </Link>
                   ))}
                 </div>
-              )}
+              ) : null}
 
               <Link href="/store" legacyBehavior>
                 <a className={`mLink ${activeClass('/store')}`} onClick={closeAll}>
@@ -633,10 +634,11 @@ export default function JeevanChandimalNavi(props) {
                 </a>
               </Link>
 
-              {/* ✅ Membership mobile dropdown */}
               <Link href="/memberships" legacyBehavior>
                 <a
-                  className={`mLink mDrop ${activeClass('/memberships') || activeClass('/members')}`}
+                  className={`mLink mDrop ${
+                    activeClass('/memberships') || activeClass('/members')
+                  }`}
                   onClick={(e) => {
                     if (!mMembershipOpen) {
                       e.preventDefault()
@@ -654,7 +656,7 @@ export default function JeevanChandimalNavi(props) {
                   </span>
                 </a>
               </Link>
-              {mMembershipOpen && (
+              {mMembershipOpen ? (
                 <div className="mSub">
                   <Link href="/memberships" legacyBehavior>
                     <a className={`mSubLink ${activeItemClass('/memberships')}`} onClick={closeAll}>
@@ -670,7 +672,7 @@ export default function JeevanChandimalNavi(props) {
                     </Link>
                   ) : null}
                 </div>
-              )}
+              ) : null}
 
               <Link href="/about" legacyBehavior>
                 <a className={`mLink ${activeClass('/about')}`} onClick={closeAll}>
@@ -710,13 +712,11 @@ export default function JeevanChandimalNavi(props) {
 
       <style jsx>{`
         :global(:root) {
-          /* ✅ Global fixed-nav height used by pages to offset content */
           --jc-nav-h: 70px;
         }
 
         @media (max-width: 520px) {
           :global(:root) {
-            /* ✅ Slightly taller on small screens (spacing + wrapping safe) */
             --jc-nav-h: 78px;
           }
         }
@@ -1007,7 +1007,6 @@ export default function JeevanChandimalNavi(props) {
           border-radius: 2px;
         }
 
-        /* mobile */
         .mOverlay {
           display: none;
         }

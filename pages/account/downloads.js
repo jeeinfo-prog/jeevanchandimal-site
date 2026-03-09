@@ -5,6 +5,10 @@ import Link from 'next/link'
 import JeevanChandimalNavi from '../../components/layout/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../../components/layout/jeevan-chandimal-new-footer'
 
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
+}
+
 export default function DownloadsPage() {
   const [email, setEmail] = React.useState('')
   const [orders, setOrders] = React.useState([])
@@ -12,14 +16,12 @@ export default function DownloadsPage() {
   const [error, setError] = React.useState('')
   const [busyId, setBusyId] = React.useState(null)
 
-  // ✅ Read email on mount
   React.useEffect(() => {
     if (typeof window === 'undefined') return
-    const e = window.localStorage.getItem('user_email') || ''
+    const e = normalizeEmail(window.localStorage.getItem('user_email') || '')
     setEmail(e)
   }, [])
 
-  // ✅ Load paid orders for this email
   React.useEffect(() => {
     if (!email) {
       setError('Please log in to view your downloads.')
@@ -34,19 +36,23 @@ export default function DownloadsPage() {
         setLoading(true)
         setError('')
 
-        const r = await fetch(`/api/orders?email=${encodeURIComponent(email)}`)
-        const data = await r.json()
+        const r = await fetch(`/api/orders?email=${encodeURIComponent(email)}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-store' },
+        })
+
+        const data = await r.json().catch(() => null)
 
         if (!alive) return
 
-        if (!data?.ok) {
+        if (!r.ok || !data?.ok) {
           setError(data?.error || 'Failed to load orders')
           setOrders([])
           return
         }
 
         setOrders(Array.isArray(data.orders) ? data.orders : [])
-      } catch (e) {
+      } catch {
         if (!alive) return
         setError('Failed to load orders')
         setOrders([])
@@ -70,12 +76,12 @@ export default function DownloadsPage() {
       const r = await fetch('/api/download/create-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // ✅ ONLY orderId is needed
+        cache: 'no-store',
         body: JSON.stringify({ orderId: order.id }),
       })
 
-      const data = await r.json()
-      if (!data?.ok || !data?.url) {
+      const data = await r.json().catch(() => null)
+      if (!r.ok || !data?.ok || !data?.url) {
         alert(data?.error || 'Failed to create download link')
         return
       }
@@ -112,26 +118,23 @@ export default function DownloadsPage() {
             </p>
           </div>
 
-          {!email && (
-            <Link href="/login">
+          {!email ? (
+            <Link href="/login" legacyBehavior>
               <a className="loginBtn">Go to Login →</a>
             </Link>
-          )}
+          ) : null}
         </header>
 
-        {loading && <div className="empty">Loading…</div>}
-        {!loading && error && <div className="empty error">{error}</div>}
+        {loading ? <div className="empty">Loading…</div> : null}
+        {!loading && error ? <div className="empty error">{error}</div> : null}
 
-        {!loading && !error && orders.length === 0 && (
+        {!loading && !error && orders.length === 0 ? (
           <div className="empty">No purchases yet.</div>
-        )}
+        ) : null}
 
-        {!loading && !error && orders.length > 0 && (
+        {!loading && !error && orders.length > 0 ? (
           <div className="list">
             {orders.map((o) => {
-              // ✅ supports BOTH formats:
-              // - flattened: o.title / o.thumb_url / o.preview_url
-              // - nested: o.photo.title / o.photo.thumb_url / o.photo.preview_url
               const title = o?.title || o?.photo?.title || 'Photo'
               const thumb =
                 o?.thumb_url ||
@@ -145,7 +148,11 @@ export default function DownloadsPage() {
               const used = Number(o.download_count || 0)
               const limit = o.download_limit == null ? null : Number(o.download_limit)
               const limitText =
-                limit === 0 ? 'Unlimited downloads' : limit != null ? `${used}/${limit} downloads` : null
+                limit === 0
+                  ? 'Unlimited downloads'
+                  : limit != null
+                  ? `${used}/${limit} downloads`
+                  : null
 
               return (
                 <div key={o.id} className="card">
@@ -158,10 +165,14 @@ export default function DownloadsPage() {
                       <div className="title">{title}</div>
 
                       <div className="line">
-                        {o.license && <span className="chip">{String(o.license).toUpperCase()}</span>}
-                        {o.format && <span className="chip">{String(o.format).toUpperCase()}</span>}
+                        {o.license ? (
+                          <span className="chip">{String(o.license).toUpperCase()}</span>
+                        ) : null}
+                        {o.format ? (
+                          <span className="chip">{String(o.format).toUpperCase()}</span>
+                        ) : null}
                         <span className="chip">{formatMoney(o.currency, o.amount)}</span>
-                        {limitText && <span className="chip">{limitText}</span>}
+                        {limitText ? <span className="chip">{limitText}</span> : null}
                       </div>
 
                       <div className="sub2">
@@ -188,7 +199,7 @@ export default function DownloadsPage() {
               )
             })}
           </div>
-        )}
+        ) : null}
       </main>
 
       <JeevanChandimalNewFooter />
