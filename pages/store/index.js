@@ -129,6 +129,36 @@ function getUnitPrice({ currency, license, format, usdLkrRate }) {
   return fallbackLkr
 }
 
+function cleanDisplayTitle(title, tags = []) {
+  const raw = String(title || '').trim()
+  if (!raw) return 'Untitled'
+
+  const words = raw.split(/\s+/).filter(Boolean)
+  if (words.length <= 1) return raw
+
+  const firstWord = String(words[0] || '').toLowerCase()
+  const normalizedTags = Array.isArray(tags)
+    ? tags.map((t) => String(t || '').toLowerCase())
+    : []
+
+  const collectionWords = new Set([
+    'history',
+    'travel',
+    'nature',
+    'wildlife',
+    'landscape',
+    'culture',
+    'lifestyle',
+    'fineart',
+  ])
+
+  if (collectionWords.has(firstWord) || normalizedTags.includes(firstWord)) {
+    return words.slice(1).join(' ').trim() || raw
+  }
+
+  return raw
+}
+
 export default function StoreIndex() {
   const router = useRouter()
 
@@ -189,7 +219,6 @@ export default function StoreIndex() {
 
         let token = readMemberToken()
 
-        // Try status with existing token first if available
         if (token) {
           const existingStatusRes = await fetch(
             `/api/member/status?email=${encodeURIComponent(savedEmail)}`,
@@ -220,12 +249,10 @@ export default function StoreIndex() {
             return
           }
 
-          // invalid/revoked token -> clear and continue with fresh session
           writeMemberToken('')
           token = ''
         }
 
-        // Start/restore member session
         const sessionRes = await fetch('/api/member/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -337,11 +364,13 @@ export default function StoreIndex() {
 
           const thumbUrl = origin ? normalizeUrl(thumbRaw, origin) : thumbRaw
           const previewUrl = origin ? normalizeUrl(previewRaw, origin) : previewRaw
+          const tags = Array.isArray(row.tags) ? row.tags : []
+          const title = cleanDisplayTitle(row.title || 'Untitled', tags)
 
           return {
             id: row.id,
-            title: row.title || 'Untitled',
-            tags: Array.isArray(row.tags) ? row.tags : [],
+            title,
+            tags,
             orientation: 'photo',
             thumbUrl,
             previewUrl,
@@ -490,7 +519,6 @@ export default function StoreIndex() {
                   <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
                     <a className="card">
                       <div className="thumb">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={imgSrc}
                           alt={p.title}
