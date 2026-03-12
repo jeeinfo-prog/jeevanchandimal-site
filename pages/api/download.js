@@ -1,5 +1,3 @@
-// pages/api/download.js
-
 import { verifyDownloadToken } from '../../lib/secureDownload'
 import { supabaseAdmin } from '../../lib/supabaseAdmin'
 import { r2 } from '../../lib/r2'
@@ -41,6 +39,7 @@ function rateLimit(req, res) {
     cur.n = 0
     cur.resetAt = now + RL_WINDOW_MS
   }
+
   cur.n += 1
   rl.set(key, cur)
 
@@ -52,6 +51,7 @@ function rateLimit(req, res) {
     res.status(429).json({ error: 'Too many requests' })
     return false
   }
+
   return true
 }
 
@@ -95,13 +95,24 @@ function isPrefixKey(key) {
   return String(key || '').endsWith('/')
 }
 
+function looksLikeTokenError(message) {
+  const msg = String(message || '').toLowerCase()
+  return (
+    msg.includes('jwt') ||
+    msg.includes('token') ||
+    msg.includes('expired') ||
+    msg.includes('invalid signature') ||
+    msg.includes('malformed')
+  )
+}
+
 async function findFirstFileUnderPrefix(prefix) {
   const Bucket = process.env.R2_BUCKET
   if (!Bucket) throw new Error('Missing R2_BUCKET')
 
   const pref = prefix.endsWith('/') ? prefix : `${prefix}/`
 
-  const res = await r2.send(
+  const result = await r2.send(
     new ListObjectsV2Command({
       Bucket,
       Prefix: pref,
@@ -109,13 +120,13 @@ async function findFirstFileUnderPrefix(prefix) {
     })
   )
 
-  const items = res?.Contents || []
+  const items = Array.isArray(result?.Contents) ? result.Contents : []
   const file = items.find((x) => x?.Key && !String(x.Key).endsWith('/'))
   return file?.Key || null
 }
 
 /* ---------------------------------------------------- */
-/* membership token consumption */
+/* token row consume */
 /* ---------------------------------------------------- */
 
 async function consumeTokenRow(jti) {
@@ -150,7 +161,7 @@ async function checkAndConsumeMembership({ email }) {
   const e = normalizeEmail(email)
   if (!e) return { ok: false, code: 'DENIED', message: 'Denied' }
 
-  const { data: m, error } = await supabaseAdmin
+  const { data: membership, error } = await supabaseAdmin
     .from('memberships')
     .select(
       `
@@ -174,25 +185,28 @@ async function checkAndConsumeMembership({ email }) {
 
   if (error) throw new Error(error.message)
 
-  if (!m) return { ok: false, code: 'NOT_MEMBER', message: 'Not a member' }
-  if (cleanLower(m.status) !== 'active') return { ok: false, code: 'NOT_MEMBER', message: 'Not a member' }
+  if (!membership) return { ok: false, code: 'NOT_MEMBER', message: 'Not a member' }
+  if (cleanLower(membership.status) !== 'active') {
+    return { ok: false, code: 'NOT_MEMBER', message: 'Not a member' }
+  }
 
-  const endsAt = m.billing_cycle_end || m.end_date || null
-  if (endsAt && isExpired(endsAt)) return { ok: false, code: 'MEMBERSHIP_EXPIRED', message: 'Membership expired' }
+  const endsAt = membership.billing_cycle_end || membership.end_date || null
+  if (endsAt && isExpired(endsAt)) {
+    return { ok: false, code: 'MEMBERSHIP_EXPIRED', message: 'Membership expired' }
+  }
 
-  const limit = Number(m.monthly_download_limit ?? 0)
-  const used = Number(m.monthly_download_used ?? 0)
+  const limit = Number(membership.monthly_download_limit ?? 0)
+  const used = Number(membership.monthly_download_used ?? 0)
 
   if (limit !== 0 && used >= limit) {
     return { ok: false, code: 'LIMIT_REACHED', message: 'Monthly download limit reached' }
   }
 
-  // consume quota with CAS (prevents race conditions)
   if (limit !== 0) {
     const { data: updated, error: upErr } = await supabaseAdmin
       .from('memberships')
       .update({ monthly_download_used: used + 1 })
-      .eq('id', m.id)
+      .eq('id', membership.id)
       .eq('monthly_download_used', used)
       .select('id')
       .maybeSingle()
@@ -227,8 +241,14 @@ export default async function handler(req, res) {
     if (!payload) return res.status(401).json({ error: 'Invalid token' })
 
     const { orderId, objectKey, jti } = payload
-    if (!objectKey || !jti) return res.status(400).json({ error: 'Invalid token payload' })
-    if (!isSafeR2Key(objectKey)) return res.status(400).json({ error: 'Invalid object key' })
+
+    if (!objectKey || !jti) {
+      return res.status(400).json({ error: 'Invalid token payload' })
+    }
+
+    if (!isSafeR2Key(objectKey)) {
+      return res.status(400).json({ error: 'Invalid object key' })
+    }
 
     const isMembership =
       cleanLower(payload?.license) === 'membership' || Boolean(payload?.membership)
@@ -240,7 +260,6 @@ export default async function handler(req, res) {
       const email = normalizeEmail(payload?.guestEmail)
       if (!email) return res.status(401).json({ error: 'Denied' })
 
-      // ✅ check membership + quota first
       const mem = await checkAndConsumeMembership({ email })
       if (!mem.ok) {
         const status =
@@ -257,7 +276,6 @@ export default async function handler(req, res) {
         return res.status(status).json({ error: mem.message })
       }
 
-      // ✅ now consume the one-time token
       const consumed = await consumeTokenRow(jti)
       if (!consumed.ok) {
         const status = consumed.code === 'TOKEN_USED_OR_EXPIRED' ? 401 : 403
@@ -281,10 +299,10 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Server error' })
       }
 
-      const r = Array.isArray(rpc) ? rpc[0] : rpc
+      const result = Array.isArray(rpc) ? rpc[0] : rpc
 
-      if (!r?.ok) {
-        const code = r?.code || 'DENIED'
+      if (!result?.ok) {
+        const code = result?.code || 'DENIED'
         const status =
           code === 'TOKEN_USED_OR_EXPIRED'
             ? 401
@@ -296,7 +314,7 @@ export default async function handler(req, res) {
                   ? 404
                   : 401
 
-        return res.status(status).json({ error: r?.message || 'Denied' })
+        return res.status(status).json({ error: result?.message || 'Denied' })
       }
     }
 
@@ -312,7 +330,9 @@ export default async function handler(req, res) {
       finalKey = scannedKey
     }
 
-    if (!finalKey || !isSafeR2Key(finalKey)) return res.status(400).json({ error: 'Invalid object key' })
+    if (!finalKey || !isSafeR2Key(finalKey)) {
+      return res.status(400).json({ error: 'Invalid object key' })
+    }
 
     const filename = safeFilename(payload?.filename || finalKey.split('/').pop() || 'download')
 
@@ -330,6 +350,11 @@ export default async function handler(req, res) {
     return res.redirect(302, signedUrl)
   } catch (err) {
     console.error('download error:', err?.name, err?.message)
-    return res.status(401).json({ error: 'Invalid or expired token' })
+
+    if (looksLikeTokenError(err?.message)) {
+      return res.status(401).json({ error: 'Invalid or expired token' })
+    }
+
+    return res.status(500).json({ error: 'Server error' })
   }
 }
