@@ -1,63 +1,9 @@
 import React from 'react'
 import Head from 'next/head'
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from 'recharts'
 
 function formatMoney(v) {
   const n = Number(v || 0)
   return `$${n.toFixed(2)}`
-}
-
-function formatShortDate(value) {
-  const s = String(value || '').trim()
-  if (!s) return ''
-  const d = new Date(s)
-  if (Number.isNaN(d.getTime())) return s
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-  })
-}
-
-function ChartTooltip({ active, payload, label, money = false }) {
-  if (!active || !payload || !payload.length) return null
-
-  return (
-    <div className="tooltipBox">
-      <div className="tooltipLabel">{formatShortDate(label)}</div>
-      <div className="tooltipValue">
-        {money ? formatMoney(payload[0]?.value) : payload[0]?.value}
-      </div>
-
-      <style jsx>{`
-        .tooltipBox {
-          background: rgba(12, 12, 12, 0.94);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          border-radius: 12px;
-          padding: 10px 12px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
-        }
-        .tooltipLabel {
-          font-size: 12px;
-          opacity: 0.7;
-          margin-bottom: 4px;
-        }
-        .tooltipValue {
-          font-size: 14px;
-          font-weight: 600;
-        }
-      `}</style>
-    </div>
-  )
 }
 
 export default function AdminDownloads() {
@@ -83,6 +29,7 @@ export default function AdminDownloads() {
     }
 
     load()
+
     return () => {
       alive = false
     }
@@ -101,13 +48,11 @@ export default function AdminDownloads() {
 
         <section className="shell">
           <div className="hero">
-            <div>
-              <p className="eyebrow">Admin dashboard</p>
-              <h1 className="title">Store Analytics</h1>
-              <p className="sub">
-                Revenue, orders, downloads, and top-performing assets in one place.
-              </p>
-            </div>
+            <p className="eyebrow">Admin dashboard</p>
+            <h1 className="title">Store Analytics</h1>
+            <p className="sub">
+              Revenue, orders, downloads, and top-performing assets in one place.
+            </p>
           </div>
 
           {error ? (
@@ -137,104 +82,123 @@ export default function AdminDownloads() {
                 </div>
               </section>
 
-              <section className="chartsGrid">
-                <div className="card chartCard">
-                  <div className="cardHead">
-                    <h2>Revenue Trend</h2>
-                    <span className="pill">Per day</span>
-                  </div>
-
-                  <div className="chartWrap">
-                    <ResponsiveContainer width="100%" height={320}>
-                      <LineChart data={stats.revenuePerDay || []}>
-                        <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                        <XAxis
-                          dataKey="date"
-                          tickFormatter={formatShortDate}
-                          tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 12 }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tickFormatter={(v) => `$${v}`}
-                          tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 12 }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip content={<ChartTooltip money />} />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#00c2ff"
-                          strokeWidth={3}
-                          dot={false}
-                          activeDot={{ r: 5 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                <div className="card chartCard">
+              <section className="tablesGrid">
+                <div className="card tableCard">
                   <div className="cardHead">
                     <h2>Top Orders</h2>
                     <span className="pill">By downloads</span>
                   </div>
 
-                  <div className="chartWrap">
-                    <ResponsiveContainer width="100%" height={320}>
-                      <BarChart data={stats.topOrders || []}>
-                        <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                        <XAxis
-                          dataKey="orderId"
-                          hide
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          tick={{ fill: 'rgba(255,255,255,0.55)', fontSize: 12 }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip content={<ChartTooltip />} />
-                        <Bar dataKey="count" fill="#00c2ff" radius={[8, 8, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <div className="tableWrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Order ID</th>
+                          <th>Downloads</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(stats.topOrders || []).length ? (
+                          stats.topOrders.map((item) => (
+                            <tr key={item.orderId}>
+                              <td className="mono">{item.orderId}</td>
+                              <td>{item.count}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="2" className="emptyCell">
+                              No download data yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="card tableCard">
+                  <div className="cardHead">
+                    <h2>Top Selling Photos</h2>
+                    <span className="pill">Paid orders only</span>
+                  </div>
+
+                  <div className="tableWrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Photo ID</th>
+                          <th>Sales</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(stats.topPhotos || []).length ? (
+                          stats.topPhotos.map((item) => (
+                            <tr key={item.photoId}>
+                              <td className="mono">{item.photoId}</td>
+                              <td>{item.count}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="2" className="emptyCell">
+                              No photo sales yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </section>
 
-              <section className="card tableCard">
-                <div className="cardHead">
-                  <h2>Top Selling Photos</h2>
-                  <span className="pill">Paid orders only</span>
+              <section className="bottomGrid">
+                <div className="card listCard">
+                  <div className="cardHead">
+                    <h2>Revenue Per Day</h2>
+                    <span className="pill">Snapshot</span>
+                  </div>
+
+                  <div className="listWrap">
+                    {(stats.revenuePerDay || []).length ? (
+                      stats.revenuePerDay
+                        .slice()
+                        .reverse()
+                        .slice(0, 10)
+                        .map((item) => (
+                          <div className="listRow" key={item.date}>
+                            <span>{item.date}</span>
+                            <strong>{formatMoney(item.value)}</strong>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="muted">No revenue data yet.</p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="tableWrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Photo ID</th>
-                        <th>Sales</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(stats.topPhotos || []).length ? (
-                        stats.topPhotos.map((item) => (
-                          <tr key={item.photoId}>
-                            <td className="mono">{item.photoId}</td>
-                            <td>{item.count}</td>
-                          </tr>
+                <div className="card listCard">
+                  <div className="cardHead">
+                    <h2>Downloads Per Day</h2>
+                    <span className="pill">Snapshot</span>
+                  </div>
+
+                  <div className="listWrap">
+                    {(stats.downloadsPerDay || []).length ? (
+                      stats.downloadsPerDay
+                        .slice()
+                        .reverse()
+                        .slice(0, 10)
+                        .map((item) => (
+                          <div className="listRow" key={item.date}>
+                            <span>{item.date}</span>
+                            <strong>{item.value}</strong>
+                          </div>
                         ))
-                      ) : (
-                        <tr>
-                          <td colSpan="2" className="emptyCell">
-                            No photo sales yet.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                    ) : (
+                      <p className="muted">No download data yet.</p>
+                    )}
+                  </div>
                 </div>
               </section>
             </>
@@ -322,6 +286,19 @@ export default function AdminDownloads() {
           margin-bottom: 22px;
         }
 
+        .tablesGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 22px;
+          margin-bottom: 22px;
+        }
+
+        .bottomGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 22px;
+        }
+
         .statCard,
         .card {
           background: rgba(255, 255, 255, 0.03);
@@ -333,6 +310,12 @@ export default function AdminDownloads() {
 
         .statCard {
           padding: 22px 24px;
+        }
+
+        .tableCard,
+        .listCard,
+        .errorCard {
+          padding: 24px;
         }
 
         .statLabel {
@@ -349,19 +332,6 @@ export default function AdminDownloads() {
           font-size: clamp(28px, 3vw, 40px);
           line-height: 1.05;
           font-weight: 600;
-        }
-
-        .chartsGrid {
-          display: grid;
-          grid-template-columns: 1.2fr 1fr;
-          gap: 22px;
-          margin-bottom: 22px;
-        }
-
-        .chartCard,
-        .tableCard,
-        .errorCard {
-          padding: 24px;
         }
 
         .cardHead {
@@ -394,11 +364,6 @@ export default function AdminDownloads() {
           white-space: nowrap;
         }
 
-        .chartWrap {
-          width: 100%;
-          height: 320px;
-        }
-
         .tableWrap {
           overflow-x: auto;
           border-radius: 16px;
@@ -409,7 +374,7 @@ export default function AdminDownloads() {
         table {
           width: 100%;
           border-collapse: collapse;
-          min-width: 520px;
+          min-width: 420px;
         }
 
         th {
@@ -439,6 +404,22 @@ export default function AdminDownloads() {
           opacity: 0.96;
         }
 
+        .listWrap {
+          display: grid;
+          gap: 10px;
+        }
+
+        .listRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 16px;
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
         .emptyCell {
           text-align: center;
           opacity: 0.68;
@@ -450,11 +431,9 @@ export default function AdminDownloads() {
         }
 
         @media (max-width: 980px) {
-          .statsGrid {
-            grid-template-columns: 1fr;
-          }
-
-          .chartsGrid {
+          .statsGrid,
+          .tablesGrid,
+          .bottomGrid {
             grid-template-columns: 1fr;
           }
         }
@@ -465,8 +444,8 @@ export default function AdminDownloads() {
           }
 
           .statCard,
-          .chartCard,
           .tableCard,
+          .listCard,
           .errorCard {
             padding: 18px;
           }

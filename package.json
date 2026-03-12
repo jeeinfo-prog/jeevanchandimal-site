@@ -22,7 +22,6 @@
     "prop-types": "15.7.2",
     "react": "17.0.2",
     "react-dom": "17.0.2",
-    "recharts": "^3.8.0",
     "resend": "^6.9.1",
     "sharp": "0.32.6"
   },
