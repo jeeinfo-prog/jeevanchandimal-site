@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 
 function unauthorized() {
-  return new NextResponse('Authentication required', {
+  return new NextResponse(null, {
     status: 401,
     headers: {
       'WWW-Authenticate': 'Basic realm="Admin Dashboard"',
+      'Cache-Control': 'no-store',
     },
   })
 }
@@ -12,29 +13,53 @@ function unauthorized() {
 export function middleware(req) {
   const { pathname } = req.nextUrl
 
-  if (!pathname.startsWith('/admin') && !pathname.startsWith('/api/admin')) {
+  const isAdminPage = pathname.startsWith('/admin')
+  const isAdminApi = pathname.startsWith('/api/admin')
+
+  if (!isAdminPage && !isAdminApi) {
     return NextResponse.next()
   }
 
-  const user = process.env.ADMIN_DASHBOARD_USER
-  const pass = process.env.ADMIN_DASHBOARD_PASS
+  const expectedUser = process.env.ADMIN_DASHBOARD_USER
+  const expectedPass = process.env.ADMIN_DASHBOARD_PASS
 
-  const auth = req.headers.get('authorization')
+  if (!expectedUser || !expectedPass) {
+    return new NextResponse(null, {
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    })
+  }
 
-  if (!auth || !auth.startsWith('Basic ')) {
+  const authHeader = req.headers.get('authorization') || ''
+
+  if (!authHeader.startsWith('Basic ')) {
     return unauthorized()
   }
 
-  const base64 = auth.split(' ')[1]
-  const decoded = Buffer.from(base64, 'base64').toString()
+  try {
+    const base64 = authHeader.slice(6).trim()
+    const decoded = Buffer.from(base64, 'base64').toString('utf8')
+    const splitIndex = decoded.indexOf(':')
 
-  const [username, password] = decoded.split(':')
+    if (splitIndex === -1) {
+      return unauthorized()
+    }
 
-  if (username !== user || password !== pass) {
+    const username = decoded.slice(0, splitIndex)
+    const password = decoded.slice(splitIndex + 1)
+
+    if (username !== expectedUser || password !== expectedPass) {
+      return unauthorized()
+    }
+
+    const res = NextResponse.next()
+    res.headers.set('Cache-Control', 'no-store')
+    return res
+  } catch (err) {
     return unauthorized()
   }
-
-  return NextResponse.next()
 }
 
 export const config = {
