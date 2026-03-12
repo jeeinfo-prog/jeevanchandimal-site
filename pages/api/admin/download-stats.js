@@ -1,12 +1,6 @@
-// pages/api/admin/download-stats.js
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET')
-    return res.status(405).json({ ok: false, error: 'Method not allowed' })
-  }
-
   try {
     const { data: tokens, error } = await supabaseAdmin
       .from('download_tokens')
@@ -14,31 +8,46 @@ export default async function handler(req, res) {
 
     if (error) throw error
 
-    const rows = Array.isArray(tokens) ? tokens : []
+    const rows = tokens || []
+
     const totalDownloads = rows.length
 
     const byOrder = {}
-    for (const t of rows) {
-      const key = String(t?.order_id || '').trim()
-      if (!key) continue
-      byOrder[key] = (byOrder[key] || 0) + 1
-    }
+    const byDay = {}
+
+    rows.forEach((t) => {
+      const order = String(t.order_id || '').trim()
+      const day = String(t.created_at || '').slice(0, 10)
+
+      if (order) {
+        byOrder[order] = (byOrder[order] || 0) + 1
+      }
+
+      if (day) {
+        byDay[day] = (byDay[day] || 0) + 1
+      }
+    })
 
     const topOrders = Object.entries(byOrder)
       .map(([orderId, count]) => ({ orderId, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
 
-    return res.status(200).json({
+    const downloadsPerDay = Object.entries(byDay)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+
+    res.status(200).json({
       ok: true,
       totalDownloads,
       topOrders,
+      downloadsPerDay,
     })
   } catch (err) {
-    console.error('download-stats error:', err)
-    return res.status(500).json({
+    console.error(err)
+    res.status(500).json({
       ok: false,
-      error: err?.message || 'Server error',
+      error: err.message,
     })
   }
 }
