@@ -1,14 +1,9 @@
-// pages/api/download/create-token.js
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createDownloadToken } from '@/lib/secureDownload'
 
-/* ---------------- security: tiny best-effort rate limit ----------------
-   NOTE: In serverless this is best-effort (memory resets), but it still helps.
-------------------------------------------------------------------------- */
-
-const RL_WINDOW_MS = 60_000 // 1 min
-const RL_MAX = 30 // 30 req/min per IP
+const RL_WINDOW_MS = 60_000
+const RL_MAX = 30
 
 const rl = globalThis.__jc_rl_create_token || new Map()
 globalThis.__jc_rl_create_token = rl
@@ -33,6 +28,7 @@ function rateLimit(req, res) {
     cur.n = 0
     cur.resetAt = now + RL_WINDOW_MS
   }
+
   cur.n += 1
   rl.set(key, cur)
 
@@ -44,10 +40,9 @@ function rateLimit(req, res) {
     res.status(429).json({ ok: false, error: 'Too many requests' })
     return false
   }
+
   return true
 }
-
-/* ---------------- helpers ---------------- */
 
 function limitForLicense(license) {
   const x = String(license || '').trim().toLowerCase()
@@ -94,11 +89,9 @@ function isUuid(v) {
 
 function isCartCode(v) {
   const s = String(v || '').trim()
-  // adjust if your code format differs
   return /^CART_[A-Za-z0-9._-]{6,120}$/.test(s)
 }
 
-// Resolve correct R2 key from photos table
 async function resolveObjectKeyFromPhotos(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid || !isUuid(pid)) return null
@@ -115,20 +108,20 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
   if (!p) return null
 
   if (fmt === 'raw') return p.original_raw_key ? String(p.original_raw_key) : null
+
   const k = p.original_jpg_key || p.original_key
   return k ? String(k) : null
 }
 
-// last-resort fallback (only if you still store files like this)
 function fallbackObjectKeyFromPhotoId(photoId, format) {
   const pid = String(photoId || '').trim()
   if (!pid) return null
+
   return format === 'raw'
     ? `photos/original/${pid}.zip`
     : `photos/original/${pid}.jpg`
 }
 
-// For single-photo order row: ensure delivery_object_key is correct
 async function ensureObjectKeyForSingleOrder(order) {
   const photoId = String(order?.photo_id || '').trim()
   if (!photoId) return ''
@@ -137,8 +130,10 @@ async function ensureObjectKeyForSingleOrder(order) {
 
   if (!objectKey) {
     const resolved = await resolveObjectKeyFromPhotos(photoId, order?.format)
+
     if (resolved) {
       objectKey = resolved
+
       const u = await supabaseAdmin
         .from('orders')
         .update({ delivery_object_key: objectKey })
@@ -160,10 +155,46 @@ function makeCartItemLabel(item, idx) {
   return `${base} • ${lic.toUpperCase()} • ${fmt.toUpperCase()}`
 }
 
-/* ---------------- handler ---------------- */
+async function findSingleOrder(ref) {
+  const value = String(ref || '').trim()
+  if (!value) return null
+
+  const selectCols =
+    'id,status,photo_id,format,email,license,download_limit,delivery_object_key,code,order_id'
+
+  if (isUuid(value)) {
+    const byId = await supabaseAdmin
+      .from('orders')
+      .select(selectCols)
+      .eq('id', value)
+      .maybeSingle()
+
+    if (byId.error) throw new Error(byId.error.message)
+    if (byId.data) return byId.data
+  }
+
+  const byCode = await supabaseAdmin
+    .from('orders')
+    .select(selectCols)
+    .eq('code', value)
+    .maybeSingle()
+
+  if (byCode.error) throw new Error(byCode.error.message)
+  if (byCode.data) return byCode.data
+
+  const byOrderId = await supabaseAdmin
+    .from('orders')
+    .select(selectCols)
+    .eq('order_id', value)
+    .maybeSingle()
+
+  if (byOrderId.error) throw new Error(byOrderId.error.message)
+  if (byOrderId.data) return byOrderId.data
+
+  return null
+}
 
 export default async function handler(req, res) {
-  // ✅ rate limit first
   if (!rateLimit(req, res)) return
 
   if (req.method !== 'POST') {
@@ -174,15 +205,12 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {}
     const orderId = String(body.orderId || '').trim()
-    const code = String(body.code || '').trim() // CART_...
+    const code = String(body.code || '').trim()
 
     if (!orderId && !code) {
       return res.status(400).json({ ok: false, error: 'Missing orderId or code' })
     }
 
-    if (orderId && !isUuid(orderId)) {
-      return res.status(400).json({ ok: false, error: 'Invalid orderId' })
-    }
     if (code && !isCartCode(code)) {
       return res.status(400).json({ ok: false, error: 'Invalid code' })
     }
@@ -190,21 +218,15 @@ export default async function handler(req, res) {
     const base = getBaseUrl(req)
     if (!base) return res.status(500).json({ ok: false, error: 'Missing site base URL' })
 
-    // ✅ keep TTL modest (short-lived links reduce abuse)
     const expiresMinutes = 30
     const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)
-
-    // ✅ cap cart items to prevent giant token batches
     const MAX_CART_ITEMS = 24
 
-    /* =========================================================
-       ✅ CART: one row orders.code = CART_..., items in orders.items (JSONB)
-    ========================================================= */
     if (code) {
       const { data: cartOrder, error } = await supabaseAdmin
         .from('orders')
-        .select('id,status,code,order_kind,items,email,currency,amount,download_limit')
-        .eq('code', code)
+        .select('id,status,code,order_id,order_kind,items,email,currency,amount,download_limit')
+        .or(`code.eq.${code},order_id.eq.${code}`)
         .maybeSingle()
 
       if (error) return res.status(500).json({ ok: false, error: error.message })
@@ -215,12 +237,13 @@ export default async function handler(req, res) {
       }
 
       const itemsArr = Array.isArray(cartOrder.items) ? cartOrder.items : []
-      if (itemsArr.length === 0) return res.status(400).json({ ok: false, error: 'Cart has no items' })
+      if (itemsArr.length === 0) {
+        return res.status(400).json({ ok: false, error: 'Cart has no items' })
+      }
       if (itemsArr.length > MAX_CART_ITEMS) {
         return res.status(400).json({ ok: false, error: `Cart too large (max ${MAX_CART_ITEMS})` })
       }
 
-      // Ensure download_limit exists on the cart order
       const licenses = itemsArr.map((it) => normalizeLicense(it?.license))
       const desiredLimit = licenses.includes('commercial')
         ? 0
@@ -236,14 +259,13 @@ export default async function handler(req, res) {
           .from('orders')
           .update({ download_limit: desiredLimit })
           .eq('id', cartOrder.id)
+
         if (u.error) console.error('cart download_limit update failed:', u.error.message)
       }
 
       const guestEmail = normalizeEmail(cartOrder.email)
-
       const outItems = []
 
-      // ✅ issue at most MAX_CART_ITEMS tokens per call
       for (let i = 0; i < itemsArr.length; i++) {
         const it = itemsArr[i] || {}
         const photoId = String(it.photoId || it.photo_id || '').trim()
@@ -252,7 +274,6 @@ export default async function handler(req, res) {
         const fmt = normalizeFormat(it.format)
         const lic = normalizeLicense(it.license)
 
-        // Prefer objectKey stored in item
         let objectKey = String(it.objectKey || it.object_key || '').trim()
 
         if (!objectKey) {
@@ -262,12 +283,12 @@ export default async function handler(req, res) {
             console.error('cart resolveObjectKeyFromPhotos failed:', e?.message || e)
           }
         }
+
         if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(photoId, fmt) || ''
         if (!objectKey) continue
 
         const jti = crypto.randomUUID()
 
-        // ✅ store token id server-side (lets you revoke/track)
         const ins = await supabaseAdmin.from('download_tokens').insert({
           jti,
           order_id: cartOrder.id,
@@ -281,7 +302,6 @@ export default async function handler(req, res) {
 
         const ext = fmt === 'raw' ? 'zip' : 'jpg'
 
-        // NOTE: keep your existing createDownloadToken signature.
         const token = createDownloadToken(
           {
             jti,
@@ -314,17 +334,11 @@ export default async function handler(req, res) {
       })
     }
 
-    /* =========================================================
-       ✅ SINGLE ORDER: body.orderId = orders.id
-    ========================================================= */
-    const { data: order, error } = await supabaseAdmin
-      .from('orders')
-      .select('id,status,photo_id,format,email,license,download_limit,delivery_object_key')
-      .eq('id', orderId)
-      .maybeSingle()
+    const order = await findSingleOrder(orderId)
 
-    if (error) return res.status(500).json({ ok: false, error: error.message })
-    if (!order) return res.status(404).json({ ok: false, error: 'Order not found' })
+    if (!order) {
+      return res.status(404).json({ ok: false, error: 'Order not found' })
+    }
 
     if (String(order.status || '').toUpperCase() !== 'PAID') {
       return res.status(400).json({ ok: false, error: 'Order not paid' })
@@ -337,7 +351,11 @@ export default async function handler(req, res) {
 
     if (order.download_limit == null) {
       const desired = limitForLicense(order.license)
-      const u = await supabaseAdmin.from('orders').update({ download_limit: desired }).eq('id', order.id)
+      const u = await supabaseAdmin
+        .from('orders')
+        .update({ download_limit: desired })
+        .eq('id', order.id)
+
       if (u.error) return res.status(500).json({ ok: false, error: 'Failed to set download limit' })
     }
 
@@ -348,6 +366,7 @@ export default async function handler(req, res) {
       order_id: order.id,
       expires_at: expiresAt.toISOString(),
     })
+
     if (ins.error) return res.status(500).json({ ok: false, error: ins.error.message })
 
     const fmt = normalizeFormat(order.format)
