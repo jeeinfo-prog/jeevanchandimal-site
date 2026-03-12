@@ -29,19 +29,60 @@ function stripExt(name) {
   const i = n.lastIndexOf('.')
   return i > 0 ? n.slice(0, i) : n
 }
-function toTitleCase(s) {
-  return String(s)
-    .replace(/__.+$/, '')
+
+function humanizeWords(s) {
+  return String(s || '')
     .replace(/[_\-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function titleCaseWords(s) {
+  return humanizeWords(s)
     .split(' ')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
+    .filter(Boolean)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ''))
     .join(' ')
 }
-function autoTitleFromFile(file) {
-  const base = stripExt(file?.name || '')
-  return toTitleCase(base)
+
+function parsePhotoFilename(file, relativePath = '') {
+  const original = stripExt(file?.name || '')
+  const withoutId = original.replace(/__.+$/, '')
+  const rawParts = withoutId.split('-').filter(Boolean)
+
+  const folder = String(relativePath || '')
+    .replace(/\\/g, '/')
+    .split('/')[0]
+    ?.trim()
+    ?.toLowerCase()
+
+  let collection = ''
+  let titleParts = rawParts
+
+  if (rawParts.length > 1) {
+    collection = rawParts[0].toLowerCase()
+    titleParts = rawParts.slice(1)
+  } else if (folder) {
+    collection = folder
+    titleParts = rawParts
+  }
+
+  const titleSlug = titleParts.join('-')
+  const title = titleCaseWords(titleSlug)
+
+  return {
+    original,
+    withoutId,
+    folder,
+    collection,
+    titleSlug,
+    title,
+  }
+}
+
+function autoTitleFromFile(file, relativePath = '') {
+  const parsed = parsePhotoFilename(file, relativePath)
+  return parsed.title || titleCaseWords(parsed.withoutId)
 }
 
 function normalizeTags(input) {
@@ -104,11 +145,9 @@ function smartEnhanceTags(tagsArr) {
 }
 
 function smartTagsFromFile(file, relativePath = '') {
-  const base0 = stripExt(file?.name || '')
-    .replace(/__.+$/, '')
-    .toLowerCase()
+  const parsed = parsePhotoFilename(file, relativePath)
 
-  const rawWords = base0
+  const rawWords = parsed.titleSlug
     .replace(/[_\-]+/g, ' ')
     .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
     .replace(/\s+/g, ' ')
@@ -150,15 +189,19 @@ function smartTagsFromFile(file, relativePath = '') {
 
   const tags = []
   const seen = new Set()
+
   const add = (t) => {
     const v = String(t || '').trim().toLowerCase()
-    if (!v) return
-    if (seen.has(v)) return
+    if (!v || seen.has(v)) return
     seen.add(v)
     tags.push(v)
   }
 
-  if (folder && folder.length >= 3 && !stop.has(folder)) add(folder)
+  if (parsed.collection && parsed.collection.length >= 3 && !stop.has(parsed.collection)) {
+    add(parsed.collection)
+  } else if (folder && folder.length >= 3 && !stop.has(folder)) {
+    add(folder)
+  }
 
   for (const w of words) {
     if (w.length < 3) continue
@@ -178,34 +221,21 @@ function smartTagsFromFile(file, relativePath = '') {
 }
 
 function autoDescriptionFromFile(file, relativePath = '') {
-  const base = stripExt(file?.name || '')
-    .replace(/__.+$/, '')
-    .replace(/[_\-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  const words = base.split(' ').filter(Boolean)
-  if (!words.length) return ''
-
-  const first = words[0]?.toLowerCase()
-  const folder = (relativePath || '').split('/')[0]?.toLowerCase()
-
-  const titleCase = (s) =>
-    String(s)
-      .split(' ')
-      .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
-      .join(' ')
-
-  const place = words.slice(1).join(' ')
-  const placeTitle = titleCase(place || words.join(' '))
+  const parsed = parsePhotoFilename(file, relativePath)
+  const first = parsed.collection
+  const placeTitle = parsed.title || titleCaseWords(parsed.withoutId)
 
   if (first === 'landscape') return `Landscape photo of ${placeTitle}.`
   if (first === 'wildlife') return `Wildlife photograph of ${placeTitle}.`
   if (first === 'nature') return `Nature photograph of ${placeTitle}.`
   if (first === 'travel') return `Travel photograph of ${placeTitle}.`
+  if (first === 'history') return `Historical site ${placeTitle}.`
+  if (first === 'culture') return `Cultural scene of ${placeTitle}.`
+  if (first === 'lifestyle') return `Lifestyle photograph of ${placeTitle}.`
+  if (first === 'fineart') return `Fine art photograph of ${placeTitle}.`
 
-  if (folder === 'history' || first === 'history') return `Historical site ${placeTitle}.`
-  if (folder === 'culture' || first === 'culture') return `Cultural scene of ${placeTitle}.`
+  if (parsed.folder === 'history') return `Historical site ${placeTitle}.`
+  if (parsed.folder === 'culture') return `Cultural scene of ${placeTitle}.`
 
   return `Photograph of ${placeTitle}.`
 }
@@ -545,7 +575,7 @@ export default function AdminUploadPage() {
       const rel = file.webkitRelativePath || ''
       const relPath = keepFolderStructure && rel ? rel : ''
 
-      const title = autoTitleFromFile(file)
+      const title = autoTitleFromFile(file, relPath)
       const tags = normalizeTags(smartTagsFromFile(file, relPath))
       const description = autoDescriptionFromFile(file, relPath)
 
