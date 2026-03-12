@@ -166,6 +166,36 @@ function buildContentLocation(location) {
   }
 }
 
+function cleanDisplayTitle(title, tags = []) {
+  const raw = String(title || '').trim()
+  if (!raw) return 'Untitled'
+
+  const words = raw.split(/\s+/).filter(Boolean)
+  if (words.length <= 1) return raw
+
+  const firstWord = String(words[0] || '').toLowerCase()
+  const normalizedTags = Array.isArray(tags)
+    ? tags.map((t) => String(t || '').toLowerCase())
+    : []
+
+  const collectionWords = new Set([
+    'history',
+    'travel',
+    'nature',
+    'wildlife',
+    'landscape',
+    'culture',
+    'lifestyle',
+    'fineart',
+  ])
+
+  if (collectionWords.has(firstWord) || normalizedTags.includes(firstWord)) {
+    return words.slice(1).join(' ').trim() || raw
+  }
+
+  return raw
+}
+
 function normalizePhotoPayload(payload) {
   const row = payload?.photo || payload
   if (!row) return null
@@ -186,11 +216,14 @@ function normalizePhotoPayload(payload) {
         (Array.isArray(row.formats) && row.formats.includes('raw')) ||
         (Array.isArray(row.available_formats) && row.available_formats.includes('raw'))
 
+  const tags = Array.isArray(row.tags) ? row.tags : []
+  const cleanedTitle = cleanDisplayTitle(row.title || 'Untitled', tags)
+
   return {
     id: row.id,
-    title: row.title || 'Untitled',
+    title: cleanedTitle,
     description: row.description || '',
-    tags: Array.isArray(row.tags) ? row.tags : [],
+    tags,
     thumbUrl: cleanedThumb || '',
     previewUrl: cleanedPreview || '',
     createdAt: row.created_at || row.createdAt || null,
@@ -388,7 +421,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return () => {
       alive = false
     }
-  }, [router.isReady, id])
+  }, [router.isReady, id, photo?.id])
 
   React.useEffect(() => {
     if (!photo?.id) return
@@ -490,7 +523,6 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
   }
 
-  /* ================== member bootstrap + status ================== */
   React.useEffect(() => {
     const em = String(email || '').trim().toLowerCase()
 
@@ -800,6 +832,7 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
         photo?.exif?.PixelXDimension ||
         photo?.exif?.ExifImageWidth
     ) || null
+
   const exifH =
     Number(
       photo?.exif?.height ||
@@ -1418,26 +1451,29 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 <div className="relState">No similar photos found yet.</div>
               ) : (
                 <div className="relGrid">
-                  {similar.map((p) => (
-                    <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
-                      <a className="relCard">
-                        <div className="relThumb">
-                          <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
-                          {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
-                        </div>
-                        <div className="relMeta">
-                          <div className="relName">{p.title || 'Untitled'}</div>
-                          <div className="relCaption">
-                            {String(p.description || '').trim()
-                              ? String(p.description).trim()
-                              : Array.isArray(p.tags) && p.tags[0]
-                              ? `#${p.tags[0]}`
-                              : 'Sri Lanka photography'}
+                  {similar.map((p) => {
+                    const cleanedTitle = cleanDisplayTitle(p.title || 'Untitled', p.tags || [])
+                    return (
+                      <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
+                        <a className="relCard">
+                          <div className="relThumb">
+                            <img src={String(p.thumb_url || '').trim()} alt={cleanedTitle} />
+                            {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                           </div>
-                        </div>
-                      </a>
-                    </Link>
-                  ))}
+                          <div className="relMeta">
+                            <div className="relName">{cleanedTitle}</div>
+                            <div className="relCaption">
+                              {String(p.description || '').trim()
+                                ? String(p.description).trim()
+                                : Array.isArray(p.tags) && p.tags[0]
+                                ? `#${p.tags[0]}`
+                                : 'Sri Lanka photography'}
+                            </div>
+                          </div>
+                        </a>
+                      </Link>
+                    )
+                  })}
                 </div>
               )}
             </section>
@@ -1456,22 +1492,25 @@ export default function StoreDetail({ initialPhoto = null, initialError = '' }) 
                 <div className="relState">No recommendations yet.</div>
               ) : (
                 <div className="relGrid">
-                  {recommended.map((p) => (
-                    <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
-                      <a className="relCard">
-                        <div className="relThumb">
-                          <img src={String(p.thumb_url || '').trim()} alt={p.title || 'Photo'} />
-                          {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
-                        </div>
-                        <div className="relMeta">
-                          <div className="relName">{p.title || 'Untitled'}</div>
-                          <div className="relTag">
-                            {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                  {recommended.map((p) => {
+                    const cleanedTitle = cleanDisplayTitle(p.title || 'Untitled', p.tags || [])
+                    return (
+                      <Link key={p.id} href={`/store/${p.id}`} legacyBehavior>
+                        <a className="relCard">
+                          <div className="relThumb">
+                            <img src={String(p.thumb_url || '').trim()} alt={cleanedTitle} />
+                            {wmOn && <div className="relWm" style={{ opacity: wmOpacity }} />}
                           </div>
-                        </div>
-                      </a>
-                    </Link>
-                  ))}
+                          <div className="relMeta">
+                            <div className="relName">{cleanedTitle}</div>
+                            <div className="relTag">
+                              {Array.isArray(p.tags) && p.tags[0] ? `#${p.tags[0]}` : 'Photo'}
+                            </div>
+                          </div>
+                        </a>
+                      </Link>
+                    )
+                  })}
                 </div>
               )}
             </section>
