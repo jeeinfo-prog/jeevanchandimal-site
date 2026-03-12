@@ -10,6 +10,12 @@ function dateKey(v) {
   return s ? s.slice(0, 10) : ''
 }
 
+function normalizeCurrency(v) {
+  const s = String(v || '').trim().toUpperCase()
+  if (!s) return 'UNKNOWN'
+  return s
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
@@ -19,7 +25,7 @@ export default async function handler(req, res) {
   try {
     const { data: orders, error: orderErr } = await supabaseAdmin
       .from('orders')
-      .select('id, photo_id, amount, status, created_at')
+      .select('id, photo_id, amount, status, created_at, currency')
 
     if (orderErr) throw orderErr
 
@@ -36,18 +42,29 @@ export default async function handler(req, res) {
       (o) => String(o?.status || '').trim().toUpperCase() === 'PAID'
     )
 
-    const totalRevenue = paidOrders.reduce((sum, o) => sum + toNumber(o?.amount), 0)
     const totalOrders = paidOrders.length
     const totalDownloads = tokenRows.length
 
-    const revenueByDay = {}
+    const revenueByCurrencyMap = {}
+    const revenuePerDayByCurrencyMap = {}
     const downloadsByDay = {}
     const byOrder = {}
     const byPhoto = {}
 
     for (const o of paidOrders) {
+      const currency = normalizeCurrency(o?.currency)
+      const amount = toNumber(o?.amount)
       const day = dateKey(o?.created_at)
-      if (day) revenueByDay[day] = (revenueByDay[day] || 0) + toNumber(o?.amount)
+
+      revenueByCurrencyMap[currency] = (revenueByCurrencyMap[currency] || 0) + amount
+
+      if (!revenuePerDayByCurrencyMap[currency]) {
+        revenuePerDayByCurrencyMap[currency] = {}
+      }
+      if (day) {
+        revenuePerDayByCurrencyMap[currency][day] =
+          (revenuePerDayByCurrencyMap[currency][day] || 0) + amount
+      }
 
       const photoId = String(o?.photo_id || '').trim()
       if (photoId) byPhoto[photoId] = (byPhoto[photoId] || 0) + 1
@@ -61,9 +78,22 @@ export default async function handler(req, res) {
       if (orderId) byOrder[orderId] = (byOrder[orderId] || 0) + 1
     }
 
-    const revenuePerDay = Object.entries(revenueByDay)
-      .map(([date, value]) => ({ date, value: Number(value.toFixed(2)) }))
-      .sort((a, b) => a.date.localeCompare(b.date))
+    const revenueByCurrency = Object.entries(revenueByCurrencyMap)
+      .map(([currency, total]) => ({
+        currency,
+        total: Number(total.toFixed(2)),
+      }))
+      .sort((a, b) => a.currency.localeCompare(b.currency))
+
+    const revenuePerDayByCurrency = {}
+    for (const currency of Object.keys(revenuePerDayByCurrencyMap)) {
+      revenuePerDayByCurrency[currency] = Object.entries(revenuePerDayByCurrencyMap[currency])
+        .map(([date, value]) => ({
+          date,
+          value: Number(value.toFixed(2)),
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date))
+    }
 
     const downloadsPerDay = Object.entries(downloadsByDay)
       .map(([date, value]) => ({ date, value }))
@@ -81,10 +111,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      totalRevenue: Number(totalRevenue.toFixed(2)),
       totalOrders,
       totalDownloads,
-      revenuePerDay,
+      revenueByCurrency,
+      revenuePerDayByCurrency,
       downloadsPerDay,
       topOrders,
       topPhotos,

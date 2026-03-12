@@ -1,14 +1,208 @@
 import React from 'react'
 import Head from 'next/head'
 
-function formatMoney(v) {
-  const n = Number(v || 0)
-  return `$${n.toFixed(2)}`
+function formatMoney(value, currency) {
+  const n = Number(value || 0)
+
+  if (currency === 'LKR') {
+    return `LKR ${n.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
+  }
+
+  if (currency === 'USD') {
+    return `$${n.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
+  }
+
+  return `${currency} ${n.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+function formatShortDate(value) {
+  const s = String(value || '').trim()
+  if (!s) return ''
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return s
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+  })
+}
+
+function MiniBarChart({ data = [], currency }) {
+  const items = Array.isArray(data) ? data : []
+  const max = Math.max(...items.map((x) => Number(x?.value || 0)), 0)
+
+  if (!items.length) {
+    return <p className="muted">No revenue data yet.</p>
+  }
+
+  return (
+    <div className="chartList">
+      {items.map((item) => {
+        const value = Number(item?.value || 0)
+        const width = max > 0 ? Math.max(6, (value / max) * 100) : 0
+
+        return (
+          <div className="chartRow" key={`${currency}-${item.date}`}>
+            <div className="chartMeta">
+              <span>{formatShortDate(item.date)}</span>
+              <strong>{formatMoney(value, currency)}</strong>
+            </div>
+            <div className="barTrack">
+              <div className="barFill" style={{ width: `${width}%` }} />
+            </div>
+          </div>
+        )
+      })}
+
+      <style jsx>{`
+        .chartList {
+          display: grid;
+          gap: 12px;
+        }
+
+        .chartRow {
+          display: grid;
+          gap: 8px;
+        }
+
+        .chartMeta {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          font-size: 13px;
+        }
+
+        .barTrack {
+          height: 10px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.06);
+          overflow: hidden;
+          border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .barFill {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(0, 194, 255, 0.85), rgba(92, 231, 255, 1));
+          box-shadow: 0 0 18px rgba(0, 194, 255, 0.25);
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function MiniLineChart({ data = [] }) {
+  const items = Array.isArray(data) ? data : []
+
+  if (!items.length) {
+    return <p className="muted">No download data yet.</p>
+  }
+
+  const width = 100
+  const height = 34
+  const max = Math.max(...items.map((x) => Number(x?.value || 0)), 0)
+
+  const points = items
+    .map((item, i) => {
+      const x = items.length === 1 ? width / 2 : (i / (items.length - 1)) * width
+      const y =
+        max > 0 ? height - (Number(item?.value || 0) / max) * (height - 4) - 2 : height - 2
+      return `${x},${y}`
+    })
+    .join(' ')
+
+  return (
+    <div className="lineChartWrap">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="lineChart">
+        <polyline fill="none" stroke="rgba(0,194,255,0.95)" strokeWidth="2.2" points={points} />
+      </svg>
+
+      <div className="chartList">
+        {items.map((item) => (
+          <div className="chartRow" key={item.date}>
+            <div className="chartMeta">
+              <span>{formatShortDate(item.date)}</span>
+              <strong>{item.value}</strong>
+            </div>
+            <div className="barTrack">
+              <div
+                className="barFill"
+                style={{
+                  width: `${Math.max(
+                    6,
+                    (Number(item?.value || 0) /
+                      Math.max(...items.map((x) => Number(x?.value || 0)), 1)) *
+                      100
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <style jsx>{`
+        .lineChartWrap {
+          display: grid;
+          gap: 14px;
+        }
+
+        .lineChart {
+          width: 100%;
+          height: 80px;
+          opacity: 0.95;
+          display: block;
+        }
+
+        .chartList {
+          display: grid;
+          gap: 12px;
+        }
+
+        .chartRow {
+          display: grid;
+          gap: 8px;
+        }
+
+        .chartMeta {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          font-size: 13px;
+        }
+
+        .barTrack {
+          height: 10px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.06);
+          overflow: hidden;
+          border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .barFill {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(0, 194, 255, 0.65), rgba(92, 231, 255, 0.95));
+        }
+      `}</style>
+    </div>
+  )
 }
 
 export default function AdminDownloads() {
   const [stats, setStats] = React.useState(null)
   const [error, setError] = React.useState('')
+  const [activeCurrency, setActiveCurrency] = React.useState('')
 
   React.useEffect(() => {
     let alive = true
@@ -22,18 +216,28 @@ export default function AdminDownloads() {
           throw new Error(data?.error || 'Failed to load analytics')
         }
 
-        if (alive) setStats(data)
+        if (!alive) return
+
+        setStats(data)
+
+        const firstCurrency = Array.isArray(data?.revenueByCurrency) && data.revenueByCurrency.length
+          ? data.revenueByCurrency[0].currency
+          : ''
+
+        setActiveCurrency(firstCurrency)
       } catch (e) {
         if (alive) setError(e?.message || 'Failed to load analytics')
       }
     }
 
     load()
-
     return () => {
       alive = false
     }
   }, [])
+
+  const revenueCards = stats?.revenueByCurrency || []
+  const revenueSeries = stats?.revenuePerDayByCurrency?.[activeCurrency] || []
 
   return (
     <>
@@ -51,7 +255,7 @@ export default function AdminDownloads() {
             <p className="eyebrow">Admin dashboard</p>
             <h1 className="title">Store Analytics</h1>
             <p className="sub">
-              Revenue, orders, downloads, and top-performing assets in one place.
+              Revenue split by currency, downloads, and top-performing assets in one place.
             </p>
           </div>
 
@@ -65,11 +269,22 @@ export default function AdminDownloads() {
             </div>
           ) : (
             <>
-              <section className="statsGrid">
-                <div className="statCard">
-                  <span className="statLabel">Revenue</span>
-                  <strong className="statValue">{formatMoney(stats.totalRevenue)}</strong>
-                </div>
+              <section className="statsGrid revenueGrid">
+                {revenueCards.map((item) => (
+                  <button
+                    key={item.currency}
+                    type="button"
+                    className={`statCard buttonCard ${
+                      activeCurrency === item.currency ? 'isActive' : ''
+                    }`}
+                    onClick={() => setActiveCurrency(item.currency)}
+                  >
+                    <span className="statLabel">Revenue · {item.currency}</span>
+                    <strong className="statValue">
+                      {formatMoney(item.total, item.currency)}
+                    </strong>
+                  </button>
+                ))}
 
                 <div className="statCard">
                   <span className="statLabel">Paid Orders</span>
@@ -156,49 +371,19 @@ export default function AdminDownloads() {
                 <div className="card listCard">
                   <div className="cardHead">
                     <h2>Revenue Per Day</h2>
-                    <span className="pill">Snapshot</span>
+                    <span className="pill">{activeCurrency || 'Currency'}</span>
                   </div>
 
-                  <div className="listWrap">
-                    {(stats.revenuePerDay || []).length ? (
-                      stats.revenuePerDay
-                        .slice()
-                        .reverse()
-                        .slice(0, 10)
-                        .map((item) => (
-                          <div className="listRow" key={item.date}>
-                            <span>{item.date}</span>
-                            <strong>{formatMoney(item.value)}</strong>
-                          </div>
-                        ))
-                    ) : (
-                      <p className="muted">No revenue data yet.</p>
-                    )}
-                  </div>
+                  <MiniBarChart data={revenueSeries.slice().reverse().slice(0, 10)} currency={activeCurrency} />
                 </div>
 
                 <div className="card listCard">
                   <div className="cardHead">
                     <h2>Downloads Per Day</h2>
-                    <span className="pill">Snapshot</span>
+                    <span className="pill">Trend</span>
                   </div>
 
-                  <div className="listWrap">
-                    {(stats.downloadsPerDay || []).length ? (
-                      stats.downloadsPerDay
-                        .slice()
-                        .reverse()
-                        .slice(0, 10)
-                        .map((item) => (
-                          <div className="listRow" key={item.date}>
-                            <span>{item.date}</span>
-                            <strong>{item.value}</strong>
-                          </div>
-                        ))
-                    ) : (
-                      <p className="muted">No download data yet.</p>
-                    )}
-                  </div>
+                  <MiniLineChart data={(stats.downloadsPerDay || []).slice().reverse().slice(0, 10)} />
                 </div>
               </section>
             </>
@@ -281,9 +466,13 @@ export default function AdminDownloads() {
 
         .statsGrid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 18px;
           margin-bottom: 22px;
+        }
+
+        .revenueGrid {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
         }
 
         .tablesGrid {
@@ -312,6 +501,25 @@ export default function AdminDownloads() {
           padding: 22px 24px;
         }
 
+        .buttonCard {
+          appearance: none;
+          color: inherit;
+          text-align: left;
+          cursor: pointer;
+          transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+        }
+
+        .buttonCard:hover {
+          transform: translateY(-1px);
+          border-color: rgba(0, 194, 255, 0.2);
+        }
+
+        .buttonCard.isActive {
+          border-color: rgba(0, 194, 255, 0.34);
+          background: rgba(0, 194, 255, 0.08);
+          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(0, 194, 255, 0.08);
+        }
+
         .tableCard,
         .listCard,
         .errorCard {
@@ -329,8 +537,8 @@ export default function AdminDownloads() {
         .statValue {
           display: block;
           margin-top: 10px;
-          font-size: clamp(28px, 3vw, 40px);
-          line-height: 1.05;
+          font-size: clamp(24px, 2.5vw, 36px);
+          line-height: 1.08;
           font-weight: 600;
         }
 
@@ -404,22 +612,6 @@ export default function AdminDownloads() {
           opacity: 0.96;
         }
 
-        .listWrap {
-          display: grid;
-          gap: 10px;
-        }
-
-        .listRow {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 14px 16px;
-          border-radius: 14px;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
         .emptyCell {
           text-align: center;
           opacity: 0.68;
@@ -430,8 +622,14 @@ export default function AdminDownloads() {
           opacity: 0.72;
         }
 
+        @media (max-width: 1100px) {
+          .revenueGrid,
+          .statsGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
         @media (max-width: 980px) {
-          .statsGrid,
           .tablesGrid,
           .bottomGrid {
             grid-template-columns: 1fr;
@@ -441,6 +639,11 @@ export default function AdminDownloads() {
         @media (max-width: 640px) {
           .wrap {
             padding: 28px 14px 50px;
+          }
+
+          .revenueGrid,
+          .statsGrid {
+            grid-template-columns: 1fr;
           }
 
           .statCard,
