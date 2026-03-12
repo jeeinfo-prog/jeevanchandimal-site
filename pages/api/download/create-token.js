@@ -162,15 +162,26 @@ async function findSingleOrder(ref) {
   const selectCols =
     'id,status,photo_id,format,email,license,download_limit,delivery_object_key,code,order_id'
 
-  if (isUuid(value)) {
+  try {
     const byId = await supabaseAdmin
       .from('orders')
       .select(selectCols)
       .eq('id', value)
       .maybeSingle()
 
-    if (byId.error) throw new Error(byId.error.message)
-    if (byId.data) return byId.data
+    if (byId.error) {
+      const msg = String(byId.error.message || '').toLowerCase()
+      if (!msg.includes('invalid input syntax') && !msg.includes('uuid')) {
+        throw new Error(byId.error.message)
+      }
+    } else if (byId.data) {
+      return byId.data
+    }
+  } catch (err) {
+    const msg = String(err?.message || '').toLowerCase()
+    if (!msg.includes('invalid input syntax') && !msg.includes('uuid')) {
+      throw err
+    }
   }
 
   const byCode = await supabaseAdmin
