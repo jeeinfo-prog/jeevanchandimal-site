@@ -3,24 +3,27 @@ import Head from 'next/head'
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar
+  ResponsiveContainer
 } from 'recharts'
 
 export default function AdminDownloads() {
+
   const [stats, setStats] = React.useState(null)
 
   React.useEffect(() => {
     fetch('/api/admin/download-stats')
-      .then((r) => r.json())
-      .then((d) => setStats(d))
+      .then(r => r.json())
+      .then(setStats)
   }, [])
 
-  if (!stats) return <p style={{ padding: 40 }}>Loading analytics...</p>
+  if (!stats) {
+    return <div style={{padding:40}}>Loading analytics...</div>
+  }
 
   return (
     <>
@@ -30,42 +33,51 @@ export default function AdminDownloads() {
 
       <main className="wrap">
 
-        <h1 className="title">Download Analytics</h1>
+        <h1 className="title">Store Analytics</h1>
 
-        <div className="grid">
+        <div className="stats">
 
-          <div className="card stat">
-            <div className="label">Total Downloads</div>
+          <div className="card">
+            <div className="label">Revenue</div>
+            <div className="value">${stats.totalRevenue}</div>
+          </div>
+
+          <div className="card">
+            <div className="label">Orders</div>
+            <div className="value">{stats.totalOrders}</div>
+          </div>
+
+          <div className="card">
+            <div className="label">Downloads</div>
             <div className="value">{stats.totalDownloads}</div>
           </div>
 
-          <div className="card chart">
-            <h3>Downloads per Day</h3>
+        </div>
+
+        <div className="grid">
+
+          <div className="chart">
+            <h3>Revenue Trend</h3>
 
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={stats.downloadsPerDay}>
-                <XAxis dataKey="date" stroke="#aaa"/>
-                <YAxis stroke="#aaa"/>
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#00c2ff"
-                  strokeWidth={2}
-                />
+              <LineChart data={stats.revenuePerDay}>
+                <XAxis dataKey="date"/>
+                <YAxis/>
+                <Tooltip/>
+                <Line dataKey="value" stroke="#00c2ff"/>
               </LineChart>
             </ResponsiveContainer>
 
           </div>
 
-          <div className="card chart">
+          <div className="chart">
             <h3>Top Orders</h3>
 
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={stats.topOrders}>
-                <XAxis dataKey="orderId" hide />
-                <YAxis stroke="#aaa"/>
-                <Tooltip />
+                <XAxis dataKey="orderId" hide/>
+                <YAxis/>
+                <Tooltip/>
                 <Bar dataKey="count" fill="#00c2ff"/>
               </BarChart>
             </ResponsiveContainer>
@@ -77,7 +89,8 @@ export default function AdminDownloads() {
       </main>
 
       <style jsx>{`
-        .wrap {
+
+        .wrap{
           min-height:100vh;
           padding:60px;
           background:#0c0c0c;
@@ -88,10 +101,11 @@ export default function AdminDownloads() {
           margin-bottom:40px;
         }
 
-        .grid{
+        .stats{
           display:grid;
-          grid-template-columns:1fr 1fr;
-          gap:30px;
+          grid-template-columns:repeat(3,1fr);
+          gap:20px;
+          margin-bottom:40px;
         }
 
         .card{
@@ -99,10 +113,6 @@ export default function AdminDownloads() {
           border:1px solid rgba(255,255,255,0.08);
           border-radius:16px;
           padding:30px;
-        }
-
-        .stat{
-          grid-column: span 2;
           text-align:center;
         }
 
@@ -111,13 +121,24 @@ export default function AdminDownloads() {
         }
 
         .value{
-          font-size:48px;
+          font-size:36px;
+          margin-top:6px;
           font-weight:600;
         }
 
-        .chart h3{
-          margin-bottom:20px;
+        .grid{
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:30px;
         }
+
+        .chart{
+          background:rgba(255,255,255,0.03);
+          border:1px solid rgba(255,255,255,0.08);
+          border-radius:16px;
+          padding:30px;
+        }
+
       `}</style>
     </>
   )
