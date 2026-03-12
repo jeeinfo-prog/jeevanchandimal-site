@@ -13,9 +13,6 @@ import JeevanChandimalNewFooter from '../../components/layout/jeevan-chandimal-n
  * /location/kandy
  * /location/ella
  *
- * This page ranks for:
- * "Batticaloa photography", "Kandy Sri Lanka photos", "Ella landscape photography", etc.
- *
  * Data source: /api/store/photos (published only)
  */
 
@@ -38,6 +35,43 @@ function cleanUrl(u) {
   return v || ''
 }
 
+/**
+ * Hide first word if it is clearly a collection/category prefix
+ * Examples:
+ * "History Rangiri Dambulla Cave Temple Sri Lanka"
+ *   -> "Rangiri Dambulla Cave Temple Sri Lanka"
+ *
+ * Also checks tags, so if first word matches a tag like history/travel/nature/etc,
+ * it removes it from display only.
+ */
+function cleanDisplayTitle(title, tags = []) {
+  const raw = String(title || '').trim()
+  if (!raw) return 'Untitled'
+
+  const words = raw.split(/\s+/).filter(Boolean)
+  if (words.length <= 1) return raw
+
+  const firstWord = String(words[0] || '').toLowerCase()
+  const normalizedTags = safeJsonArray(tags).map((t) => String(t || '').toLowerCase())
+
+  const collectionWords = new Set([
+    'history',
+    'travel',
+    'nature',
+    'wildlife',
+    'landscape',
+    'culture',
+    'lifestyle',
+    'fineart',
+  ])
+
+  if (collectionWords.has(firstWord) || normalizedTags.includes(firstWord)) {
+    return words.slice(1).join(' ').trim() || raw
+  }
+
+  return raw
+}
+
 export default function LocationPage() {
   const router = useRouter()
   const slug = typeof router.query.slug === 'string' ? router.query.slug : ''
@@ -48,11 +82,8 @@ export default function LocationPage() {
   const [photos, setPhotos] = React.useState([])
 
   const prettyLocation = toTitleCase(locationTag)
-  const canonicalUrl = `https://www.jeevanchandimal.com/location/${encodeURIComponent(
-    locationTag
-  )}`
+  const canonicalUrl = `https://www.jeevanchandimal.com/location/${encodeURIComponent(locationTag)}`
 
-  // SEO text (simple + keyword rich but natural)
   const seoTitle = prettyLocation
     ? `${prettyLocation} Photography | Jeevan Chandimal`
     : `Location Photography | Jeevan Chandimal`
@@ -72,7 +103,6 @@ export default function LocationPage() {
         setError('')
         setPhotos([])
 
-        // Use your existing store API (already published only)
         const r = await fetch('/api/store/photos', {
           headers: { 'Cache-Control': 'no-store' },
         })
@@ -89,22 +119,26 @@ export default function LocationPage() {
 
         const list = safeJsonArray(j.photos)
 
-        // Filter by tag == locationTag
         const filtered = list
           .filter((p) => {
-            const tags = safeJsonArray(p?.tags).map((t) =>
-              String(t || '').toLowerCase()
-            )
+            const tags = safeJsonArray(p?.tags).map((t) => String(t || '').toLowerCase())
             return tags.includes(locationTag)
           })
-          .map((p) => ({
-            id: p.id,
-            title: p.title || 'Untitled',
-            description: p.description || '',
-            tags: safeJsonArray(p.tags),
-            thumbUrl: cleanUrl(p.thumb_url),
-            previewUrl: cleanUrl(p.preview_url),
-          }))
+          .map((p) => {
+            const tags = safeJsonArray(p?.tags)
+            const rawTitle = p.title || 'Untitled'
+            const title = cleanDisplayTitle(rawTitle, tags)
+
+            return {
+              id: p.id,
+              title,
+              rawTitle,
+              description: p.description || '',
+              tags,
+              thumbUrl: cleanUrl(p.thumb_url),
+              previewUrl: cleanUrl(p.preview_url),
+            }
+          })
 
         setPhotos(filtered)
         setLoading(false)
@@ -122,11 +156,9 @@ export default function LocationPage() {
     }
   }, [router.isReady, locationTag])
 
-  // For internal linking to collections if you also use /collections/[tag]
   const collectionsUrl = `/collections/${encodeURIComponent(locationTag)}`
   const storeTagUrl = `/store?tag=${encodeURIComponent(locationTag)}`
 
-  // JSON-LD: CollectionPage with ItemList
   const jsonLd =
     locationTag && photos.length > 0
       ? {
@@ -159,13 +191,11 @@ export default function LocationPage() {
         <meta name="description" content={seoDescription} />
         <link rel="canonical" href={canonicalUrl} />
 
-        {/* Open Graph */}
         <meta property="og:title" content={seoTitle} />
         <meta property="og:description" content={seoDescription} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={canonicalUrl} />
 
-        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={seoTitle} />
         <meta name="twitter:description" content={seoDescription} />
@@ -202,8 +232,7 @@ export default function LocationPage() {
 
           <div className="hintRow">
             <span className="hint">
-              Tip: Use keywords like “{prettyLocation} sunset”, “{prettyLocation}{' '}
-              nature”, “{prettyLocation} Sri Lanka”.
+              Tip: Use keywords like “{prettyLocation} sunset”, “{prettyLocation} nature”, “{prettyLocation} Sri Lanka”.
             </span>
           </div>
         </header>
@@ -216,9 +245,7 @@ export default function LocationPage() {
             {photos.length === 0 ? (
               <div className="empty">
                 <h2>No photos found yet for “{prettyLocation}”.</h2>
-                <p>
-                  Try the store page or explore other locations and collections.
-                </p>
+                <p>Try the store page or explore other locations and collections.</p>
                 <div className="emptyActions">
                   <Link href="/store">
                     <a className="btn">Browse store</a>
@@ -232,12 +259,9 @@ export default function LocationPage() {
               <>
                 <div className="countRow">
                   <div className="count">
-                    {photos.length} photo{photos.length === 1 ? '' : 's'} in{' '}
-                    {prettyLocation}
+                    {photos.length} photo{photos.length === 1 ? '' : 's'} in {prettyLocation}
                   </div>
-                  <div className="note">
-                    All images are available for licensing.
-                  </div>
+                  <div className="note">All images are available for licensing.</div>
                 </div>
 
                 <section className="grid">
@@ -272,13 +296,11 @@ export default function LocationPage() {
                   ))}
                 </section>
 
-                {/* Internal linking block (SEO booster) */}
                 <section className="seoBlock">
                   <h2>More {prettyLocation} photos</h2>
                   <p>
-                    Browse more work from {prettyLocation} and discover similar
-                    photography across Sri Lanka. These pages help Google connect
-                    your images to real locations and keywords.
+                    Browse more work from {prettyLocation} and discover similar photography across Sri Lanka. These
+                    pages help Google connect your images to real locations and keywords.
                   </p>
 
                   <div className="seoLinks">
@@ -425,8 +447,7 @@ export default function LocationPage() {
           border-radius: 16px;
           overflow: hidden;
           background: rgba(255, 255, 255, 0.02);
-          transition: transform 0.18s ease, border-color 0.18s ease,
-            box-shadow 0.18s ease;
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
         }
 
         .card:hover {
