@@ -67,12 +67,10 @@ function MiniBarChart({ data = [], currency }) {
           display: grid;
           gap: 12px;
         }
-
         .chartRow {
           display: grid;
           gap: 8px;
         }
-
         .chartMeta {
           display: flex;
           align-items: center;
@@ -80,7 +78,6 @@ function MiniBarChart({ data = [], currency }) {
           gap: 12px;
           font-size: 13px;
         }
-
         .barTrack {
           height: 10px;
           border-radius: 999px;
@@ -88,7 +85,6 @@ function MiniBarChart({ data = [], currency }) {
           overflow: hidden;
           border: 1px solid rgba(255, 255, 255, 0.04);
         }
-
         .barFill {
           height: 100%;
           border-radius: 999px;
@@ -120,6 +116,8 @@ function MiniLineChart({ data = [] }) {
     })
     .join(' ')
 
+  const localMax = Math.max(...items.map((x) => Number(x?.value || 0)), 1)
+
   return (
     <div className="lineChartWrap">
       <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="lineChart">
@@ -137,12 +135,7 @@ function MiniLineChart({ data = [] }) {
               <div
                 className="barFill"
                 style={{
-                  width: `${Math.max(
-                    6,
-                    (Number(item?.value || 0) /
-                      Math.max(...items.map((x) => Number(x?.value || 0)), 1)) *
-                      100
-                  )}%`,
+                  width: `${Math.max(6, (Number(item?.value || 0) / localMax) * 100)}%`,
                 }}
               />
             </div>
@@ -155,24 +148,20 @@ function MiniLineChart({ data = [] }) {
           display: grid;
           gap: 14px;
         }
-
         .lineChart {
           width: 100%;
           height: 80px;
           opacity: 0.95;
           display: block;
         }
-
         .chartList {
           display: grid;
           gap: 12px;
         }
-
         .chartRow {
           display: grid;
           gap: 8px;
         }
-
         .chartMeta {
           display: flex;
           align-items: center;
@@ -180,7 +169,6 @@ function MiniLineChart({ data = [] }) {
           gap: 12px;
           font-size: 13px;
         }
-
         .barTrack {
           height: 10px;
           border-radius: 999px;
@@ -188,7 +176,6 @@ function MiniLineChart({ data = [] }) {
           overflow: hidden;
           border: 1px solid rgba(255, 255, 255, 0.04);
         }
-
         .barFill {
           height: 100%;
           border-radius: 999px;
@@ -209,7 +196,9 @@ export default function AdminDownloads() {
 
     async function load() {
       try {
-        const r = await fetch('/api/admin/download-stats')
+        const r = await fetch('/api/admin/download-stats', {
+          credentials: 'same-origin',
+        })
         const data = await r.json().catch(() => ({}))
 
         if (!r.ok || data?.ok === false) {
@@ -220,9 +209,10 @@ export default function AdminDownloads() {
 
         setStats(data)
 
-        const firstCurrency = Array.isArray(data?.revenueByCurrency) && data.revenueByCurrency.length
-          ? data.revenueByCurrency[0].currency
-          : ''
+        const firstCurrency =
+          Array.isArray(data?.revenueByCurrency) && data.revenueByCurrency.length
+            ? data.revenueByCurrency[0].currency
+            : ''
 
         setActiveCurrency(firstCurrency)
       } catch (e) {
@@ -374,7 +364,10 @@ export default function AdminDownloads() {
                     <span className="pill">{activeCurrency || 'Currency'}</span>
                   </div>
 
-                  <MiniBarChart data={revenueSeries.slice().reverse().slice(0, 10)} currency={activeCurrency} />
+                  <MiniBarChart
+                    data={revenueSeries.slice().reverse().slice(0, 10)}
+                    currency={activeCurrency}
+                  />
                 </div>
 
                 <div className="card listCard">
@@ -383,7 +376,9 @@ export default function AdminDownloads() {
                     <span className="pill">Trend</span>
                   </div>
 
-                  <MiniLineChart data={(stats.downloadsPerDay || []).slice().reverse().slice(0, 10)} />
+                  <MiniLineChart
+                    data={(stats.downloadsPerDay || []).slice().reverse().slice(0, 10)}
+                  />
                 </div>
               </section>
             </>

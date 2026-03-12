@@ -61,6 +61,7 @@ export default async function handler(req, res) {
       if (!revenuePerDayByCurrencyMap[currency]) {
         revenuePerDayByCurrencyMap[currency] = {}
       }
+
       if (day) {
         revenuePerDayByCurrencyMap[currency][day] =
           (revenuePerDayByCurrencyMap[currency][day] || 0) + amount
