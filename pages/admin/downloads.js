@@ -73,8 +73,8 @@ export default function AdminDownloads() {
   }, [])
 
   function logout() {
-    window.location.href = '/admin/logout'
-  }
+  window.location.href = '/api/admin/logout'
+}
 
   const revenueCards = stats?.revenueByCurrency || []
   const revenueSeries = stats?.revenuePerDayByCurrency?.[activeCurrency] || []
