@@ -21,6 +21,40 @@ function cleanLower(v) {
   return String(v || '').trim().toLowerCase()
 }
 
+function isUuid(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(v || '').trim()
+  )
+}
+
+function isExpired(v) {
+  if (!v) return false
+  const ms = new Date(v).getTime()
+  if (!Number.isFinite(ms)) return false
+  return ms < Date.now()
+}
+
+function isPastOrNow(v) {
+  if (!v) return false
+  const ms = new Date(v).getTime()
+  if (!Number.isFinite(ms)) return false
+  return ms <= Date.now()
+}
+
+function addMonths(date, months) {
+  const d = new Date(date)
+  const day = d.getUTCDate()
+  d.setUTCMonth(d.getUTCMonth() + months)
+  if (d.getUTCDate() < day) d.setUTCDate(0)
+  return d
+}
+
+function addYears(date, years) {
+  const d = new Date(date)
+  d.setUTCFullYear(d.getUTCFullYear() + years)
+  return d
+}
+
 function cinematicKickMessage() {
   return {
     title: 'Session closed',
@@ -61,22 +95,25 @@ function verifySessionFromReq(req) {
 
 function resolveTierTermFromMembershipRow(memberRow) {
   const planRaw = cleanLower(memberRow?.plan)
+  const billingCycleRaw = cleanLower(memberRow?.billing_cycle)
 
-  // ✅ current live mapping
+  const termFromBilling =
+    ['monthly', 'yearly', 'lifetime'].includes(billingCycleRaw) ? billingCycleRaw : null
+
+  if (['basic', 'pro', 'elite'].includes(planRaw)) {
+    return { tier: planRaw, term: termFromBilling || 'monthly' }
+  }
+
   if (planRaw === 'monthly') return { tier: 'pro', term: 'monthly' }
-
-  // legacy / alternate mappings
   if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
   if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
 
-  if (['basic', 'pro', 'elite'].includes(planRaw)) {
-    return { tier: planRaw, term: 'monthly' }
-  }
-
-  return { tier: 'pro', term: 'monthly' }
+  return { tier: 'pro', term: termFromBilling || 'monthly' }
 }
 
 async function ensureActiveSession(userId, deviceId) {
+  if (!isUuid(userId) || !deviceId) return false
+
   const { data, error } = await supabaseAdmin
     .from('member_sessions')
     .select('id')
@@ -90,6 +127,8 @@ async function ensureActiveSession(userId, deviceId) {
 }
 
 async function countActiveSessions(userId) {
+  if (!isUuid(userId)) return 0
+
   const { count, error } = await supabaseAdmin
     .from('member_sessions')
     .select('id', { count: 'exact', head: true })
@@ -98,6 +137,48 @@ async function countActiveSessions(userId) {
 
   if (error) throw new Error(error.message)
   return Number(count || 0)
+}
+
+async function refreshMembershipCycleIfNeeded(member) {
+  if (!member?.id) return member
+
+  const currentEnd = member.billing_cycle_end || null
+  if (!currentEnd || !isPastOrNow(currentEnd)) {
+    return member
+  }
+
+  const billingCycle = cleanLower(member.billing_cycle)
+  const nextStart = new Date()
+  let nextEnd = null
+
+  if (billingCycle === 'monthly') {
+    nextEnd = addMonths(nextStart, 1)
+  } else if (billingCycle === 'yearly') {
+    nextEnd = addYears(nextStart, 1)
+  } else if (billingCycle === 'lifetime') {
+    nextEnd = addYears(nextStart, 100)
+  } else {
+    nextEnd = addMonths(nextStart, 1)
+  }
+
+  const patch = {
+    monthly_download_used: 0,
+    billing_cycle_start: nextStart.toISOString(),
+    billing_cycle_end: nextEnd.toISOString(),
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('memberships')
+    .update(patch)
+    .eq('id', member.id)
+    .select(
+      'id,email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle,billing_cycle_start,billing_cycle_end'
+    )
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  return data || { ...member, ...patch }
 }
 
 export default async function handler(req, res) {
@@ -123,7 +204,7 @@ export default async function handler(req, res) {
     const deviceId = clean(sess.payload?.deviceId)
     const userId = clean(sess.payload?.userId)
 
-    if (!tokenEmail || tokenEmail !== email || !deviceId || !userId) {
+    if (!tokenEmail || tokenEmail !== email || !deviceId || !userId || !isUuid(userId)) {
       return res.status(401).json({
         ok: false,
         code: 'SESSION_MISMATCH',
@@ -145,7 +226,7 @@ export default async function handler(req, res) {
     const { data: member, error } = await supabaseAdmin
       .from('memberships')
       .select(
-        'email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle_end'
+        'id,email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle,billing_cycle_start,billing_cycle_end'
       )
       .eq('email', email)
       .eq('status', 'active')
@@ -161,15 +242,25 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, member: false })
     }
 
-    const endsAt = member.billing_cycle_end || member.end_date || null
-    if (endsAt && new Date(endsAt) < new Date()) {
+    if (member.user_id && isUuid(member.user_id) && String(member.user_id).trim() !== userId) {
+      return res.status(401).json({
+        ok: false,
+        code: 'SESSION_MISMATCH',
+        error: 'Session mismatch. Please sign in again.',
+        cinematic: cinematicKickMessage(),
+      })
+    }
+
+    if (isExpired(member.end_date)) {
       return res.status(200).json({ ok: true, member: false })
     }
 
-    const { tier, term } = resolveTierTermFromMembershipRow(member)
+    const activeMember = await refreshMembershipCycleIfNeeded(member)
 
-    const used = Number(member.monthly_download_used ?? 0)
-    const limit = Number(member.monthly_download_limit ?? 0)
+    const { tier, term } = resolveTierTermFromMembershipRow(activeMember)
+
+    const used = Number(activeMember.monthly_download_used ?? 0)
+    const limit = Number(activeMember.monthly_download_limit ?? 0)
     const remaining = limit === 0 ? 0 : Math.max(0, limit - used)
     const activeDevices = await countActiveSessions(userId)
 
@@ -181,8 +272,8 @@ export default async function handler(req, res) {
       used,
       limit,
       remaining,
-      ends_at: member.end_date || null,
-      reset_at: member.billing_cycle_end || null,
+      ends_at: activeMember.end_date || null,
+      reset_at: activeMember.billing_cycle_end || null,
       devices: { active: activeDevices, max: MAX_DEVICES },
     })
   } catch (e) {

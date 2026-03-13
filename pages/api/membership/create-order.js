@@ -26,10 +26,8 @@ function cleanLower(v, fallback) {
   return s || fallback
 }
 
-// Basic sanity for FX (prevents garbage / malicious values)
 function normalizeFxRate(v, fallback) {
   const n = Number(v)
-  // USD->LKR realistic guardrails (adjust if needed)
   if (!Number.isFinite(n) || n < 100 || n > 1000) return fallback
   return n
 }
@@ -40,7 +38,7 @@ function usdToLkrNumber(usd, fxRate) {
 }
 
 function money2(n) {
-  return Number(n || 0).toFixed(2)
+  return Number(Number(n || 0).toFixed(2)).toFixed(2)
 }
 
 function cleanBaseUrl(v) {
@@ -55,8 +53,8 @@ function getBaseUrl(req) {
     cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL)
   if (webhook) return webhook
 
-  const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
-  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
+  const proto = String(req.headers['x-forwarded-proto'] || 'https')
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
   if (host) return `${proto}://${host}`
 
   return cleanBaseUrl(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL)
@@ -77,7 +75,6 @@ async function fetchLiveUsdLkr(fallback) {
 }
 
 function getPayhereMode() {
-  // Set PAYHERE_MODE="sandbox" for testing, otherwise live.
   const m = String(process.env.PAYHERE_MODE || '').trim().toLowerCase()
   return m === 'sandbox' ? 'sandbox' : 'live'
 }
@@ -96,55 +93,55 @@ export default async function handler(req, res) {
   }
 
   try {
-    /**
-     * ✅ Accept both old + new request shapes
-     * old: { email, plan, currency } where plan was monthly/yearly/lifetime (pro assumed)
-     * new: { email, tier, term, currency_display, fx_rate }
-     */
     const body = req.body || {}
 
     const email = String(body.email || '').trim().toLowerCase()
-    if (!email) return res.status(400).json({ ok: false, error: 'Missing email' })
-    if (!isValidEmail(email)) return res.status(400).json({ ok: false, error: 'Invalid email' })
+    if (!email) {
+      return res.status(400).json({ ok: false, error: 'Missing email' })
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ ok: false, error: 'Invalid email' })
+    }
 
-    // tier/term normalization
     let tier = cleanLower(body.tier, '')
     let term = cleanLower(body.term, '')
 
-    // Backward compatibility:
-    // If UI sends { plan: 'monthly' }, treat it as term and default tier to 'pro'
     if (!term && body.plan) term = cleanLower(body.plan, '')
     if (!tier) tier = 'pro'
     if (!term) term = 'monthly'
 
     const validTiers = ['basic', 'pro', 'elite']
     const validTerms = ['monthly', 'yearly', 'lifetime']
-    if (!validTiers.includes(tier)) return res.status(400).json({ ok: false, error: 'Invalid tier' })
-    if (!validTerms.includes(term)) return res.status(400).json({ ok: false, error: 'Invalid term' })
 
-    // Display currency only (UI toggle)
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({ ok: false, error: 'Invalid tier' })
+    }
+
+    if (!validTerms.includes(term)) {
+      return res.status(400).json({ ok: false, error: 'Invalid term' })
+    }
+
     const currencyDisplay = cleanUpper(body.currency_display || body.currency, 'USD')
     if (!['LKR', 'USD'].includes(currencyDisplay)) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
-    // USD base amount
     const usdAmount = USD_BASE_PRICES?.[tier]?.[term]
-    if (!usdAmount) return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+    if (!usdAmount) {
+      return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+    }
 
-    // FX: client locked rate OR env fallback OR live fetch
     const envFallback = normalizeFxRate(process.env.MEMBERSHIP_USD_LKR_RATE, 300)
     const clientFx = normalizeFxRate(body.fx_rate, null)
     const fxRate = clientFx || (await fetchLiveUsdLkr(envFallback))
 
-    // ✅ Always charge memberships in LKR
     const payCurrency = 'LKR'
     const amountNum = usdToLkrNumber(usdAmount, fxRate)
-    const amount = money2(amountNum) // ✅ string "1234.00"
+    const amount = money2(amountNum)
 
-    // PayHere creds (server env only)
     const merchantId = String(process.env.PAYHERE_MERCHANT_ID || '').trim()
     const merchantSecret = String(process.env.PAYHERE_MERCHANT_SECRET || '').trim()
+
     if (!merchantId || !merchantSecret) {
       return res.status(500).json({
         ok: false,
@@ -160,16 +157,12 @@ export default async function handler(req, res) {
 
     const orderId = crypto.randomUUID()
 
-    /**
-     * ✅ Store membership details using existing orders columns:
-     * - license = tier (basic/pro/elite)
-     * - format  = term (monthly/yearly/lifetime)
-     */
     const payload = {
       id: orderId,
       email,
       order_kind: 'membership',
 
+      // membership details
       license: tier,
       format: term,
 
@@ -177,12 +170,15 @@ export default async function handler(req, res) {
       amount,
       status: 'PENDING',
 
-      // legacy placeholders
-      photo_id: 'membership',
-      delivery_object_key: 'membership',
+      // ✅ IMPORTANT: never put non-UUID text into UUID-style fields
+      photo_id: null,
+
+      // membership orders do not need delivery file keys
+      delivery_object_key: null,
     }
 
     const { error } = await supabaseAdmin.from('orders').insert(payload)
+
     if (error) {
       console.error('membership order insert error:', error)
       return res.status(500).json({ ok: false, error: error.message })
@@ -198,10 +194,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-
-      // ✅ PayHere essentials (frontend MUST use these)
       checkoutUrl,
-      merchantId, // safe to expose
+      merchantId,
       orderId,
       amount,
       currency: payCurrency,

@@ -12,7 +12,7 @@ import {
 } from '../../../lib/payhere'
 
 export const config = {
-  api: { bodyParser: false }, // PayHere posts x-www-form-urlencoded
+  api: { bodyParser: false },
 }
 
 /* ---------------- helpers ---------------- */
@@ -20,6 +20,12 @@ export const config = {
 function round2(n) {
   const x = Number(n || 0)
   return Math.round(x * 100) / 100
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || '').trim()
+  )
 }
 
 function readRawBody(req) {
@@ -117,7 +123,6 @@ function addYears(date, years) {
   return d
 }
 
-// ✅ monthly caps
 const MEMBER_LIMITS = {
   basic: 20,
   pro: 75,
@@ -128,7 +133,7 @@ const MEMBER_LIMITS = {
 
 function limitForLicense(license) {
   const x = normalizeLicense(license)
-  if (x === 'commercial') return 0 // unlimited
+  if (x === 'commercial') return 0
   if (x === 'editorial') return 5
   return 3
 }
@@ -176,7 +181,7 @@ function fallbackObjectKeyFromPhotoId(photoId, format) {
 
 async function resolveObjectKeyFromPhotos(photoId, format) {
   const pid = String(photoId || '').trim()
-  if (!pid) return null
+  if (!pid || !isUuid(pid)) return null
 
   const fmt = normalizeFormat(format)
 
@@ -199,7 +204,7 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
   const id = String(cartOrderDbId || '').trim()
   const code = String(cartCode || '').trim()
 
-  if (id) {
+  if (id && isUuid(id)) {
     const byId = await supabaseAdmin.from('orders').select('*').eq('id', id).maybeSingle()
     if (!byId.error && byId?.data) return byId.data
   }
@@ -216,8 +221,10 @@ async function findSingleOrderByRef(ref) {
   const v = String(ref || '').trim()
   if (!v) return null
 
-  const byId = await supabaseAdmin.from('orders').select('*').eq('id', v).maybeSingle()
-  if (!byId.error && byId?.data) return byId.data
+  if (isUuid(v)) {
+    const byId = await supabaseAdmin.from('orders').select('*').eq('id', v).maybeSingle()
+    if (!byId.error && byId?.data) return byId.data
+  }
 
   const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', v).maybeSingle()
   if (!byOrderId.error && byOrderId?.data) return byOrderId.data
@@ -228,9 +235,6 @@ async function findSingleOrderByRef(ref) {
   return null
 }
 
-/**
- * ✅ Idempotency helper: set timestamp only if currently NULL.
- */
 async function claimSendOnce(orderId, column) {
   const now = new Date().toISOString()
   const r = await supabaseAdmin
@@ -248,9 +252,6 @@ async function claimSendOnce(orderId, column) {
   return !!r.data
 }
 
-/**
- * ✅ Webhook idempotency helper: claim payhere_payment_id only once.
- */
 async function claimPaymentOnce(orderDbId, paymentId) {
   const pid = normalizePaymentId(paymentId)
   if (!pid) return false
@@ -313,7 +314,6 @@ function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency })
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
-  // PayHere expects 200 always
   if (req.method !== 'POST') return res.status(200).send('OK')
 
   try {
@@ -338,8 +338,6 @@ export default async function handler(req, res) {
     if (!order_id) return res.status(200).send('OK')
 
     const pid = normalizePaymentId(payment_id)
-
-    // ✅ Signature check (use correct secret for this merchant_id)
     const secretForThisMerchant = getPayhereSecretForMerchantId(merchant_id)
 
     const ok = payhereVerifyMd5Sig({
@@ -352,14 +350,12 @@ export default async function handler(req, res) {
       md5sig,
     })
 
-    // cart detection vars (used in multiple places)
     const cartCode = String(order_id || '').trim()
     const cartDbId = String(custom_2 || '').trim()
 
     if (!ok) {
       console.error('MD5 signature mismatch for order:', order_id)
 
-      // Try to find DB row early (helps kind detection + marking)
       let dbOrder = null
       try {
         if (
@@ -374,7 +370,6 @@ export default async function handler(req, res) {
 
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 
-      // ✅ INVALID_SIG: never store payhere_payment_id
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
@@ -406,7 +401,6 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
-    // ✅ merchant_id hard check (accept both default + split merchant ids)
     const knownIds = [
       String(PAYHERE.merchantId || '').trim(),
       String(PAYHERE.merchantIdLive || '').trim(),
@@ -423,7 +417,6 @@ export default async function handler(req, res) {
 
     const statusCodeNum = Number(status_code)
 
-    // Try to find DB row early (helps kind detection + amount validation)
     let dbOrder = null
     try {
       if (
@@ -436,9 +429,6 @@ export default async function handler(req, res) {
       }
     } catch {}
 
-    /* =========================================================
-       ✅ PAYMENT SUCCESS
-    ========================================================= */
     if (statusCodeNum === 2) {
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
       const isMembership = orderLooksLikeMembership(custom_1, dbOrder)
@@ -514,10 +504,6 @@ export default async function handler(req, res) {
         }
 
         const o = freshRes.data || order
-
-        // IMPORTANT:
-        // - orders.license stores membership tier (basic/pro/elite)
-        // - orders.format stores membership term (monthly/yearly/lifetime)
         const tier = normalizeMembershipTier(o.license)
         const term = normalizeMembershipTerm(o.format)
 
@@ -536,14 +522,11 @@ export default async function handler(req, res) {
             email,
             plan: tier,
             status: 'active',
-
             start_date: startDate,
             end_date: endDate,
-
             billing_cycle: term,
             billing_cycle_start: startDate,
             billing_cycle_end: endDate,
-
             monthly_download_limit: monthlyLimit,
             monthly_download_used: 0,
           }
@@ -705,7 +688,7 @@ export default async function handler(req, res) {
 
           for (const it of items) {
             const photoId = String(it?.photoId || it?.photo_id || '').trim()
-            if (!photoId) continue
+            if (!photoId || !isUuid(photoId)) continue
 
             const title = String(it?.title || photoId || 'Photo')
             const license = normalizeLicense(it?.license)
@@ -856,9 +839,11 @@ export default async function handler(req, res) {
       try {
         objectKey = await resolveObjectKeyFromPhotos(o.photo_id, o.format)
       } catch {}
+
       if (!objectKey) objectKey = String(o.delivery_object_key || '').trim()
-      if (!objectKey)
+      if (!objectKey) {
         objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
+      }
       if (!objectKey) return res.status(200).send('OK')
 
       const desiredLimit = limitForLicense(o.license)
@@ -890,16 +875,19 @@ export default async function handler(req, res) {
         const fmt = normalizeFormat(o.format)
         const ext = fmt === 'raw' ? 'zip' : 'jpg'
 
+        const safePhotoId = isUuid(o.photo_id) ? o.photo_id : null
+        if (!safePhotoId) return res.status(200).send('OK')
+
         const token = createDownloadToken(
           {
             jti,
             orderId: o.id,
-            photoId: o.photo_id,
+            photoId: safePhotoId,
             format: fmt,
             objectKey,
             userId: o.user_id || null,
             guestEmail: email,
-            filename: `${o.photo_id}.${ext}`,
+            filename: `${safePhotoId}.${ext}`,
             license: normalizeLicense(o.license),
           },
           '1h'
@@ -914,7 +902,7 @@ export default async function handler(req, res) {
             invoiceNo,
             amount: o.amount,
             currency: o.currency,
-            photoTitle: o.photo_id,
+            photoTitle: safePhotoId,
             license: normalizeLicense(o.license),
             format: normalizeFormat(o.format),
             paymentId: pid || null,
@@ -925,7 +913,7 @@ export default async function handler(req, res) {
           await sendDownloadEmail({
             to: email,
             orderId: o.id,
-            photoTitle: o.photo_id,
+            photoTitle: safePhotoId,
             downloadUrl,
             license: normalizeLicense(o.license),
             format: normalizeFormat(o.format),
@@ -938,9 +926,6 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
-    /* =========================================================
-       ❌ PAYMENT FAILED / CANCELED / CHARGEDBACK
-    ========================================================= */
     if (statusCodeNum < 0) {
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 

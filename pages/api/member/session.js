@@ -19,8 +19,25 @@ function clean(v) {
   return String(v || '').trim()
 }
 
+function cleanLower(v) {
+  return String(v || '').trim().toLowerCase()
+}
+
+function isUuid(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(v || '').trim()
+  )
+}
+
 function nowIso() {
   return new Date().toISOString()
+}
+
+function isExpired(value) {
+  if (!value) return false
+  const ms = new Date(value).getTime()
+  if (!Number.isFinite(ms)) return false
+  return ms < Date.now()
 }
 
 function cinematicKickMessage() {
@@ -49,7 +66,7 @@ function verifySessionToken(token) {
 async function getActiveMembershipByEmail(email) {
   const { data, error } = await supabaseAdmin
     .from('memberships')
-    .select('id,email,user_id,plan,status,end_date,billing_cycle_end,created_at')
+    .select('id,email,user_id,plan,status,end_date,billing_cycle,billing_cycle_end,created_at')
     .eq('email', email)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -60,16 +77,14 @@ async function getActiveMembershipByEmail(email) {
   if (!data) return null
 
   const endsAt = data.billing_cycle_end || data.end_date || null
-  if (endsAt && new Date(endsAt) < new Date()) return null
-
-  if (!data.user_id) {
-    throw new Error('memberships.user_id is NULL for this member (required).')
-  }
+  if (isExpired(endsAt)) return null
 
   return data
 }
 
 async function getAllActiveSessions(userId) {
+  if (!isUuid(userId)) return []
+
   const { data, error } = await supabaseAdmin
     .from('member_sessions')
     .select('id,user_id,device_id,created_at,last_seen,revoked_at')
@@ -82,13 +97,17 @@ async function getAllActiveSessions(userId) {
 }
 
 async function countActiveDevices(userId) {
+  if (!isUuid(userId)) return 0
   const rows = await getAllActiveSessions(userId)
   const unique = new Set(rows.map((r) => clean(r.device_id)).filter(Boolean))
   return unique.size
 }
 
 async function revokeSessionsByIds(ids) {
-  const cleanIds = Array.isArray(ids) ? ids.filter(Boolean) : []
+  const cleanIds = Array.isArray(ids)
+    ? ids.map((x) => clean(x)).filter(isUuid)
+    : []
+
   if (!cleanIds.length) return
 
   const stamp = nowIso()
@@ -102,6 +121,8 @@ async function revokeSessionsByIds(ids) {
 }
 
 async function cleanupDuplicateDeviceSessions(userId, deviceId) {
+  if (!isUuid(userId) || !deviceId) return null
+
   const { data, error } = await supabaseAdmin
     .from('member_sessions')
     .select('id,user_id,device_id,created_at,last_seen,revoked_at')
@@ -119,7 +140,7 @@ async function cleanupDuplicateDeviceSessions(userId, deviceId) {
   const revokeIds = rows
     .slice(1)
     .map((r) => r.id)
-    .filter(Boolean)
+    .filter(isUuid)
 
   if (revokeIds.length) {
     await revokeSessionsByIds(revokeIds)
@@ -129,15 +150,22 @@ async function cleanupDuplicateDeviceSessions(userId, deviceId) {
 }
 
 async function touchSession(sessionId) {
+  const id = clean(sessionId)
+  if (!isUuid(id)) return
+
   const up = await supabaseAdmin
     .from('member_sessions')
     .update({ last_seen: nowIso() })
-    .eq('id', sessionId)
+    .eq('id', id)
 
   if (up.error) throw new Error(up.error.message)
 }
 
 async function createSession({ userId, deviceId }) {
+  if (!isUuid(userId)) {
+    throw new Error('Invalid memberships.user_id for session creation.')
+  }
+
   const stamp = nowIso()
 
   const ins = await supabaseAdmin
@@ -157,6 +185,10 @@ async function createSession({ userId, deviceId }) {
 }
 
 async function upsertSession({ userId, deviceId }) {
+  if (!isUuid(userId) || !deviceId) {
+    return { invalid: true }
+  }
+
   const existing = await cleanupDuplicateDeviceSessions(userId, deviceId)
 
   if (existing) {
@@ -173,11 +205,13 @@ async function upsertSession({ userId, deviceId }) {
 }
 
 async function revokeOtherSessions(userId, keepDeviceId) {
+  if (!isUuid(userId)) return 0
+
   const rows = await getAllActiveSessions(userId)
   const ids = rows
     .filter((r) => clean(r.device_id) !== clean(keepDeviceId))
     .map((r) => r.id)
-    .filter(Boolean)
+    .filter(isUuid)
 
   if (ids.length) {
     await revokeSessionsByIds(ids)
@@ -187,6 +221,8 @@ async function revokeOtherSessions(userId, keepDeviceId) {
 }
 
 async function revokeCurrentSession(userId, deviceId) {
+  if (!isUuid(userId) || !deviceId) return
+
   const stamp = nowIso()
 
   const up = await supabaseAdmin
@@ -231,7 +267,7 @@ export default async function handler(req, res) {
       const deviceId = clean(payload?.deviceId)
       const userId = clean(payload?.userId)
 
-      if (!email || !deviceId || !userId) {
+      if (!email || !deviceId || !userId || !isUuid(userId)) {
         return res.status(401).json({
           ok: false,
           code: 'SESSION_INVALID',
@@ -259,7 +295,7 @@ export default async function handler(req, res) {
       return res.status(405).json({ ok: false, error: 'Method not allowed' })
     }
 
-    const action = String(req.body?.action || 'start').trim().toLowerCase()
+    const action = cleanLower(req.body?.action || 'start')
 
     if (action === 'logout') {
       const auth = String(req.headers.authorization || '')
@@ -278,20 +314,20 @@ export default async function handler(req, res) {
         }
       }
 
-      if (!userId || !deviceId) {
+      if ((!userId || !deviceId || !isUuid(userId)) && req.body) {
         const email = normalizeEmail(req.body?.email)
         const bodyDeviceId = clean(req.body?.deviceId)
 
         if (email && bodyDeviceId) {
           const member = await getActiveMembershipByEmail(email).catch(() => null)
-          if (member?.user_id) {
+          if (member?.user_id && isUuid(member.user_id)) {
             userId = clean(member.user_id)
             deviceId = bodyDeviceId
           }
         }
       }
 
-      if (userId && deviceId) {
+      if (userId && deviceId && isUuid(userId)) {
         await revokeCurrentSession(userId, deviceId)
       }
 
@@ -325,7 +361,7 @@ export default async function handler(req, res) {
       const userId = clean(payload?.userId)
       const deviceId = clean(payload?.deviceId)
 
-      if (!userId || !deviceId) {
+      if (!userId || !deviceId || !isUuid(userId)) {
         return res.status(401).json({ ok: false, error: 'Invalid session' })
       }
 
@@ -363,10 +399,26 @@ export default async function handler(req, res) {
       })
     }
 
+    if (!member.user_id || !isUuid(member.user_id)) {
+      return res.status(409).json({
+        ok: false,
+        code: 'MEMBER_USER_MISSING',
+        error: 'Membership exists, but user_id is missing or invalid.',
+      })
+    }
+
     const up = await upsertSession({
-      userId: member.user_id,
+      userId: clean(member.user_id),
       deviceId,
     })
+
+    if (up?.invalid) {
+      return res.status(409).json({
+        ok: false,
+        code: 'MEMBER_USER_MISSING',
+        error: 'Membership user is invalid.',
+      })
+    }
 
     if (up?.denied) {
       return res.status(403).json({
@@ -382,12 +434,13 @@ export default async function handler(req, res) {
       })
     }
 
-    const active = await countActiveDevices(member.user_id)
+    const safeUserId = clean(member.user_id)
+    const active = await countActiveDevices(safeUserId)
 
     const token = signSession({
       v: 1,
       email,
-      userId: member.user_id,
+      userId: safeUserId,
       deviceId,
       sessionId: up.id,
     })
