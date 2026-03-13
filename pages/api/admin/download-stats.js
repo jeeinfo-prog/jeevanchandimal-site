@@ -23,6 +23,12 @@ function chunkArray(arr, size) {
   return out
 }
 
+function normalizeAssetUrl(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  return raw
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
@@ -30,7 +36,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    /* ---------------- orders ---------------- */
     const { data: orders, error: orderErr } = await supabaseAdmin
       .from('orders')
       .select('id, photo_id, amount, currency, status, created_at')
@@ -38,7 +43,6 @@ export default async function handler(req, res) {
 
     if (orderErr) throw orderErr
 
-    /* ---------------- download tokens ---------------- */
     const { data: tokens, error: tokenErr } = await supabaseAdmin
       .from('download_tokens')
       .select('order_id, created_at')
@@ -55,7 +59,6 @@ export default async function handler(req, res) {
     const totalOrders = paidOrders.length
     const totalDownloads = tokenRows.length
 
-    /* ---------------- analytics maps ---------------- */
     const revenueByCurrencyMap = {}
     const revenuePerDayByCurrencyMap = {}
     const downloadsByDay = {}
@@ -94,7 +97,6 @@ export default async function handler(req, res) {
       }
     }
 
-    /* ---------------- photos lookup (NO RELATIONSHIP JOIN) ---------------- */
     const uniquePhotoIds = Array.from(
       new Set(
         paidOrders
@@ -108,7 +110,9 @@ export default async function handler(req, res) {
     for (const ids of chunkArray(uniquePhotoIds, 200)) {
       const { data: photos, error: photosErr } = await supabaseAdmin
         .from('photos')
-        .select('id, thumbnail_key, original_key, original_jpg_key')
+        .select(
+          'id, title, thumb_url, preview_url, original_key, original_jpg_key, original_filename'
+        )
         .in('id', ids)
 
       if (photosErr) throw photosErr
@@ -118,7 +122,6 @@ export default async function handler(req, res) {
       }
     }
 
-    /* ---------------- analytics outputs ---------------- */
     const revenueByCurrency = Object.entries(revenueByCurrencyMap)
       .map(([currency, total]) => ({
         currency,
@@ -145,7 +148,6 @@ export default async function handler(req, res) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
 
-    /* ---------------- recent orders monitor ---------------- */
     const ordersOut = paidOrders
       .slice()
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -157,12 +159,14 @@ export default async function handler(req, res) {
         return {
           orderId: o.id,
           photoId,
+          title: photo?.title || '',
           amount: Number(toNumber(o?.amount).toFixed(2)),
           currency: normalizeCurrency(o?.currency),
           date: o.created_at,
           downloads: downloadsByOrder[o.id] || 0,
-          thumbnail: photo?.thumbnail_key || null,
-          original: photo?.original_jpg_key || photo?.original_key || null,
+          thumbnail: normalizeAssetUrl(photo?.thumb_url || photo?.preview_url),
+          original: normalizeAssetUrl(photo?.preview_url || null),
+          originalFilename: photo?.original_filename || null,
         }
       })
 
