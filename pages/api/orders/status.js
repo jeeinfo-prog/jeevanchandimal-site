@@ -1,27 +1,63 @@
 // pages/api/orders/status.js
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
+function clean(v) {
+  return String(v || '').trim()
+}
+
 function isCartGroup(ref) {
-  return String(ref || '').toUpperCase().startsWith('CART_')
+  return clean(ref).toUpperCase().startsWith('CART_')
 }
 
 function normStatus(s) {
-  return String(s || 'PENDING').trim().toUpperCase()
+  return clean(s || 'PENDING').toUpperCase()
+}
+
+function isPaidRow(row) {
+  const status = normStatus(row?.status)
+  const gatewayCode = clean(row?.payhere_status_code)
+  const paidAt = clean(row?.paid_at)
+
+  if (gatewayCode === '2') return true
+  if (paidAt) return true
+  if (status === 'PAID' || status === 'SUCCESS' || status === 'COMPLETED' || status === 'CONFIRMED') {
+    return true
+  }
+  return false
+}
+
+function isFailedRow(row) {
+  const status = normStatus(row?.status)
+  const gatewayCode = clean(row?.payhere_status_code)
+
+  if (gatewayCode === '-1' || gatewayCode === '-2' || gatewayCode === '-3') return true
+  if (status === 'FAILED' || status === 'CANCELED' || status === 'CANCELLED' || status === 'EXPIRED') {
+    return true
+  }
+  return false
 }
 
 function groupStatus(rows) {
   const list = Array.isArray(rows) ? rows : []
   if (list.length === 0) return 'NOT_FOUND'
 
-  const statuses = list.map((r) => normStatus(r.status))
-
-  if (statuses.some((s) => s === 'FAILED' || s === 'CANCELED' || s === 'CANCELLED')) {
-    return 'FAILED'
-  }
-
-  if (statuses.some((s) => s === 'PAID')) return 'PAID'
-
+  if (list.some(isPaidRow)) return 'PAID'
+  if (list.some(isFailedRow)) return 'FAILED'
   return 'PENDING'
+}
+
+function buildResponse(row, refOverride) {
+  const resolved = row?.order_id || row?.code || row?.id || refOverride || ''
+
+  return {
+    ok: true,
+    id: row?.id || null,
+    code: row?.code || row?.order_id || row?.id || refOverride || '',
+    order_id: resolved,
+    status: normStatus(row?.status),
+    paid_at: row?.paid_at || null,
+    payhere_status_code: row?.payhere_status_code ?? null,
+  }
 }
 
 export default async function handler(req, res) {
@@ -35,36 +71,62 @@ export default async function handler(req, res) {
   }
 
   try {
-    const ref = String(req.query.order_id || '').trim()
-    if (!ref) return res.status(400).json({ ok: false, error: 'Missing order_id' })
+    const orderIdRef = clean(req.query.order_id)
+    const codeRef = clean(req.query.code)
+    const idRef = clean(req.query.id)
+
+    const ref = orderIdRef || codeRef || idRef
+
+    if (!ref) {
+      return res.status(400).json({ ok: false, error: 'Missing order reference' })
+    }
 
     /* =========================
        CART GROUP: CART_...
-       group stored in orders.order_id
+       Can be sent as code=... or order_id=...
     ========================= */
     if (isCartGroup(ref)) {
-      const r = await supabaseAdmin
+      const byGroupOrderId = await supabaseAdmin
         .from('orders')
         .select('id,status,paid_at,payhere_status_code,order_id,code')
         .eq('order_id', ref)
 
-      if (r.error) return res.status(500).json({ ok: false, error: r.error.message })
+      if (byGroupOrderId.error) {
+        return res.status(500).json({ ok: false, error: byGroupOrderId.error.message })
+      }
 
-      const rows = Array.isArray(r.data) ? r.data : []
-      if (rows.length === 0) return res.status(404).json({ ok: false, error: 'Order not found' })
+      let rows = Array.isArray(byGroupOrderId.data) ? byGroupOrderId.data : []
+
+      // fallback: some setups may store the cart ref in code instead
+      if (rows.length === 0) {
+        const byGroupCode = await supabaseAdmin
+          .from('orders')
+          .select('id,status,paid_at,payhere_status_code,order_id,code')
+          .eq('code', ref)
+
+        if (byGroupCode.error) {
+          return res.status(500).json({ ok: false, error: byGroupCode.error.message })
+        }
+
+        rows = Array.isArray(byGroupCode.data) ? byGroupCode.data : []
+      }
+
+      if (rows.length === 0) {
+        return res.status(404).json({ ok: false, error: 'Order not found' })
+      }
 
       const st = groupStatus(rows)
-      const paidRow = rows.find((x) => normStatus(x.status) === 'PAID') || rows[0]
+      const bestRow = rows.find(isPaidRow) || rows.find((x) => !isFailedRow(x)) || rows[0]
 
       return res.status(200).json({
         ok: true,
-        id: paidRow?.id || rows[0].id,
+        id: bestRow?.id || null,
         code: ref,
         order_id: ref,
         status: st,
         count: rows.length,
-        paid_at: paidRow?.paid_at || null,
-        payhere_status_code: paidRow?.payhere_status_code ?? null,
+        paid_at: bestRow?.paid_at || null,
+        payhere_status_code: bestRow?.payhere_status_code ?? null,
       })
     }
 
@@ -77,18 +139,11 @@ export default async function handler(req, res) {
       .eq('id', ref)
       .maybeSingle()
 
-    if (byId.error) return res.status(500).json({ ok: false, error: byId.error.message })
+    if (byId.error) {
+      return res.status(500).json({ ok: false, error: byId.error.message })
+    }
     if (byId.data) {
-      const resolved = byId.data?.order_id || byId.data?.code || byId.data?.id || ref
-      return res.status(200).json({
-        ok: true,
-        id: byId.data.id,
-        code: byId.data.code || byId.data.order_id || byId.data.id || ref,
-        order_id: resolved,
-        status: byId.data.status,
-        paid_at: byId.data.paid_at || null,
-        payhere_status_code: byId.data.payhere_status_code ?? null,
-      })
+      return res.status(200).json(buildResponse(byId.data, ref))
     }
 
     /* =========================
@@ -100,18 +155,11 @@ export default async function handler(req, res) {
       .eq('order_id', ref)
       .maybeSingle()
 
-    if (byOrderId.error) return res.status(500).json({ ok: false, error: byOrderId.error.message })
+    if (byOrderId.error) {
+      return res.status(500).json({ ok: false, error: byOrderId.error.message })
+    }
     if (byOrderId.data) {
-      const resolved = byOrderId.data?.order_id || byOrderId.data?.code || byOrderId.data?.id || ref
-      return res.status(200).json({
-        ok: true,
-        id: byOrderId.data.id,
-        code: byOrderId.data.code || byOrderId.data.order_id || byOrderId.data.id || ref,
-        order_id: resolved,
-        status: byOrderId.data.status,
-        paid_at: byOrderId.data.paid_at || null,
-        payhere_status_code: byOrderId.data.payhere_status_code ?? null,
-      })
+      return res.status(200).json(buildResponse(byOrderId.data, ref))
     }
 
     /* =========================
@@ -123,19 +171,14 @@ export default async function handler(req, res) {
       .eq('code', ref)
       .maybeSingle()
 
-    if (byCode.error) return res.status(500).json({ ok: false, error: byCode.error.message })
-    if (!byCode.data) return res.status(404).json({ ok: false, error: 'Order not found' })
+    if (byCode.error) {
+      return res.status(500).json({ ok: false, error: byCode.error.message })
+    }
+    if (byCode.data) {
+      return res.status(200).json(buildResponse(byCode.data, ref))
+    }
 
-    const resolved = byCode.data?.order_id || byCode.data?.code || byCode.data?.id || ref
-    return res.status(200).json({
-      ok: true,
-      id: byCode.data.id,
-      code: byCode.data.code || byCode.data.order_id || byCode.data.id || ref,
-      order_id: resolved,
-      status: byCode.data.status,
-      paid_at: byCode.data.paid_at || null,
-      payhere_status_code: byCode.data.payhere_status_code ?? null,
-    })
+    return res.status(404).json({ ok: false, error: 'Order not found' })
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
   }
