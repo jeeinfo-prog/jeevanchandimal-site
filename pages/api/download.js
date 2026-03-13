@@ -13,8 +13,8 @@ export const config = {
 /* security: tiny best-effort rate limit (serverless-safe-ish) */
 /* ---------------------------------------------------- */
 
-const RL_WINDOW_MS = 60_000 // 1 min
-const RL_MAX = 60 // 60 req/min per IP
+const RL_WINDOW_MS = 60_000
+const RL_MAX = 60
 
 const rl = globalThis.__jc_rl_download || new Map()
 globalThis.__jc_rl_download = rl
@@ -103,6 +103,17 @@ function looksLikeTokenError(message) {
     msg.includes('expired') ||
     msg.includes('invalid signature') ||
     msg.includes('malformed')
+  )
+}
+
+function looksLikeMembershipPayload(payload) {
+  const license = cleanLower(payload?.license)
+  const membershipPlans = new Set(['membership', 'basic', 'pro', 'elite'])
+
+  return (
+    payload?.membership === true ||
+    membershipPlans.has(license) ||
+    (!payload?.orderId && !!normalizeEmail(payload?.guestEmail))
   )
 }
 
@@ -250,8 +261,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid object key' })
     }
 
-    const isMembership =
-      cleanLower(payload?.license) === 'membership' || Boolean(payload?.membership)
+    const isMembership = looksLikeMembershipPayload(payload)
 
     /* ---------------------------------------------------- */
     /* membership downloads */
