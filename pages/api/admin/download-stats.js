@@ -49,7 +49,9 @@ export default async function handler(req, res) {
   try {
     const { data: orders, error: orderErr } = await supabaseAdmin
       .from('orders')
-      .select('id, photo_id, amount, currency, status, created_at')
+      .select(
+        'id, photo_id, photo_ref, photo_title_snapshot, photo_thumb_snapshot, photo_preview_snapshot, amount, currency, status, created_at'
+      )
       .order('created_at', { ascending: false })
 
     if (orderErr) throw orderErr
@@ -93,7 +95,7 @@ export default async function handler(req, res) {
       }
 
       const photoId = String(o?.photo_id || '').trim()
-      if (isUuid(photoId)) {
+      if (isUuid(photoId) && photoId !== '00000000-0000-0000-0000-000000000000') {
         byPhoto[photoId] = (byPhoto[photoId] || 0) + 1
       }
     }
@@ -112,7 +114,7 @@ export default async function handler(req, res) {
       new Set(
         paidOrders
           .map((o) => String(o?.photo_id || '').trim())
-          .filter(isUuid)
+          .filter((id) => isUuid(id) && id !== '00000000-0000-0000-0000-000000000000')
       )
     )
 
@@ -175,19 +177,37 @@ export default async function handler(req, res) {
       .slice(0, 20)
       .map((o) => {
         const rawPhotoId = String(o?.photo_id || '').trim()
-        const photoId = isUuid(rawPhotoId) ? rawPhotoId : null
+        const isRealPhotoUuid =
+          isUuid(rawPhotoId) && rawPhotoId !== '00000000-0000-0000-0000-000000000000'
+
+        const photoId = isRealPhotoUuid ? rawPhotoId : null
         const photo = photoId ? photosById[photoId] || null : null
+
+        const title =
+          String(o?.photo_title_snapshot || '').trim() ||
+          photo?.title ||
+          String(o?.photo_ref || '').trim() ||
+          ''
+
+        const thumbnail = normalizeAssetUrl(
+          o?.photo_thumb_snapshot || photo?.thumb_url || photo?.preview_url
+        )
+
+        const original = normalizeAssetUrl(
+          o?.photo_preview_snapshot || photo?.preview_url || null
+        )
 
         return {
           orderId: o.id,
           photoId,
-          title: photo?.title || '',
+          photoRef: String(o?.photo_ref || '').trim() || null,
+          title,
           amount: Number(toNumber(o?.amount).toFixed(2)),
           currency: normalizeCurrency(o?.currency),
           date: o.created_at,
           downloads: downloadsByOrder[String(o.id)] || 0,
-          thumbnail: normalizeAssetUrl(photo?.thumb_url || photo?.preview_url),
-          original: normalizeAssetUrl(photo?.preview_url || null),
+          thumbnail,
+          original,
           originalFilename: photo?.original_filename || null,
         }
       })

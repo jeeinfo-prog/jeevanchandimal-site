@@ -66,7 +66,7 @@ function verifySessionToken(token) {
 async function getActiveMembershipByEmail(email) {
   const { data, error } = await supabaseAdmin
     .from('memberships')
-    .select('id,email,user_id,plan,status,end_date,billing_cycle,billing_cycle_end,created_at')
+    .select('id,email,user_id,plan,status,end_date,created_at')
     .eq('email', email)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -76,8 +76,8 @@ async function getActiveMembershipByEmail(email) {
   if (error) throw new Error(error.message)
   if (!data) return null
 
-  const endsAt = data.billing_cycle_end || data.end_date || null
-  if (isExpired(endsAt)) return null
+  // membership validity depends only on end_date
+  if (isExpired(data.end_date)) return null
 
   return data
 }
@@ -137,6 +137,7 @@ async function cleanupDuplicateDeviceSessions(userId, deviceId) {
   if (rows.length <= 1) return rows[0] || null
 
   const keep = rows[0]
+
   const revokeIds = rows
     .slice(1)
     .map((r) => r.id)
@@ -162,10 +163,6 @@ async function touchSession(sessionId) {
 }
 
 async function createSession({ userId, deviceId }) {
-  if (!isUuid(userId)) {
-    throw new Error('Invalid memberships.user_id for session creation.')
-  }
-
   const stamp = nowIso()
 
   const ins = await supabaseAdmin
@@ -181,14 +178,11 @@ async function createSession({ userId, deviceId }) {
     .maybeSingle()
 
   if (ins.error) throw new Error(ins.error.message)
+
   return { id: ins.data?.id, reused: false }
 }
 
 async function upsertSession({ userId, deviceId }) {
-  if (!isUuid(userId) || !deviceId) {
-    return { invalid: true }
-  }
-
   const existing = await cleanupDuplicateDeviceSessions(userId, deviceId)
 
   if (existing) {
@@ -197,6 +191,7 @@ async function upsertSession({ userId, deviceId }) {
   }
 
   const activeDevices = await countActiveDevices(userId)
+
   if (activeDevices >= MAX_DEVICES) {
     return { denied: true }
   }
@@ -205,9 +200,8 @@ async function upsertSession({ userId, deviceId }) {
 }
 
 async function revokeOtherSessions(userId, keepDeviceId) {
-  if (!isUuid(userId)) return 0
-
   const rows = await getAllActiveSessions(userId)
+
   const ids = rows
     .filter((r) => clean(r.device_id) !== clean(keepDeviceId))
     .map((r) => r.id)
@@ -221,8 +215,6 @@ async function revokeOtherSessions(userId, keepDeviceId) {
 }
 
 async function revokeCurrentSession(userId, deviceId) {
-  if (!isUuid(userId) || !deviceId) return
-
   const stamp = nowIso()
 
   const up = await supabaseAdmin
@@ -239,26 +231,25 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
   try {
+
     if (req.method === 'GET') {
+
       const auth = String(req.headers.authorization || '')
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
 
       if (!token) {
-        return res.status(401).json({
-          ok: false,
-          code: 'NO_SESSION',
-          error: 'No session',
-        })
+        return res.status(401).json({ ok:false, code:'NO_SESSION', error:'No session'})
       }
 
       let payload
+
       try {
         payload = verifySessionToken(token)
       } catch {
         return res.status(401).json({
-          ok: false,
-          code: 'SESSION_INVALID',
-          error: 'Session expired. Please sign in again.',
+          ok:false,
+          code:'SESSION_INVALID',
+          error:'Session expired. Please sign in again.',
           cinematic: cinematicKickMessage(),
         })
       }
@@ -267,194 +258,132 @@ export default async function handler(req, res) {
       const deviceId = clean(payload?.deviceId)
       const userId = clean(payload?.userId)
 
-      if (!email || !deviceId || !userId || !isUuid(userId)) {
+      const session = await cleanupDuplicateDeviceSessions(userId, deviceId)
+
+      if (!session) {
         return res.status(401).json({
-          ok: false,
-          code: 'SESSION_INVALID',
-          error: 'Invalid session',
+          ok:false,
+          code:'SESSION_REVOKED',
+          error:'Session closed.',
+          cinematic: cinematicKickMessage(),
         })
       }
 
-      const session = await cleanupDuplicateDeviceSessions(userId, deviceId)
-      if (!session) {
-        return res.status(401).json({
-          ok: false,
-          code: 'SESSION_REVOKED',
-          error: 'Session closed.',
-          cinematic: cinematicKickMessage(),
+      const member = await getActiveMembershipByEmail(email)
+
+      if (!member || clean(member.user_id) !== userId) {
+        await revokeCurrentSession(userId, deviceId)
+        return res.status(403).json({
+          ok:false,
+          code:'NOT_MEMBER',
+          error:'No active membership found.',
         })
       }
 
       await touchSession(session.id)
 
       const active = await countActiveDevices(userId)
-      return res.status(200).json({ ok: true, email, active, max: MAX_DEVICES })
+
+      return res.status(200).json({
+        ok:true,
+        email,
+        active,
+        max:MAX_DEVICES,
+      })
     }
 
     if (req.method !== 'POST') {
-      return res.status(405).json({ ok: false, error: 'Method not allowed' })
+      return res.status(405).json({ ok:false, error:'Method not allowed'})
     }
 
     const action = cleanLower(req.body?.action || 'start')
 
     if (action === 'logout') {
+
       const auth = String(req.headers.authorization || '')
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
 
-      let userId = ''
-      let deviceId = ''
+      try {
+        const payload = verifySessionToken(token)
+        await revokeCurrentSession(clean(payload.userId), clean(payload.deviceId))
+      } catch {}
 
-      if (token) {
-        try {
-          const payload = verifySessionToken(token)
-          userId = clean(payload?.userId)
-          deviceId = clean(payload?.deviceId)
-        } catch {
-          // fallback to body
-        }
-      }
-
-      if ((!userId || !deviceId || !isUuid(userId)) && req.body) {
-        const email = normalizeEmail(req.body?.email)
-        const bodyDeviceId = clean(req.body?.deviceId)
-
-        if (email && bodyDeviceId) {
-          const member = await getActiveMembershipByEmail(email).catch(() => null)
-          if (member?.user_id && isUuid(member.user_id)) {
-            userId = clean(member.user_id)
-            deviceId = bodyDeviceId
-          }
-        }
-      }
-
-      if (userId && deviceId && isUuid(userId)) {
-        await revokeCurrentSession(userId, deviceId)
-      }
-
-      return res.status(200).json({ ok: true })
+      return res.status(200).json({ ok:true })
     }
 
     if (action === 'revoke_others') {
+
       const auth = String(req.headers.authorization || '')
       const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
 
-      if (!token) {
-        return res.status(401).json({
-          ok: false,
-          code: 'NO_SESSION',
-          error: 'No session',
-        })
-      }
+      const payload = verifySessionToken(token)
 
-      let payload
-      try {
-        payload = verifySessionToken(token)
-      } catch {
-        return res.status(401).json({
-          ok: false,
-          code: 'SESSION_INVALID',
-          error: 'Session expired. Please sign in again.',
-          cinematic: cinematicKickMessage(),
-        })
-      }
-
-      const userId = clean(payload?.userId)
-      const deviceId = clean(payload?.deviceId)
-
-      if (!userId || !deviceId || !isUuid(userId)) {
-        return res.status(401).json({ ok: false, error: 'Invalid session' })
-      }
-
-      const session = await cleanupDuplicateDeviceSessions(userId, deviceId)
-      if (!session) {
-        return res.status(401).json({
-          ok: false,
-          code: 'SESSION_REVOKED',
-          error: 'Session closed.',
-          cinematic: cinematicKickMessage(),
-        })
-      }
+      const userId = clean(payload.userId)
+      const deviceId = clean(payload.deviceId)
 
       const active = await revokeOtherSessions(userId, deviceId)
-      return res.status(200).json({ ok: true, active, max: MAX_DEVICES })
+
+      return res.status(200).json({
+        ok:true,
+        active,
+        max:MAX_DEVICES,
+      })
     }
 
     const email = normalizeEmail(req.body?.email)
     const deviceId = clean(req.body?.deviceId)
 
     if (!email || !isValidEmail(email)) {
-      return res.status(400).json({ ok: false, error: 'Invalid email' })
+      return res.status(400).json({ ok:false, error:'Invalid email'})
     }
 
     if (!deviceId || deviceId.length < 8) {
-      return res.status(400).json({ ok: false, error: 'Missing deviceId' })
+      return res.status(400).json({ ok:false, error:'Missing deviceId'})
     }
 
     const member = await getActiveMembershipByEmail(email)
+
     if (!member) {
       return res.status(403).json({
-        ok: false,
-        code: 'NOT_MEMBER',
-        error: 'No active membership found.',
+        ok:false,
+        code:'NOT_MEMBER',
+        error:'No active membership found.',
       })
     }
 
-    if (!member.user_id || !isUuid(member.user_id)) {
-      return res.status(409).json({
-        ok: false,
-        code: 'MEMBER_USER_MISSING',
-        error: 'Membership exists, but user_id is missing or invalid.',
-      })
-    }
+    const userId = clean(member.user_id)
 
-    const up = await upsertSession({
-      userId: clean(member.user_id),
-      deviceId,
-    })
-
-    if (up?.invalid) {
-      return res.status(409).json({
-        ok: false,
-        code: 'MEMBER_USER_MISSING',
-        error: 'Membership user is invalid.',
-      })
-    }
+    const up = await upsertSession({ userId, deviceId })
 
     if (up?.denied) {
       return res.status(403).json({
-        ok: false,
-        code: 'DEVICE_LIMIT',
-        error: `Device limit reached. Maximum ${MAX_DEVICES} devices.`,
-        cinematic: {
-          title: 'Two devices already active',
-          body:
-            'For protection, memberships can be used on up to 2 devices at once.\n\nTo continue, sign out one device (or use “Sign out other devices” on a device that’s already signed in).',
-          hint: 'This keeps your membership private — no sharing.',
-        },
+        ok:false,
+        code:'DEVICE_LIMIT',
+        error:`Device limit reached. Maximum ${MAX_DEVICES} devices.`,
       })
     }
 
-    const safeUserId = clean(member.user_id)
-    const active = await countActiveDevices(safeUserId)
-
     const token = signSession({
-      v: 1,
+      v:1,
       email,
-      userId: safeUserId,
+      userId,
       deviceId,
       sessionId: up.id,
     })
 
+    const active = await countActiveDevices(userId)
+
     return res.status(200).json({
-      ok: true,
+      ok:true,
       token,
       email,
       active,
-      max: MAX_DEVICES,
+      max:MAX_DEVICES,
       reused: !!up?.reused,
     })
-  } catch (e) {
+  }
+  catch(e){
     console.error('member/session error:', e)
-    return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
+    return res.status(500).json({ ok:false, error:e?.message || 'Server error'})
   }
 }

@@ -56,11 +56,15 @@ function getBaseUrl(req) {
     cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL)
   if (webhook) return webhook
 
-  const proto = (req.headers['x-forwarded-proto'] || 'https').toString()
-  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toString()
+  const proto = String(req.headers['x-forwarded-proto'] || 'https')
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
   if (host) return `${proto}://${host}`
 
-  return cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL)
+  return (
+    cleanBaseUrl(process.env.SITE_URL) ||
+    cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    ''
+  )
 }
 
 function buildDownloadUrl(token, req) {
@@ -95,6 +99,16 @@ function normalizePaymentId(v) {
   const s = String(v || '').trim()
   if (!s || s === '0') return null
   return s
+}
+
+function alreadyProcessedPaidOrder(order, paymentId) {
+  const pid = normalizePaymentId(paymentId)
+  if (!order || !pid) return false
+
+  return (
+    String(order.status || '').toUpperCase() === 'PAID' &&
+    String(order.payhere_payment_id || '').trim() === pid
+  )
 }
 
 /* ===== MEMBERSHIP HELPERS ===== */
@@ -204,7 +218,7 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
   const id = String(cartOrderDbId || '').trim()
   const code = String(cartCode || '').trim()
 
-  if (id && isUuid(id)) {
+  if (id) {
     const byId = await supabaseAdmin.from('orders').select('*').eq('id', id).maybeSingle()
     if (!byId.error && byId?.data) return byId.data
   }
@@ -221,10 +235,8 @@ async function findSingleOrderByRef(ref) {
   const v = String(ref || '').trim()
   if (!v) return null
 
-  if (isUuid(v)) {
-    const byId = await supabaseAdmin.from('orders').select('*').eq('id', v).maybeSingle()
-    if (!byId.error && byId?.data) return byId.data
-  }
+  const byId = await supabaseAdmin.from('orders').select('*').eq('id', v).maybeSingle()
+  if (!byId.error && byId?.data) return byId.data
 
   const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', v).maybeSingle()
   if (!byOrderId.error && byOrderId?.data) return byOrderId.data
@@ -429,6 +441,9 @@ export default async function handler(req, res) {
       }
     } catch {}
 
+    /* =========================================================
+       ✅ PAYMENT SUCCESS
+    ========================================================= */
     if (statusCodeNum === 2) {
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
       const isMembership = orderLooksLikeMembership(custom_1, dbOrder)
@@ -437,6 +452,10 @@ export default async function handler(req, res) {
       if (isMembership) {
         const order = dbOrder || (await findSingleOrderByRef(order_id))
         if (!order) return res.status(200).send('OK')
+
+        if (alreadyProcessedPaidOrder(order, payment_id)) {
+          return res.status(200).send('OK')
+        }
 
         if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
           if (pid) await claimPaymentOnce(order.id, pid)
@@ -504,8 +523,9 @@ export default async function handler(req, res) {
         }
 
         const o = freshRes.data || order
-        const tier = normalizeMembershipTier(o.license)
-        const term = normalizeMembershipTerm(o.format)
+
+        const tier = normalizeMembershipTier(o.membership_plan || o.license)
+        const term = normalizeMembershipTerm(o.membership_term || o.format)
 
         const now = new Date()
         const startDate = now.toISOString()
@@ -565,6 +585,10 @@ export default async function handler(req, res) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (!cartOrder) {
           console.error('Cart order not found:', { cartDbId, cartCode })
+          return res.status(200).send('OK')
+        }
+
+        if (alreadyProcessedPaidOrder(cartOrder, payment_id)) {
           return res.status(200).send('OK')
         }
 
@@ -775,6 +799,10 @@ export default async function handler(req, res) {
       const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (!order) return res.status(200).send('OK')
 
+      if (alreadyProcessedPaidOrder(order, payment_id)) {
+        return res.status(200).send('OK')
+      }
+
       if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
         if (pid) await claimPaymentOnce(order.id, pid)
 
@@ -926,6 +954,9 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
+    /* =========================================================
+       ❌ PAYMENT FAILED / CANCELED / CHARGEDBACK
+    ========================================================= */
     if (statusCodeNum < 0) {
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 

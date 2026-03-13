@@ -3,281 +3,188 @@ import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
 const MAX_DEVICES = 2
-const SESSION_SECRET = process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
+const SESSION_SECRET =
+  process.env.MEMBER_SESSION_SECRET || process.env.DOWNLOAD_TOKEN_SECRET
 
-function normalizeEmail(v) {
+function normalizeEmail(v){
   return String(v || '').trim().toLowerCase()
 }
 
-function isValidEmail(v) {
+function isValidEmail(v){
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
 
-function clean(v) {
+function clean(v){
   return String(v || '').trim()
 }
 
-function cleanLower(v) {
-  return String(v || '').trim().toLowerCase()
-}
-
-function isUuid(v) {
+function isUuid(v){
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     String(v || '').trim()
   )
 }
 
-function isExpired(v) {
-  if (!v) return false
+function isExpired(v){
+  if(!v) return false
   const ms = new Date(v).getTime()
-  if (!Number.isFinite(ms)) return false
+  if(!Number.isFinite(ms)) return false
   return ms < Date.now()
 }
 
-function isPastOrNow(v) {
-  if (!v) return false
+function isPastOrNow(v){
+  if(!v) return false
   const ms = new Date(v).getTime()
-  if (!Number.isFinite(ms)) return false
+  if(!Number.isFinite(ms)) return false
   return ms <= Date.now()
 }
 
-function addMonths(date, months) {
-  const d = new Date(date)
-  const day = d.getUTCDate()
-  d.setUTCMonth(d.getUTCMonth() + months)
-  if (d.getUTCDate() < day) d.setUTCDate(0)
-  return d
-}
-
-function addYears(date, years) {
-  const d = new Date(date)
-  d.setUTCFullYear(d.getUTCFullYear() + years)
-  return d
-}
-
-function cinematicKickMessage() {
+function cinematicKickMessage(){
   return {
-    title: 'Session closed',
-    body:
-      'This membership is active on another device.\n\nFor protection, your session has been closed here. Please sign in again to continue.',
-    hint: 'Max 2 devices • No sharing',
+    title:'Session closed',
+    body:'This membership is active on another device.\n\nFor protection your session has been closed.',
+    hint:'Max 2 devices'
   }
 }
 
-function verifySessionFromReq(req) {
+function verifySessionFromReq(req){
+
   const auth = String(req.headers.authorization || '')
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
 
-  if (!token) {
-    return { ok: false, code: 'NO_SESSION', error: 'Please sign in to continue.' }
+  if(!token){
+    return { ok:false, code:'NO_SESSION', error:'Please sign in.' }
   }
 
-  if (!SESSION_SECRET) {
-    return {
-      ok: false,
-      code: 'SERVER_MISCONFIG',
-      error: 'Missing MEMBER_SESSION_SECRET',
-    }
-  }
-
-  try {
+  try{
     const payload = jwt.verify(token, SESSION_SECRET)
-    return { ok: true, payload }
-  } catch {
+    return { ok:true, payload }
+  }catch{
     return {
-      ok: false,
-      code: 'SESSION_INVALID',
-      error: 'Session expired. Please sign in again.',
-      cinematic: cinematicKickMessage(),
+      ok:false,
+      code:'SESSION_INVALID',
+      error:'Session expired.',
+      cinematic:cinematicKickMessage()
     }
   }
 }
 
-function resolveTierTermFromMembershipRow(memberRow) {
-  const planRaw = cleanLower(memberRow?.plan)
-  const billingCycleRaw = cleanLower(memberRow?.billing_cycle)
+async function ensureActiveSession(userId, deviceId){
 
-  const termFromBilling =
-    ['monthly', 'yearly', 'lifetime'].includes(billingCycleRaw) ? billingCycleRaw : null
-
-  if (['basic', 'pro', 'elite'].includes(planRaw)) {
-    return { tier: planRaw, term: termFromBilling || 'monthly' }
-  }
-
-  if (planRaw === 'monthly') return { tier: 'pro', term: 'monthly' }
-  if (planRaw === 'yearly') return { tier: 'pro', term: 'yearly' }
-  if (planRaw === 'lifetime') return { tier: 'elite', term: 'lifetime' }
-
-  return { tier: 'pro', term: termFromBilling || 'monthly' }
-}
-
-async function ensureActiveSession(userId, deviceId) {
-  if (!isUuid(userId) || !deviceId) return false
-
-  const { data, error } = await supabaseAdmin
+  const {data,error} = await supabaseAdmin
     .from('member_sessions')
     .select('id')
-    .eq('user_id', userId)
-    .eq('device_id', deviceId)
-    .is('revoked_at', null)
+    .eq('user_id',userId)
+    .eq('device_id',deviceId)
+    .is('revoked_at',null)
     .maybeSingle()
 
-  if (error) throw new Error(error.message)
+  if(error) throw new Error(error.message)
+
   return !!data
 }
 
-async function countActiveSessions(userId) {
-  if (!isUuid(userId)) return 0
+async function countActiveSessions(userId){
 
-  const { count, error } = await supabaseAdmin
+  const {count,error} = await supabaseAdmin
     .from('member_sessions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .is('revoked_at', null)
+    .select('id',{count:'exact',head:true})
+    .eq('user_id',userId)
+    .is('revoked_at',null)
 
-  if (error) throw new Error(error.message)
+  if(error) throw new Error(error.message)
+
   return Number(count || 0)
 }
 
-async function refreshMembershipCycleIfNeeded(member) {
-  if (!member?.id) return member
+export default async function handler(req,res){
 
-  const currentEnd = member.billing_cycle_end || null
-  if (!currentEnd || !isPastOrNow(currentEnd)) {
-    return member
+  res.setHeader('Cache-Control','no-store')
+
+  if(req.method !== 'GET'){
+    return res.status(405).json({ok:false,error:'Method not allowed'})
   }
 
-  const billingCycle = cleanLower(member.billing_cycle)
-  const nextStart = new Date()
-  let nextEnd = null
+  try{
 
-  if (billingCycle === 'monthly') {
-    nextEnd = addMonths(nextStart, 1)
-  } else if (billingCycle === 'yearly') {
-    nextEnd = addYears(nextStart, 1)
-  } else if (billingCycle === 'lifetime') {
-    nextEnd = addYears(nextStart, 100)
-  } else {
-    nextEnd = addMonths(nextStart, 1)
-  }
-
-  const patch = {
-    monthly_download_used: 0,
-    billing_cycle_start: nextStart.toISOString(),
-    billing_cycle_end: nextEnd.toISOString(),
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from('memberships')
-    .update(patch)
-    .eq('id', member.id)
-    .select(
-      'id,email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle,billing_cycle_start,billing_cycle_end'
-    )
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-
-  return data || { ...member, ...patch }
-}
-
-export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0')
-  res.setHeader('Pragma', 'no-cache')
-  res.setHeader('Expires', '0')
-  res.setHeader('Surrogate-Control', 'no-store')
-
-  if (req.method !== 'GET') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' })
-  }
-
-  try {
     const email = normalizeEmail(req.query?.email)
-    if (!email || !isValidEmail(email)) {
-      return res.status(400).json({ ok: false, error: 'Invalid email' })
+
+    if(!email || !isValidEmail(email)){
+      return res.status(400).json({ok:false,error:'Invalid email'})
     }
 
     const sess = verifySessionFromReq(req)
-    if (!sess.ok) return res.status(401).json(sess)
 
-    const tokenEmail = normalizeEmail(sess.payload?.email)
-    const deviceId = clean(sess.payload?.deviceId)
-    const userId = clean(sess.payload?.userId)
+    if(!sess.ok){
+      return res.status(401).json(sess)
+    }
 
-    if (!tokenEmail || tokenEmail !== email || !deviceId || !userId || !isUuid(userId)) {
+    const tokenEmail = normalizeEmail(sess.payload.email)
+    const deviceId = clean(sess.payload.deviceId)
+    const userId = clean(sess.payload.userId)
+
+    if(tokenEmail !== email || !isUuid(userId)){
       return res.status(401).json({
-        ok: false,
-        code: 'SESSION_MISMATCH',
-        error: 'Session mismatch. Please sign in again.',
-        cinematic: cinematicKickMessage(),
+        ok:false,
+        code:'SESSION_MISMATCH',
+        error:'Session mismatch',
+        cinematic:cinematicKickMessage(),
       })
     }
 
-    const activeSession = await ensureActiveSession(userId, deviceId)
-    if (!activeSession) {
+    const activeSession = await ensureActiveSession(userId,deviceId)
+
+    if(!activeSession){
       return res.status(401).json({
-        ok: false,
-        code: 'SESSION_REVOKED',
-        error: 'Session closed.',
-        cinematic: cinematicKickMessage(),
+        ok:false,
+        code:'SESSION_REVOKED',
+        error:'Session closed',
+        cinematic:cinematicKickMessage(),
       })
     }
 
-    const { data: member, error } = await supabaseAdmin
+    const {data:member,error} = await supabaseAdmin
       .from('memberships')
       .select(
-        'id,email,user_id,plan,status,end_date,created_at,monthly_download_limit,monthly_download_used,billing_cycle,billing_cycle_start,billing_cycle_end'
+        'id,email,user_id,plan,status,end_date,monthly_download_limit,monthly_download_used,billing_cycle_end'
       )
-      .eq('email', email)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
+      .eq('email',email)
+      .eq('status','active')
+      .order('created_at',{ascending:false})
       .limit(1)
       .maybeSingle()
 
-    if (error) {
-      return res.status(500).json({ ok: false, error: error.message })
+    if(error){
+      return res.status(500).json({ok:false,error:error.message})
     }
 
-    if (!member) {
-      return res.status(200).json({ ok: true, member: false })
+    if(!member || isExpired(member.end_date)){
+      return res.status(200).json({ok:true,member:false})
     }
 
-    if (member.user_id && isUuid(member.user_id) && String(member.user_id).trim() !== userId) {
-      return res.status(401).json({
-        ok: false,
-        code: 'SESSION_MISMATCH',
-        error: 'Session mismatch. Please sign in again.',
-        cinematic: cinematicKickMessage(),
-      })
-    }
+    const used = Number(member.monthly_download_used || 0)
+    const limit = Number(member.monthly_download_limit || 0)
 
-    if (isExpired(member.end_date)) {
-      return res.status(200).json({ ok: true, member: false })
-    }
+    const remaining = limit === 0 ? 0 : Math.max(0,limit - used)
 
-    const activeMember = await refreshMembershipCycleIfNeeded(member)
-
-    const { tier, term } = resolveTierTermFromMembershipRow(activeMember)
-
-    const used = Number(activeMember.monthly_download_used ?? 0)
-    const limit = Number(activeMember.monthly_download_limit ?? 0)
-    const remaining = limit === 0 ? 0 : Math.max(0, limit - used)
     const activeDevices = await countActiveSessions(userId)
 
     return res.status(200).json({
-      ok: true,
-      member: true,
-      tier,
-      term,
+      ok:true,
+      member:true,
+      tier:member.plan,
       used,
       limit,
       remaining,
-      ends_at: activeMember.end_date || null,
-      reset_at: activeMember.billing_cycle_end || null,
-      devices: { active: activeDevices, max: MAX_DEVICES },
+      ends_at:member.end_date || null,
+      reset_at:member.billing_cycle_end || null,
+      devices:{
+        active:activeDevices,
+        max:MAX_DEVICES
+      }
     })
-  } catch (e) {
-    console.error('member/status error:', e)
-    return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
+  }
+  catch(e){
+    console.error('member/status error:',e)
+    return res.status(500).json({ok:false,error:e?.message || 'Server error'})
   }
 }

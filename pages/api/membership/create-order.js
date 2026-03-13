@@ -12,6 +12,10 @@ const USD_BASE_PRICES = {
 
 /* ---------------- helpers ---------------- */
 
+function normalizeEmail(v) {
+  return String(v || '').trim().toLowerCase()
+}
+
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 }
@@ -51,13 +55,19 @@ function getBaseUrl(req) {
   const webhook =
     cleanBaseUrl(process.env.WEBHOOK_BASE_URL) ||
     cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL)
+
   if (webhook) return webhook
 
   const proto = String(req.headers['x-forwarded-proto'] || 'https')
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+
   if (host) return `${proto}://${host}`
 
-  return cleanBaseUrl(process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL)
+  return (
+    cleanBaseUrl(process.env.SITE_URL) ||
+    cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
+    ''
+  )
 }
 
 async function fetchLiveUsdLkr(fallback) {
@@ -66,11 +76,15 @@ async function fetchLiveUsdLkr(fallback) {
       cache: 'no-store',
       headers: { 'Cache-Control': 'no-store' },
     })
+
     if (!r.ok) return fallback
+
     const data = await r.json().catch(() => null)
     const n = Number(data?.rates?.LKR)
+
     if (Number.isFinite(n) && n > 0) return n
   } catch {}
+
   return fallback
 }
 
@@ -85,22 +99,34 @@ function getPayhereCheckoutUrl(mode) {
     : 'https://www.payhere.lk/pay/checkout'
 }
 
+function generateOrderId() {
+  const ts = Date.now()
+  const rand = crypto.randomBytes(6).toString('hex')
+  return `ORD_${ts}_${rand}`
+}
+
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
+
+  res.setHeader('Cache-Control', 'no-store')
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' })
+    return res.status(405).json({ ok:false, error:'Method not allowed'})
   }
 
   try {
+
     const body = req.body || {}
 
-    const email = String(body.email || '').trim().toLowerCase()
+    const email = normalizeEmail(body.email)
+
     if (!email) {
-      return res.status(400).json({ ok: false, error: 'Missing email' })
+      return res.status(400).json({ ok:false, error:'Missing email'})
     }
+
     if (!isValidEmail(email)) {
-      return res.status(400).json({ ok: false, error: 'Invalid email' })
+      return res.status(400).json({ ok:false, error:'Invalid email'})
     }
 
     let tier = cleanLower(body.tier, '')
@@ -110,32 +136,36 @@ export default async function handler(req, res) {
     if (!tier) tier = 'pro'
     if (!term) term = 'monthly'
 
-    const validTiers = ['basic', 'pro', 'elite']
-    const validTerms = ['monthly', 'yearly', 'lifetime']
+    const validTiers = ['basic','pro','elite']
+    const validTerms = ['monthly','yearly','lifetime']
 
     if (!validTiers.includes(tier)) {
-      return res.status(400).json({ ok: false, error: 'Invalid tier' })
+      return res.status(400).json({ ok:false, error:'Invalid tier'})
     }
 
     if (!validTerms.includes(term)) {
-      return res.status(400).json({ ok: false, error: 'Invalid term' })
+      return res.status(400).json({ ok:false, error:'Invalid term'})
     }
 
     const currencyDisplay = cleanUpper(body.currency_display || body.currency, 'USD')
-    if (!['LKR', 'USD'].includes(currencyDisplay)) {
-      return res.status(400).json({ ok: false, error: 'Invalid currency' })
+
+    if (!['LKR','USD'].includes(currencyDisplay)) {
+      return res.status(400).json({ ok:false, error:'Invalid currency'})
     }
 
     const usdAmount = USD_BASE_PRICES?.[tier]?.[term]
+
     if (!usdAmount) {
-      return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
+      return res.status(400).json({ ok:false, error:'Invalid pricing selection'})
     }
 
     const envFallback = normalizeFxRate(process.env.MEMBERSHIP_USD_LKR_RATE, 300)
     const clientFx = normalizeFxRate(body.fx_rate, null)
-    const fxRate = clientFx || (await fetchLiveUsdLkr(envFallback))
+
+    const fxRate = clientFx || await fetchLiveUsdLkr(envFallback)
 
     const payCurrency = 'LKR'
+
     const amountNum = usdToLkrNumber(usdAmount, fxRate)
     const amount = money2(amountNum)
 
@@ -144,8 +174,8 @@ export default async function handler(req, res) {
 
     if (!merchantId || !merchantSecret) {
       return res.status(500).json({
-        ok: false,
-        error: 'Missing PAYHERE_MERCHANT_ID or PAYHERE_MERCHANT_SECRET (server env).',
+        ok:false,
+        error:'Missing PAYHERE_MERCHANT_ID or PAYHERE_MERCHANT_SECRET'
       })
     }
 
@@ -155,33 +185,33 @@ export default async function handler(req, res) {
     const base = getBaseUrl(req)
     const notifyUrl = base ? `${base}/api/payhere/notify` : undefined
 
-    const orderId = crypto.randomUUID()
+    const orderId = generateOrderId()
 
     const payload = {
+
       id: orderId,
       email,
+
       order_kind: 'membership',
 
-      // membership details
-      license: tier,
-      format: term,
+      membership_plan: tier,
+      membership_term: term,
 
       currency: payCurrency,
       amount,
       status: 'PENDING',
 
-      // ✅ IMPORTANT: never put non-UUID text into UUID-style fields
       photo_id: null,
-
-      // membership orders do not need delivery file keys
       delivery_object_key: null,
     }
 
-    const { error } = await supabaseAdmin.from('orders').insert(payload)
+    const { error } = await supabaseAdmin
+      .from('orders')
+      .insert(payload)
 
     if (error) {
       console.error('membership order insert error:', error)
-      return res.status(500).json({ ok: false, error: error.message })
+      return res.status(500).json({ ok:false, error:error.message })
     }
 
     const hash = payhereInitHash({
@@ -193,7 +223,9 @@ export default async function handler(req, res) {
     })
 
     return res.status(200).json({
-      ok: true,
+
+      ok:true,
+
       checkoutUrl,
       merchantId,
       orderId,
@@ -202,7 +234,6 @@ export default async function handler(req, res) {
       hash,
       notifyUrl,
 
-      // helpful debug/display fields
       tier,
       term,
       usdAmount,
@@ -210,8 +241,14 @@ export default async function handler(req, res) {
       currencyDisplay,
       mode,
     })
+
   } catch (e) {
+
     console.error('membership/create-order error:', e)
-    return res.status(500).json({ ok: false, error: e?.message || 'Server error' })
+
+    return res.status(500).json({
+      ok:false,
+      error:e?.message || 'Server error'
+    })
   }
 }
