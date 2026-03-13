@@ -9,7 +9,7 @@ import WhatIDoAudioServices from '../components/what-i-do-audio-services'
 import HowIApproachAudio from '../components/how-i-approach-audio'
 import WhoItsForAudio from '../components/who-its-for-audio'
 import ServicesAudioFinalCTA from '../components/services-audio-final-cta'
-import JeevanChandimalNewFooter from '../components/layout/jeevan-chimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
 
 const ServicesAudio = () => {
   return (
