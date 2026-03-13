@@ -622,8 +622,6 @@ export default async function handler(req, res) {
 
         const email = normalizeEmail(order.email)
         const userId = isUuid(order.user_id) ? String(order.user_id).trim() : null
-        if (!email || !userId) return res.status(200).send('OK')
-
         const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
 
         if (!wasPaidAlready) {
@@ -641,6 +639,8 @@ export default async function handler(req, res) {
             payhere_status_message: status_message || null,
           })
         }
+
+        if (!email) return res.status(200).send('OK')
 
         const freshRes = await supabaseAdmin
           .from('orders')
@@ -666,27 +666,34 @@ export default async function handler(req, res) {
 
         const monthlyLimit = MEMBER_LIMITS[tier] ?? 75
 
-        try {
-          const payload = {
-            user_id: userId,
-            email,
-            plan: tier,
-            term,
-            status: 'active',
-            start_date: startDate,
-            end_date: endDate,
-            billing_cycle: term,
-            billing_cycle_start: startDate,
-            billing_cycle_end: endDate,
-            monthly_download_limit: monthlyLimit,
-            monthly_download_used: 0,
-            updated_at: new Date().toISOString(),
-          }
+        if (userId) {
+          try {
+            const payload = {
+              user_id: userId,
+              email,
+              plan: tier,
+              term,
+              status: 'active',
+              start_date: startDate,
+              end_date: endDate,
+              billing_cycle: term,
+              billing_cycle_start: startDate,
+              billing_cycle_end: endDate,
+              monthly_download_limit: monthlyLimit,
+              monthly_download_used: 0,
+              updated_at: new Date().toISOString(),
+            }
 
-          const up = await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'user_id' })
-          if (up.error) console.error('memberships upsert error:', up.error.message)
-        } catch (e) {
-          console.error('memberships activate error:', e?.message || e)
+            const up = await supabaseAdmin
+              .from('memberships')
+              .upsert(payload, { onConflict: 'user_id' })
+
+            if (up.error) console.error('memberships upsert error:', up.error.message)
+          } catch (e) {
+            console.error('memberships activate error:', e?.message || e)
+          }
+        } else {
+          console.error('membership activation skipped: missing UUID user_id for order', order.id)
         }
 
         try {
@@ -873,7 +880,10 @@ export default async function handler(req, res) {
               }
 
               const ext = format === 'raw' ? 'zip' : 'jpg'
-              const safePhotoId = photoId && isUuid(photoId) ? photoId : '00000000-0000-0000-0000-000000000000'
+              const safePhotoId =
+                photoId && isUuid(photoId)
+                  ? photoId
+                  : '00000000-0000-0000-0000-000000000000'
 
               const token = createDownloadToken(
                 {
@@ -1012,7 +1022,9 @@ export default async function handler(req, res) {
         const invoiceNo = await ensureInvoiceNo(o)
         const fmt = normalizeFormat(o.format)
         const ext = fmt === 'raw' ? 'zip' : 'jpg'
-        const safePhotoId = isUuid(o.photo_id) ? o.photo_id : '00000000-0000-0000-0000-000000000000'
+        const safePhotoId = isUuid(o.photo_id)
+          ? o.photo_id
+          : '00000000-0000-0000-0000-000000000000'
         const safePhotoRef = String(o.photo_ref || '').trim() || null
 
         let downloadUrl = null
