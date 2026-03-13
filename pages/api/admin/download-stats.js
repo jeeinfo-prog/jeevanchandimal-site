@@ -29,6 +29,17 @@ function normalizeAssetUrl(value) {
   return raw
 }
 
+function isUuid(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(v || '').trim()
+  )
+}
+
+function safeDateMs(v) {
+  const ms = new Date(v).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
@@ -82,7 +93,7 @@ export default async function handler(req, res) {
       }
 
       const photoId = String(o?.photo_id || '').trim()
-      if (photoId) {
+      if (isUuid(photoId)) {
         byPhoto[photoId] = (byPhoto[photoId] || 0) + 1
       }
     }
@@ -101,13 +112,15 @@ export default async function handler(req, res) {
       new Set(
         paidOrders
           .map((o) => String(o?.photo_id || '').trim())
-          .filter(Boolean)
+          .filter(isUuid)
       )
     )
 
     const photosById = {}
 
     for (const ids of chunkArray(uniquePhotoIds, 200)) {
+      if (!ids.length) continue
+
       const { data: photos, error: photosErr } = await supabaseAdmin
         .from('photos')
         .select(
@@ -144,17 +157,26 @@ export default async function handler(req, res) {
       .sort((a, b) => a.date.localeCompare(b.date))
 
     const topPhotos = Object.entries(byPhoto)
-      .map(([photoId, count]) => ({ photoId, count }))
+      .map(([photoId, count]) => {
+        const photo = photosById[photoId] || null
+        return {
+          photoId,
+          count,
+          title: photo?.title || '',
+          thumbnail: normalizeAssetUrl(photo?.thumb_url || photo?.preview_url),
+        }
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
 
     const ordersOut = paidOrders
       .slice()
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .sort((a, b) => safeDateMs(b?.created_at) - safeDateMs(a?.created_at))
       .slice(0, 20)
       .map((o) => {
-        const photoId = String(o?.photo_id || '').trim()
-        const photo = photosById[photoId] || null
+        const rawPhotoId = String(o?.photo_id || '').trim()
+        const photoId = isUuid(rawPhotoId) ? rawPhotoId : null
+        const photo = photoId ? photosById[photoId] || null : null
 
         return {
           orderId: o.id,
@@ -163,7 +185,7 @@ export default async function handler(req, res) {
           amount: Number(toNumber(o?.amount).toFixed(2)),
           currency: normalizeCurrency(o?.currency),
           date: o.created_at,
-          downloads: downloadsByOrder[o.id] || 0,
+          downloads: downloadsByOrder[String(o.id)] || 0,
           thumbnail: normalizeAssetUrl(photo?.thumb_url || photo?.preview_url),
           original: normalizeAssetUrl(photo?.preview_url || null),
           originalFilename: photo?.original_filename || null,
