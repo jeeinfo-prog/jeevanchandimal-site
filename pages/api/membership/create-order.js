@@ -10,6 +10,8 @@ const USD_BASE_PRICES = {
   elite: { monthly: 149, yearly: 1490, lifetime: 3990 },
 }
 
+const PLACEHOLDER_PHOTO_ID = '00000000-0000-0000-0000-000000000000'
+
 /* ---------------- helpers ---------------- */
 
 function normalizeEmail(v) {
@@ -108,25 +110,23 @@ function generateOrderId() {
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
-
   res.setHeader('Cache-Control', 'no-store')
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok:false, error:'Method not allowed'})
+    return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
   try {
-
     const body = req.body || {}
 
     const email = normalizeEmail(body.email)
 
     if (!email) {
-      return res.status(400).json({ ok:false, error:'Missing email'})
+      return res.status(400).json({ ok: false, error: 'Missing email' })
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).json({ ok:false, error:'Invalid email'})
+      return res.status(400).json({ ok: false, error: 'Invalid email' })
     }
 
     let tier = cleanLower(body.tier, '')
@@ -136,36 +136,34 @@ export default async function handler(req, res) {
     if (!tier) tier = 'pro'
     if (!term) term = 'monthly'
 
-    const validTiers = ['basic','pro','elite']
-    const validTerms = ['monthly','yearly','lifetime']
+    const validTiers = ['basic', 'pro', 'elite']
+    const validTerms = ['monthly', 'yearly', 'lifetime']
 
     if (!validTiers.includes(tier)) {
-      return res.status(400).json({ ok:false, error:'Invalid tier'})
+      return res.status(400).json({ ok: false, error: 'Invalid tier' })
     }
 
     if (!validTerms.includes(term)) {
-      return res.status(400).json({ ok:false, error:'Invalid term'})
+      return res.status(400).json({ ok: false, error: 'Invalid term' })
     }
 
     const currencyDisplay = cleanUpper(body.currency_display || body.currency, 'USD')
 
-    if (!['LKR','USD'].includes(currencyDisplay)) {
-      return res.status(400).json({ ok:false, error:'Invalid currency'})
+    if (!['LKR', 'USD'].includes(currencyDisplay)) {
+      return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
     const usdAmount = USD_BASE_PRICES?.[tier]?.[term]
 
     if (!usdAmount) {
-      return res.status(400).json({ ok:false, error:'Invalid pricing selection'})
+      return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
     }
 
     const envFallback = normalizeFxRate(process.env.MEMBERSHIP_USD_LKR_RATE, 300)
     const clientFx = normalizeFxRate(body.fx_rate, null)
-
-    const fxRate = clientFx || await fetchLiveUsdLkr(envFallback)
+    const fxRate = clientFx || (await fetchLiveUsdLkr(envFallback))
 
     const payCurrency = 'LKR'
-
     const amountNum = usdToLkrNumber(usdAmount, fxRate)
     const amount = money2(amountNum)
 
@@ -174,8 +172,8 @@ export default async function handler(req, res) {
 
     if (!merchantId || !merchantSecret) {
       return res.status(500).json({
-        ok:false,
-        error:'Missing PAYHERE_MERCHANT_ID or PAYHERE_MERCHANT_SECRET'
+        ok: false,
+        error: 'Missing PAYHERE_MERCHANT_ID or PAYHERE_MERCHANT_SECRET',
       })
     }
 
@@ -186,10 +184,11 @@ export default async function handler(req, res) {
     const notifyUrl = base ? `${base}/api/payhere/notify` : undefined
 
     const orderId = generateOrderId()
+    const now = new Date().toISOString()
 
     const payload = {
-
       id: orderId,
+      order_id: orderId,
       email,
 
       order_kind: 'membership',
@@ -197,21 +196,28 @@ export default async function handler(req, res) {
       membership_plan: tier,
       membership_term: term,
 
+      // keep legacy required columns non-null
+      license: tier,
+      format: term,
+
+      // legacy photo fields
+      photo_id: PLACEHOLDER_PHOTO_ID,
+      photo_ref: null,
+      delivery_object_key: null,
+
       currency: payCurrency,
       amount,
       status: 'PENDING',
 
-      photo_id: null,
-      delivery_object_key: null,
+      created_at: now,
+      updated_at: now,
     }
 
-    const { error } = await supabaseAdmin
-      .from('orders')
-      .insert(payload)
+    const { error } = await supabaseAdmin.from('orders').insert(payload)
 
     if (error) {
       console.error('membership order insert error:', error)
-      return res.status(500).json({ ok:false, error:error.message })
+      return res.status(500).json({ ok: false, error: error.message })
     }
 
     const hash = payhereInitHash({
@@ -223,8 +229,7 @@ export default async function handler(req, res) {
     })
 
     return res.status(200).json({
-
-      ok:true,
+      ok: true,
 
       checkoutUrl,
       merchantId,
@@ -241,14 +246,12 @@ export default async function handler(req, res) {
       currencyDisplay,
       mode,
     })
-
   } catch (e) {
-
     console.error('membership/create-order error:', e)
 
     return res.status(500).json({
-      ok:false,
-      error:e?.message || 'Server error'
+      ok: false,
+      error: e?.message || 'Server error',
     })
   }
 }
