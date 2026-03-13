@@ -22,9 +22,13 @@ function round2(n) {
   return Math.round(x * 100) / 100
 }
 
+function clean(v) {
+  return String(v || '').trim()
+}
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    String(value || '').trim()
+    clean(value)
   )
 }
 
@@ -54,15 +58,13 @@ function safeJsonParse(v, fallback = null) {
 
 function firstNonEmpty(...values) {
   for (const v of values) {
-    if (String(v || '').trim()) return String(v).trim()
+    if (clean(v)) return clean(v)
   }
   return ''
 }
 
 function cleanBaseUrl(v) {
-  return String(v || '')
-    .trim()
-    .replace(/\/+$/, '')
+  return clean(v).replace(/\/+$/, '')
 }
 
 function getBaseUrl(req) {
@@ -71,15 +73,11 @@ function getBaseUrl(req) {
     cleanBaseUrl(process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL)
   if (webhook) return webhook
 
-  const proto = String(req.headers['x-forwarded-proto'] || 'https')
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+  const proto = clean(req.headers['x-forwarded-proto'] || 'https')
+  const host = clean(req.headers['x-forwarded-host'] || req.headers.host || '')
   if (host) return `${proto}://${host}`
 
-  return (
-    cleanBaseUrl(process.env.SITE_URL) ||
-    cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
-    ''
-  )
+  return cleanBaseUrl(process.env.SITE_URL) || cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) || ''
 }
 
 function buildDownloadUrl(token, req) {
@@ -92,26 +90,26 @@ function normalizePayhereAmount(v) {
 }
 
 function normalizeEmail(v) {
-  return String(v || '').trim().toLowerCase()
+  return clean(v).toLowerCase()
 }
 
 function normalizeLicense(v) {
-  const x = String(v || '').trim().toLowerCase()
+  const x = clean(v).toLowerCase()
   if (x === 'commercial') return 'commercial'
   if (x === 'editorial') return 'editorial'
   return 'personal'
 }
 
 function normalizeFormat(v) {
-  return String(v || '').trim().toLowerCase() === 'raw' ? 'raw' : 'jpg'
+  return clean(v).toLowerCase() === 'raw' ? 'raw' : 'jpg'
 }
 
 function normalizeCurrency(v) {
-  return String(v || '').trim().toUpperCase() === 'USD' ? 'USD' : 'LKR'
+  return clean(v).toUpperCase() === 'USD' ? 'USD' : 'LKR'
 }
 
 function normalizePaymentId(v) {
-  const s = String(v || '').trim()
+  const s = clean(v)
   if (!s || s === '0') return null
   return s
 }
@@ -122,7 +120,7 @@ function alreadyProcessedPaidOrder(order, paymentId) {
 
   return (
     String(order.status || '').toUpperCase() === 'PAID' &&
-    String(order.payhere_payment_id || '').trim() === pid
+    clean(order.payhere_payment_id) === pid
   )
 }
 
@@ -131,12 +129,12 @@ function makeReplayFingerprint(data, rawBody) {
     .createHash('sha256')
     .update(
       [
-        String(data.merchant_id || '').trim(),
-        String(data.order_id || '').trim(),
-        String(data.payment_id || '').trim(),
+        clean(data.merchant_id),
+        clean(data.order_id),
+        clean(data.payment_id),
         normalizePayhereAmount(data.payhere_amount),
         normalizeCurrency(data.payhere_currency),
-        String(data.status_code || '').trim(),
+        clean(data.status_code),
         String(rawBody || ''),
       ].join('|')
     )
@@ -146,12 +144,12 @@ function makeReplayFingerprint(data, rawBody) {
 /* ===== MEMBERSHIP HELPERS ===== */
 
 function normalizeMembershipTier(v) {
-  const x = String(v || '').trim().toLowerCase()
+  const x = clean(v).toLowerCase()
   return ['basic', 'pro', 'elite'].includes(x) ? x : 'pro'
 }
 
 function normalizeMembershipTerm(v) {
-  const x = String(v || '').trim().toLowerCase()
+  const x = clean(v).toLowerCase()
   return ['monthly', 'yearly', 'lifetime'].includes(x) ? x : 'monthly'
 }
 
@@ -243,7 +241,7 @@ function genInvoiceNo(orderId) {
   const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
   const dd = String(d.getUTCDate()).padStart(2, '0')
   const tail =
-    String(orderId || '')
+    clean(orderId)
       .replace(/[^a-zA-Z0-9]/g, '')
       .slice(-6)
       .toUpperCase() || crypto.randomUUID().slice(0, 6).toUpperCase()
@@ -262,14 +260,14 @@ async function ensureInvoiceNo(order) {
 /* ===== OBJECT KEY RESOLVE ===== */
 
 function fallbackObjectKeyFromPhotoId(photoId, format) {
-  const pid = String(photoId || '')
+  const pid = clean(photoId)
   if (!pid) return null
   if (format === 'raw') return `photos/original/${pid}.zip`
   return `photos/original/${pid}.jpg`
 }
 
 async function resolveObjectKeyFromPhotos(photoId, format) {
-  const pid = String(photoId || '').trim()
+  const pid = clean(photoId)
   if (!pid || !isUuid(pid)) return null
 
   const fmt = normalizeFormat(format)
@@ -290,8 +288,8 @@ async function resolveObjectKeyFromPhotos(photoId, format) {
 /* ===== ORDER LOOKUPS ===== */
 
 async function findCartOrder({ cartOrderDbId, cartCode }) {
-  const id = String(cartOrderDbId || '').trim()
-  const code = String(cartCode || '').trim()
+  const id = clean(cartOrderDbId)
+  const code = clean(cartCode)
 
   if (id) {
     const byId = await supabaseAdmin.from('orders').select('*').eq('id', id).maybeSingle()
@@ -301,13 +299,26 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
   if (code) {
     const byCode = await supabaseAdmin.from('orders').select('*').eq('code', code).maybeSingle()
     if (!byCode.error && byCode?.data) return byCode.data
+
+    const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', code).maybeSingle()
+    if (!byOrderId.error && byOrderId?.data) return byOrderId.data
+
+    const byPayhereOrderId = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('payhere_order_id', code)
+      .maybeSingle()
+    if (!byPayhereOrderId.error && byPayhereOrderId?.data) return byPayhereOrderId.data
+
+    const byId2 = await supabaseAdmin.from('orders').select('*').eq('id', code).maybeSingle()
+    if (!byId2.error && byId2?.data) return byId2.data
   }
 
   return null
 }
 
 async function findSingleOrderByRef(ref) {
-  const v = String(ref || '').trim()
+  const v = clean(ref)
   if (!v) return null
 
   const byId = await supabaseAdmin.from('orders').select('*').eq('id', v).maybeSingle()
@@ -350,7 +361,7 @@ async function claimPaymentOnce(orderDbId, paymentId) {
 
 async function updateOrderStatusSafe(orderId, patch) {
   const r = await supabaseAdmin.from('orders').update(patch).eq('id', orderId)
-  if (r.error) console.error('updateOrderStatusSafe failed:', r.error.message)
+  if (r.error) console.error('updateOrderStatusSafe failed:', r.error.message, { orderId, patch })
 }
 
 async function markEmailSent(orderId, column) {
@@ -372,22 +383,19 @@ async function markReplayIfPossible({ fingerprint, orderId, paymentId, statusCod
   try {
     await supabaseAdmin.from('payhere_notifications').insert({
       fingerprint,
-      order_id: String(orderId || '').trim() || null,
+      order_id: clean(orderId) || null,
       payment_id: normalizePaymentId(paymentId),
-      status_code: String(statusCode || '').trim() || null,
+      status_code: clean(statusCode) || null,
       payload,
       created_at: new Date().toISOString(),
     })
     return { duplicate: false }
   } catch (e) {
     const msg = String(e?.message || '')
-    if (
-      msg.includes('duplicate key') ||
-      msg.includes('unique constraint') ||
-      msg.includes('23505')
-    ) {
+    if (msg.includes('duplicate key') || msg.includes('unique constraint') || msg.includes('23505')) {
       return { duplicate: true }
     }
+    console.error('markReplayIfPossible failed:', msg)
     return { duplicate: false }
   }
 }
@@ -395,15 +403,15 @@ async function markReplayIfPossible({ fingerprint, orderId, paymentId, statusCod
 /* ===== KIND DETECTION + AMOUNT SAFETY ===== */
 
 function orderLooksLikeCart(order_id, custom_1, dbOrder) {
-  const kindRaw = String(custom_1 || '').trim().toLowerCase()
+  const kindRaw = clean(custom_1).toLowerCase()
   const isCartByCustom = kindRaw === 'cart'
-  const isCartByPrefix = String(order_id || '').startsWith('CART_')
-  const isCartByDb = String(dbOrder?.order_kind || '').toLowerCase() === 'cart'
+  const isCartByPrefix = clean(order_id).startsWith('CART_')
+  const isCartByDb = clean(dbOrder?.order_kind).toLowerCase() === 'cart'
   return isCartByCustom || isCartByPrefix || isCartByDb
 }
 
 function orderLooksLikeMembership(data, dbOrder) {
-  const kindRaw = String(data?.custom_1 || '').trim().toLowerCase()
+  const kindRaw = clean(data?.custom_1).toLowerCase()
   const { c1, c2 } = extractCustomPayloads(data)
 
   const hasPlan = !!firstNonEmpty(
@@ -429,7 +437,7 @@ function orderLooksLikeMembership(data, dbOrder) {
   )
 
   const isMemByCustom = kindRaw === 'membership'
-  const isMemByDb = String(dbOrder?.order_kind || '').toLowerCase() === 'membership'
+  const isMemByDb = clean(dbOrder?.order_kind).toLowerCase() === 'membership'
 
   return isMemByCustom || isMemByDb || hasPlan || hasTerm
 }
@@ -447,6 +455,7 @@ function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency })
     console.error('Amount/currency mismatch:', {
       orderId: dbOrder.id,
       code: dbOrder.code,
+      order_id: dbOrder.order_id,
       dbAmount,
       dbCurrency,
       phAmount,
@@ -460,7 +469,10 @@ function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency })
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(200).send('OK')
+  if (req.method !== 'POST') {
+    console.log('notify: non-POST request ignored')
+    return res.status(200).send('OK')
+  }
 
   try {
     assertPayhereEnv()
@@ -481,7 +493,22 @@ export default async function handler(req, res) {
       custom_2,
     } = data
 
-    if (!order_id) return res.status(200).send('OK')
+    console.log('=== PayHere notify hit ===')
+    console.log('notify raw:', raw)
+    console.log('notify parsed:', data)
+    console.log('notify summary:', {
+      order_id: clean(order_id),
+      payment_id: clean(payment_id),
+      status_code: clean(status_code),
+      merchant_id: clean(merchant_id),
+      custom_1: clean(custom_1),
+      custom_2: clean(custom_2),
+    })
+
+    if (!order_id) {
+      console.log('notify: missing order_id')
+      return res.status(200).send('OK')
+    }
 
     const pid = normalizePaymentId(payment_id)
     const fingerprint = makeReplayFingerprint(data, raw)
@@ -497,60 +524,52 @@ export default async function handler(req, res) {
       md5sig,
     })
 
-    const cartCode = String(order_id || '').trim()
-    const cartDbId = String(custom_2 || '').trim()
+    const cartCode = clean(order_id)
+    const cartDbId = clean(custom_2)
 
     if (!ok) {
-      console.error('MD5 signature mismatch for order:', order_id)
+      console.error('notify: MD5 signature mismatch', {
+        order_id: clean(order_id),
+        merchant_id: clean(merchant_id),
+        status_code: clean(status_code),
+        payhere_amount: normalizePayhereAmount(payhere_amount),
+        payhere_currency: clean(payhere_currency),
+        md5sig: clean(md5sig),
+      })
 
       let dbOrder = null
       try {
-        if (
-          String(order_id || '').startsWith('CART_') ||
-          String(custom_1 || '').trim().toLowerCase() === 'cart'
-        ) {
+        if (clean(order_id).startsWith('CART_') || clean(custom_1).toLowerCase() === 'cart') {
           dbOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
         } else {
           dbOrder = await findSingleOrderByRef(order_id)
         }
-      } catch {}
+      } catch (e) {
+        console.error('notify: lookup during invalid sig failed:', e?.message || e)
+      }
 
-      const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
+      console.log('notify: dbOrder found during invalid sig?', !!dbOrder)
 
-      if (isCart) {
-        const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
-        if (cartOrder) {
-          await updateOrderStatusSafe(cartOrder.id, {
-            status: 'INVALID_SIG',
-            payhere_payment_id: null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-        }
-      } else {
-        const single = dbOrder || (await findSingleOrderByRef(order_id))
-        if (single) {
-          await updateOrderStatusSafe(single.id, {
-            status: 'INVALID_SIG',
-            payhere_payment_id: null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-        }
+      if (dbOrder) {
+        await updateOrderStatusSafe(dbOrder.id, {
+          status: 'INVALID_SIG',
+          payhere_status_code: clean(status_code) || null,
+          payhere_status_message: clean(status_message) || null,
+        })
       }
 
       return res.status(200).send('OK')
     }
 
     const knownIds = [
-      String(PAYHERE.merchantId || '').trim(),
-      String(PAYHERE.merchantIdLive || '').trim(),
-      String(PAYHERE.merchantIdSandbox || '').trim(),
+      clean(PAYHERE.merchantId),
+      clean(PAYHERE.merchantIdLive),
+      clean(PAYHERE.merchantIdSandbox),
     ].filter(Boolean)
 
-    if (!knownIds.includes(String(merchant_id || '').trim())) {
-      console.error('Merchant ID mismatch:', {
-        got: String(merchant_id || '').trim(),
+    if (!knownIds.includes(clean(merchant_id))) {
+      console.error('notify: merchant ID mismatch', {
+        got: clean(merchant_id),
         expected_any_of: knownIds,
       })
       return res.status(200).send('OK')
@@ -565,6 +584,10 @@ export default async function handler(req, res) {
     })
 
     if (replayResult.duplicate) {
+      console.log('notify: duplicate webhook ignored', {
+        order_id: clean(order_id),
+        payment_id: pid,
+      })
       return res.status(200).send('OK')
     }
 
@@ -572,29 +595,44 @@ export default async function handler(req, res) {
 
     let dbOrder = null
     try {
-      if (
-        String(order_id || '').startsWith('CART_') ||
-        String(custom_1 || '').trim().toLowerCase() === 'cart'
-      ) {
+      if (clean(order_id).startsWith('CART_') || clean(custom_1).toLowerCase() === 'cart') {
         dbOrder = await findCartOrder({ cartOrderDbId: cartDbId, cartCode })
       } else {
         dbOrder = await findSingleOrderByRef(order_id)
       }
-    } catch {}
+    } catch (e) {
+      console.error('notify: initial order lookup failed:', e?.message || e)
+    }
+
+    console.log('notify: dbOrder found?', !!dbOrder, {
+      order_id: clean(order_id),
+      dbOrderId: dbOrder?.id || null,
+      dbOrderKind: dbOrder?.order_kind || null,
+      dbStatus: dbOrder?.status || null,
+    })
 
     /* =========================================================
        ✅ PAYMENT SUCCESS
     ========================================================= */
     if (statusCodeNum === 2) {
+      console.log('notify: success branch entered', {
+        order_id: clean(order_id),
+        payment_id: pid,
+      })
+
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
       const isMembership = orderLooksLikeMembership(data, dbOrder)
 
       /* ================= MEMBERSHIP ================= */
       if (isMembership) {
         const order = dbOrder || (await findSingleOrderByRef(order_id))
-        if (!order) return res.status(200).send('OK')
+        if (!order) {
+          console.error('notify: membership order not found', { order_id: clean(order_id) })
+          return res.status(200).send('OK')
+        }
 
         if (alreadyProcessedPaidOrder(order, payment_id)) {
+          console.log('notify: membership already processed', { orderId: order.id, payment_id: pid })
           return res.status(200).send('OK')
         }
 
@@ -603,8 +641,8 @@ export default async function handler(req, res) {
 
           await updateOrderStatusSafe(order.id, {
             status: 'AMOUNT_MISMATCH',
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
 
           return res.status(200).send('OK')
@@ -614,39 +652,38 @@ export default async function handler(req, res) {
 
         if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
           await updateOrderStatusSafe(order.id, {
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
           return res.status(200).send('OK')
         }
 
         const email = normalizeEmail(order.email)
-        const userId = isUuid(order.user_id) ? String(order.user_id).trim() : null
+        const userId = isUuid(order.user_id) ? clean(order.user_id) : null
         const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
 
         if (!wasPaidAlready) {
           await updateOrderStatusSafe(order.id, {
             status: 'PAID',
             paid_at: new Date().toISOString(),
-            payhere_order_id: String(order_id || '').trim() || null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_order_id: clean(order_id) || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
         } else {
           await updateOrderStatusSafe(order.id, {
-            payhere_order_id: String(order_id || '').trim() || null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_order_id: clean(order_id) || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
         }
 
-        if (!email) return res.status(200).send('OK')
+        if (!email) {
+          console.log('notify: membership email missing, payment still marked paid', { orderId: order.id })
+          return res.status(200).send('OK')
+        }
 
-        const freshRes = await supabaseAdmin
-          .from('orders')
-          .select('*')
-          .eq('id', order.id)
-          .maybeSingle()
+        const freshRes = await supabaseAdmin.from('orders').select('*').eq('id', order.id).maybeSingle()
 
         if (freshRes.error) {
           console.error('membership refetch failed:', freshRes.error.message)
@@ -684,9 +721,7 @@ export default async function handler(req, res) {
               updated_at: new Date().toISOString(),
             }
 
-            const up = await supabaseAdmin
-              .from('memberships')
-              .upsert(payload, { onConflict: 'user_id' })
+            const up = await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'user_id' })
 
             if (up.error) console.error('memberships upsert error:', up.error.message)
           } catch (e) {
@@ -722,15 +757,20 @@ export default async function handler(req, res) {
         return res.status(200).send('OK')
       }
 
-      /* ================= CART (SINGLE ROW) ================= */
+      /* ================= CART ================= */
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (!cartOrder) {
-          console.error('Cart order not found:', { cartDbId, cartCode })
+          console.error('notify: cart order not found', {
+            cartDbId,
+            cartCode,
+            order_id: clean(order_id),
+          })
           return res.status(200).send('OK')
         }
 
         if (alreadyProcessedPaidOrder(cartOrder, payment_id)) {
+          console.log('notify: cart already processed', { orderId: cartOrder.id, payment_id: pid })
           return res.status(200).send('OK')
         }
 
@@ -739,8 +779,8 @@ export default async function handler(req, res) {
 
           await updateOrderStatusSafe(cartOrder.id, {
             status: 'AMOUNT_MISMATCH',
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
 
           return res.status(200).send('OK')
@@ -749,31 +789,34 @@ export default async function handler(req, res) {
         const claimedPayment = pid ? await claimPaymentOnce(cartOrder.id, pid) : false
         if (!claimedPayment && String(cartOrder.status || '').toUpperCase() === 'PAID') {
           await updateOrderStatusSafe(cartOrder.id, {
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
           return res.status(200).send('OK')
         }
 
         const email = normalizeEmail(cartOrder.email)
-        if (!email) return res.status(200).send('OK')
-
         const wasPaidAlready = String(cartOrder.status || '').toUpperCase() === 'PAID'
 
         if (!wasPaidAlready) {
           await updateOrderStatusSafe(cartOrder.id, {
             status: 'PAID',
             paid_at: new Date().toISOString(),
-            payhere_order_id: String(order_id || '').trim() || null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_order_id: clean(order_id) || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
         } else {
           await updateOrderStatusSafe(cartOrder.id, {
-            payhere_order_id: String(order_id || '').trim() || null,
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_order_id: clean(order_id) || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
+        }
+
+        if (!email) {
+          console.log('notify: cart email missing, payment still marked paid', { orderId: cartOrder.id })
+          return res.status(200).send('OK')
         }
 
         const { data: freshCart, error: freshErr } = await supabaseAdmin
@@ -794,8 +837,8 @@ export default async function handler(req, res) {
           console.error('Cart order has no items array:', o.id)
           await updateOrderStatusSafe(o.id, {
             status: 'PAID_NO_ITEMS',
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
           return res.status(200).send('OK')
         }
@@ -844,13 +887,13 @@ export default async function handler(req, res) {
             const links = []
 
             for (const it of items) {
-              const photoId = String(it?.photoId || it?.photo_id || '').trim()
-              const legacyPhotoRef = String(it?.photoRef || it?.photo_ref || '').trim()
-              const title = String(it?.title || legacyPhotoRef || photoId || 'Photo')
+              const photoId = clean(it?.photoId || it?.photo_id)
+              const legacyPhotoRef = clean(it?.photoRef || it?.photo_ref)
+              const title = clean(it?.title) || legacyPhotoRef || photoId || 'Photo'
               const license = normalizeLicense(it?.license)
               const format = normalizeFormat(it?.format)
 
-              let objectKey = String(it?.objectKey || it?.object_key || '').trim()
+              let objectKey = clean(it?.objectKey || it?.object_key)
 
               if (photoId && isUuid(photoId) && !objectKey) {
                 try {
@@ -943,9 +986,13 @@ export default async function handler(req, res) {
       /* ================= SINGLE PHOTO ================= */
 
       const order = dbOrder || (await findSingleOrderByRef(order_id))
-      if (!order) return res.status(200).send('OK')
+      if (!order) {
+        console.error('notify: single order not found', { order_id: clean(order_id) })
+        return res.status(200).send('OK')
+      }
 
       if (alreadyProcessedPaidOrder(order, payment_id)) {
+        console.log('notify: single order already processed', { orderId: order.id, payment_id: pid })
         return res.status(200).send('OK')
       }
 
@@ -954,8 +1001,8 @@ export default async function handler(req, res) {
 
         await updateOrderStatusSafe(order.id, {
           status: 'AMOUNT_MISMATCH',
-          payhere_status_code: status_code || null,
-          payhere_status_message: status_message || null,
+          payhere_status_code: clean(status_code) || null,
+          payhere_status_message: clean(status_message) || null,
         })
 
         return res.status(200).send('OK')
@@ -964,8 +1011,8 @@ export default async function handler(req, res) {
       const claimedPayment = pid ? await claimPaymentOnce(order.id, pid) : false
       if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
         await updateOrderStatusSafe(order.id, {
-          payhere_status_code: status_code || null,
-          payhere_status_message: status_message || null,
+          payhere_status_code: clean(status_code) || null,
+          payhere_status_message: clean(status_message) || null,
         })
 
         return res.status(200).send('OK')
@@ -976,45 +1023,49 @@ export default async function handler(req, res) {
         await updateOrderStatusSafe(order.id, {
           status: 'PAID',
           paid_at: new Date().toISOString(),
-          payhere_order_id: String(order_id || '').trim() || null,
-          payhere_status_code: status_code || null,
-          payhere_status_message: status_message || null,
+          payhere_order_id: clean(order_id) || null,
+          payhere_status_code: clean(status_code) || null,
+          payhere_status_message: clean(status_message) || null,
         })
       } else {
         await updateOrderStatusSafe(order.id, {
-          payhere_order_id: String(order_id || '').trim() || null,
-          payhere_status_code: status_code || null,
-          payhere_status_message: status_message || null,
+          payhere_order_id: clean(order_id) || null,
+          payhere_status_code: clean(status_code) || null,
+          payhere_status_message: clean(status_message) || null,
         })
       }
 
-      const { data: fresh } = await supabaseAdmin
-        .from('orders')
-        .select('*')
-        .eq('id', order.id)
-        .maybeSingle()
+      const { data: fresh } = await supabaseAdmin.from('orders').select('*').eq('id', order.id).maybeSingle()
 
       const o = fresh || order
       const email = normalizeEmail(o.email)
-      if (!email) return res.status(200).send('OK')
+      if (!email) {
+        console.log('notify: single order email missing, payment still marked paid', { orderId: o.id })
+        return res.status(200).send('OK')
+      }
 
       let objectKey = null
       try {
         objectKey = await resolveObjectKeyFromPhotos(o.photo_id, o.format)
-      } catch {}
-
-      if (!objectKey) objectKey = String(o.delivery_object_key || '').trim()
-      if (!objectKey) {
-        objectKey = fallbackObjectKeyFromPhotoId(String(o.photo_id || ''), normalizeFormat(o.format))
+      } catch (e) {
+        console.error('notify: resolveObjectKeyFromPhotos failed:', e?.message || e)
       }
-      if (!objectKey) return res.status(200).send('OK')
+
+      if (!objectKey) objectKey = clean(o.delivery_object_key)
+      if (!objectKey) {
+        objectKey = fallbackObjectKeyFromPhotoId(clean(o.photo_id), normalizeFormat(o.format))
+      }
+      if (!objectKey) {
+        console.error('notify: no objectKey resolved for single order', { orderId: o.id })
+        return res.status(200).send('OK')
+      }
 
       const desiredLimit = limitForLicense(o.license)
       if (o.download_limit == null || Number(o.download_limit) !== Number(desiredLimit)) {
         await supabaseAdmin.from('orders').update({ download_limit: desiredLimit }).eq('id', o.id)
       }
 
-      if (String(o.delivery_object_key || '') !== String(objectKey)) {
+      if (clean(o.delivery_object_key) !== clean(objectKey)) {
         await supabaseAdmin.from('orders').update({ delivery_object_key: objectKey }).eq('id', o.id)
       }
 
@@ -1025,7 +1076,7 @@ export default async function handler(req, res) {
         const safePhotoId = isUuid(o.photo_id)
           ? o.photo_id
           : '00000000-0000-0000-0000-000000000000'
-        const safePhotoRef = String(o.photo_ref || '').trim() || null
+        const safePhotoRef = clean(o.photo_ref) || null
 
         let downloadUrl = null
 
@@ -1088,7 +1139,7 @@ export default async function handler(req, res) {
           await markEmailSent(o.id, 'download_email_sent_at')
         }
       } catch (e) {
-        console.error('❌ Single photo delivery email block failed:', o.id, e)
+        console.error('Single photo delivery email block failed:', o.id, e?.message || e)
       }
 
       return res.status(200).send('OK')
@@ -1098,6 +1149,12 @@ export default async function handler(req, res) {
        ❌ PAYMENT FAILED / CANCELED / CHARGEDBACK
     ========================================================= */
     if (statusCodeNum < 0) {
+      console.log('notify: failed payment branch entered', {
+        order_id: clean(order_id),
+        payment_id: pid,
+        status_code: clean(status_code),
+      })
+
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
 
       const attachPidIfPossible = async (orderRow) => {
@@ -1111,9 +1168,11 @@ export default async function handler(req, res) {
           await attachPidIfPossible(cartOrder)
           await updateOrderStatusSafe(cartOrder.id, {
             status: 'FAILED',
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
           })
+        } else {
+          console.error('notify: failed cart order not found', { order_id: clean(order_id) })
         }
         return res.status(200).send('OK')
       }
@@ -1123,15 +1182,22 @@ export default async function handler(req, res) {
         await attachPidIfPossible(order)
         await updateOrderStatusSafe(order.id, {
           status: 'FAILED',
-          payhere_status_code: status_code || null,
-          payhere_status_message: status_message || null,
+          payhere_status_code: clean(status_code) || null,
+          payhere_status_message: clean(status_message) || null,
         })
+      } else if (!order) {
+        console.error('notify: failed single order not found', { order_id: clean(order_id) })
       }
     }
 
+    console.log('notify: completed without matching special branch', {
+      order_id: clean(order_id),
+      status_code: clean(status_code),
+    })
+
     return res.status(200).send('OK')
   } catch (err) {
-    console.error('PayHere notify error:', err)
+    console.error('PayHere notify error:', err?.message || err)
     return res.status(200).send('OK')
   }
 }
