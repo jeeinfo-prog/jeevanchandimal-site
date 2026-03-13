@@ -68,43 +68,42 @@ function normStatus(s) {
 }
 
 function isCartGroup(ref) {
-  return String(ref || '').toUpperCase().startsWith('CART_')
+  return String(ref || '')
+    .trim()
+    .toUpperCase()
+    .startsWith('CART_')
 }
 
 export default function StoreDownload() {
   const router = useRouter()
 
-  // ✅ support both:
+  // supports:
   // - /store/download?order_id=...  (single)
   // - /store/download?code=CART_... (cart group)
   const orderIdRef = readQueryStr(router.query, 'order_id')
   const codeRef = readQueryStr(router.query, 'code')
 
-  const mode = codeRef ? 'cart' : 'single'
-  const ref = codeRef || orderIdRef // what we show + what we pass to status
-  const isCart = mode === 'cart' || isCartGroup(ref)
+  const ref = codeRef || orderIdRef
+  const isCart = !!codeRef || isCartGroup(ref)
 
   const [status, setStatus] = React.useState('PENDING')
   const [msg, setMsg] = React.useState('')
   const [downloadLinks, setDownloadLinks] = React.useState([])
-  const [resolvedId, setResolvedId] = React.useState('') // for single
   const [loading, setLoading] = React.useState(false)
 
   async function load() {
-    if (!ref) return
-    if (loading) return
+    if (!ref || loading) return
 
     setLoading(true)
     setMsg('')
     setDownloadLinks([])
-    setResolvedId('')
 
     try {
-      // 1) Resolve + verify paid (works for both single + cart if your status API supports it)
-      const sr = await fetch(
-        `/api/orders/status?order_id=${encodeURIComponent(ref)}&t=${Date.now()}`,
-        { headers: { 'Cache-Control': 'no-store' } }
-      )
+      // 1) Verify paid
+      const statusParam = isCart ? `code=${encodeURIComponent(ref)}` : `order_id=${encodeURIComponent(ref)}`
+      const sr = await fetch(`/api/orders/status?${statusParam}&t=${Date.now()}`, {
+        headers: { 'Cache-Control': 'no-store' },
+      })
 
       const sdata = await sr.json().catch(() => ({}))
 
@@ -123,23 +122,8 @@ export default function StoreDownload() {
       }
 
       // 2) Generate secure link(s)
-      // ✅ single expects internal orders.id
-      // ✅ cart expects group code (server will return multiple tokens)
-      let payload = null
-
-      if (isCart) {
-        payload = { code: ref } // ✅ cart group
-      } else {
-        const oid = String(sdata?.id || '').trim()
-        setResolvedId(oid)
-
-        if (!oid) {
-          setMsg('Missing internal order id. Please contact support.')
-          return
-        }
-
-        payload = { orderId: oid } // ✅ single
-      }
+      // Use public reference directly instead of internal DB id
+      const payload = isCart ? { code: ref } : { orderId: ref }
 
       const tr = await fetch('/api/download/create-token', {
         method: 'POST',
@@ -171,14 +155,15 @@ export default function StoreDownload() {
   }
 
   React.useEffect(() => {
-    if (!router.isReady) return
+    if (!router.isReady || !ref) return
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, ref])
+  }, [router.isReady, ref, isCart])
 
   const paid = PAID_STATUSES.has(status)
-
-  const backHref = ref ? `/store/return?order_id=${encodeURIComponent(ref)}` : '/store'
+  const backHref = isCart
+    ? `/store/return?code=${encodeURIComponent(ref)}`
+    : `/store/return?order_id=${encodeURIComponent(ref)}`
 
   return (
     <>
@@ -195,7 +180,7 @@ export default function StoreDownload() {
 
           {!ref ? (
             <p className="p">
-              Missing order id. Go back to the{' '}
+              Missing order reference. Go back to the{' '}
               <Link href="/store" className="link">
                 store
               </Link>
@@ -206,12 +191,6 @@ export default function StoreDownload() {
               <p className="p">
                 {isCart ? 'Cart Code' : 'Order'}: <span className="mono">{ref}</span>
               </p>
-
-              {!isCart && resolvedId && resolvedId !== ref ? (
-                <p className="p2">
-                  Internal ID: <span className="mono">{resolvedId}</span>
-                </p>
-              ) : null}
 
               {!paid ? (
                 <>
