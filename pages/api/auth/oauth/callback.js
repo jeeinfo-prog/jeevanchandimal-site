@@ -1,4 +1,5 @@
 // pages/api/auth/oauth/callback.js
+import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
 function cleanNext(value) {
   const v = String(value || '').trim()
@@ -64,6 +65,81 @@ function clearOauthCookies(res, isProd) {
 function clearOauthCookiesAndRedirect(res, isProd, location) {
   clearOauthCookies(res, isProd)
   return res.redirect(302, location)
+}
+
+async function findAuthUserByEmail(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!cleanEmail) return null
+
+  const { data, error } = await supabaseAdmin.auth.admin.listUsers()
+
+  if (error) throw error
+
+  const users = Array.isArray(data?.users) ? data.users : []
+  return users.find((u) => String(u.email || '').trim().toLowerCase() === cleanEmail) || null
+}
+
+async function ensureSupabaseAuthUser({ email, name, picture }) {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  const cleanName = String(name || '').trim()
+  const cleanPicture = String(picture || '').trim()
+
+  if (!cleanEmail) {
+    throw new Error('Missing email')
+  }
+
+  const existing = await findAuthUserByEmail(cleanEmail)
+  if (existing?.id) {
+    return { userId: existing.id, created: false }
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email: cleanEmail,
+    email_confirm: true,
+    user_metadata: {
+      full_name: cleanName || null,
+      avatar_url: cleanPicture || null,
+      provider: 'google',
+    },
+  })
+
+  if (error) throw error
+  if (!data?.user?.id) throw new Error('Could not create auth user')
+
+  return { userId: data.user.id, created: true }
+}
+
+async function attachUserIdToMembershipIfNeeded(email, userId) {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  const cleanUserId = String(userId || '').trim()
+
+  if (!cleanEmail || !cleanUserId) return
+
+  const { data, error } = await supabaseAdmin
+    .from('memberships')
+    .select('id,email,user_id,status,end_date,created_at')
+    .eq('email', cleanEmail)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data?.id) return
+
+  const existingUserId = String(data.user_id || '').trim()
+  if (existingUserId === cleanUserId) return
+
+  // If membership already belongs to another auth user, do not overwrite automatically.
+  if (existingUserId && existingUserId !== cleanUserId) {
+    throw new Error('Membership is already linked to another user')
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('memberships')
+    .update({ user_id: cleanUserId })
+    .eq('id', data.id)
+
+  if (updateError) throw updateError
 }
 
 export default async function handler(req, res) {
@@ -177,12 +253,39 @@ export default async function handler(req, res) {
 
     const profile = await profileRes.json().catch(() => ({}))
     const email = String(profile?.email || '').trim().toLowerCase()
+    const name = String(profile?.name || '').trim()
+    const picture = String(profile?.picture || '').trim()
 
     if (!profileRes.ok || !email) {
       return clearOauthCookiesAndRedirect(
         res,
         isProd,
         buildErrorRedirect('Failed to load Google profile')
+      )
+    }
+
+    let authUserId = ''
+
+    try {
+      const ensured = await ensureSupabaseAuthUser({ email, name, picture })
+      authUserId = String(ensured?.userId || '').trim()
+    } catch (err) {
+      console.error('ensureSupabaseAuthUser error', err)
+      return clearOauthCookiesAndRedirect(
+        res,
+        isProd,
+        buildErrorRedirect('Could not create your account')
+      )
+    }
+
+    try {
+      await attachUserIdToMembershipIfNeeded(email, authUserId)
+    } catch (err) {
+      console.error('attachUserIdToMembershipIfNeeded error', err)
+      return clearOauthCookiesAndRedirect(
+        res,
+        isProd,
+        buildErrorRedirect(err?.message || 'Could not link membership')
       )
     }
 
