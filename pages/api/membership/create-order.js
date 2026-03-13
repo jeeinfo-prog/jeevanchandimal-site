@@ -185,7 +185,6 @@ export default async function handler(req, res) {
     const notifyUrl = base ? `${base}/api/payhere/notify` : undefined
 
     const orderId = generateOrderId()
-    const now = new Date().toISOString()
 
     const payload = {
       id: orderId,
@@ -209,9 +208,6 @@ export default async function handler(req, res) {
       currency: payCurrency,
       amount,
       status: 'PENDING',
-
-      created_at: now,
-      updated_at: now,
     }
 
     const { error } = await supabaseAdmin.from('orders').insert(payload)
@@ -231,7 +227,6 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-
       checkoutUrl,
       merchantId,
       orderId,
@@ -239,7 +234,6 @@ export default async function handler(req, res) {
       currency: payCurrency,
       hash,
       notifyUrl,
-
       tier,
       term,
       usdAmount,

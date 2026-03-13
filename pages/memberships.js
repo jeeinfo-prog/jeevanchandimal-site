@@ -4,16 +4,11 @@ import Head from 'next/head'
 import Link from 'next/link'
 import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
-
-// ✅ FX (display only + auto refresh; server controls billing)
 import { DEFAULT_FX, getFxForDisplay, hasFxLock, fetchLiveFx } from '../lib/fx'
-
-/* ================== helpers ================== */
 
 const STORAGE_CCY_KEY = 'jc_currency_v1'
 const DEFAULT_CURRENCY = 'USD'
 
-// ✅ USD base prices (server enforces + auto-converts LKR at checkout)
 const PRICES_USD = {
   basic: 49,
   pro: 89,
@@ -61,8 +56,6 @@ function formatMoney(currency, amount) {
   return `$${Number(n).toLocaleString('en-US')}`
 }
 
-/* ================== reveal hook ================== */
-
 function useRevealOnScroll() {
   React.useEffect(() => {
     if (typeof window === 'undefined') return
@@ -97,22 +90,15 @@ function useRevealOnScroll() {
   }, [])
 }
 
-/* ================== page ================== */
-
 export default function Memberships() {
   useRevealOnScroll()
 
   const [email, setEmail] = React.useState('')
-  const [loadingPlan, setLoadingPlan] = React.useState('') // "pro:monthly"
+  const [loadingPlan, setLoadingPlan] = React.useState('')
   const [error, setError] = React.useState('')
-
-  // ✅ default USD + persisted toggle
   const [currency, setCurrency] = React.useState(DEFAULT_CURRENCY)
-
-  // ✅ FX rate for display only
   const [fxRate, setFxRate] = React.useState(getFxForDisplay())
 
-  // FAQ tabs + accordion
   const tabs = React.useMemo(() => ['General', 'Licensing', 'Billing'], [])
   const [faqTab, setFaqTab] = React.useState('General')
   const [openFaq, setOpenFaq] = React.useState(-1)
@@ -319,14 +305,11 @@ export default function Memberships() {
         return_url: returnUrl,
         cancel_url: cancelUrl,
         notify_url: finalNotifyUrl,
-
         order_id: orderId,
         items: `Membership (${tier} - ${term})`,
         currency: payCurrency,
         amount: formatPayhereAmount(amount),
-
         hash,
-
         first_name: cleanEmail.split('@')[0] || 'Member',
         last_name: 'User',
         email: cleanEmail,
@@ -334,7 +317,6 @@ export default function Memberships() {
         address: 'N/A',
         city: 'Colombo',
         country: 'Sri Lanka',
-
         custom_1: 'membership',
         custom_2: JSON.stringify({
           membership_plan: tier,
@@ -694,26 +676,11 @@ export default function Memberships() {
       <JeevanChandimalNewFooter />
 
       <style jsx>{`
-        .center {
-          text-align: center;
-        }
+        .center { text-align: center; }
+        .revealInit { opacity: 0; transform: translateY(12px); transition: opacity 600ms ease, transform 600ms ease; will-change: opacity, transform; }
+        .revealIn { opacity: 1; transform: translateY(0); }
 
-        .revealInit {
-          opacity: 0;
-          transform: translateY(12px);
-          transition: opacity 600ms ease, transform 600ms ease;
-          will-change: opacity, transform;
-        }
-        .revealIn {
-          opacity: 1;
-          transform: translateY(0);
-        }
-
-        .hero,
-        .membership-features,
-        .faqHead,
-        .compareWrap,
-        .cineBlock {
+        .hero, .membership-features, .faqHead, .compareWrap, .cineBlock {
           width: 100%;
           margin-left: auto;
           margin-right: auto;
@@ -726,11 +693,7 @@ export default function Memberships() {
           gap: 18px;
           justify-items: center;
         }
-        .sub {
-          max-width: 760px;
-          opacity: 0.9;
-          line-height: 1.7;
-        }
+        .sub { max-width: 760px; opacity: 0.9; line-height: 1.7; }
 
         .toggleRow {
           margin-top: 6px;
@@ -740,16 +703,9 @@ export default function Memberships() {
           flex-wrap: wrap;
           justify-content: center;
         }
-        .toggleLabel {
-          font-size: 13px;
-          opacity: 0.85;
-        }
-        .togglePills {
-          display: inline-flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: center;
-        }
+        .toggleLabel { font-size: 13px; opacity: 0.85; }
+        .togglePills { display: inline-flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
         .pill {
           border: 1px solid rgba(245, 244, 244, 0.16);
           background: rgba(255, 255, 255, 0.02);
@@ -794,10 +750,7 @@ export default function Memberships() {
           gap: 10px;
           margin-top: 6px;
         }
-        .emailLabel {
-          font-size: 14px;
-          opacity: 0.9;
-        }
+        .emailLabel { font-size: 14px; opacity: 0.9; }
         .emailInput {
           width: 100%;
           padding: 12px 14px;
@@ -807,14 +760,8 @@ export default function Memberships() {
           color: #f5f4f4;
           outline: none;
         }
-        .emailInput:focus {
-          border-color: rgba(37, 195, 226, 0.65);
-        }
-        .errorText {
-          margin: 0;
-          font-size: 13px;
-          color: #ffb3b3;
-        }
+        .emailInput:focus { border-color: rgba(37, 195, 226, 0.65); }
+        .errorText { margin: 0; font-size: 13px; color: #ffb3b3; }
 
         .cineBlock {
           margin-top: var(--dl-layout-space-fiveunits);
@@ -858,19 +805,9 @@ export default function Memberships() {
           background: rgba(37, 195, 226, 0.07);
         }
 
-        .cineTop {
-          display: grid;
-          gap: 4px;
-        }
-        .cineTitle {
-          margin: 0;
-          font-size: 18px;
-        }
-        .cinePrice {
-          margin: 0;
-          font-size: 14px;
-          opacity: 0.9;
-        }
+        .cineTop { display: grid; gap: 4px; }
+        .cineTitle { margin: 0; font-size: 18px; }
+        .cinePrice { margin: 0; font-size: 14px; opacity: 0.9; }
 
         .cineList {
           list-style: none;
@@ -891,16 +828,8 @@ export default function Memberships() {
           background: rgba(0, 0, 0, 0.22);
         }
 
-        .cineBtn {
-          margin-top: 6px;
-        }
-
-        .smallNote {
-          margin: 0;
-          font-size: 12px;
-          opacity: 0.85;
-          line-height: 1.5;
-        }
+        .cineBtn { margin-top: 6px; }
+        .smallNote { margin: 0; font-size: 12px; opacity: 0.85; line-height: 1.5; }
 
         .membership-features {
           margin-top: var(--dl-layout-space-fiveunits);
@@ -914,14 +843,8 @@ export default function Memberships() {
           gap: var(--dl-layout-space-threeunits);
           text-align: left;
         }
-        .feature-grid h4 {
-          margin: 0 0 8px;
-        }
-        .feature-grid p {
-          margin: 0;
-          opacity: 0.88;
-          line-height: 1.7;
-        }
+        .feature-grid h4 { margin: 0 0 8px; }
+        .feature-grid p { margin: 0; opacity: 0.88; line-height: 1.7; }
 
         .cineMiniGrid {
           margin-top: var(--dl-layout-space-threeunits);
@@ -997,9 +920,7 @@ export default function Memberships() {
           font-size: 13px;
           opacity: 0.95;
         }
-        .compareTable > div:nth-child(3n) {
-          border-right: 0;
-        }
+        .compareTable > div:nth-child(3n) { border-right: 0; }
         .compareHead {
           font-weight: 800;
           background: rgba(0, 0, 0, 0.22);
@@ -1156,29 +1077,16 @@ export default function Memberships() {
           display: grid;
           gap: 10px;
         }
-        .ctaCard h3 {
-          margin: 0;
-          font-size: 18px;
-        }
-        .ctaCard p {
-          margin: 0;
-          opacity: 0.9;
-          line-height: 1.7;
-        }
+        .ctaCard h3 { margin: 0; font-size: 18px; }
+        .ctaCard p { margin: 0; opacity: 0.9; line-height: 1.7; }
         .ctaCard.subtle {
           border-color: rgba(245, 244, 244, 0.14);
           background: rgba(255, 255, 255, 0.02);
         }
 
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
         :global(.thq-button-filled) {
