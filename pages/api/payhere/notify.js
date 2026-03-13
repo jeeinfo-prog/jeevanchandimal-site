@@ -44,6 +44,21 @@ function parseForm(body) {
   return obj
 }
 
+function safeJsonParse(v, fallback = null) {
+  try {
+    return JSON.parse(v)
+  } catch {
+    return fallback
+  }
+}
+
+function firstNonEmpty(...values) {
+  for (const v of values) {
+    if (String(v || '').trim()) return String(v).trim()
+  }
+  return ''
+}
+
 function cleanBaseUrl(v) {
   return String(v || '')
     .trim()
@@ -111,6 +126,23 @@ function alreadyProcessedPaidOrder(order, paymentId) {
   )
 }
 
+function makeReplayFingerprint(data, rawBody) {
+  return crypto
+    .createHash('sha256')
+    .update(
+      [
+        String(data.merchant_id || '').trim(),
+        String(data.order_id || '').trim(),
+        String(data.payment_id || '').trim(),
+        normalizePayhereAmount(data.payhere_amount),
+        normalizeCurrency(data.payhere_currency),
+        String(data.status_code || '').trim(),
+        String(rawBody || ''),
+      ].join('|')
+    )
+    .digest('hex')
+}
+
 /* ===== MEMBERSHIP HELPERS ===== */
 
 function normalizeMembershipTier(v) {
@@ -121,6 +153,49 @@ function normalizeMembershipTier(v) {
 function normalizeMembershipTerm(v) {
   const x = String(v || '').trim().toLowerCase()
   return ['monthly', 'yearly', 'lifetime'].includes(x) ? x : 'monthly'
+}
+
+function extractCustomPayloads(data) {
+  const c1 = safeJsonParse(data?.custom_1, null)
+  const c2 = safeJsonParse(data?.custom_2, null)
+
+  return {
+    c1: c1 && typeof c1 === 'object' ? c1 : null,
+    c2: c2 && typeof c2 === 'object' ? c2 : null,
+  }
+}
+
+function getMembershipMeta(data, dbOrder) {
+  const { c1, c2 } = extractCustomPayloads(data)
+
+  const plan = firstNonEmpty(
+    data?.membership_plan,
+    data?.plan,
+    c1?.membership_plan,
+    c1?.plan,
+    c2?.membership_plan,
+    c2?.plan,
+    dbOrder?.membership_plan,
+    dbOrder?.plan,
+    dbOrder?.license
+  )
+
+  const term = firstNonEmpty(
+    data?.membership_term,
+    data?.term,
+    c1?.membership_term,
+    c1?.term,
+    c2?.membership_term,
+    c2?.term,
+    dbOrder?.membership_term,
+    dbOrder?.term,
+    dbOrder?.format
+  )
+
+  return {
+    plan: normalizeMembershipTier(plan),
+    term: normalizeMembershipTerm(term),
+  }
 }
 
 function addMonths(date, months) {
@@ -241,27 +316,17 @@ async function findSingleOrderByRef(ref) {
   const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', v).maybeSingle()
   if (!byOrderId.error && byOrderId?.data) return byOrderId.data
 
+  const byPayhereOrderId = await supabaseAdmin
+    .from('orders')
+    .select('*')
+    .eq('payhere_order_id', v)
+    .maybeSingle()
+  if (!byPayhereOrderId.error && byPayhereOrderId?.data) return byPayhereOrderId.data
+
   const byCode = await supabaseAdmin.from('orders').select('*').eq('code', v).maybeSingle()
   if (!byCode.error && byCode?.data) return byCode.data
 
   return null
-}
-
-async function claimSendOnce(orderId, column) {
-  const now = new Date().toISOString()
-  const r = await supabaseAdmin
-    .from('orders')
-    .update({ [column]: now })
-    .eq('id', orderId)
-    .is(column, null)
-    .select('id')
-    .maybeSingle()
-
-  if (r.error) {
-    console.error('claimSendOnce failed:', column, r.error.message)
-    return false
-  }
-  return !!r.data
 }
 
 async function claimPaymentOnce(orderDbId, paymentId) {
@@ -283,6 +348,50 @@ async function claimPaymentOnce(orderDbId, paymentId) {
   return !!r.data
 }
 
+async function updateOrderStatusSafe(orderId, patch) {
+  const r = await supabaseAdmin.from('orders').update(patch).eq('id', orderId)
+  if (r.error) console.error('updateOrderStatusSafe failed:', r.error.message)
+}
+
+async function markEmailSent(orderId, column) {
+  const now = new Date().toISOString()
+  const r = await supabaseAdmin
+    .from('orders')
+    .update({ [column]: now })
+    .eq('id', orderId)
+    .is(column, null)
+
+  if (r.error) {
+    console.error('markEmailSent failed:', column, r.error.message)
+    return false
+  }
+  return true
+}
+
+async function markReplayIfPossible({ fingerprint, orderId, paymentId, statusCode, payload }) {
+  try {
+    await supabaseAdmin.from('payhere_notifications').insert({
+      fingerprint,
+      order_id: String(orderId || '').trim() || null,
+      payment_id: normalizePaymentId(paymentId),
+      status_code: String(statusCode || '').trim() || null,
+      payload,
+      created_at: new Date().toISOString(),
+    })
+    return { duplicate: false }
+  } catch (e) {
+    const msg = String(e?.message || '')
+    if (
+      msg.includes('duplicate key') ||
+      msg.includes('unique constraint') ||
+      msg.includes('23505')
+    ) {
+      return { duplicate: true }
+    }
+    return { duplicate: false }
+  }
+}
+
 /* ===== KIND DETECTION + AMOUNT SAFETY ===== */
 
 function orderLooksLikeCart(order_id, custom_1, dbOrder) {
@@ -293,11 +402,36 @@ function orderLooksLikeCart(order_id, custom_1, dbOrder) {
   return isCartByCustom || isCartByPrefix || isCartByDb
 }
 
-function orderLooksLikeMembership(custom_1, dbOrder) {
-  const kindRaw = String(custom_1 || '').trim().toLowerCase()
+function orderLooksLikeMembership(data, dbOrder) {
+  const kindRaw = String(data?.custom_1 || '').trim().toLowerCase()
+  const { c1, c2 } = extractCustomPayloads(data)
+
+  const hasPlan = !!firstNonEmpty(
+    data?.membership_plan,
+    data?.plan,
+    c1?.membership_plan,
+    c1?.plan,
+    c2?.membership_plan,
+    c2?.plan,
+    dbOrder?.membership_plan,
+    dbOrder?.plan
+  )
+
+  const hasTerm = !!firstNonEmpty(
+    data?.membership_term,
+    data?.term,
+    c1?.membership_term,
+    c1?.term,
+    c2?.membership_term,
+    c2?.term,
+    dbOrder?.membership_term,
+    dbOrder?.term
+  )
+
   const isMemByCustom = kindRaw === 'membership'
   const isMemByDb = String(dbOrder?.order_kind || '').toLowerCase() === 'membership'
-  return isMemByCustom || isMemByDb
+
+  return isMemByCustom || isMemByDb || hasPlan || hasTerm
 }
 
 function amountCurrencyMatchOrLog({ dbOrder, payhere_amount, payhere_currency }) {
@@ -350,6 +484,7 @@ export default async function handler(req, res) {
     if (!order_id) return res.status(200).send('OK')
 
     const pid = normalizePaymentId(payment_id)
+    const fingerprint = makeReplayFingerprint(data, raw)
     const secretForThisMerchant = getPayhereSecretForMerchantId(merchant_id)
 
     const ok = payhereVerifyMd5Sig({
@@ -385,28 +520,22 @@ export default async function handler(req, res) {
       if (isCart) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'INVALID_SIG',
-              payhere_payment_id: null,
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', cartOrder.id)
+          await updateOrderStatusSafe(cartOrder.id, {
+            status: 'INVALID_SIG',
+            payhere_payment_id: null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
         }
       } else {
         const single = dbOrder || (await findSingleOrderByRef(order_id))
         if (single) {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'INVALID_SIG',
-              payhere_payment_id: null,
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', single.id)
+          await updateOrderStatusSafe(single.id, {
+            status: 'INVALID_SIG',
+            payhere_payment_id: null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
         }
       }
 
@@ -424,6 +553,18 @@ export default async function handler(req, res) {
         got: String(merchant_id || '').trim(),
         expected_any_of: knownIds,
       })
+      return res.status(200).send('OK')
+    }
+
+    const replayResult = await markReplayIfPossible({
+      fingerprint,
+      orderId: order_id,
+      paymentId: pid,
+      statusCode: status_code,
+      payload: data,
+    })
+
+    if (replayResult.duplicate) {
       return res.status(200).send('OK')
     }
 
@@ -446,7 +587,7 @@ export default async function handler(req, res) {
     ========================================================= */
     if (statusCodeNum === 2) {
       const isCart = orderLooksLikeCart(order_id, custom_1, dbOrder)
-      const isMembership = orderLooksLikeMembership(custom_1, dbOrder)
+      const isMembership = orderLooksLikeMembership(data, dbOrder)
 
       /* ================= MEMBERSHIP ================= */
       if (isMembership) {
@@ -460,14 +601,11 @@ export default async function handler(req, res) {
         if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
           if (pid) await claimPaymentOnce(order.id, pid)
 
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'AMOUNT_MISMATCH',
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', order.id)
+          await updateOrderStatusSafe(order.id, {
+            status: 'AMOUNT_MISMATCH',
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
 
           return res.status(200).send('OK')
         }
@@ -475,40 +613,33 @@ export default async function handler(req, res) {
         const claimedPayment = pid ? await claimPaymentOnce(order.id, pid) : false
 
         if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', order.id)
-
+          await updateOrderStatusSafe(order.id, {
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
           return res.status(200).send('OK')
         }
 
         const email = normalizeEmail(order.email)
-        if (!email) return res.status(200).send('OK')
+        const userId = isUuid(order.user_id) ? String(order.user_id).trim() : null
+        if (!email || !userId) return res.status(200).send('OK')
 
         const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
 
         if (!wasPaidAlready) {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'PAID',
-              paid_at: new Date().toISOString(),
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', order.id)
+          await updateOrderStatusSafe(order.id, {
+            status: 'PAID',
+            paid_at: new Date().toISOString(),
+            payhere_order_id: String(order_id || '').trim() || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
         } else {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', order.id)
+          await updateOrderStatusSafe(order.id, {
+            payhere_order_id: String(order_id || '').trim() || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
         }
 
         const freshRes = await supabaseAdmin
@@ -523,9 +654,7 @@ export default async function handler(req, res) {
         }
 
         const o = freshRes.data || order
-
-        const tier = normalizeMembershipTier(o.membership_plan || o.license)
-        const term = normalizeMembershipTerm(o.membership_term || o.format)
+        const { plan: tier, term } = getMembershipMeta(data, o)
 
         const now = new Date()
         const startDate = now.toISOString()
@@ -539,8 +668,10 @@ export default async function handler(req, res) {
 
         try {
           const payload = {
+            user_id: userId,
             email,
             plan: tier,
+            term,
             status: 'active',
             start_date: startDate,
             end_date: endDate,
@@ -549,9 +680,10 @@ export default async function handler(req, res) {
             billing_cycle_end: endDate,
             monthly_download_limit: monthlyLimit,
             monthly_download_used: 0,
+            updated_at: new Date().toISOString(),
           }
 
-          const up = await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'email' })
+          const up = await supabaseAdmin.from('memberships').upsert(payload, { onConflict: 'user_id' })
           if (up.error) console.error('memberships upsert error:', up.error.message)
         } catch (e) {
           console.error('memberships activate error:', e?.message || e)
@@ -559,8 +691,9 @@ export default async function handler(req, res) {
 
         try {
           const invoiceNo = await ensureInvoiceNo(o)
-          const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
-          if (claimedReceipt) {
+          const alreadySent = !!o.invoice_email_sent_at
+
+          if (!alreadySent) {
             await sendReceiptEmail({
               to: email,
               orderId: o.id,
@@ -572,6 +705,8 @@ export default async function handler(req, res) {
               format: term,
               paymentId: pid || null,
             })
+
+            await markEmailSent(o.id, 'invoice_email_sent_at')
           }
         } catch (e) {
           console.error('membership receipt email failed:', o?.id, e?.message || e)
@@ -595,28 +730,21 @@ export default async function handler(req, res) {
         if (!amountCurrencyMatchOrLog({ dbOrder: cartOrder, payhere_amount, payhere_currency })) {
           if (pid) await claimPaymentOnce(cartOrder.id, pid)
 
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'AMOUNT_MISMATCH',
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', cartOrder.id)
+          await updateOrderStatusSafe(cartOrder.id, {
+            status: 'AMOUNT_MISMATCH',
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
 
           return res.status(200).send('OK')
         }
 
         const claimedPayment = pid ? await claimPaymentOnce(cartOrder.id, pid) : false
         if (!claimedPayment && String(cartOrder.status || '').toUpperCase() === 'PAID') {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', cartOrder.id)
-
+          await updateOrderStatusSafe(cartOrder.id, {
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
           return res.status(200).send('OK')
         }
 
@@ -626,23 +754,19 @@ export default async function handler(req, res) {
         const wasPaidAlready = String(cartOrder.status || '').toUpperCase() === 'PAID'
 
         if (!wasPaidAlready) {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'PAID',
-              paid_at: new Date().toISOString(),
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', cartOrder.id)
+          await updateOrderStatusSafe(cartOrder.id, {
+            status: 'PAID',
+            paid_at: new Date().toISOString(),
+            payhere_order_id: String(order_id || '').trim() || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
         } else {
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', cartOrder.id)
+          await updateOrderStatusSafe(cartOrder.id, {
+            payhere_order_id: String(order_id || '').trim() || null,
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
         }
 
         const { data: freshCart, error: freshErr } = await supabaseAdmin
@@ -661,14 +785,11 @@ export default async function handler(req, res) {
 
         if (items.length === 0) {
           console.error('Cart order has no items array:', o.id)
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'PAID_NO_ITEMS',
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', o.id)
+          await updateOrderStatusSafe(o.id, {
+            status: 'PAID_NO_ITEMS',
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
           return res.status(200).send('OK')
         }
 
@@ -679,116 +800,131 @@ export default async function handler(req, res) {
 
         const invoiceNo = await ensureInvoiceNo(o)
 
-        const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
-        if (claimedReceipt) {
-          const amount =
-            o.amount != null
-              ? String(o.amount)
-              : String(
-                  round2(
-                    items.reduce(
-                      (sum, it) => sum + Number(it?.unitPrice || 0) * Number(it?.qty || 1),
-                      0
+        try {
+          if (!o.invoice_email_sent_at) {
+            const amount =
+              o.amount != null
+                ? String(o.amount)
+                : String(
+                    round2(
+                      items.reduce(
+                        (sum, it) => sum + Number(it?.unitPrice || 0) * Number(it?.qty || 1),
+                        0
+                      )
                     )
                   )
-                )
 
-          await sendReceiptEmail({
-            to: email,
-            orderId: o.code || o.id,
-            invoiceNo,
-            amount,
-            currency: o.currency || payhere_currency || 'LKR',
-            photoTitle: `Cart (${items.length} items)`,
-            license: '—',
-            format: '—',
-            paymentId: pid || null,
-          })
-        }
-
-        const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
-        if (claimedDownload) {
-          const links = []
-
-          for (const it of items) {
-            const photoId = String(it?.photoId || it?.photo_id || '').trim()
-            if (!photoId || !isUuid(photoId)) continue
-
-            const title = String(it?.title || photoId || 'Photo')
-            const license = normalizeLicense(it?.license)
-            const format = normalizeFormat(it?.format)
-
-            let objectKey = String(it?.objectKey || it?.object_key || '').trim()
-
-            if (!objectKey) {
-              try {
-                objectKey = (await resolveObjectKeyFromPhotos(photoId, format)) || ''
-              } catch (e) {
-                console.error('photos key resolve failed:', e?.message || e)
-              }
-            }
-
-            if (!objectKey) objectKey = fallbackObjectKeyFromPhotoId(photoId, format)
-            if (!objectKey) continue
-
-            const jti = crypto.randomUUID()
-            const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
-
-            const ins = await supabaseAdmin.from('download_tokens').insert({
-              jti,
-              order_id: o.id,
-              expires_at: expiresAt.toISOString(),
-            })
-            if (ins.error) {
-              console.error('download_tokens insert failed:', ins.error.message)
-              continue
-            }
-
-            const ext = format === 'raw' ? 'zip' : 'jpg'
-            const token = createDownloadToken(
-              {
-                jti,
-                orderId: o.id,
-                photoId,
-                format,
-                objectKey,
-                userId: o.user_id || null,
-                guestEmail: email,
-                filename: `${photoId}.${ext}`,
-                license,
-              },
-              '1h'
-            )
-
-            links.push({
-              title,
-              license,
-              format,
-              url: buildDownloadUrl(token, req),
-            })
-          }
-
-          if (links.length > 0) {
-            const combined = links
-              .map(
-                (x, idx) =>
-                  `${idx + 1}) ${x.title} • ${String(x.license).toUpperCase()} • ${String(
-                    x.format
-                  ).toUpperCase()}\n${x.url}`
-              )
-              .join('\n\n')
-
-            await sendDownloadEmail({
+            await sendReceiptEmail({
               to: email,
               orderId: o.code || o.id,
-              photoTitle: `Cart (${links.length} items)`,
-              downloadUrl: combined,
+              invoiceNo,
+              amount,
+              currency: o.currency || payhere_currency || 'LKR',
+              photoTitle: `Cart (${items.length} items)`,
               license: '—',
               format: '—',
+              paymentId: pid || null,
             })
-          } else {
-            console.error('Cart claimed download email, but no links were generated:', o.id)
+
+            await markEmailSent(o.id, 'invoice_email_sent_at')
           }
+        } catch (e) {
+          console.error('cart receipt email failed:', o?.id, e?.message || e)
+        }
+
+        try {
+          if (!o.download_email_sent_at) {
+            const links = []
+
+            for (const it of items) {
+              const photoId = String(it?.photoId || it?.photo_id || '').trim()
+              const legacyPhotoRef = String(it?.photoRef || it?.photo_ref || '').trim()
+              const title = String(it?.title || legacyPhotoRef || photoId || 'Photo')
+              const license = normalizeLicense(it?.license)
+              const format = normalizeFormat(it?.format)
+
+              let objectKey = String(it?.objectKey || it?.object_key || '').trim()
+
+              if (photoId && isUuid(photoId) && !objectKey) {
+                try {
+                  objectKey = (await resolveObjectKeyFromPhotos(photoId, format)) || ''
+                } catch (e) {
+                  console.error('photos key resolve failed:', e?.message || e)
+                }
+              }
+
+              if (!objectKey && photoId && isUuid(photoId)) {
+                objectKey = fallbackObjectKeyFromPhotoId(photoId, format)
+              }
+
+              if (!objectKey) continue
+
+              const jti = crypto.randomUUID()
+              const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
+
+              const ins = await supabaseAdmin.from('download_tokens').insert({
+                jti,
+                order_id: o.id,
+                expires_at: expiresAt.toISOString(),
+              })
+              if (ins.error) {
+                console.error('download_tokens insert failed:', ins.error.message)
+                continue
+              }
+
+              const ext = format === 'raw' ? 'zip' : 'jpg'
+              const safePhotoId = photoId && isUuid(photoId) ? photoId : '00000000-0000-0000-0000-000000000000'
+
+              const token = createDownloadToken(
+                {
+                  jti,
+                  orderId: o.id,
+                  photoId: safePhotoId,
+                  photoRef: legacyPhotoRef || null,
+                  format,
+                  objectKey,
+                  userId: o.user_id || null,
+                  guestEmail: email,
+                  filename: `${safePhotoId}.${ext}`,
+                  license,
+                },
+                '1h'
+              )
+
+              links.push({
+                title,
+                license,
+                format,
+                url: buildDownloadUrl(token, req),
+              })
+            }
+
+            if (links.length > 0) {
+              const combined = links
+                .map(
+                  (x, idx) =>
+                    `${idx + 1}) ${x.title} • ${String(x.license).toUpperCase()} • ${String(
+                      x.format
+                    ).toUpperCase()}\n${x.url}`
+                )
+                .join('\n\n')
+
+              await sendDownloadEmail({
+                to: email,
+                orderId: o.code || o.id,
+                photoTitle: `Cart (${links.length} items)`,
+                downloadUrl: combined,
+                license: '—',
+                format: '—',
+              })
+
+              await markEmailSent(o.id, 'download_email_sent_at')
+            } else {
+              console.error('Cart download links not generated:', o.id)
+            }
+          }
+        } catch (e) {
+          console.error('cart download email failed:', o?.id, e?.message || e)
         }
 
         return res.status(200).send('OK')
@@ -806,50 +942,40 @@ export default async function handler(req, res) {
       if (!amountCurrencyMatchOrLog({ dbOrder: order, payhere_amount, payhere_currency })) {
         if (pid) await claimPaymentOnce(order.id, pid)
 
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            status: 'AMOUNT_MISMATCH',
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('id', order.id)
+        await updateOrderStatusSafe(order.id, {
+          status: 'AMOUNT_MISMATCH',
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
+        })
 
         return res.status(200).send('OK')
       }
 
       const claimedPayment = pid ? await claimPaymentOnce(order.id, pid) : false
       if (!claimedPayment && String(order.status || '').toUpperCase() === 'PAID') {
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('id', order.id)
+        await updateOrderStatusSafe(order.id, {
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
+        })
 
         return res.status(200).send('OK')
       }
 
       const wasPaidAlready = String(order.status || '').toUpperCase() === 'PAID'
       if (!wasPaidAlready) {
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            status: 'PAID',
-            paid_at: new Date().toISOString(),
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('id', order.id)
+        await updateOrderStatusSafe(order.id, {
+          status: 'PAID',
+          paid_at: new Date().toISOString(),
+          payhere_order_id: String(order_id || '').trim() || null,
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
+        })
       } else {
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('id', order.id)
+        await updateOrderStatusSafe(order.id, {
+          payhere_order_id: String(order_id || '').trim() || null,
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
+        })
       }
 
       const { data: fresh } = await supabaseAdmin
@@ -859,7 +985,6 @@ export default async function handler(req, res) {
         .maybeSingle()
 
       const o = fresh || order
-
       const email = normalizeEmail(o.email)
       if (!email) return res.status(200).send('OK')
 
@@ -885,67 +1010,70 @@ export default async function handler(req, res) {
 
       try {
         const invoiceNo = await ensureInvoiceNo(o)
-
-        const claimedReceipt = await claimSendOnce(o.id, 'invoice_email_sent_at')
-        const claimedDownload = await claimSendOnce(o.id, 'download_email_sent_at')
-        if (!claimedReceipt && !claimedDownload) return res.status(200).send('OK')
-
-        const jti = crypto.randomUUID()
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
-
-        const ins = await supabaseAdmin.from('download_tokens').insert({
-          jti,
-          order_id: o.id,
-          expires_at: expiresAt.toISOString(),
-        })
-        if (ins.error) throw new Error(`download_tokens insert failed: ${ins.error.message}`)
-
         const fmt = normalizeFormat(o.format)
         const ext = fmt === 'raw' ? 'zip' : 'jpg'
+        const safePhotoId = isUuid(o.photo_id) ? o.photo_id : '00000000-0000-0000-0000-000000000000'
+        const safePhotoRef = String(o.photo_ref || '').trim() || null
 
-        const safePhotoId = isUuid(o.photo_id) ? o.photo_id : null
-        if (!safePhotoId) return res.status(200).send('OK')
+        let downloadUrl = null
 
-        const token = createDownloadToken(
-          {
+        if (!o.download_email_sent_at) {
+          const jti = crypto.randomUUID()
+          const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
+
+          const ins = await supabaseAdmin.from('download_tokens').insert({
             jti,
-            orderId: o.id,
-            photoId: safePhotoId,
-            format: fmt,
-            objectKey,
-            userId: o.user_id || null,
-            guestEmail: email,
-            filename: `${safePhotoId}.${ext}`,
-            license: normalizeLicense(o.license),
-          },
-          '1h'
-        )
+            order_id: o.id,
+            expires_at: expiresAt.toISOString(),
+          })
+          if (ins.error) throw new Error(`download_tokens insert failed: ${ins.error.message}`)
 
-        const downloadUrl = buildDownloadUrl(token, req)
+          const token = createDownloadToken(
+            {
+              jti,
+              orderId: o.id,
+              photoId: safePhotoId,
+              photoRef: safePhotoRef,
+              format: fmt,
+              objectKey,
+              userId: o.user_id || null,
+              guestEmail: email,
+              filename: `${safePhotoId}.${ext}`,
+              license: normalizeLicense(o.license),
+            },
+            '1h'
+          )
 
-        if (claimedReceipt) {
+          downloadUrl = buildDownloadUrl(token, req)
+        }
+
+        if (!o.invoice_email_sent_at) {
           await sendReceiptEmail({
             to: email,
             orderId: o.id,
             invoiceNo,
             amount: o.amount,
             currency: o.currency,
-            photoTitle: safePhotoId,
+            photoTitle: safePhotoRef || safePhotoId,
             license: normalizeLicense(o.license),
-            format: normalizeFormat(o.format),
+            format: fmt,
             paymentId: pid || null,
           })
+
+          await markEmailSent(o.id, 'invoice_email_sent_at')
         }
 
-        if (claimedDownload) {
+        if (!o.download_email_sent_at && downloadUrl) {
           await sendDownloadEmail({
             to: email,
             orderId: o.id,
-            photoTitle: safePhotoId,
+            photoTitle: safePhotoRef || safePhotoId,
             downloadUrl,
             license: normalizeLicense(o.license),
-            format: normalizeFormat(o.format),
+            format: fmt,
           })
+
+          await markEmailSent(o.id, 'download_email_sent_at')
         }
       } catch (e) {
         console.error('❌ Single photo delivery email block failed:', o.id, e)
@@ -969,14 +1097,11 @@ export default async function handler(req, res) {
         const cartOrder = dbOrder || (await findCartOrder({ cartOrderDbId: cartDbId, cartCode }))
         if (cartOrder) {
           await attachPidIfPossible(cartOrder)
-          await supabaseAdmin
-            .from('orders')
-            .update({
-              status: 'FAILED',
-              payhere_status_code: status_code || null,
-              payhere_status_message: status_message || null,
-            })
-            .eq('id', cartOrder.id)
+          await updateOrderStatusSafe(cartOrder.id, {
+            status: 'FAILED',
+            payhere_status_code: status_code || null,
+            payhere_status_message: status_message || null,
+          })
         }
         return res.status(200).send('OK')
       }
@@ -984,14 +1109,11 @@ export default async function handler(req, res) {
       const order = dbOrder || (await findSingleOrderByRef(order_id))
       if (order && String(order.status || '').toUpperCase() !== 'FAILED') {
         await attachPidIfPossible(order)
-        await supabaseAdmin
-          .from('orders')
-          .update({
-            status: 'FAILED',
-            payhere_status_code: status_code || null,
-            payhere_status_message: status_message || null,
-          })
-          .eq('id', order.id)
+        await updateOrderStatusSafe(order.id, {
+          status: 'FAILED',
+          payhere_status_code: status_code || null,
+          payhere_status_message: status_message || null,
+        })
       }
     }
 
