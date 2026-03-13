@@ -15,10 +15,10 @@ function groupStatus(rows) {
 
   const statuses = list.map((r) => normStatus(r.status))
 
-  // fail wins
-  if (statuses.some((s) => s === 'FAILED' || s === 'CANCELED' || s === 'CANCELLED')) return 'FAILED'
+  if (statuses.some((s) => s === 'FAILED' || s === 'CANCELED' || s === 'CANCELLED')) {
+    return 'FAILED'
+  }
 
-  // ✅ IMPORTANT: for carts, return PAID if ANY row is PAID (webhook may update rows one-by-one)
   if (statuses.some((s) => s === 'PAID')) return 'PAID'
 
   return 'PENDING'
@@ -39,13 +39,13 @@ export default async function handler(req, res) {
     if (!ref) return res.status(400).json({ ok: false, error: 'Missing order_id' })
 
     /* =========================
-       ✅ CART GROUP: CART_...
+       CART GROUP: CART_...
        group stored in orders.order_id
     ========================= */
     if (isCartGroup(ref)) {
       const r = await supabaseAdmin
         .from('orders')
-        .select('id,status,paid_at,payhere_status_code,order_id')
+        .select('id,status,paid_at,payhere_status_code,order_id,code')
         .eq('order_id', ref)
 
       if (r.error) return res.status(500).json({ ok: false, error: r.error.message })
@@ -54,14 +54,12 @@ export default async function handler(req, res) {
       if (rows.length === 0) return res.status(404).json({ ok: false, error: 'Order not found' })
 
       const st = groupStatus(rows)
-
-      // representative PAID row (for paid_at / status_code)
       const paidRow = rows.find((x) => normStatus(x.status) === 'PAID') || rows[0]
 
       return res.status(200).json({
         ok: true,
-        id: paidRow?.id || rows[0].id, // used by download page
-        code: ref, // keep response compatible
+        id: paidRow?.id || rows[0].id,
+        code: ref,
         order_id: ref,
         status: st,
         count: rows.length,
@@ -71,21 +69,21 @@ export default async function handler(req, res) {
     }
 
     /* =========================
-       ✅ SINGLE ORDER: try by id
+       SINGLE ORDER: try by id
     ========================= */
     const byId = await supabaseAdmin
       .from('orders')
-      .select('id,code,status,paid_at,payhere_status_code')
+      .select('id,code,order_id,status,paid_at,payhere_status_code')
       .eq('id', ref)
       .maybeSingle()
 
     if (byId.error) return res.status(500).json({ ok: false, error: byId.error.message })
     if (byId.data) {
-      const resolved = byId.data?.code || byId.data?.id || ref
+      const resolved = byId.data?.order_id || byId.data?.code || byId.data?.id || ref
       return res.status(200).json({
         ok: true,
         id: byId.data.id,
-        code: resolved,
+        code: byId.data.code || byId.data.order_id || byId.data.id || ref,
         order_id: resolved,
         status: byId.data.status,
         paid_at: byId.data.paid_at || null,
@@ -94,22 +92,45 @@ export default async function handler(req, res) {
     }
 
     /* =========================
-       ✅ SINGLE ORDER: try by code
+       SINGLE ORDER: try by order_id
+    ========================= */
+    const byOrderId = await supabaseAdmin
+      .from('orders')
+      .select('id,code,order_id,status,paid_at,payhere_status_code')
+      .eq('order_id', ref)
+      .maybeSingle()
+
+    if (byOrderId.error) return res.status(500).json({ ok: false, error: byOrderId.error.message })
+    if (byOrderId.data) {
+      const resolved = byOrderId.data?.order_id || byOrderId.data?.code || byOrderId.data?.id || ref
+      return res.status(200).json({
+        ok: true,
+        id: byOrderId.data.id,
+        code: byOrderId.data.code || byOrderId.data.order_id || byOrderId.data.id || ref,
+        order_id: resolved,
+        status: byOrderId.data.status,
+        paid_at: byOrderId.data.paid_at || null,
+        payhere_status_code: byOrderId.data.payhere_status_code ?? null,
+      })
+    }
+
+    /* =========================
+       SINGLE ORDER: try by code
     ========================= */
     const byCode = await supabaseAdmin
       .from('orders')
-      .select('id,code,status,paid_at,payhere_status_code')
+      .select('id,code,order_id,status,paid_at,payhere_status_code')
       .eq('code', ref)
       .maybeSingle()
 
     if (byCode.error) return res.status(500).json({ ok: false, error: byCode.error.message })
     if (!byCode.data) return res.status(404).json({ ok: false, error: 'Order not found' })
 
-    const resolved = byCode.data?.code || byCode.data?.id || ref
+    const resolved = byCode.data?.order_id || byCode.data?.code || byCode.data?.id || ref
     return res.status(200).json({
       ok: true,
       id: byCode.data.id,
-      code: resolved,
+      code: byCode.data.code || byCode.data.order_id || byCode.data.id || ref,
       order_id: resolved,
       status: byCode.data.status,
       paid_at: byCode.data.paid_at || null,
