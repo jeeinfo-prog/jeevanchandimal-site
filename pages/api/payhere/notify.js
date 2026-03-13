@@ -664,18 +664,16 @@ export default async function handler(req, res) {
 
         if (!wasPaidAlready) {
           await updateOrderStatusSafe(order.id, {
-            status: 'PAID',
-            paid_at: new Date().toISOString(),
-            payhere_order_id: clean(order_id) || null,
-            payhere_status_code: clean(status_code) || null,
-            payhere_status_message: clean(status_message) || null,
-          })
+  status: 'PAID',
+  paid_at: new Date().toISOString(),
+  payhere_status_code: clean(status_code) || null,
+  payhere_status_message: clean(status_message) || null,
+})
         } else {
           await updateOrderStatusSafe(order.id, {
-            payhere_order_id: clean(order_id) || null,
-            payhere_status_code: clean(status_code) || null,
-            payhere_status_message: clean(status_message) || null,
-          })
+  payhere_status_code: clean(status_code) || null,
+  payhere_status_message: clean(status_message) || null,
+})
         }
 
         if (!email) {

@@ -149,7 +149,6 @@ export default async function handler(req, res) {
       format,
       delivery_object_key: deliveryObjectKey,
       order_kind: 'photo',
-      payhere_order_id: orderId,
     }
 
     const { error: insertError } = await supabaseAdmin.from('orders').insert(insertPayload)
