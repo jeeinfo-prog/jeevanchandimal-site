@@ -20,27 +20,25 @@ const PRICES = {
   },
 }
 
+function clean(v) {
+  return String(v || '').trim()
+}
+
 function getDeliveryObjectKey(photoId, format) {
   if (format === 'raw') return `photos/original/${photoId}.zip`
   return `photos/original/${photoId}.jpg`
 }
 
 function isValidEmail(v) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean(v))
 }
 
 function cleanBaseUrl(v) {
-  return String(v || '')
-    .trim()
-    .replace(/\/+$/, '')
+  return clean(v).replace(/\/+$/, '')
 }
 
 function normalizePublicBaseUrl() {
-  const siteUrl =
-    cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) ||
-    cleanBaseUrl(process.env.SITE_URL)
-
-  return siteUrl
+  return cleanBaseUrl(process.env.NEXT_PUBLIC_SITE_URL) || cleanBaseUrl(process.env.SITE_URL)
 }
 
 function normalizeWebhookBaseUrl() {
@@ -59,43 +57,43 @@ export default async function handler(req, res) {
   try {
     assertPayhereEnv()
 
-    const {
-      photoId,
-      license,
-      format,
-      currency,
-      email,
-      firstName = 'Customer',
-      lastName = 'Guest',
-      phone = '0000000000',
-      address = 'N/A',
-      city = 'N/A',
-      country = 'Sri Lanka',
-    } = req.body || {}
+    const body = req.body || {}
+
+    const photoId = clean(body.photoId)
+    const license = clean(body.license).toLowerCase()
+    const format = clean(body.format).toLowerCase()
+    const currency = clean(body.currency).toUpperCase()
+    const cleanEmail = clean(body.email).toLowerCase()
+
+    const firstName = clean(body.firstName || 'Customer')
+    const lastName = clean(body.lastName || 'Guest')
+    const phone = clean(body.phone || '0000000000')
+    const address = clean(body.address || 'N/A')
+    const city = clean(body.city || 'N/A')
+    const country = clean(body.country || 'Sri Lanka')
 
     if (!photoId || !license || !format || !currency) {
       return res.status(400).json({ ok: false, error: 'Missing required fields' })
     }
 
-    if (!['personal', 'commercial', 'editorial'].includes(String(license))) {
+    if (!['personal', 'commercial', 'editorial'].includes(license)) {
       return res.status(400).json({ ok: false, error: 'Invalid license' })
     }
 
-    if (!['jpg', 'raw'].includes(String(format))) {
+    if (!['jpg', 'raw'].includes(format)) {
       return res.status(400).json({ ok: false, error: 'Invalid format' })
     }
 
-    if (!['LKR', 'USD'].includes(String(currency))) {
+    if (!['LKR', 'USD'].includes(currency)) {
       return res.status(400).json({ ok: false, error: 'Invalid currency' })
     }
 
-    const cleanEmail = String(email || '').trim().toLowerCase()
     if (!isValidEmail(cleanEmail)) {
       return res.status(400).json({ ok: false, error: 'Valid email is required' })
     }
 
     const amount = PRICES?.[currency]?.[license]?.[format]
-    if (!amount) {
+    if (amount == null) {
       return res.status(400).json({ ok: false, error: 'Invalid pricing selection' })
     }
 
@@ -120,11 +118,10 @@ export default async function handler(req, res) {
     const returnUrl = `${siteUrl}/store/return?order_id=`
     const cancelUrl = `${siteUrl}/store/cancel?order_id=`
 
-    // published photo only
     const { data: photo, error: photoErr } = await supabaseAdmin
       .from('photos')
       .select('id, title, status')
-      .eq('id', String(photoId))
+      .eq('id', photoId)
       .eq('status', 'published')
       .single()
 
@@ -134,7 +131,7 @@ export default async function handler(req, res) {
     }
 
     const orderId = uid()
-    const deliveryObjectKey = getDeliveryObjectKey(String(photoId), format)
+    const deliveryObjectKey = getDeliveryObjectKey(photoId, format)
 
     const insertPayload = {
       id: orderId,
@@ -144,7 +141,7 @@ export default async function handler(req, res) {
       email: cleanEmail,
       currency,
       amount,
-      photo_id: String(photoId),
+      photo_id: photoId,
       license,
       format,
       delivery_object_key: deliveryObjectKey,
@@ -175,16 +172,16 @@ export default async function handler(req, res) {
       cancel_url: `${cancelUrl}${encodeURIComponent(orderId)}`,
       notify_url: notifyUrl,
 
-      first_name: String(firstName || 'Customer').trim(),
-      last_name: String(lastName || 'Guest').trim(),
+      first_name: firstName,
+      last_name: lastName,
       email: cleanEmail,
-      phone: String(phone || '0000000000').trim(),
-      address: String(address || 'N/A').trim(),
-      city: String(city || 'N/A').trim(),
-      country: String(country || 'Sri Lanka').trim(),
+      phone,
+      address,
+      city,
+      country,
 
       order_id: orderId,
-      items: `${photo.title || 'Photo'} - ${String(license).toUpperCase()} - ${String(format).toUpperCase()}`,
+      items: `${photo.title || 'Photo'} - ${license.toUpperCase()} - ${format.toUpperCase()}`,
       currency,
       amount: Number(amount).toFixed(2),
       hash,
