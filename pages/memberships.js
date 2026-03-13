@@ -103,7 +103,7 @@ export default function Memberships() {
   useRevealOnScroll()
 
   const [email, setEmail] = React.useState('')
-  const [loadingPlan, setLoadingPlan] = React.useState('') // 'monthly' | ...
+  const [loadingPlan, setLoadingPlan] = React.useState('') // "pro:monthly"
   const [error, setError] = React.useState('')
 
   // ✅ default USD + persisted toggle
@@ -119,7 +119,6 @@ export default function Memberships() {
 
   const faqsAll = React.useMemo(
     () => [
-      // GENERAL
       {
         tab: 'General',
         q: 'What does the membership include?',
@@ -135,7 +134,6 @@ export default function Memberships() {
         q: 'How often is new content added?',
         a: 'New images are added regularly, reflecting ongoing projects, travels, and visual explorations.',
       },
-      // LICENSING
       {
         tab: 'Licensing',
         q: 'How can I use the images?',
@@ -156,7 +154,6 @@ export default function Memberships() {
         q: 'Are high-resolution files included?',
         a: 'Yes. JPG files are delivered as professionally graded, high-resolution files suitable for digital and print (tier dependent).',
       },
-      // BILLING
       {
         tab: 'Billing',
         q: 'Can I cancel my membership anytime?',
@@ -188,7 +185,6 @@ export default function Memberships() {
     setCurrency(c)
     writeCurrency(c)
 
-    // keep in sync if navbar toggles currency in another tab
     function onStorage(e) {
       if (!e) return
       if (e.key === STORAGE_CCY_KEY) setCurrency(readCurrency())
@@ -196,11 +192,9 @@ export default function Memberships() {
     window.addEventListener('storage', onStorage)
 
     return () => window.removeEventListener('storage', onStorage)
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ✅ Live FX refresh every 6 hours (only if NOT locked) — display only
   React.useEffect(() => {
     let alive = true
 
@@ -242,120 +236,127 @@ export default function Memberships() {
     return formatMoney('USD', usd)
   }
 
-  async function startMembershipCheckout(plan) {
-  try {
-    setError('')
-    const cleanEmail = String(email || '').trim().toLowerCase()
+  async function startMembershipCheckout(selection) {
+    try {
+      setError('')
 
-    if (!isValidEmail(cleanEmail)) {
-      setError('Please enter a valid email address.')
-      return
-    }
+      const cleanEmail = String(email || '').trim().toLowerCase()
 
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('user_email', cleanEmail)
-    }
+      if (!isValidEmail(cleanEmail)) {
+        setError('Please enter a valid email address.')
+        return
+      }
 
-    setLoadingPlan(plan)
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('user_email', cleanEmail)
+      }
 
-    const res = await fetch('/api/membership/create-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      const tier = String(selection?.tier || '').trim().toLowerCase()
+      const term = String(selection?.term || '').trim().toLowerCase()
+      const loadingKey = `${tier}:${term}`
+
+      setLoadingPlan(loadingKey)
+
+      const res = await fetch('/api/membership/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          tier,
+          term,
+          currency: safeCurrency(currency),
+        }),
+      })
+
+      const json = await res.json().catch(() => null)
+
+      if (!res.ok || !json?.ok) {
+        setError(json?.error || 'Failed to create membership order.')
+        setLoadingPlan('')
+        return
+      }
+
+      const {
+        checkoutUrl,
+        merchantId,
+        orderId,
+        amount,
+        currency: payCurrency,
+        hash,
+        notifyUrl,
+      } = json
+
+      if (!checkoutUrl || !merchantId || !orderId || !amount || !payCurrency || !hash) {
+        setError('Missing order details from server.')
+        setLoadingPlan('')
+        return
+      }
+
+      const siteUrl =
+        String(process.env.NEXT_PUBLIC_SITE_URL || '').trim() ||
+        (typeof window !== 'undefined' ? window.location.origin : '')
+
+      if (!siteUrl) {
+        setError('Missing NEXT_PUBLIC_SITE_URL.')
+        setLoadingPlan('')
+        return
+      }
+
+      const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(
+        orderId
+      )}&email=${encodeURIComponent(cleanEmail)}`
+      const cancelUrl = `${siteUrl}/membership/cancel?order_id=${encodeURIComponent(
+        orderId
+      )}&email=${encodeURIComponent(cleanEmail)}`
+      const finalNotifyUrl = notifyUrl || `${siteUrl}/api/payhere/notify`
+
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = checkoutUrl
+
+      const fields = {
+        merchant_id: merchantId,
+        return_url: returnUrl,
+        cancel_url: cancelUrl,
+        notify_url: finalNotifyUrl,
+
+        order_id: orderId,
+        items: `Membership (${tier} - ${term})`,
+        currency: payCurrency,
+        amount: formatPayhereAmount(amount),
+
+        hash,
+
+        first_name: cleanEmail.split('@')[0] || 'Member',
+        last_name: 'User',
         email: cleanEmail,
-        plan, // backward compatible
-        currency: safeCurrency(currency), // display only; server charges LKR
-        // optional: fx_rate: getFxForDisplay() if you want to lock it from client
-      }),
-    })
+        phone: '0000000000',
+        address: 'N/A',
+        city: 'Colombo',
+        country: 'Sri Lanka',
 
-    const json = await res.json().catch(() => null)
+        custom_1: 'membership',
+        custom_2: JSON.stringify({
+          membership_plan: tier,
+          membership_term: term,
+        }),
+      }
 
-    if (!res.ok || !json?.ok) {
-      setError(json?.error || 'Failed to create membership order.')
+      Object.entries(fields).forEach(([name, value]) => {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = name
+        input.value = value == null ? '' : String(value)
+        form.appendChild(input)
+      })
+
+      document.body.appendChild(form)
+      form.submit()
+    } catch (e) {
+      setError(e?.message || 'Something went wrong.')
       setLoadingPlan('')
-      return
     }
-
-    // ✅ ALWAYS trust server response (prevents sandbox/live/hash mismatch)
-    const {
-      checkoutUrl,
-      merchantId,
-      orderId,
-      amount,
-      currency: payCurrency,
-      hash,
-      notifyUrl,
-    } = json
-
-    if (!checkoutUrl || !merchantId || !orderId || !amount || !payCurrency || !hash) {
-      setError('Missing order details from server.')
-      setLoadingPlan('')
-      return
-    }
-
-    const siteUrl =
-      String(process.env.NEXT_PUBLIC_SITE_URL || '').trim() ||
-      (typeof window !== 'undefined' ? window.location.origin : '')
-
-    if (!siteUrl) {
-      setError('Missing NEXT_PUBLIC_SITE_URL.')
-      setLoadingPlan('')
-      return
-    }
-
-    const returnUrl = `${siteUrl}/membership/success?order_id=${encodeURIComponent(
-      orderId
-    )}&email=${encodeURIComponent(cleanEmail)}`
-    const cancelUrl = `${siteUrl}/membership/cancel?order_id=${encodeURIComponent(
-      orderId
-    )}&email=${encodeURIComponent(cleanEmail)}`
-    const finalNotifyUrl = notifyUrl || `${siteUrl}/api/payhere/notify`
-
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = checkoutUrl
-
-    const fields = {
-      merchant_id: merchantId,
-      return_url: returnUrl,
-      cancel_url: cancelUrl,
-      notify_url: finalNotifyUrl,
-
-      order_id: orderId,
-      items: `Membership (${plan})`,
-      currency: payCurrency,
-      amount: formatPayhereAmount(amount),
-
-      hash,
-
-      first_name: cleanEmail.split('@')[0] || 'Member',
-      last_name: 'User',
-      email: cleanEmail,
-      phone: '0000000000',
-      address: 'N/A',
-      city: 'Colombo',
-      country: 'Sri Lanka',
-
-      custom_1: 'membership',
-      custom_2: String(plan || ''),
-    }
-
-    Object.entries(fields).forEach(([name, value]) => {
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = name
-      input.value = value == null ? '' : String(value)
-      form.appendChild(input)
-    })
-
-    document.body.appendChild(form)
-    form.submit()
-  } catch (e) {
-    setError(e?.message || 'Something went wrong.')
-    setLoadingPlan('')
   }
-}
 
   return (
     <>
@@ -371,7 +372,6 @@ export default function Memberships() {
 
       <main className="membership-page thq-section-padding">
         <div className="thq-section-max-width">
-          {/* HERO */}
           <section className="hero" data-reveal>
             <h1 className="thq-heading-1 center">Membership</h1>
             <p className="thq-body-large center sub">
@@ -379,7 +379,6 @@ export default function Memberships() {
               agencies, brands, and publishers.
             </p>
 
-            {/* Currency toggle */}
             <div className="toggleRow">
               <span className="toggleLabel">Pricing</span>
               <div className="togglePills" role="tablist" aria-label="Currency toggle">
@@ -407,7 +406,6 @@ export default function Memberships() {
               </div>
             </div>
 
-            {/* Email input */}
             <div className="emailBox">
               <label className="emailLabel">Email (for access + receipts)</label>
               <input
@@ -427,12 +425,10 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* PLANS (cinematic 360 cards) */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">Choose your plan</h2>
 
             <div className="cineGrid">
-              {/* BASIC */}
               <div className="cineCard">
                 <div className="cineTop">
                   <h3 className="cineTitle">Basic</h3>
@@ -454,7 +450,6 @@ export default function Memberships() {
                 </button>
               </div>
 
-              {/* PRO (mapped to monthly) */}
               <div className="cineCard featured">
                 <div className="cineTop">
                   <h3 className="cineTitle">Pro</h3>
@@ -473,16 +468,15 @@ export default function Memberships() {
 
                 <button
                   className="thq-button-filled cineBtn"
-                  onClick={() => startMembershipCheckout('monthly')}
-                  disabled={loadingPlan === 'monthly'}
+                  onClick={() => startMembershipCheckout({ tier: 'pro', term: 'monthly' })}
+                  disabled={loadingPlan === 'pro:monthly'}
                 >
-                  {loadingPlan === 'monthly' ? 'Redirecting…' : 'Get Pro Access'}
+                  {loadingPlan === 'pro:monthly' ? 'Redirecting…' : 'Get Pro Access'}
                 </button>
 
                 <p className="smallNote">You’ll be redirected to PayHere to complete payment.</p>
               </div>
 
-              {/* ELITE */}
               <div className="cineCard">
                 <div className="cineTop">
                   <h3 className="cineTitle">Elite</h3>
@@ -511,7 +505,6 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* FEATURE LIST */}
           <section className="membership-features" data-reveal>
             <h2 className="thq-heading-2">Why Membership?</h2>
 
@@ -538,7 +531,6 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* LICENSE OVERVIEW */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">License Overview</h2>
             <div className="cineMiniGrid">
@@ -551,7 +543,6 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* TRUST */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">Trusted by</h2>
             <div className="trustRow">
@@ -562,7 +553,6 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* HOW IT WORKS */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">How it works</h2>
             <div className="stepsGrid">
@@ -581,7 +571,6 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* PLAN COMPARISON */}
           <section className="cineBlock" data-reveal>
             <h2 className="thq-heading-2 center">Plan comparison</h2>
 
@@ -614,7 +603,6 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* FAQ */}
           <div className="faqWrap" data-reveal>
             <div className="faqHead">
               <h2 className="thq-heading-2">Frequently Asked Questions</h2>
@@ -680,7 +668,6 @@ export default function Memberships() {
             </div>
           </div>
 
-          {/* CUSTOM LICENSING CTA */}
           <section className="cineBlock" data-reveal>
             <div className="ctaCard">
               <h3>Need custom licensing?</h3>
@@ -691,7 +678,6 @@ export default function Memberships() {
             </div>
           </section>
 
-          {/* RETURNING MEMBER */}
           <section className="cineBlock" data-reveal>
             <div className="ctaCard subtle">
               <h3>Already a member?</h3>
@@ -712,7 +698,6 @@ export default function Memberships() {
           text-align: center;
         }
 
-        /* ---------- reveal ---------- */
         .revealInit {
           opacity: 0;
           transform: translateY(12px);
@@ -724,7 +709,6 @@ export default function Memberships() {
           transform: translateY(0);
         }
 
-        /* ✅ prevent “shift left” feeling */
         .hero,
         .membership-features,
         .faqHead,
@@ -735,7 +719,6 @@ export default function Memberships() {
           margin-right: auto;
         }
 
-        /* ---------- hero ---------- */
         .hero {
           max-width: 860px;
           margin: 0 auto var(--dl-layout-space-fiveunits);
@@ -833,13 +816,11 @@ export default function Memberships() {
           color: #ffb3b3;
         }
 
-        /* ---------- cinematic blocks ---------- */
         .cineBlock {
           margin-top: var(--dl-layout-space-fiveunits);
           text-align: center;
         }
 
-        /* ✅ earlier card sizing (fluid + capped) */
         .cineGrid {
           width: 100%;
           max-width: 1200px;
@@ -921,7 +902,6 @@ export default function Memberships() {
           line-height: 1.5;
         }
 
-        /* ---------- features ---------- */
         .membership-features {
           margin-top: var(--dl-layout-space-fiveunits);
           text-align: center;
@@ -943,7 +923,6 @@ export default function Memberships() {
           line-height: 1.7;
         }
 
-        /* ---------- license mini grid ---------- */
         .cineMiniGrid {
           margin-top: var(--dl-layout-space-threeunits);
           display: grid;
@@ -995,7 +974,6 @@ export default function Memberships() {
           transform: translateY(-2px);
         }
 
-        /* ---------- compare table ---------- */
         .compareWrap {
           margin-top: var(--dl-layout-space-threeunits);
           display: flex;
@@ -1027,7 +1005,6 @@ export default function Memberships() {
           background: rgba(0, 0, 0, 0.22);
         }
 
-        /* ---------- FAQ ---------- */
         .faqWrap {
           margin-top: var(--dl-layout-space-fiveunits);
           text-align: center;
@@ -1167,7 +1144,6 @@ export default function Memberships() {
           line-height: 1.7;
         }
 
-        /* ---------- CTA cards ---------- */
         .ctaCard {
           width: 100%;
           max-width: 860px;
@@ -1205,7 +1181,6 @@ export default function Memberships() {
           }
         }
 
-        /* --- theme buttons (only this page) --- */
         :global(.thq-button-filled) {
           border-radius: 999px !important;
           border: 1px solid rgba(37, 195, 226, 0.55) !important;
@@ -1232,7 +1207,6 @@ export default function Memberships() {
           transform: translateY(-1px);
         }
 
-        /* ---------- responsive ---------- */
         @media (max-width: 1100px) {
           .cineGrid,
           .faqCineGrid {

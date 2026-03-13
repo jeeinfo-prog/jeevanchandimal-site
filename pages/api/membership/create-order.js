@@ -132,6 +132,7 @@ export default async function handler(req, res) {
     let tier = cleanLower(body.tier, '')
     let term = cleanLower(body.term, '')
 
+    // backward compatibility
     if (!term && body.plan) term = cleanLower(body.plan, '')
     if (!tier) tier = 'pro'
     if (!term) term = 'monthly'
@@ -196,11 +197,11 @@ export default async function handler(req, res) {
       membership_plan: tier,
       membership_term: term,
 
-      // keep legacy required columns non-null
+      // legacy required columns
       license: tier,
       format: term,
 
-      // legacy photo fields
+      // legacy photo columns
       photo_id: PLACEHOLDER_PHOTO_ID,
       photo_ref: null,
       delivery_object_key: null,
