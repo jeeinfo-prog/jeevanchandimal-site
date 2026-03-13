@@ -303,13 +303,6 @@ async function findCartOrder({ cartOrderDbId, cartCode }) {
     const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', code).maybeSingle()
     if (!byOrderId.error && byOrderId?.data) return byOrderId.data
 
-    const byPayhereOrderId = await supabaseAdmin
-      .from('orders')
-      .select('*')
-      .eq('payhere_order_id', code)
-      .maybeSingle()
-    if (!byPayhereOrderId.error && byPayhereOrderId?.data) return byPayhereOrderId.data
-
     const byId2 = await supabaseAdmin.from('orders').select('*').eq('id', code).maybeSingle()
     if (!byId2.error && byId2?.data) return byId2.data
   }
@@ -326,13 +319,6 @@ async function findSingleOrderByRef(ref) {
 
   const byOrderId = await supabaseAdmin.from('orders').select('*').eq('order_id', v).maybeSingle()
   if (!byOrderId.error && byOrderId?.data) return byOrderId.data
-
-  const byPayhereOrderId = await supabaseAdmin
-    .from('orders')
-    .select('*')
-    .eq('payhere_order_id', v)
-    .maybeSingle()
-  if (!byPayhereOrderId.error && byPayhereOrderId?.data) return byPayhereOrderId.data
 
   const byCode = await supabaseAdmin.from('orders').select('*').eq('code', v).maybeSingle()
   if (!byCode.error && byCode?.data) return byCode.data
@@ -611,9 +597,6 @@ export default async function handler(req, res) {
       dbStatus: dbOrder?.status || null,
     })
 
-    /* =========================================================
-       ✅ PAYMENT SUCCESS
-    ========================================================= */
     if (statusCodeNum === 2) {
       console.log('notify: success branch entered', {
         order_id: clean(order_id),
@@ -664,16 +647,16 @@ export default async function handler(req, res) {
 
         if (!wasPaidAlready) {
           await updateOrderStatusSafe(order.id, {
-  status: 'PAID',
-  paid_at: new Date().toISOString(),
-  payhere_status_code: clean(status_code) || null,
-  payhere_status_message: clean(status_message) || null,
-})
+            status: 'PAID',
+            paid_at: new Date().toISOString(),
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
+          })
         } else {
           await updateOrderStatusSafe(order.id, {
-  payhere_status_code: clean(status_code) || null,
-  payhere_status_message: clean(status_message) || null,
-})
+            payhere_status_code: clean(status_code) || null,
+            payhere_status_message: clean(status_message) || null,
+          })
         }
 
         if (!email) {
@@ -800,13 +783,11 @@ export default async function handler(req, res) {
           await updateOrderStatusSafe(cartOrder.id, {
             status: 'PAID',
             paid_at: new Date().toISOString(),
-            payhere_order_id: clean(order_id) || null,
             payhere_status_code: clean(status_code) || null,
             payhere_status_message: clean(status_message) || null,
           })
         } else {
           await updateOrderStatusSafe(cartOrder.id, {
-            payhere_order_id: clean(order_id) || null,
             payhere_status_code: clean(status_code) || null,
             payhere_status_message: clean(status_message) || null,
           })
@@ -1021,13 +1002,11 @@ export default async function handler(req, res) {
         await updateOrderStatusSafe(order.id, {
           status: 'PAID',
           paid_at: new Date().toISOString(),
-          payhere_order_id: clean(order_id) || null,
           payhere_status_code: clean(status_code) || null,
           payhere_status_message: clean(status_message) || null,
         })
       } else {
         await updateOrderStatusSafe(order.id, {
-          payhere_order_id: clean(order_id) || null,
           payhere_status_code: clean(status_code) || null,
           payhere_status_message: clean(status_message) || null,
         })
@@ -1143,9 +1122,6 @@ export default async function handler(req, res) {
       return res.status(200).send('OK')
     }
 
-    /* =========================================================
-       ❌ PAYMENT FAILED / CANCELED / CHARGEDBACK
-    ========================================================= */
     if (statusCodeNum < 0) {
       console.log('notify: failed payment branch entered', {
         order_id: clean(order_id),
