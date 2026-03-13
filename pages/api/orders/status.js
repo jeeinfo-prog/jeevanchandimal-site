@@ -46,17 +46,10 @@ function groupStatus(rows) {
   return 'PENDING'
 }
 
-function buildResponse(row, refOverride) {
-  const resolved = row?.order_id || row?.code || row?.id || refOverride || ''
-
+function buildResponse(row) {
   return {
     ok: true,
-    id: row?.id || null,
-    code: row?.code || row?.order_id || row?.id || refOverride || '',
-    order_id: resolved,
     status: normStatus(row?.status),
-    paid_at: row?.paid_at || null,
-    payhere_status_code: row?.payhere_status_code ?? null,
   }
 }
 
@@ -88,7 +81,7 @@ export default async function handler(req, res) {
     if (isCartGroup(ref)) {
       const byGroupOrderId = await supabaseAdmin
         .from('orders')
-        .select('id,status,paid_at,payhere_status_code,order_id,code')
+        .select('status,paid_at,payhere_status_code')
         .eq('order_id', ref)
 
       if (byGroupOrderId.error) {
@@ -97,11 +90,10 @@ export default async function handler(req, res) {
 
       let rows = Array.isArray(byGroupOrderId.data) ? byGroupOrderId.data : []
 
-      // fallback: some setups may store the cart ref in code instead
       if (rows.length === 0) {
         const byGroupCode = await supabaseAdmin
           .from('orders')
-          .select('id,status,paid_at,payhere_status_code,order_id,code')
+          .select('status,paid_at,payhere_status_code')
           .eq('code', ref)
 
         if (byGroupCode.error) {
@@ -115,18 +107,9 @@ export default async function handler(req, res) {
         return res.status(404).json({ ok: false, error: 'Order not found' })
       }
 
-      const st = groupStatus(rows)
-      const bestRow = rows.find(isPaidRow) || rows.find((x) => !isFailedRow(x)) || rows[0]
-
       return res.status(200).json({
         ok: true,
-        id: bestRow?.id || null,
-        code: ref,
-        order_id: ref,
-        status: st,
-        count: rows.length,
-        paid_at: bestRow?.paid_at || null,
-        payhere_status_code: bestRow?.payhere_status_code ?? null,
+        status: groupStatus(rows),
       })
     }
 
@@ -135,7 +118,7 @@ export default async function handler(req, res) {
     ========================= */
     const byId = await supabaseAdmin
       .from('orders')
-      .select('id,code,order_id,status,paid_at,payhere_status_code')
+      .select('status,paid_at,payhere_status_code')
       .eq('id', ref)
       .maybeSingle()
 
@@ -143,7 +126,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: byId.error.message })
     }
     if (byId.data) {
-      return res.status(200).json(buildResponse(byId.data, ref))
+      return res.status(200).json(buildResponse(byId.data))
     }
 
     /* =========================
@@ -151,7 +134,7 @@ export default async function handler(req, res) {
     ========================= */
     const byOrderId = await supabaseAdmin
       .from('orders')
-      .select('id,code,order_id,status,paid_at,payhere_status_code')
+      .select('status,paid_at,payhere_status_code')
       .eq('order_id', ref)
       .maybeSingle()
 
@@ -159,7 +142,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: byOrderId.error.message })
     }
     if (byOrderId.data) {
-      return res.status(200).json(buildResponse(byOrderId.data, ref))
+      return res.status(200).json(buildResponse(byOrderId.data))
     }
 
     /* =========================
@@ -167,7 +150,7 @@ export default async function handler(req, res) {
     ========================= */
     const byCode = await supabaseAdmin
       .from('orders')
-      .select('id,code,order_id,status,paid_at,payhere_status_code')
+      .select('status,paid_at,payhere_status_code')
       .eq('code', ref)
       .maybeSingle()
 
@@ -175,7 +158,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: byCode.error.message })
     }
     if (byCode.data) {
-      return res.status(200).json(buildResponse(byCode.data, ref))
+      return res.status(200).json(buildResponse(byCode.data))
     }
 
     return res.status(404).json({ ok: false, error: 'Order not found' })
