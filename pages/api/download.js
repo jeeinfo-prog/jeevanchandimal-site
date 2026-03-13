@@ -1,3 +1,5 @@
+// pages/api/download.js
+
 import { verifyDownloadToken } from '../../lib/secureDownload'
 import { supabaseAdmin } from '../../lib/supabaseAdmin'
 import { r2 } from '../../lib/r2'
@@ -19,14 +21,14 @@ const RL_MAX = 60
 const rl = globalThis.__jc_rl_download || new Map()
 globalThis.__jc_rl_download = rl
 
+function clean(v) {
+  return String(v || '').trim()
+}
+
 function getIp(req) {
   const xf = req.headers['x-forwarded-for']
   if (typeof xf === 'string' && xf.trim()) return xf.split(',')[0].trim()
-  return (
-    String(req.headers['x-real-ip'] || '').trim() ||
-    String(req.socket?.remoteAddress || '').trim() ||
-    'unknown'
-  )
+  return clean(req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown')
 }
 
 function rateLimit(req, res) {
@@ -60,20 +62,17 @@ function rateLimit(req, res) {
 /* ---------------------------------------------------- */
 
 function safeFilename(name) {
-  return (
-    String(name || '')
-      .replace(/[\r\n"]/g, '')
-      .replace(/[\\/]/g, '-')
-      .trim() || 'download'
-  )
+  return clean(name)
+    .replace(/[\r\n"]/g, '')
+    .replace(/[\\/]/g, '-') || 'download'
 }
 
 function normalizeEmail(v) {
-  return String(v || '').trim().toLowerCase()
+  return clean(v).toLowerCase()
 }
 
 function cleanLower(v) {
-  return String(v || '').trim().toLowerCase()
+  return clean(v).toLowerCase()
 }
 
 function isExpired(date) {
@@ -84,7 +83,7 @@ function isExpired(date) {
 }
 
 function isSafeR2Key(key) {
-  const k = String(key || '').trim()
+  const k = clean(key)
   if (!k) return false
   if (k.includes('..') || k.includes('\\')) return false
   if (!k.startsWith('photos/')) return false
@@ -92,11 +91,11 @@ function isSafeR2Key(key) {
 }
 
 function isPrefixKey(key) {
-  return String(key || '').endsWith('/')
+  return clean(key).endsWith('/')
 }
 
 function looksLikeTokenError(message) {
-  const msg = String(message || '').toLowerCase()
+  const msg = clean(message).toLowerCase()
   return (
     msg.includes('jwt') ||
     msg.includes('token') ||
@@ -121,7 +120,7 @@ async function findFirstFileUnderPrefix(prefix) {
   const Bucket = process.env.R2_BUCKET
   if (!Bucket) throw new Error('Missing R2_BUCKET')
 
-  const pref = prefix.endsWith('/') ? prefix : `${prefix}/`
+  const pref = clean(prefix).endsWith('/') ? clean(prefix) : `${clean(prefix)}/`
 
   const result = await r2.send(
     new ListObjectsV2Command({
@@ -144,7 +143,7 @@ async function consumeTokenRow(jti) {
   const { data, error } = await supabaseAdmin
     .from('download_tokens')
     .select('jti, expires_at')
-    .eq('jti', String(jti))
+    .eq('jti', clean(jti))
     .maybeSingle()
 
   if (error) throw new Error(error.message)
@@ -154,11 +153,11 @@ async function consumeTokenRow(jti) {
   }
 
   if (data.expires_at && isExpired(data.expires_at)) {
-    await supabaseAdmin.from('download_tokens').delete().eq('jti', String(jti))
+    await supabaseAdmin.from('download_tokens').delete().eq('jti', clean(jti))
     return { ok: false, code: 'TOKEN_USED_OR_EXPIRED', message: 'Token used or expired' }
   }
 
-  const del = await supabaseAdmin.from('download_tokens').delete().eq('jti', String(jti))
+  const del = await supabaseAdmin.from('download_tokens').delete().eq('jti', clean(jti))
   if (del.error) throw new Error(del.error.message)
 
   return { ok: true }
@@ -251,7 +250,16 @@ export default async function handler(req, res) {
     const payload = verifyDownloadToken(token)
     if (!payload) return res.status(401).json({ error: 'Invalid token' })
 
-    const { orderId, objectKey, jti } = payload
+    const orderId = clean(payload?.orderId)
+    const objectKey = clean(payload?.objectKey)
+    const jti = clean(payload?.jti)
+
+    console.log('download request:', {
+      orderId: orderId || null,
+      hasObjectKey: !!objectKey,
+      jti: jti || null,
+      membershipLike: looksLikeMembershipPayload(payload),
+    })
 
     if (!objectKey || !jti) {
       return res.status(400).json({ error: 'Invalid token payload' })
@@ -272,6 +280,8 @@ export default async function handler(req, res) {
 
       const mem = await checkAndConsumeMembership({ email })
       if (!mem.ok) {
+        console.error('download membership denied:', { email, code: mem.code })
+
         const status =
           mem.code === 'LIMIT_REACHED'
             ? 403
@@ -300,8 +310,8 @@ export default async function handler(req, res) {
       if (!orderId) return res.status(400).json({ error: 'Invalid token payload' })
 
       const { data: rpc, error } = await supabaseAdmin.rpc('consume_download_token', {
-        p_order_id: String(orderId),
-        p_jti: String(jti),
+        p_order_id: orderId,
+        p_jti: jti,
       })
 
       if (error) {
@@ -313,6 +323,13 @@ export default async function handler(req, res) {
 
       if (!result?.ok) {
         const code = result?.code || 'DENIED'
+        console.error('download denied:', {
+          orderId,
+          jti,
+          code,
+          message: result?.message || 'Denied',
+        })
+
         const status =
           code === 'TOKEN_USED_OR_EXPIRED'
             ? 401
@@ -332,7 +349,7 @@ export default async function handler(req, res) {
     /* resolve real R2 key */
     /* ---------------------------------------------------- */
 
-    let finalKey = String(objectKey).trim()
+    let finalKey = objectKey
 
     if (isPrefixKey(finalKey)) {
       const scannedKey = await findFirstFileUnderPrefix(finalKey)
