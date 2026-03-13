@@ -22,6 +22,7 @@ function safeSet(key, value) {
     window.localStorage.setItem(key, value)
   } catch {}
 }
+
 function safeGet(key) {
   try {
     return window.localStorage.getItem(key) || ''
@@ -31,18 +32,19 @@ function safeGet(key) {
 }
 
 function normalizeStatus(data) {
-  const raw =
-    data?.status ??
-    data?.order?.status ??
-    data?.payhere_status_code ?? // sometimes exposed
-    'PENDING'
+  const directStatus = String(data?.status ?? data?.order?.status ?? '').trim().toUpperCase()
+  const gatewayCode = String(data?.payhere_status_code ?? data?.order?.payhere_status_code ?? '').trim()
+  const paidAt = String(data?.paid_at ?? data?.order?.paid_at ?? '').trim()
 
-  const s = String(raw).trim()
+  // strongest positive signals first
+  if (gatewayCode === '2') return 'PAID'
+  if (paidAt) return 'PAID'
 
-  if (s === '2') return 'PAID'
-  if (s === '-1' || s === '-2' || s === '-3') return 'FAILED'
+  // strongest negative signals
+  if (gatewayCode === '-1' || gatewayCode === '-2' || gatewayCode === '-3') return 'FAILED'
 
-  return s.toUpperCase()
+  if (directStatus) return directStatus
+  return 'PENDING'
 }
 
 function isCartGroup(ref) {
@@ -64,7 +66,7 @@ export default function StoreReturn() {
     if (urlOrderId) {
       setOrderId(urlOrderId)
       safeSet('last_order_ref', urlOrderId)
-      safeSet('last_order_id', urlOrderId) // backward compat
+      safeSet('last_order_id', urlOrderId)
       return
     }
 
@@ -86,7 +88,11 @@ export default function StoreReturn() {
 
       try {
         const url = `/api/orders/status?order_id=${encodeURIComponent(orderId)}&t=${Date.now()}`
-        const r = await fetch(url, { headers: { 'Cache-Control': 'no-store' } })
+        const r = await fetch(url, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-store' },
+        })
+
         const data = await r.json().catch(() => ({}))
         if (stopped) return
 
@@ -96,16 +102,13 @@ export default function StoreReturn() {
           const s = normalizeStatus(data)
           setStatus(s)
 
-          // ✅ PAID
           if (PAID_STATUSES.has(s)) {
             stopped = true
 
-            // clear cart only after confirmed paid
             try {
               window.localStorage.removeItem('jc_cart_v1')
             } catch {}
 
-            // ✅ If CART_* then go to download page with code=
             const target = isCartGroup(orderId)
               ? `/store/download?code=${encodeURIComponent(orderId)}`
               : `/store/download?order_id=${encodeURIComponent(orderId)}`
@@ -123,7 +126,6 @@ export default function StoreReturn() {
             return
           }
 
-          // ✅ FAILED/CANCELED
           if (FAIL_STATUSES.has(s)) {
             stopped = true
             setMsg('Payment not completed. If you were charged, please contact support with your Order ID.')
