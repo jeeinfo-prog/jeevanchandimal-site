@@ -71,12 +71,38 @@ async function findAuthUserByEmail(email) {
   const cleanEmail = String(email || '').trim().toLowerCase()
   if (!cleanEmail) return null
 
-  const { data, error } = await supabaseAdmin.auth.admin.listUsers()
+  if (typeof supabaseAdmin.auth.admin.getUserByEmail === 'function') {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(cleanEmail)
+    if (error) {
+      const msg = String(error.message || '').toLowerCase()
+      if (!msg.includes('not found')) throw error
+      return null
+    }
+    return data?.user || null
+  }
 
-  if (error) throw error
+  let page = 1
+  const perPage = 1000
 
-  const users = Array.isArray(data?.users) ? data.users : []
-  return users.find((u) => String(u.email || '').trim().toLowerCase() === cleanEmail) || null
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage,
+    })
+
+    if (error) throw error
+
+    const users = Array.isArray(data?.users) ? data.users : []
+    const found =
+      users.find((u) => String(u.email || '').trim().toLowerCase() === cleanEmail) || null
+
+    if (found) return found
+    if (users.length < perPage) break
+
+    page += 1
+  }
+
+  return null
 }
 
 async function ensureSupabaseAuthUser({ email, name, picture }) {
@@ -90,6 +116,20 @@ async function ensureSupabaseAuthUser({ email, name, picture }) {
 
   const existing = await findAuthUserByEmail(cleanEmail)
   if (existing?.id) {
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(existing.id, {
+        user_metadata: {
+          ...(existing.user_metadata || {}),
+          full_name: cleanName || existing.user_metadata?.full_name || null,
+          avatar_url: cleanPicture || existing.user_metadata?.avatar_url || null,
+          provider: 'google',
+        },
+        email_confirm: true,
+      })
+    } catch (err) {
+      console.warn('updateUserById warning:', err?.message || err)
+    }
+
     return { userId: existing.id, created: false }
   }
 
@@ -129,7 +169,6 @@ async function attachUserIdToMembershipIfNeeded(email, userId) {
   const existingUserId = String(data.user_id || '').trim()
   if (existingUserId === cleanUserId) return
 
-  // If membership already belongs to another auth user, do not overwrite automatically.
   if (existingUserId && existingUserId !== cleanUserId) {
     throw new Error('Membership is already linked to another user')
   }
