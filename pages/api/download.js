@@ -31,6 +31,15 @@ function getIp(req) {
   return clean(req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown')
 }
 
+function applySecurityHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store, private, max-age=0, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+}
+
 function rateLimit(req, res) {
   const ip = getIp(req)
   const now = Date.now()
@@ -62,9 +71,11 @@ function rateLimit(req, res) {
 /* ---------------------------------------------------- */
 
 function safeFilename(name) {
-  return clean(name)
-    .replace(/[\r\n"]/g, '')
-    .replace(/[\\/]/g, '-') || 'download'
+  return (
+    clean(name)
+      .replace(/[\r\n"]/g, '')
+      .replace(/[\\/]/g, '-') || 'download'
+  )
 }
 
 function normalizeEmail(v) {
@@ -233,6 +244,8 @@ async function checkAndConsumeMembership({ email }) {
 /* ---------------------------------------------------- */
 
 export default async function handler(req, res) {
+  applySecurityHeaders(res)
+
   if (!rateLimit(req, res)) return
 
   if (req.method !== 'GET') {
@@ -373,7 +386,6 @@ export default async function handler(req, res) {
       { expiresIn: 60 }
     )
 
-    res.setHeader('Cache-Control', 'no-store')
     return res.redirect(302, signedUrl)
   } catch (err) {
     console.error('download error:', err?.name, err?.message)
