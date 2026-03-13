@@ -1,8 +1,5 @@
-// pages/services-audio.js
 import React, { Fragment } from 'react'
 import Head from 'next/head'
-
-import { useTranslations } from 'next-intl'
 
 import JeevanChandimalNavi from '../components/layout/jeevan-chandimal-navi'
 import ServiceAudioHero from '../components/service-audio-hero'
@@ -12,12 +9,9 @@ import WhatIDoAudioServices from '../components/what-i-do-audio-services'
 import HowIApproachAudio from '../components/how-i-approach-audio'
 import WhoItsForAudio from '../components/who-its-for-audio'
 import ServicesAudioFinalCTA from '../components/services-audio-final-cta'
-import JeevanChandimalNewFooter from '../components/layout/jeevan-chandimal-new-footer'
+import JeevanChandimalNewFooter from '../components/layout/jeevan-chimal-new-footer'
 
-const ServicesAudio = (props) => {
-  // keep (even if unused) to match your setup
-  useTranslations?.()
-
+const ServicesAudio = () => {
   return (
     <>
       <div className="page">
@@ -131,11 +125,9 @@ const ServicesAudio = (props) => {
           rootClassName="jeevan-chandimal-naviroot-class-name20"
         />
 
-        {/* ✅ THIS is the important part: ensures hero starts BELOW the nav */}
         <div className="navSpacer" aria-hidden="true" />
 
         <main className="main">
-          {/* HERO */}
           <section className="section">
             <div className="block heroBlock">
               <ServiceAudioHero
@@ -165,7 +157,6 @@ const ServicesAudio = (props) => {
             </div>
           </section>
 
-          {/* INTRO */}
           <section className="section">
             <IntroductionAudioServices
               feature1Title={
@@ -192,7 +183,6 @@ const ServicesAudio = (props) => {
             />
           </section>
 
-          {/* SELECTED AUDIO WORK */}
           <section className="section">
             <SelectedAudioWork
               content1={
@@ -215,7 +205,6 @@ const ServicesAudio = (props) => {
             />
           </section>
 
-          {/* WHAT I DO */}
           <section className="section">
             <WhatIDoAudioServices
               sectionTitle={
@@ -289,7 +278,9 @@ const ServicesAudio = (props) => {
               }
               feature3Description={
                 <Fragment>
-                  <span className="t">Editing, mixing, and refinement for clarity, balance, and impact.</span>
+                  <span className="t">
+                    Editing, mixing, and refinement for clarity, balance, and impact.
+                  </span>
                 </Fragment>
               }
               feature4Description={
@@ -300,7 +291,6 @@ const ServicesAudio = (props) => {
             />
           </section>
 
-          {/* HOW I APPROACH */}
           <section className="section">
             <HowIApproachAudio
               feature1Title={
@@ -327,7 +317,6 @@ const ServicesAudio = (props) => {
             />
           </section>
 
-          {/* WHO IT'S FOR */}
           <section className="section">
             <WhoItsForAudio
               content1={
@@ -347,7 +336,6 @@ const ServicesAudio = (props) => {
             />
           </section>
 
-          {/* FINAL CTA */}
           <section className="section">
             <ServicesAudioFinalCTA
               action2={
@@ -488,7 +476,6 @@ const ServicesAudio = (props) => {
           overflow-y: visible;
         }
 
-        /* ✅ the key: create physical space for a fixed/sticky nav */
         .navSpacer {
           height: var(--jc-nav-h, 72px);
           width: 100%;
