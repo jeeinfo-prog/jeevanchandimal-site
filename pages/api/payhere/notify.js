@@ -479,17 +479,12 @@ export default async function handler(req, res) {
       custom_2,
     } = data
 
-    console.log('=== PayHere notify hit ===')
-    console.log('notify raw:', raw)
-    console.log('notify parsed:', data)
-    console.log('notify summary:', {
-      order_id: clean(order_id),
-      payment_id: clean(payment_id),
-      status_code: clean(status_code),
-      merchant_id: clean(merchant_id),
-      custom_1: clean(custom_1),
-      custom_2: clean(custom_2),
-    })
+    console.log('PayHere notify:', {
+  order_id: clean(order_id),
+  payment_id: clean(payment_id) || null,
+  status_code: clean(status_code),
+  merchant_id: clean(merchant_id),
+})
 
     if (!order_id) {
       console.log('notify: missing order_id')
