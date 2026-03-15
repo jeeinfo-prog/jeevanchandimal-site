@@ -1,4 +1,3 @@
-// pages/api/admin/photos/commit.js
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
 const GRAPH_VERSION = 'v25.0'
@@ -129,7 +128,7 @@ function smartTagsFromFilename(filename) {
 }
 
 function absoluteUrl(base, path) {
-  const b = clean(base)
+  const b = clean(base).replace(/\/+$/, '')
   const p = clean(path)
   if (!p) return ''
   if (p.startsWith('http://') || p.startsWith('https://')) return p
@@ -155,6 +154,27 @@ function maskToken(token) {
   if (!t) return ''
   if (t.length <= 10) return '***'
   return `${t.slice(0, 6)}...${t.slice(-4)}`
+}
+
+function readFacebookEnv() {
+  return {
+    pageId:
+      clean(process.env.FACEBOOK_PAGE_ID) ||
+      clean(process.env.FB_PAGE_ID) ||
+      '',
+    pageAccessToken:
+      clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN) ||
+      clean(process.env.FB_PAGE_ACCESS_TOKEN) ||
+      '',
+    longLivedUserToken:
+      clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN) ||
+      clean(process.env.FB_LONG_LIVED_USER_TOKEN) ||
+      '',
+    siteBase:
+      clean(process.env.NEXT_PUBLIC_SITE_URL) ||
+      clean(process.env.SITE_URL) ||
+      'http://localhost:3000',
+  }
 }
 
 async function graphGet(path, params = {}) {
@@ -205,31 +225,55 @@ async function graphPost(path, form = {}) {
 }
 
 /**
- * Token priority:
- * 1) FACEBOOK_PAGE_ACCESS_TOKEN
- * 2) derive page token using FACEBOOK_LONG_LIVED_USER_TOKEN + FACEBOOK_PAGE_ID
+ * Resolve page credentials safely.
+ *
+ * Priority:
+ * 1) FACEBOOK_PAGE_ACCESS_TOKEN + FACEBOOK_PAGE_ID
+ * 2) FACEBOOK_PAGE_ACCESS_TOKEN and auto-detect page id from /me
+ * 3) FACEBOOK_LONG_LIVED_USER_TOKEN + FACEBOOK_PAGE_ID -> derive page token via /me/accounts
  */
-async function resolvePageAccessToken() {
-  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
-  const directPageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
-  const longLivedUserToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
+async function resolveFacebookPageCredentials() {
+  const env = readFacebookEnv()
+  const pageId = env.pageId
+  const directPageToken = env.pageAccessToken
+  const longLivedUserToken = env.longLivedUserToken
 
-  if (directPageToken) {
-    if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
+  if (directPageToken && pageId) {
     return {
+      pageId,
       token: directPageToken,
       source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
-      pageId,
     }
   }
 
-  if (!pageId) {
-    throw new Error('Missing FACEBOOK_PAGE_ID')
+  if (directPageToken && !pageId) {
+    const me = await graphGet('/me', {
+      fields: 'id,name',
+      access_token: directPageToken,
+    })
+
+    const detectedPageId = clean(me?.id)
+    if (!detectedPageId) {
+      throw new Error('Could not detect page id from FACEBOOK_PAGE_ACCESS_TOKEN')
+    }
+
+    return {
+      pageId: detectedPageId,
+      token: directPageToken,
+      source: 'FACEBOOK_PAGE_ACCESS_TOKEN:auto_page_id',
+      pageName: clean(me?.name),
+    }
   }
 
   if (!longLivedUserToken) {
     throw new Error(
-      'Missing token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN'
+      'Missing Facebook token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN'
+    )
+  }
+
+  if (!pageId) {
+    throw new Error(
+      'Missing FACEBOOK_PAGE_ID: required when using FACEBOOK_LONG_LIVED_USER_TOKEN'
     )
   }
 
@@ -245,19 +289,20 @@ async function resolvePageAccessToken() {
   }
 
   if (!match.access_token) {
-    throw new Error(`Missing token for page ${pageId}`)
+    throw new Error(`Missing page access token for page ${pageId}`)
   }
 
   return {
+    pageId,
     token: match.access_token,
     source: 'derived_from_user_token',
-    pageId,
+    pageName: clean(match?.name),
   }
 }
 
 async function validatePageToken(pageId, token) {
-  if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
-  if (!token) throw new Error('Missing token')
+  if (!pageId) throw new Error('Missing Facebook page id')
+  if (!token) throw new Error('Missing Facebook token')
 
   const page = await graphGet(`/${pageId}`, {
     fields: 'id,name',
@@ -265,20 +310,15 @@ async function validatePageToken(pageId, token) {
   })
 
   return {
-    id: page?.id || '',
-    name: page?.name || '',
+    id: clean(page?.id),
+    name: clean(page?.name),
   }
 }
 
 async function autoPostToFacebook({ photoId, title, description, previewUrl, thumbUrl }) {
-  const pageIdEnv = clean(process.env.FACEBOOK_PAGE_ID)
-  const siteBase =
-    clean(process.env.NEXT_PUBLIC_SITE_URL) ||
-    clean(process.env.SITE_URL) ||
-    'http://localhost:3000'
-
-  const storeUrl = absoluteUrl(siteBase, `/store/${encodeURIComponent(photoId)}`)
-  const photoUrl = absoluteUrl(siteBase, previewUrl || thumbUrl || '')
+  const env = readFacebookEnv()
+  const storeUrl = absoluteUrl(env.siteBase, `/store/${encodeURIComponent(photoId)}`)
+  const photoUrl = absoluteUrl(env.siteBase, previewUrl || thumbUrl || '')
   const message = buildFacebookCaption({ title, description, storeUrl })
 
   if (!photoUrl) {
@@ -289,11 +329,10 @@ async function autoPostToFacebook({ photoId, title, description, previewUrl, thu
     }
   }
 
-  const resolved = await resolvePageAccessToken()
-  const finalPageId = pageIdEnv || resolved.pageId
-  const page = await validatePageToken(finalPageId, resolved.token)
+  const resolved = await resolveFacebookPageCredentials()
+  const page = await validatePageToken(resolved.pageId, resolved.token)
 
-  const result = await graphPost(`/${finalPageId}/photos`, {
+  const result = await graphPost(`/${resolved.pageId}/photos`, {
     url: photoUrl,
     caption: message,
     published: 'true',
@@ -309,7 +348,7 @@ async function autoPostToFacebook({ photoId, title, description, previewUrl, thu
     },
     tokenSource: resolved.source,
     debug: {
-      pageId: finalPageId,
+      pageId: resolved.pageId,
       tokenPreview: maskToken(resolved.token),
       storeUrl,
       photoUrl,
@@ -322,12 +361,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
+  const env = readFacebookEnv()
+
   console.log('FB ENV DEBUG', {
-    FACEBOOK_PAGE_ID: process.env.FACEBOOK_PAGE_ID || '(missing)',
-    hasPageToken: !!process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
-    hasLongLivedUserToken: !!process.env.FACEBOOK_LONG_LIVED_USER_TOKEN,
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || '(missing)',
-    SITE_URL: process.env.SITE_URL || '(missing)',
+    FACEBOOK_PAGE_ID: env.pageId || '(missing)',
+    hasPageToken: !!env.pageAccessToken,
+    hasLongLivedUserToken: !!env.longLivedUserToken,
+    NEXT_PUBLIC_SITE_URL: env.siteBase || '(missing)',
   })
 
   const admin = await requireAdmin(req)
@@ -370,7 +410,8 @@ export default async function handler(req, res) {
       return res.status(400).json({
         ok: false,
         error: 'Missing filename (not in request and not found in DB)',
-        hint: 'Send filename to commit OR ensure create-upload stores original_filename OR original_jpg_key is saved',
+        hint:
+          'Send filename to commit OR ensure create-upload stores original_filename OR original_jpg_key is saved',
       })
     }
 

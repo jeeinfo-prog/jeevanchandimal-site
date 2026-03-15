@@ -1,29 +1,33 @@
 // pages/admin/upload.js
 // ✅ Final corrected version
-// - create-upload + commit send token in BOTH headers:
-//   Authorization: Bearer <token>
-//   x-supabase-access-token: <token>
-// - Facebook auto-post is now handled inside /api/admin/photos/commit
-// - Removed browser-side Facebook secret usage entirely
-// - Keeps current UI, queue, metadata, and progress flow
+// - create-upload + commit send token in BOTH headers
+// - Facebook auto-post is handled inside /api/admin/photos/commit
+// - browser no longer uses any Facebook secret/token directly
+// - fixes auto-start after retry
+// - aborts active uploads on clear/sign-out/pause
+// - keeps current UI, queue, metadata, and progress flow
 
 import React from 'react'
 import Head from 'next/head'
 
-// ---------------- helpers ----------------
+/* ---------------- helpers ---------------- */
+
 function fmtMB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(2)
 }
+
 function fmtSpeed(bps) {
   if (!bps || bps <= 0) return '—'
   return `${(bps / (1024 * 1024)).toFixed(2)} MB/s`
 }
+
 function fmtEta(sec) {
   if (!sec || sec <= 0 || !Number.isFinite(sec)) return '—'
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
+
 function stripExt(name) {
   const n = String(name || '')
   const i = n.lastIndexOf('.')
@@ -105,6 +109,7 @@ function normalizeTags(input) {
     out.push(t)
     if (out.length >= 30) break
   }
+
   return out
 }
 
@@ -124,6 +129,7 @@ function smartEnhanceTags(tagsArr) {
     add('nature')
     add('travel')
   }
+
   if (set.has('wildlife')) add('nature')
 
   const combinePairs = [
@@ -255,8 +261,11 @@ const COLLECTION_TAGS = [
 
 export default function AdminUploadPage() {
   const supabaseRef = React.useRef(null)
-  const [supabaseReady, setSupabaseReady] = React.useState(false)
+  const runningRef = React.useRef(false)
+  const queueRef = React.useRef([])
+  const xhrMapRef = React.useRef(new Map())
 
+  const [supabaseReady, setSupabaseReady] = React.useState(false)
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [session, setSession] = React.useState(null)
@@ -279,9 +288,6 @@ export default function AdminUploadPage() {
   const [autoLkrFromUsd, setAutoLkrFromUsd] = React.useState(true)
 
   const concurrency = 4
-  const runningRef = React.useRef(false)
-  const queueRef = React.useRef([])
-  const xhrMapRef = React.useRef(new Map())
 
   const LICENSE_PRESETS = React.useMemo(
     () => ({
@@ -291,6 +297,15 @@ export default function AdminUploadPage() {
     }),
     []
   )
+
+  const countQueued = queue.filter((x) => x.status === 'QUEUED').length
+  const countWorking = queue.filter((x) => x.status === 'UPLOADING' || x.status === 'COMMITTING').length
+  const countDone = queue.filter((x) => x.status === 'DONE').length
+  const countErr = queue.filter((x) => x.status === 'ERROR').length
+
+  const canStart = !busy && !paused && isAdmin && countQueued > 0
+  const canPause = busy && !paused && countWorking > 0
+  const canResume = !busy && paused && countQueued > 0
 
   React.useEffect(() => {
     queueRef.current = queue
@@ -304,14 +319,30 @@ export default function AdminUploadPage() {
     setQueue((q) => q.map((it) => (it.id === id ? { ...it, ...patch } : it)))
   }
 
+  function abortAllXhrs() {
+    for (const [, xhr] of xhrMapRef.current.entries()) {
+      try {
+        xhr.abort()
+      } catch {}
+    }
+    xhrMapRef.current.clear()
+  }
+
   function removeItem(id) {
     const xhr = xhrMapRef.current.get(id)
     if (xhr) {
       try {
         xhr.abort()
       } catch {}
+      xhrMapRef.current.delete(id)
     }
     setQueue((q) => q.filter((it) => it.id !== id))
+  }
+
+  function clearQueue() {
+    abortAllXhrs()
+    setQueue([])
+    log('🧹 Queue cleared')
   }
 
   function retryFailed() {
@@ -330,6 +361,7 @@ export default function AdminUploadPage() {
           : it
       )
     )
+    log('🔁 Failed items moved back to queue')
   }
 
   function applyBulkPresetToQueued() {
@@ -354,6 +386,7 @@ export default function AdminUploadPage() {
   function applyBulkTag(tag) {
     const t = normalizeTags([tag])[0]
     if (!t) return
+
     setQueue((q) =>
       q.map((it) => {
         if (!(it.status === 'QUEUED' || it.status === 'ERROR')) return it
@@ -362,6 +395,7 @@ export default function AdminUploadPage() {
         return { ...it, meta: { ...(it.meta || {}), tags: Array.from(next) } }
       })
     )
+
     log(`🏷 Added bulk tag to queued items: ${t}`)
   }
 
@@ -376,10 +410,13 @@ export default function AdminUploadPage() {
 
   React.useEffect(() => {
     if (!autoLkrFromUsd) return
+
     const usd = Number(priceUsd)
     if (!Number.isFinite(usd)) return
+
     const rate = Number(fxUsdToLkr || 0)
     if (!Number.isFinite(rate) || rate <= 0) return
+
     const lkr = Math.round(usd * rate)
     if (Number.isFinite(lkr) && lkr > 0) setPriceLkr(lkr)
   }, [priceUsd, fxUsdToLkr, autoLkrFromUsd])
@@ -425,6 +462,7 @@ export default function AdminUploadPage() {
     }
 
     init()
+
     return () => {
       cancelled = true
     }
@@ -433,8 +471,14 @@ export default function AdminUploadPage() {
   React.useEffect(() => {
     if (!supabaseReady || !supabaseRef.current) return
 
-    supabaseRef.current.auth.getSession().then(({ data }) => setSession(data?.session || null))
-    const { data: sub } = supabaseRef.current.auth.onAuthStateChange((_e, s) => setSession(s))
+    supabaseRef.current.auth.getSession().then(({ data }) => {
+      setSession(data?.session || null)
+    })
+
+    const { data: sub } = supabaseRef.current.auth.onAuthStateChange((_e, s) => {
+      setSession(s)
+    })
+
     return () => sub?.subscription?.unsubscribe?.()
   }, [supabaseReady])
 
@@ -470,16 +514,33 @@ export default function AdminUploadPage() {
     checkAdmin()
   }, [session?.user?.id, supabaseReady])
 
+  React.useEffect(() => {
+    if (!autoStart) return
+    if (paused) return
+    if (busy) return
+    if (stopAfterCurrent) return
+    if (!session?.access_token || !isAdmin) return
+
+    const hasQueued = queue.some((x) => x.status === 'QUEUED')
+    if (hasQueued) runQueue()
+  }, [queue, autoStart, paused, busy, stopAfterCurrent, session?.access_token, isAdmin])
+
   async function signIn() {
     setBusy(true)
     setLogs([])
+
     try {
       if (!supabaseReady || !supabaseRef.current) throw new Error('Supabase not ready')
-      const { error } = await supabaseRef.current.auth.signInWithPassword({ email, password })
+
+      const { error } = await supabaseRef.current.auth.signInWithPassword({
+        email,
+        password,
+      })
+
       if (error) throw error
       log('✅ Signed in')
     } catch (e) {
-      log(`❌ Sign in error: ${e.message}`)
+      log(`❌ Sign in error: ${e?.message || 'Unknown error'}`)
     } finally {
       setBusy(false)
     }
@@ -487,8 +548,12 @@ export default function AdminUploadPage() {
 
   async function signOut() {
     setBusy(true)
+
     try {
+      abortAllXhrs()
+
       if (!supabaseReady || !supabaseRef.current) throw new Error('Supabase not ready')
+
       await supabaseRef.current.auth.signOut()
       setIsAdmin(false)
       setQueue([])
@@ -496,7 +561,7 @@ export default function AdminUploadPage() {
       setStopAfterCurrent(false)
       log('✅ Signed out')
     } catch (e) {
-      log(`❌ Sign out error: ${e.message}`)
+      log(`❌ Sign out error: ${e?.message || 'Unknown error'}`)
     } finally {
       setBusy(false)
     }
@@ -508,6 +573,7 @@ export default function AdminUploadPage() {
     e.preventDefault()
     e.stopPropagation()
     setDragOver(false)
+
     const files = e.dataTransfer?.files
     if (files && files.length) addFiles(files)
   }
@@ -516,6 +582,7 @@ export default function AdminUploadPage() {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
       xhr.open('PUT', uploadUrl, true)
+
       xhrMapRef.current.set(itemId, xhr)
 
       let lastAt = Date.now()
@@ -523,6 +590,7 @@ export default function AdminUploadPage() {
 
       xhr.upload.onprogress = (evt) => {
         if (!evt.lengthComputable) return
+
         const now = Date.now()
         const loaded = evt.loaded
         const total = evt.total
@@ -543,8 +611,15 @@ export default function AdminUploadPage() {
 
       xhr.onload = () => {
         xhrMapRef.current.delete(itemId)
+
         if (xhr.status >= 200 && xhr.status < 300) {
-          onProgress({ pct: 100, loaded: file.size, total: file.size, speedBps: 0, etaSec: 0 })
+          onProgress({
+            pct: 100,
+            loaded: file.size,
+            total: file.size,
+            speedBps: 0,
+            etaSec: 0,
+          })
           resolve()
         } else {
           reject(Object.assign(new Error(`R2 PUT failed: ${xhr.status}`), { _type: 'R2' }))
@@ -604,17 +679,6 @@ export default function AdminUploadPage() {
     setQueue((q) => [...q, ...items])
   }
 
-  React.useEffect(() => {
-    if (!autoStart) return
-    if (paused) return
-    if (busy) return
-    if (stopAfterCurrent) return
-    if (!session?.access_token || !isAdmin) return
-
-    const hasQueued = queue.some((x) => x.status === 'QUEUED')
-    if (hasQueued) runQueue()
-  }, [queue.length, autoStart, paused, busy, stopAfterCurrent, session?.access_token, isAdmin])
-
   async function uploadSingleItem(item, token) {
     const file = item.file
 
@@ -632,7 +696,9 @@ export default function AdminUploadPage() {
     log(`Preparing upload: ${file.name}`)
     log(`Auth token present: ${token ? 'YES' : 'NO'}`)
 
-    let photoId, uploadUrl, objectKey
+    let photoId
+    let uploadUrl
+    let objectKey
 
     try {
       log('Step 1/4: create-upload')
@@ -657,18 +723,27 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(createResp)
+
       if (!createResp.ok) {
         throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
       }
 
-      photoId = json.photoId
-      uploadUrl = json.uploadUrl
-      objectKey = json.objectKey
+      photoId = json?.photoId
+      uploadUrl = json?.uploadUrl
+      objectKey = json?.objectKey
+
+      if (!photoId || !uploadUrl) {
+        throw Object.assign(new Error('create-upload response missing photoId or uploadUrl'), {
+          _type: 'CREATE',
+        })
+      }
 
       log(`✅ create-upload OK — photoId=${photoId}`)
       setItem(item.id, { photoId })
     } catch (e) {
-      throw Object.assign(new Error(e.message), { _type: e?._type || 'CREATE' })
+      throw Object.assign(new Error(e?.message || 'create-upload failed'), {
+        _type: e?._type || 'CREATE',
+      })
     }
 
     try {
@@ -682,12 +757,22 @@ export default function AdminUploadPage() {
       log(`✅ R2 PUT OK (${objectKey || 'key'})`)
     } catch (e) {
       if (String(e?.message || '').toLowerCase().includes('aborted')) throw e
-      throw Object.assign(new Error(e.message), { _type: e?._type || 'R2' })
+
+      throw Object.assign(new Error(e?.message || 'R2 upload failed'), {
+        _type: e?._type || 'R2',
+      })
     }
 
     try {
       log('Step 3/4: commit')
-      setItem(item.id, { status: 'COMMITTING', speedBps: 0, etaSec: 0 })
+      setItem(item.id, {
+        status: 'COMMITTING',
+        progress: 100,
+        loaded: file.size || 0,
+        total: file.size || 0,
+        speedBps: 0,
+        etaSec: 0,
+      })
       log(`Commit: ${file.name}`)
 
       const commitResp = await fetch('/api/admin/photos/commit', {
@@ -701,8 +786,12 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(commitResp)
+
       if (!commitResp.ok) {
-        throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
+        throw Object.assign(
+          new Error(json?.detail || json?.error || text || 'Commit failed'),
+          { _type: 'COMMIT' }
+        )
       }
 
       log('✅ Done: commit complete')
@@ -717,18 +806,16 @@ export default function AdminUploadPage() {
         log(`⚠️ Facebook post failed: ${json.facebook.error}`)
       }
     } catch (e) {
-      throw Object.assign(new Error(e.message), { _type: e?._type || 'COMMIT' })
+      throw Object.assign(new Error(e?.message || 'Commit failed'), {
+        _type: e?._type || 'COMMIT',
+      })
     }
   }
 
   function pauseQueue() {
     setPaused(true)
     log('⏸ Pausing… aborting active uploads')
-    for (const [, xhr] of xhrMapRef.current.entries()) {
-      try {
-        xhr.abort()
-      } catch {}
-    }
+    abortAllXhrs()
   }
 
   function resumeQueue() {
@@ -756,7 +843,10 @@ export default function AdminUploadPage() {
         if (paused) break
 
         if (stopAfterCurrent) {
-          const anyWorking = queueRef.current.some((x) => x.status === 'UPLOADING' || x.status === 'COMMITTING')
+          const anyWorking = queueRef.current.some(
+            (x) => x.status === 'UPLOADING' || x.status === 'COMMITTING'
+          )
+
           if (!anyWorking) break
           await new Promise((r) => setTimeout(r, 200))
           continue
@@ -776,6 +866,7 @@ export default function AdminUploadPage() {
           next.map(async (it) => {
             try {
               await uploadSingleItem(it, token)
+
               setItem(it.id, {
                 status: 'DONE',
                 error: '',
@@ -788,7 +879,11 @@ export default function AdminUploadPage() {
               const msg = e?.message || String(e)
 
               if (paused && msg.toLowerCase().includes('aborted')) {
-                setItem(it.id, { status: 'QUEUED', error: '', errorType: '' })
+                setItem(it.id, {
+                  status: 'QUEUED',
+                  error: '',
+                  errorType: '',
+                })
                 return
               }
 
@@ -799,6 +894,7 @@ export default function AdminUploadPage() {
                 speedBps: 0,
                 etaSec: 0,
               })
+
               log(`❌ Failed: ${it.file.name} — ${msg}`)
             }
           })
@@ -816,22 +912,16 @@ export default function AdminUploadPage() {
     }
   }
 
-  const countQueued = queue.filter((x) => x.status === 'QUEUED').length
-  const countWorking = queue.filter((x) => x.status === 'UPLOADING' || x.status === 'COMMITTING').length
-  const countDone = queue.filter((x) => x.status === 'DONE').length
-  const countErr = queue.filter((x) => x.status === 'ERROR').length
-
-  const canStart = !busy && !paused && isAdmin && countQueued > 0
-  const canPause = busy && !paused && countWorking > 0
-  const canResume = !busy && paused && countQueued > 0
-
   return (
     <>
       <Head>
         <title>Admin Upload</title>
       </Head>
 
-      <main className="adminUpload" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px' }}>
+      <main
+        className="adminUpload"
+        style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 20px' }}
+      >
         <h1 style={{ margin: 0 }}>Admin Upload</h1>
         <p style={{ opacity: 0.8, marginTop: 8 }}>
           Folder upload + auto title + smart tags + auto description + manual editor + secure commit.
@@ -841,18 +931,21 @@ export default function AdminUploadPage() {
           <div className="card" style={{ marginTop: 18, padding: 16, borderRadius: 14 }}>
             <h3 style={{ marginTop: 0 }}>Supabase</h3>
             <p style={{ margin: 0, opacity: 0.85 }}>
-              Supabase client is not ready. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+              Supabase client is not ready. Check NEXT_PUBLIC_SUPABASE_URL and
+              NEXT_PUBLIC_SUPABASE_ANON_KEY.
             </p>
           </div>
         ) : !session ? (
           <div className="card" style={{ marginTop: 18, padding: 16, borderRadius: 14 }}>
             <h3 style={{ marginTop: 0 }}>Login</h3>
+
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
               style={{ width: '100%', padding: 10, marginBottom: 10 }}
             />
+
             <input
               type="password"
               value={password}
@@ -860,21 +953,32 @@ export default function AdminUploadPage() {
               placeholder="Password"
               style={{ width: '100%', padding: 10, marginBottom: 10 }}
             />
+
             <button onClick={signIn} disabled={busy} style={{ padding: '10px 14px' }}>
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
           </div>
         ) : (
           <div className="card" style={{ marginTop: 18, padding: 16, borderRadius: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
               <div>
                 <div style={{ fontWeight: 700 }}>Signed in</div>
                 <div style={{ opacity: 0.8, fontSize: 13 }}>{session.user.email}</div>
                 <div style={{ marginTop: 6, fontSize: 13 }}>
                   Role:{' '}
-                  <strong style={{ color: isAdmin ? '#7CFF9B' : '#FF7C7C' }}>{isAdmin ? 'admin' : 'not admin'}</strong>
+                  <strong style={{ color: isAdmin ? '#7CFF9B' : '#FF7C7C' }}>
+                    {isAdmin ? 'admin' : 'not admin'}
+                  </strong>
                 </div>
               </div>
+
               <button onClick={signOut} disabled={busy} style={{ padding: '10px 14px' }}>
                 Sign out
               </button>
@@ -938,8 +1042,24 @@ export default function AdminUploadPage() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-                <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 16,
+                  alignItems: 'center',
+                  marginTop: 10,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    gap: 8,
+                    alignItems: 'center',
+                    fontSize: 13,
+                    opacity: 0.9,
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={autoLkrFromUsd}
@@ -966,7 +1086,10 @@ export default function AdminUploadPage() {
               </div>
 
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 8 }}>Quick add a tag to queued:</div>
+                <div style={{ fontSize: 13, opacity: 0.9, marginBottom: 8 }}>
+                  Quick add a tag to queued:
+                </div>
+
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {COLLECTION_TAGS.map((t) => (
                     <button
@@ -983,8 +1106,24 @@ export default function AdminUploadPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: 14, display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-              <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
+            <div
+              style={{
+                marginTop: 14,
+                display: 'flex',
+                gap: 14,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+              }}
+            >
+              <label
+                style={{
+                  display: 'inline-flex',
+                  gap: 8,
+                  alignItems: 'center',
+                  fontSize: 13,
+                  opacity: 0.9,
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={keepFolderStructure}
@@ -994,7 +1133,15 @@ export default function AdminUploadPage() {
                 Keep folder structure
               </label>
 
-              <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center', fontSize: 13, opacity: 0.9 }}>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  gap: 8,
+                  alignItems: 'center',
+                  fontSize: 13,
+                  opacity: 0.9,
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={autoStart}
@@ -1035,7 +1182,9 @@ export default function AdminUploadPage() {
                 }}
               >
                 <div style={{ fontWeight: 700 }}>Drag & drop files here</div>
-                <div style={{ opacity: 0.75, marginTop: 6, fontSize: 13 }}>Tip: use folder picker for folders.</div>
+                <div style={{ opacity: 0.75, marginTop: 6, fontSize: 13 }}>
+                  Tip: use folder picker for folders.
+                </div>
 
                 <div style={{ marginTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <label style={{ display: 'inline-block' }}>
@@ -1077,12 +1226,15 @@ export default function AdminUploadPage() {
                 <button onClick={runQueue} disabled={!canStart} style={{ padding: '10px 14px' }}>
                   Start Uploads
                 </button>
+
                 <button onClick={pauseQueue} disabled={!canPause} style={{ padding: '10px 14px' }}>
                   Pause
                 </button>
+
                 <button onClick={resumeQueue} disabled={!canResume} style={{ padding: '10px 14px' }}>
                   Resume
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -1094,10 +1246,12 @@ export default function AdminUploadPage() {
                 >
                   Stop after current
                 </button>
+
                 <button onClick={retryFailed} disabled={busy || countErr === 0} style={{ padding: '10px 14px' }}>
                   Retry failed ({countErr})
                 </button>
-                <button onClick={() => setQueue([])} disabled={busy} style={{ padding: '10px 14px' }}>
+
+                <button onClick={clearQueue} disabled={busy && !paused} style={{ padding: '10px 14px' }}>
                   Clear queue
                 </button>
               </div>
@@ -1118,10 +1272,18 @@ export default function AdminUploadPage() {
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div
+                            style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {it.file.name}
                             {it.relativePath ? (
-                              <span style={{ marginLeft: 8, opacity: 0.7, fontSize: 12 }}>({it.relativePath})</span>
+                              <span style={{ marginLeft: 8, opacity: 0.7, fontSize: 12 }}>
+                                ({it.relativePath})
+                              </span>
                             ) : null}
                             <span style={{ marginLeft: 8, opacity: 0.7, fontSize: 12 }}>
                               ({fmtMB(it.total || it.file.size)} MB)
@@ -1163,7 +1325,9 @@ export default function AdminUploadPage() {
                             <textarea
                               value={it?.meta?.description || ''}
                               onChange={(e) =>
-                                setItem(it.id, { meta: { ...(it.meta || {}), description: e.target.value } })
+                                setItem(it.id, {
+                                  meta: { ...(it.meta || {}), description: e.target.value },
+                                })
                               }
                               style={{
                                 width: '100%',
@@ -1184,7 +1348,9 @@ export default function AdminUploadPage() {
                               type="text"
                               value={normalizeTags(it?.meta?.tags || []).join(', ')}
                               onChange={(e) =>
-                                setItem(it.id, { meta: { ...(it.meta || {}), tags: normalizeTags(e.target.value) } })
+                                setItem(it.id, {
+                                  meta: { ...(it.meta || {}), tags: normalizeTags(e.target.value) },
+                                })
                               }
                               style={{ width: '100%', marginTop: 4, padding: 6, fontSize: 12 }}
                               placeholder="nature, travel, fineart"
@@ -1194,6 +1360,7 @@ export default function AdminUploadPage() {
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                               {COLLECTION_TAGS.map((t) => {
                                 const active = normalizeTags(it?.meta?.tags || []).includes(t)
+
                                 return (
                                   <button
                                     key={t}
@@ -1203,10 +1370,15 @@ export default function AdminUploadPage() {
                                       const current = new Set(normalizeTags(it?.meta?.tags || []))
                                       if (current.has(t)) current.delete(t)
                                       else current.add(t)
-                                      setItem(it.id, { meta: { ...(it.meta || {}), tags: Array.from(current) } })
+
+                                      setItem(it.id, {
+                                        meta: { ...(it.meta || {}), tags: Array.from(current) },
+                                      })
                                     }}
                                     disabled={busy && (it.status === 'UPLOADING' || it.status === 'COMMITTING')}
-                                    style={{ background: active ? 'rgba(245,244,244,0.22)' : 'transparent' }}
+                                    style={{
+                                      background: active ? 'rgba(245,244,244,0.22)' : 'transparent',
+                                    }}
                                   >
                                     {t}
                                   </button>
@@ -1263,8 +1435,11 @@ export default function AdminUploadPage() {
                               ? `${it.errorType || 'ERROR'}: ${it.error || 'Unknown error'}`
                               : 'Waiting…'}
                           </div>
+
                           <div style={{ whiteSpace: 'nowrap' }}>
-                            {it.status === 'UPLOADING' ? `${fmtSpeed(it.speedBps)} • ETA ${fmtEta(it.etaSec)}` : ' '}
+                            {it.status === 'UPLOADING'
+                              ? `${fmtSpeed(it.speedBps)} • ETA ${fmtEta(it.etaSec)}`
+                              : ' '}
                           </div>
                         </div>
                       </div>
@@ -1299,16 +1474,20 @@ export default function AdminUploadPage() {
         .adminUpload {
           color: #e8edf7;
         }
+
         .adminUpload a {
           color: #e8edf7;
         }
+
         .adminUpload .card {
           border: 1px solid rgba(245, 244, 244, 0.16);
           background: rgba(255, 255, 255, 0.02);
         }
+
         .adminUpload .dropZone {
           border: 1px dashed rgba(245, 244, 244, 0.25);
         }
+
         .adminUpload input,
         .adminUpload textarea,
         .adminUpload select {
@@ -1318,10 +1497,12 @@ export default function AdminUploadPage() {
           border-radius: 10px;
           outline: none;
         }
+
         .adminUpload input::placeholder,
         .adminUpload textarea::placeholder {
           color: rgba(232, 237, 247, 0.55);
         }
+
         .adminUpload button {
           color: #e8edf7 !important;
           border: 1px solid rgba(245, 244, 244, 0.18);
@@ -1329,15 +1510,18 @@ export default function AdminUploadPage() {
           border-radius: 10px;
           cursor: pointer;
         }
+
         .adminUpload button:hover {
           background: rgba(255, 255, 255, 0.08);
         }
+
         .adminUpload .pill {
           padding: 4px 10px;
           font-size: 12px;
           border-radius: 999px;
           background: transparent;
         }
+
         .spinner {
           display: inline-block;
           width: 10px;
@@ -1347,6 +1531,7 @@ export default function AdminUploadPage() {
           border-top-color: rgba(245, 244, 244, 0.95);
           animation: spin 0.8s linear infinite;
         }
+
         @keyframes spin {
           to {
             transform: rotate(360deg);
