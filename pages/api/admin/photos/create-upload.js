@@ -2,13 +2,42 @@
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 import { getPresignedPutUrl } from '../../../../lib/r2'
 
+function readHeader(req, name) {
+  const v = req.headers?.[name]
+  if (Array.isArray(v)) return v[0] || ''
+  return typeof v === 'string' ? v : ''
+}
+
+function extractAccessToken(req) {
+  const authHeader =
+    readHeader(req, 'authorization') ||
+    readHeader(req, 'Authorization') ||
+    ''
+
+  const m = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (m?.[1]) return m[1].trim()
+
+  const alt =
+    readHeader(req, 'x-supabase-access-token') ||
+    readHeader(req, 'x-access-token') ||
+    ''
+
+  if (alt) return alt.trim()
+
+  return ''
+}
+
 async function requireAdmin(req) {
-  const authHeader = req.headers.authorization || ''
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
-  if (!token) return { ok: false, status: 401, error: 'Missing token' }
+  const token = extractAccessToken(req)
+
+  if (!token) {
+    return { ok: false, status: 401, error: 'Missing token' }
+  }
 
   const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
-  if (userErr || !userData?.user) return { ok: false, status: 401, error: 'Invalid token' }
+  if (userErr || !userData?.user) {
+    return { ok: false, status: 401, error: 'Invalid token' }
+  }
 
   const { data: profile, error: profErr } = await supabaseAdmin
     .from('profiles')
@@ -16,8 +45,13 @@ async function requireAdmin(req) {
     .eq('id', userData.user.id)
     .single()
 
-  if (profErr || !profile) return { ok: false, status: 403, error: 'No profile' }
-  if (profile.role !== 'admin') return { ok: false, status: 403, error: 'Not admin' }
+  if (profErr || !profile) {
+    return { ok: false, status: 403, error: 'No profile' }
+  }
+
+  if (profile.role !== 'admin') {
+    return { ok: false, status: 403, error: 'Not admin' }
+  }
 
   return { ok: true, user: userData.user }
 }
@@ -158,21 +192,15 @@ export default async function handler(req, res) {
 
     const safeName = sanitizeFilename(filename)
 
-    // Folder support (webkitdirectory)
     const relativePath = body.relativePath ? sanitizePath(body.relativePath) : ''
     const pathPart = relativePath && relativePath.includes('/') ? relativePath : safeName
 
-    // Parse filename on backend too
     const parsed = parsePhotoFilename(filename, relativePath)
 
-    // Optional metadata from client
     const rawTitle = typeof body.title === 'string' ? body.title.trim() : ''
     const description = typeof body.description === 'string' ? body.description.trim() : ''
-
-    // Use client title if provided, otherwise safely auto-generate from filename
     const title = rawTitle || parsed.title || ''
 
-    // Keep incoming tags, normalized
     let tags = Array.isArray(body.tags)
       ? body.tags
           .filter((t) => typeof t === 'string' && t.trim())
@@ -181,19 +209,16 @@ export default async function handler(req, res) {
 
     tags = normalizeTags(tags)
 
-    // Ensure collection tag exists when available
     if (parsed.collection) {
       const merged = new Set(tags)
       merged.add(parsed.collection)
       tags = Array.from(merged)
     }
 
-    // Optional licensing fields
     const licensePreset = typeof body.licensePreset === 'string' ? body.licensePreset.trim() : ''
     const priceLkr = body.priceLkr != null ? Number(body.priceLkr) : null
     const priceUsd = body.priceUsd != null ? Number(body.priceUsd) : null
 
-    // 1) Insert draft photo row
     let photoId = null
     {
       const insertPayload = { status: 'draft' }
@@ -217,7 +242,6 @@ export default async function handler(req, res) {
           return res.status(500).json({ ok: false, error: first.error.message })
         }
 
-        // fallback insert with only guaranteed columns
         const fallback = await supabaseAdmin
           .from('photos')
           .insert([{ status: 'draft' }])
@@ -231,7 +255,6 @@ export default async function handler(req, res) {
 
         photoId = fallback.data.id
 
-        // best-effort update metadata
         const updatePayload = {}
         if (title) updatePayload.title = title
         if (description) updatePayload.description = description
@@ -255,13 +278,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // best-effort store filename
     await trySaveOriginalFilename(photoId, safeName)
 
-    // 2) Object key (folder structure kept under photoId namespace)
     const objectKey = `photos/original/${photoId}/${pathPart}`
 
-    // 3) Update photos row with original_jpg_key
     {
       const up = await supabaseAdmin
         .from('photos')
@@ -274,10 +294,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4) Presigned PUT URL
     const uploadUrl = await getPresignedPutUrl({ key: objectKey })
 
-    // 5) Asset row (best-effort)
     {
       const asset = await supabaseAdmin
         .from('photo_assets')

@@ -1,6 +1,9 @@
 // pages/api/admin/photos/commit.js
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
+const GRAPH_VERSION = 'v25.0'
+const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
 }
@@ -17,6 +20,76 @@ async function withRetry(fn, { tries = 4, baseDelayMs = 250 } = {}) {
     }
   }
   throw lastErr
+}
+
+function readHeader(req, name) {
+  const v = req.headers?.[name]
+  if (Array.isArray(v)) return v[0] || ''
+  return typeof v === 'string' ? v : ''
+}
+
+function clean(v) {
+  return String(v || '').trim()
+}
+
+function extractAccessToken(req) {
+  const authHeader =
+    readHeader(req, 'authorization') ||
+    readHeader(req, 'Authorization') ||
+    ''
+
+  const m = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (m?.[1]) return m[1].trim()
+
+  const alt =
+    readHeader(req, 'x-supabase-access-token') ||
+    readHeader(req, 'x-access-token') ||
+    ''
+
+  if (alt) return alt.trim()
+
+  return ''
+}
+
+function parseBody(req) {
+  if (!req?.body) return {}
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body)
+    } catch {
+      return {}
+    }
+  }
+  return req.body
+}
+
+async function requireAdmin(req) {
+  const token = extractAccessToken(req)
+
+  if (!token) {
+    return { ok: false, status: 401, error: 'Missing token' }
+  }
+
+  const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
+  if (userErr || !userData?.user) {
+    return { ok: false, status: 401, error: 'Invalid token' }
+  }
+
+  const { data: profile, error: profErr } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single()
+
+  if (profErr || !profile) {
+    return { ok: false, status: 403, error: 'No profile' }
+  }
+
+  if (profile.role !== 'admin') {
+    return { ok: false, status: 403, error: 'Not admin' }
+  }
+
+  return { ok: true, user: userData.user }
 }
 
 function stripExt(name) {
@@ -55,23 +128,217 @@ function smartTagsFromFilename(filename) {
   return tags
 }
 
+function absoluteUrl(base, path) {
+  const b = clean(base)
+  const p = clean(path)
+  if (!p) return ''
+  if (p.startsWith('http://') || p.startsWith('https://')) return p
+  if (!b) return p
+  return `${b}${p.startsWith('/') ? '' : '/'}${p}`
+}
+
+function buildFacebookCaption({ title, description, storeUrl }) {
+  return [
+    title,
+    '',
+    description || 'A cinematic moment captured in Sri Lanka.',
+    '',
+    'Available for licensing and purchase:',
+    storeUrl,
+    '',
+    '#SriLanka #Photography #VisualStorytelling #FineArtPhotography',
+  ].join('\n')
+}
+
+function maskToken(token) {
+  const t = String(token || '')
+  if (!t) return ''
+  if (t.length <= 10) return '***'
+  return `${t.slice(0, 6)}...${t.slice(-4)}`
+}
+
+async function graphGet(path, params = {}) {
+  const url = new URL(`${GRAPH_BASE}${path}`)
+
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') {
+      url.searchParams.set(k, String(v))
+    }
+  })
+
+  const r = await fetch(url.toString(), { method: 'GET' })
+  const data = await r.json().catch(() => ({}))
+
+  if (!r.ok || data?.error) {
+    const err = data?.error || {}
+    throw new Error(err.message || err.error_user_msg || `Graph GET failed (${r.status})`)
+  }
+
+  return data
+}
+
+async function graphPost(path, form = {}) {
+  const body = new URLSearchParams()
+
+  Object.entries(form).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') {
+      body.append(k, String(v))
+    }
+  })
+
+  const r = await fetch(`${GRAPH_BASE}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  })
+
+  const data = await r.json().catch(() => ({}))
+
+  if (!r.ok || data?.error) {
+    const err = data?.error || {}
+    throw new Error(err.message || err.error_user_msg || `Graph POST failed (${r.status})`)
+  }
+
+  return data
+}
+
+/**
+ * Token priority:
+ * 1) FACEBOOK_PAGE_ACCESS_TOKEN
+ * 2) derive page token using FACEBOOK_LONG_LIVED_USER_TOKEN + FACEBOOK_PAGE_ID
+ */
+async function resolvePageAccessToken() {
+  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
+  const directPageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
+  const longLivedUserToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
+
+  if (directPageToken) {
+    if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
+    return {
+      token: directPageToken,
+      source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
+      pageId,
+    }
+  }
+
+  if (!pageId) {
+    throw new Error('Missing FACEBOOK_PAGE_ID')
+  }
+
+  if (!longLivedUserToken) {
+    throw new Error(
+      'Missing token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN'
+    )
+  }
+
+  const accounts = await graphGet('/me/accounts', {
+    access_token: longLivedUserToken,
+  })
+
+  const pages = Array.isArray(accounts?.data) ? accounts.data : []
+  const match = pages.find((p) => String(p?.id || '') === String(pageId))
+
+  if (!match) {
+    throw new Error(`Page ${pageId} not found in /me/accounts for the provided user token`)
+  }
+
+  if (!match.access_token) {
+    throw new Error(`Missing token for page ${pageId}`)
+  }
+
+  return {
+    token: match.access_token,
+    source: 'derived_from_user_token',
+    pageId,
+  }
+}
+
+async function validatePageToken(pageId, token) {
+  if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
+  if (!token) throw new Error('Missing token')
+
+  const page = await graphGet(`/${pageId}`, {
+    fields: 'id,name',
+    access_token: token,
+  })
+
+  return {
+    id: page?.id || '',
+    name: page?.name || '',
+  }
+}
+
+async function autoPostToFacebook({ photoId, title, description, previewUrl, thumbUrl }) {
+  const pageIdEnv = clean(process.env.FACEBOOK_PAGE_ID)
+  const siteBase =
+    clean(process.env.NEXT_PUBLIC_SITE_URL) ||
+    clean(process.env.SITE_URL) ||
+    'http://localhost:3000'
+
+  const storeUrl = absoluteUrl(siteBase, `/store/${encodeURIComponent(photoId)}`)
+  const photoUrl = absoluteUrl(siteBase, previewUrl || thumbUrl || '')
+  const message = buildFacebookCaption({ title, description, storeUrl })
+
+  if (!photoUrl) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'Missing preview/thumb URL',
+    }
+  }
+
+  const resolved = await resolvePageAccessToken()
+  const finalPageId = pageIdEnv || resolved.pageId
+  const page = await validatePageToken(finalPageId, resolved.token)
+
+  const result = await graphPost(`/${finalPageId}/photos`, {
+    url: photoUrl,
+    caption: message,
+    published: 'true',
+    access_token: resolved.token,
+  })
+
+  return {
+    ok: true,
+    postId: result?.post_id || result?.id || '',
+    page: {
+      id: page.id,
+      name: page.name,
+    },
+    tokenSource: resolved.source,
+    debug: {
+      pageId: finalPageId,
+      tokenPreview: maskToken(resolved.token),
+      storeUrl,
+      photoUrl,
+    },
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
+  const admin = await requireAdmin(req)
+  if (!admin.ok) {
+    return res.status(admin.status).json({ ok: false, error: admin.error })
+  }
+
   try {
-    const body = req.body || {}
-    const photoId = String(body.photoId || body.id || '').trim()
-    let filename = String(body.filename || body.originalFilename || '').trim()
+    const body = parseBody(req)
+    const photoId = clean(body.photoId || body.id)
+    let filename = clean(body.filename || body.originalFilename)
 
-    if (!photoId) return res.status(400).json({ ok: false, error: 'Missing photoId' })
+    if (!photoId) {
+      return res.status(400).json({ ok: false, error: 'Missing photoId' })
+    }
 
-    // ✅ Read row (retry to avoid serverless timing)
     const row = await withRetry(async () => {
       const { data, error } = await supabaseAdmin
         .from('photos')
-        // ✅ IMPORTANT: do NOT select file_name (it doesn't exist in your schema)
         .select('id, status, original_filename, filename, original_jpg_key')
         .eq('id', photoId)
         .maybeSingle()
@@ -81,14 +348,14 @@ export default async function handler(req, res) {
       return data
     })
 
-    // ✅ If filename not provided, read from DB; FINAL fallback = derive from original_jpg_key
-    const originalKeyFromDb = String(row?.original_jpg_key || '').trim()
+    const originalKeyFromDb = clean(row?.original_jpg_key)
 
     if (!filename) {
-      filename = String(row?.original_filename || row?.filename || '').trim()
+      filename = clean(row?.original_filename || row?.filename)
 
-      // Final fallback: derive from original_jpg_key = photos/original/{photoId}/{filename}
-      if (!filename && originalKeyFromDb) filename = originalKeyFromDb.split('/').pop()
+      if (!filename && originalKeyFromDb) {
+        filename = clean(originalKeyFromDb.split('/').pop())
+      }
     }
 
     if (!filename) {
@@ -99,16 +366,18 @@ export default async function handler(req, res) {
       })
     }
 
-    // ✅ Canonical original_key path
     const original_key = `photos/original/${photoId}/${filename}`
 
-    const title = String(body.title || '').trim() || smartTitleFromFilename(filename)
+    const title = clean(body.title) || smartTitleFromFilename(filename)
     const description =
-      String(body.description || '').trim() ||
+      clean(body.description) ||
       `${title} – premium Sri Lanka photography by Jeevan Chandimal. Available for licensing.`
-    const tags = Array.isArray(body.tags) && body.tags.length > 0 ? body.tags : smartTagsFromFilename(filename)
 
-    // ✅ endpoints
+    const tags =
+      Array.isArray(body.tags) && body.tags.length > 0
+        ? body.tags
+        : smartTagsFromFilename(filename)
+
     const preview_url = `/api/photo/${encodeURIComponent(photoId)}/preview?variant=standard`
     const thumb_url = `/api/photo/${encodeURIComponent(photoId)}/thumb`
 
@@ -127,11 +396,30 @@ export default async function handler(req, res) {
       .from('photos')
       .update(updatePayload)
       .eq('id', photoId)
-      .select('id, title, description, tags, status, original_key, original_filename, preview_url, thumb_url, created_at')
+      .select(
+        'id, title, description, tags, status, original_key, original_filename, preview_url, thumb_url, created_at'
+      )
       .single()
 
     if (upErr || !updated) {
       return res.status(500).json({ ok: false, error: upErr?.message || 'Commit failed' })
+    }
+
+    let facebook = null
+
+    try {
+      facebook = await autoPostToFacebook({
+        photoId: updated.id,
+        title: updated.title,
+        description: updated.description,
+        previewUrl: updated.preview_url,
+        thumbUrl: updated.thumb_url,
+      })
+    } catch (fbErr) {
+      facebook = {
+        ok: false,
+        error: fbErr?.message || 'Facebook auto-post failed',
+      }
     }
 
     return res.status(200).json({
@@ -139,6 +427,7 @@ export default async function handler(req, res) {
       photo: updated,
       thumbUrl: updated?.thumb_url,
       previewUrl: updated?.preview_url,
+      facebook,
     })
   } catch (e) {
     console.error('commit error:', e)

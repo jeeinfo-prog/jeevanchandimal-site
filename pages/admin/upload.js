@@ -1,11 +1,11 @@
 // pages/admin/upload.js
-// ✅ Final: commit auth header, folder picker attrs, dark UI,
-// auto description + smart tags, queue with progress + concurrency,
-// compatible with FINAL create-upload.js + commit.js
-//
-// ✅ Build-safe + perf:
-// - Do NOT import Supabase SDK at module scope (keeps this page lighter).
-// - Create it lazily on the client only (inside useEffect), then use supabaseRef.current everywhere.
+// ✅ Final corrected version
+// - create-upload + commit send token in BOTH headers:
+//   Authorization: Bearer <token>
+//   x-supabase-access-token: <token>
+// - Facebook auto-post is now handled inside /api/admin/photos/commit
+// - Removed browser-side Facebook secret usage entirely
+// - Keeps current UI, queue, metadata, and progress flow
 
 import React from 'react'
 import Head from 'next/head'
@@ -111,6 +111,7 @@ function normalizeTags(input) {
 function smartEnhanceTags(tagsArr) {
   const tags = Array.isArray(tagsArr) ? tagsArr.slice() : []
   const set = new Set(tags)
+
   const add = (t) => {
     const v = String(t || '').trim().toLowerCase()
     if (!v) return
@@ -131,6 +132,7 @@ function smartEnhanceTags(tagsArr) {
     ['train', 'bridge'],
     ['tea', 'plantation'],
   ]
+
   for (const [a, b] of combinePairs) {
     if (set.has(a) && set.has(b)) add(`${a}-${b}`)
   }
@@ -252,33 +254,27 @@ const COLLECTION_TAGS = [
 ]
 
 export default function AdminUploadPage() {
-  // ✅ Supabase client (client-only)
   const supabaseRef = React.useRef(null)
   const [supabaseReady, setSupabaseReady] = React.useState(false)
 
-  // Auth
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [session, setSession] = React.useState(null)
   const [isAdmin, setIsAdmin] = React.useState(false)
 
-  // Queue
   const [queue, setQueue] = React.useState([])
   const [logs, setLogs] = React.useState([])
   const [busy, setBusy] = React.useState(false)
 
-  // Controls
   const [autoStart, setAutoStart] = React.useState(true)
   const [paused, setPaused] = React.useState(false)
   const [stopAfterCurrent, setStopAfterCurrent] = React.useState(false)
   const [keepFolderStructure, setKeepFolderStructure] = React.useState(true)
 
-  // License preset defaults
   const [licensePreset, setLicensePreset] = React.useState('personal')
   const [priceUsd, setPriceUsd] = React.useState(8)
   const [priceLkr, setPriceLkr] = React.useState(2500)
 
-  // FX (USD -> LKR)
   const [fxUsdToLkr, setFxUsdToLkr] = React.useState(320)
   const [autoLkrFromUsd, setAutoLkrFromUsd] = React.useState(true)
 
@@ -378,7 +374,6 @@ export default function AdminUploadPage() {
     }
   }
 
-  // Auto LKR from USD
   React.useEffect(() => {
     if (!autoLkrFromUsd) return
     const usd = Number(priceUsd)
@@ -389,7 +384,6 @@ export default function AdminUploadPage() {
     if (Number.isFinite(lkr) && lkr > 0) setPriceLkr(lkr)
   }, [priceUsd, fxUsdToLkr, autoLkrFromUsd])
 
-  // ✅ Lazy-load Supabase SDK on client only (reduces initial bundle)
   React.useEffect(() => {
     let cancelled = false
 
@@ -412,7 +406,14 @@ export default function AdminUploadPage() {
         const mod = await import('@supabase/supabase-js')
         if (cancelled) return
 
-        supabaseRef.current = mod.createClient(url, key)
+        supabaseRef.current = mod.createClient(url, key, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+          },
+        })
+
         setSupabaseReady(true)
       } catch (e) {
         log(`❌ Supabase init failed: ${e?.message || 'unknown error'}`)
@@ -427,10 +428,8 @@ export default function AdminUploadPage() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Session
   React.useEffect(() => {
     if (!supabaseReady || !supabaseRef.current) return
 
@@ -439,7 +438,6 @@ export default function AdminUploadPage() {
     return () => sub?.subscription?.unsubscribe?.()
   }, [supabaseReady])
 
-  // Admin check
   React.useEffect(() => {
     async function checkAdmin() {
       if (!supabaseReady || !supabaseRef.current) {
@@ -463,12 +461,13 @@ export default function AdminUploadPage() {
         setIsAdmin(false)
         return
       }
+
       const ok = data?.role === 'admin'
       setIsAdmin(ok)
       log(ok ? '✅ Admin verified' : '❌ Not admin')
     }
+
     checkAdmin()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id, supabaseReady])
 
   async function signIn() {
@@ -513,7 +512,6 @@ export default function AdminUploadPage() {
     if (files && files.length) addFiles(files)
   }
 
-  // PUT to R2 with progress
   function putToR2WithProgress(itemId, uploadUrl, file, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
@@ -606,7 +604,6 @@ export default function AdminUploadPage() {
     setQueue((q) => [...q, ...items])
   }
 
-  // Auto-start
   React.useEffect(() => {
     if (!autoStart) return
     if (paused) return
@@ -616,7 +613,6 @@ export default function AdminUploadPage() {
 
     const hasQueued = queue.some((x) => x.status === 'QUEUED')
     if (hasQueued) runQueue()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.length, autoStart, paused, busy, stopAfterCurrent, session?.access_token, isAdmin])
 
   async function uploadSingleItem(item, token) {
@@ -634,13 +630,20 @@ export default function AdminUploadPage() {
     })
 
     log(`Preparing upload: ${file.name}`)
+    log(`Auth token present: ${token ? 'YES' : 'NO'}`)
 
-    // 1) create-upload
     let photoId, uploadUrl, objectKey
+
     try {
+      log('Step 1/4: create-upload')
+
       const createResp = await fetch('/api/admin/photos/create-upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-supabase-access-token': token,
+        },
         body: JSON.stringify({
           filename: file.name,
           relativePath: item.relativePath || '',
@@ -654,8 +657,9 @@ export default function AdminUploadPage() {
       })
 
       const { json, text } = await safeJson(createResp)
-      if (!createResp.ok)
+      if (!createResp.ok) {
         throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
+      }
 
       photoId = json.photoId
       uploadUrl = json.uploadUrl
@@ -667,36 +671,51 @@ export default function AdminUploadPage() {
       throw Object.assign(new Error(e.message), { _type: e?._type || 'CREATE' })
     }
 
-    // 2) PUT to R2
     try {
+      log('Step 2/4: R2 upload')
       log(`Uploading to R2: ${file.name}`)
+
       await putToR2WithProgress(item.id, uploadUrl, file, ({ pct, loaded, total, speedBps, etaSec }) => {
         setItem(item.id, { progress: pct, loaded, total, speedBps, etaSec })
       })
+
       log(`✅ R2 PUT OK (${objectKey || 'key'})`)
     } catch (e) {
       if (String(e?.message || '').toLowerCase().includes('aborted')) throw e
       throw Object.assign(new Error(e.message), { _type: e?._type || 'R2' })
     }
 
-    // 3) COMMIT (publish)
     try {
+      log('Step 3/4: commit')
       setItem(item.id, { status: 'COMMITTING', speedBps: 0, etaSec: 0 })
       log(`Commit: ${file.name}`)
 
       const commitResp = await fetch('/api/admin/photos/commit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'x-supabase-access-token': token,
+        },
         body: JSON.stringify({ photoId }),
       })
 
       const { json, text } = await safeJson(commitResp)
-      if (!commitResp.ok)
+      if (!commitResp.ok) {
         throw Object.assign(new Error(json?.detail || json?.error || text || 'Commit failed'), { _type: 'COMMIT' })
+      }
 
       log('✅ Done: commit complete')
-      log(`thumbUrl: ${json?.thumb_url || json?.thumbUrl || json?.photo?.thumb_url || '(none)'}`)
-      log(`previewUrl: ${json?.preview_url || json?.previewUrl || json?.photo?.preview_url || '(none)'}`)
+      log(`thumbUrl: ${json?.thumbUrl || json?.thumb_url || json?.photo?.thumb_url || '(none)'}`)
+      log(`previewUrl: ${json?.previewUrl || json?.preview_url || json?.photo?.preview_url || '(none)'}`)
+
+      if (json?.facebook?.ok) {
+        log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
+      } else if (json?.facebook?.skipped) {
+        log(`⚠️ Facebook skipped: ${json.facebook.reason || 'Skipped'}`)
+      } else if (json?.facebook?.error) {
+        log(`⚠️ Facebook post failed: ${json.facebook.error}`)
+      }
     } catch (e) {
       throw Object.assign(new Error(e.message), { _type: e?._type || 'COMMIT' })
     }
@@ -739,13 +758,13 @@ export default function AdminUploadPage() {
         if (stopAfterCurrent) {
           const anyWorking = queueRef.current.some((x) => x.status === 'UPLOADING' || x.status === 'COMMITTING')
           if (!anyWorking) break
-          // eslint-disable-next-line no-await-in-loop
           await new Promise((r) => setTimeout(r, 200))
           continue
         }
 
         const snapshot = queueRef.current
         const next = []
+
         for (const it of snapshot) {
           if (next.length >= concurrency) break
           if (it.status === 'QUEUED') next.push(it)
@@ -757,7 +776,14 @@ export default function AdminUploadPage() {
           next.map(async (it) => {
             try {
               await uploadSingleItem(it, token)
-              setItem(it.id, { status: 'DONE', error: '', errorType: '', progress: 100, speedBps: 0, etaSec: 0 })
+              setItem(it.id, {
+                status: 'DONE',
+                error: '',
+                errorType: '',
+                progress: 100,
+                speedBps: 0,
+                etaSec: 0,
+              })
             } catch (e) {
               const msg = e?.message || String(e)
 
@@ -778,7 +804,6 @@ export default function AdminUploadPage() {
           })
         )
 
-        // eslint-disable-next-line no-await-in-loop
         await new Promise((r) => setTimeout(r, 30))
       }
 
@@ -855,7 +880,6 @@ export default function AdminUploadPage() {
               </button>
             </div>
 
-            {/* Bulk preset */}
             <div className="card" style={{ marginTop: 18, padding: 14, borderRadius: 14 }}>
               <h3 style={{ marginTop: 0 }}>Bulk preset</h3>
 
@@ -990,7 +1014,6 @@ export default function AdminUploadPage() {
               {stopAfterCurrent && <span style={{ opacity: 0.9 }}>🛑 Will stop after current</span>}
             </div>
 
-            {/* Add files */}
             <div style={{ marginTop: 14 }}>
               <h3 style={{ marginTop: 0 }}>Add files</h3>
 
@@ -1079,7 +1102,6 @@ export default function AdminUploadPage() {
                 </button>
               </div>
 
-              {/* Queue list */}
               {queue.length > 0 && (
                 <div style={{ marginTop: 16 }}>
                   <div style={{ fontWeight: 700, marginBottom: 10 }}>Queue</div>
