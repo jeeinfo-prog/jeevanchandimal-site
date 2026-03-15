@@ -156,27 +156,6 @@ function maskToken(token) {
   return `${t.slice(0, 6)}...${t.slice(-4)}`
 }
 
-function readFacebookEnv() {
-  return {
-    pageId:
-      clean(process.env.FACEBOOK_PAGE_ID) ||
-      clean(process.env.FB_PAGE_ID) ||
-      '',
-    pageAccessToken:
-      clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN) ||
-      clean(process.env.FB_PAGE_ACCESS_TOKEN) ||
-      '',
-    longLivedUserToken:
-      clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN) ||
-      clean(process.env.FB_LONG_LIVED_USER_TOKEN) ||
-      '',
-    siteBase:
-      clean(process.env.NEXT_PUBLIC_SITE_URL) ||
-      clean(process.env.SITE_URL) ||
-      'http://localhost:3000',
-  }
-}
-
 async function graphGet(path, params = {}) {
   const url = new URL(`${GRAPH_BASE}${path}`)
 
@@ -224,85 +203,76 @@ async function graphPost(path, form = {}) {
   return data
 }
 
-/**
- * Resolve page credentials safely.
- *
- * Priority:
- * 1) FACEBOOK_PAGE_ACCESS_TOKEN + FACEBOOK_PAGE_ID
- * 2) FACEBOOK_PAGE_ACCESS_TOKEN and auto-detect page id from /me
- * 3) FACEBOOK_LONG_LIVED_USER_TOKEN + FACEBOOK_PAGE_ID -> derive page token via /me/accounts
- */
+function readFacebookEnv() {
+  return {
+    pageId: clean(process.env.FACEBOOK_PAGE_ID),
+    pageToken: clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN),
+    longLivedUserToken: clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN),
+    siteBase:
+      clean(process.env.NEXT_PUBLIC_SITE_URL) ||
+      clean(process.env.SITE_URL) ||
+      'http://localhost:3000',
+  }
+}
+
 async function resolveFacebookPageCredentials() {
   const env = readFacebookEnv()
-  const pageId = env.pageId
-  const directPageToken = env.pageAccessToken
-  const longLivedUserToken = env.longLivedUserToken
 
-  if (directPageToken && pageId) {
+  console.log('FB RESOLVE DEBUG', {
+    hasPageId: !!env.pageId,
+    hasPageToken: !!env.pageToken,
+    pageTokenPreview: env.pageToken ? `${env.pageToken.slice(0, 12)}...` : '(missing)',
+    hasLongLivedUserToken: !!env.longLivedUserToken,
+  })
+
+  if (env.pageId && env.pageToken) {
     return {
-      pageId,
-      token: directPageToken,
-      source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
+      pageId: env.pageId,
+      token: env.pageToken,
+      source: 'env_page_token',
     }
   }
 
-  if (directPageToken && !pageId) {
+  if (!env.pageId && env.pageToken) {
     const me = await graphGet('/me', {
       fields: 'id,name',
-      access_token: directPageToken,
+      access_token: env.pageToken,
     })
 
-    const detectedPageId = clean(me?.id)
-    if (!detectedPageId) {
-      throw new Error('Could not detect page id from FACEBOOK_PAGE_ACCESS_TOKEN')
-    }
-
     return {
-      pageId: detectedPageId,
-      token: directPageToken,
-      source: 'FACEBOOK_PAGE_ACCESS_TOKEN:auto_page_id',
+      pageId: clean(me?.id),
+      token: env.pageToken,
+      source: 'env_page_token_auto_page_id',
       pageName: clean(me?.name),
     }
   }
 
-  if (!longLivedUserToken) {
-    throw new Error(
-      'Missing Facebook token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN'
-    )
+  if (env.longLivedUserToken && env.pageId) {
+    const accounts = await graphGet('/me/accounts', {
+      access_token: env.longLivedUserToken,
+    })
+
+    const pages = Array.isArray(accounts?.data) ? accounts.data : []
+    const match = pages.find((p) => String(p?.id || '') === String(env.pageId))
+
+    if (!match?.access_token) {
+      throw new Error(`Page ${env.pageId} not found in /me/accounts for the provided user token`)
+    }
+
+    return {
+      pageId: env.pageId,
+      token: clean(match.access_token),
+      source: 'derived_from_user_token',
+      pageName: clean(match?.name),
+    }
   }
 
-  if (!pageId) {
-    throw new Error(
-      'Missing FACEBOOK_PAGE_ID: required when using FACEBOOK_LONG_LIVED_USER_TOKEN'
-    )
-  }
-
-  const accounts = await graphGet('/me/accounts', {
-    access_token: longLivedUserToken,
-  })
-
-  const pages = Array.isArray(accounts?.data) ? accounts.data : []
-  const match = pages.find((p) => String(p?.id || '') === String(pageId))
-
-  if (!match) {
-    throw new Error(`Page ${pageId} not found in /me/accounts for the provided user token`)
-  }
-
-  if (!match.access_token) {
-    throw new Error(`Missing page access token for page ${pageId}`)
-  }
-
-  return {
-    pageId,
-    token: match.access_token,
-    source: 'derived_from_user_token',
-    pageName: clean(match?.name),
-  }
+  throw new Error('Missing Facebook token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN')
 }
 
 async function validatePageToken(pageId, token) {
   if (!pageId) throw new Error('Missing Facebook page id')
-  if (!token) throw new Error('Missing Facebook token')
+  if (!token) throw new Error('Missing Facebook page token')
 
   const page = await graphGet(`/${pageId}`, {
     fields: 'id,name',
@@ -365,8 +335,11 @@ export default async function handler(req, res) {
 
   console.log('FB ENV DEBUG', {
     FACEBOOK_PAGE_ID: env.pageId || '(missing)',
-    hasPageToken: !!env.pageAccessToken,
-    hasLongLivedUserToken: !!env.longLivedUserToken,
+    FACEBOOK_PAGE_ACCESS_TOKEN_PREFIX: env.pageToken ? `${env.pageToken.slice(0, 12)}...` : '(missing)',
+    FACEBOOK_PAGE_ACCESS_TOKEN_LENGTH: env.pageToken ? env.pageToken.length : 0,
+    FACEBOOK_LONG_LIVED_USER_TOKEN_PREFIX: env.longLivedUserToken
+      ? `${env.longLivedUserToken.slice(0, 12)}...`
+      : '(missing)',
     NEXT_PUBLIC_SITE_URL: env.siteBase || '(missing)',
   })
 
@@ -410,8 +383,6 @@ export default async function handler(req, res) {
       return res.status(400).json({
         ok: false,
         error: 'Missing filename (not in request and not found in DB)',
-        hint:
-          'Send filename to commit OR ensure create-upload stores original_filename OR original_jpg_key is saved',
       })
     }
 
