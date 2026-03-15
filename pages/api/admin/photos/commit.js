@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
 const GRAPH_VERSION = 'v25.0'
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
-const COMMIT_API_VERSION = '2026-03-15-facebook-direct-env-final'
+const COMMIT_API_VERSION = '2026-03-16-facebook-direct-env-pageid-fallback'
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
@@ -157,10 +157,16 @@ function maskToken(token) {
   return `${t.slice(0, 8)}...${t.slice(-4)}`
 }
 
-function readFacebookEnv() {
+function readFacebookEnv(body = {}) {
   return {
-    pageId: clean(process.env.FACEBOOK_PAGE_ID),
-    pageToken: clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN),
+    pageId:
+      clean(process.env.FACEBOOK_PAGE_ID) ||
+      clean(process.env.FB_PAGE_ID) ||
+      clean(body.pageId) ||
+      '956649424209102',
+    pageToken:
+      clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN) ||
+      clean(process.env.FB_PAGE_ACCESS_TOKEN),
     siteBase:
       clean(process.env.NEXT_PUBLIC_SITE_URL) ||
       clean(process.env.SITE_URL) ||
@@ -239,8 +245,15 @@ async function validatePageToken(pageId, token) {
 }
 
 async function autoPostToFacebook({ photoId, title, description, previewUrl, thumbUrl }) {
-  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
-  const pageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
+  const pageId =
+    clean(process.env.FACEBOOK_PAGE_ID) ||
+    clean(process.env.FB_PAGE_ID) ||
+    '956649424209102'
+
+  const pageToken =
+    clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN) ||
+    clean(process.env.FB_PAGE_ACCESS_TOKEN)
+
   const siteBase =
     clean(process.env.NEXT_PUBLIC_SITE_URL) ||
     clean(process.env.SITE_URL) ||
@@ -308,7 +321,8 @@ export default async function handler(req, res) {
 
   console.log(`COMMIT API VERSION: ${COMMIT_API_VERSION}`)
 
-  const env = readFacebookEnv()
+  const body = parseBody(req)
+  const env = readFacebookEnv(body)
 
   console.log('FB ENV DEBUG', {
     FACEBOOK_PAGE_ID: env.pageId || '(missing)',
@@ -323,7 +337,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = parseBody(req)
     const photoId = clean(body.photoId || body.id)
     let filename = clean(body.filename || body.originalFilename)
 
