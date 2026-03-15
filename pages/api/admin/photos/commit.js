@@ -322,6 +322,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
+  console.log('FB ENV DEBUG', {
+    FACEBOOK_PAGE_ID: process.env.FACEBOOK_PAGE_ID || '(missing)',
+    hasPageToken: !!process.env.FACEBOOK_PAGE_ACCESS_TOKEN,
+    hasLongLivedUserToken: !!process.env.FACEBOOK_LONG_LIVED_USER_TOKEN,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || '(missing)',
+    SITE_URL: process.env.SITE_URL || '(missing)',
+  })
+
   const admin = await requireAdmin(req)
   if (!admin.ok) {
     return res.status(admin.status).json({ ok: false, error: admin.error })
