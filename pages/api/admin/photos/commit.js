@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
 const GRAPH_VERSION = 'v25.0'
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
+const COMMIT_API_VERSION = '2026-03-15-facebook-fix-final'
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
@@ -59,7 +60,7 @@ function parseBody(req) {
       return {}
     }
   }
-  return req.body
+  return req.body || {}
 }
 
 async function requireAdmin(req) {
@@ -131,7 +132,7 @@ function absoluteUrl(base, path) {
   const b = clean(base).replace(/\/+$/, '')
   const p = clean(path)
   if (!p) return ''
-  if (p.startsWith('http://') || p.startsWith('https://')) return p
+  if (/^https?:\/\//i.test(p)) return p
   if (!b) return p
   return `${b}${p.startsWith('/') ? '' : '/'}${p}`
 }
@@ -151,9 +152,21 @@ function buildFacebookCaption({ title, description, storeUrl }) {
 
 function maskToken(token) {
   const t = String(token || '')
-  if (!t) return ''
-  if (t.length <= 10) return '***'
-  return `${t.slice(0, 6)}...${t.slice(-4)}`
+  if (!t) return '(missing)'
+  if (t.length <= 12) return '***'
+  return `${t.slice(0, 8)}...${t.slice(-4)}`
+}
+
+function readFacebookEnv() {
+  return {
+    pageId: clean(process.env.FACEBOOK_PAGE_ID),
+    pageToken: clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN),
+    longLivedUserToken: clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN),
+    siteBase:
+      clean(process.env.NEXT_PUBLIC_SITE_URL) ||
+      clean(process.env.SITE_URL) ||
+      'http://localhost:3000',
+  }
 }
 
 async function graphGet(path, params = {}) {
@@ -170,7 +183,11 @@ async function graphGet(path, params = {}) {
 
   if (!r.ok || data?.error) {
     const err = data?.error || {}
-    throw new Error(err.message || err.error_user_msg || `Graph GET failed (${r.status})`)
+    throw new Error(
+      err.error_user_msg ||
+        err.message ||
+        `Graph GET failed (${r.status})`
+    )
   }
 
   return data
@@ -197,22 +214,14 @@ async function graphPost(path, form = {}) {
 
   if (!r.ok || data?.error) {
     const err = data?.error || {}
-    throw new Error(err.message || err.error_user_msg || `Graph POST failed (${r.status})`)
+    throw new Error(
+      err.error_user_msg ||
+        err.message ||
+        `Graph POST failed (${r.status})`
+    )
   }
 
   return data
-}
-
-function readFacebookEnv() {
-  return {
-    pageId: clean(process.env.FACEBOOK_PAGE_ID),
-    pageToken: clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN),
-    longLivedUserToken: clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN),
-    siteBase:
-      clean(process.env.NEXT_PUBLIC_SITE_URL) ||
-      clean(process.env.SITE_URL) ||
-      'http://localhost:3000',
-  }
 }
 
 async function resolveFacebookPageCredentials() {
@@ -221,10 +230,11 @@ async function resolveFacebookPageCredentials() {
   console.log('FB RESOLVE DEBUG', {
     hasPageId: !!env.pageId,
     hasPageToken: !!env.pageToken,
-    pageTokenPreview: env.pageToken ? `${env.pageToken.slice(0, 12)}...` : '(missing)',
+    pageTokenPreview: maskToken(env.pageToken),
     hasLongLivedUserToken: !!env.longLivedUserToken,
   })
 
+  // 1) Best path: explicit page id + page token from env
   if (env.pageId && env.pageToken) {
     return {
       pageId: env.pageId,
@@ -233,20 +243,27 @@ async function resolveFacebookPageCredentials() {
     }
   }
 
-  if (!env.pageId && env.pageToken) {
+  // 2) If page token exists but page id is missing, try /me on that page token
+  if (env.pageToken && !env.pageId) {
     const me = await graphGet('/me', {
       fields: 'id,name',
       access_token: env.pageToken,
     })
 
+    const detectedPageId = clean(me?.id)
+    if (!detectedPageId) {
+      throw new Error('Could not detect page id from FACEBOOK_PAGE_ACCESS_TOKEN')
+    }
+
     return {
-      pageId: clean(me?.id),
+      pageId: detectedPageId,
       token: env.pageToken,
       source: 'env_page_token_auto_page_id',
       pageName: clean(me?.name),
     }
   }
 
+  // 3) Fallback: derive page token from long-lived user token
   if (env.longLivedUserToken && env.pageId) {
     const accounts = await graphGet('/me/accounts', {
       access_token: env.longLivedUserToken,
@@ -255,8 +272,12 @@ async function resolveFacebookPageCredentials() {
     const pages = Array.isArray(accounts?.data) ? accounts.data : []
     const match = pages.find((p) => String(p?.id || '') === String(env.pageId))
 
-    if (!match?.access_token) {
-      throw new Error(`Page ${env.pageId} not found in /me/accounts for the provided user token`)
+    if (!match) {
+      throw new Error(`Page ${env.pageId} not found in /me/accounts`)
+    }
+
+    if (!match.access_token) {
+      throw new Error(`Page ${env.pageId} found but no page access token returned`)
     }
 
     return {
@@ -267,7 +288,9 @@ async function resolveFacebookPageCredentials() {
     }
   }
 
-  throw new Error('Missing Facebook token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN')
+  throw new Error(
+    'Missing Facebook token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN'
+  )
 }
 
 async function validatePageToken(pageId, token) {
@@ -331,15 +354,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed' })
   }
 
+  console.log(`COMMIT API VERSION: ${COMMIT_API_VERSION}`)
+
   const env = readFacebookEnv()
 
   console.log('FB ENV DEBUG', {
     FACEBOOK_PAGE_ID: env.pageId || '(missing)',
-    FACEBOOK_PAGE_ACCESS_TOKEN_PREFIX: env.pageToken ? `${env.pageToken.slice(0, 12)}...` : '(missing)',
+    FACEBOOK_PAGE_ACCESS_TOKEN_PREFIX: maskToken(env.pageToken),
     FACEBOOK_PAGE_ACCESS_TOKEN_LENGTH: env.pageToken ? env.pageToken.length : 0,
-    FACEBOOK_LONG_LIVED_USER_TOKEN_PREFIX: env.longLivedUserToken
-      ? `${env.longLivedUserToken.slice(0, 12)}...`
-      : '(missing)',
+    FACEBOOK_LONG_LIVED_USER_TOKEN_PREFIX: maskToken(env.longLivedUserToken),
     NEXT_PUBLIC_SITE_URL: env.siteBase || '(missing)',
   })
 
@@ -422,7 +445,10 @@ export default async function handler(req, res) {
       .single()
 
     if (upErr || !updated) {
-      return res.status(500).json({ ok: false, error: upErr?.message || 'Commit failed' })
+      return res.status(500).json({
+        ok: false,
+        error: upErr?.message || 'Commit failed',
+      })
     }
 
     let facebook = null
@@ -451,6 +477,9 @@ export default async function handler(req, res) {
     })
   } catch (e) {
     console.error('commit error:', e)
-    return res.status(500).json({ ok: false, error: e?.message || 'Commit failed' })
+    return res.status(500).json({
+      ok: false,
+      error: e?.message || 'Commit failed',
+    })
   }
 }
