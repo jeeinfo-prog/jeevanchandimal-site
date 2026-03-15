@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
 const GRAPH_VERSION = 'v25.0'
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
-const COMMIT_API_VERSION = '2026-03-16-facebook-direct-env-pageid-fallback'
+const COMMIT_API_VERSION = '2026-03-16-facebook-hardcoded-local-test-fixed'
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
@@ -157,16 +157,8 @@ function maskToken(token) {
   return `${t.slice(0, 8)}...${t.slice(-4)}`
 }
 
-function readFacebookEnv(body = {}) {
+function readFacebookEnv() {
   return {
-    pageId:
-      clean(process.env.FACEBOOK_PAGE_ID) ||
-      clean(process.env.FB_PAGE_ID) ||
-      clean(body.pageId) ||
-      '956649424209102',
-    pageToken:
-      clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN) ||
-      clean(process.env.FB_PAGE_ACCESS_TOKEN),
     siteBase:
       clean(process.env.NEXT_PUBLIC_SITE_URL) ||
       clean(process.env.SITE_URL) ||
@@ -245,14 +237,9 @@ async function validatePageToken(pageId, token) {
 }
 
 async function autoPostToFacebook({ photoId, title, description, previewUrl, thumbUrl }) {
-  const pageId =
-    clean(process.env.FACEBOOK_PAGE_ID) ||
-    clean(process.env.FB_PAGE_ID) ||
-    '956649424209102'
-
-  const pageToken =
-    clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN) ||
-    clean(process.env.FB_PAGE_ACCESS_TOKEN)
+  // LOCAL DIAGNOSTIC TEST ONLY
+  const pageId = '956649424209102'
+  const pageToken = 'EAAS7TUnTZA7QBQ9wKiG9XiavDzbxFkvZBPDCaQ8WoK6HPQzfBCDYQjZADrG8RzX7dcyvmMiZBqyTZCnZBmIppSJb8AnMEuHz6ZBZBysDtQYuDfk92VnA8pCdTztrrWG6qECuJfIvROSqXNsZAmp7H83EuK9yWzB7nhhRbPniuZAZBZB3Fc0aWKloMyrfRRlvZAvZAKJcBCKlz32z4SWm4IbRfGBmxZAub474tDvgPqiyvrdEuJZCsMXJigZDZD'
 
   const siteBase =
     clean(process.env.NEXT_PUBLIC_SITE_URL) ||
@@ -265,9 +252,12 @@ async function autoPostToFacebook({ photoId, title, description, previewUrl, thu
 
   console.log('FB SIMPLE DEBUG', {
     hasPageId: !!pageId,
-    hasPageToken: !!pageToken,
-    pageId: pageId || '(missing)',
-    tokenPreview: pageToken ? `${pageToken.slice(0, 12)}...` : '(missing)',
+    hasPageToken: !!pageToken && pageToken !== 'PASTE_YOUR_REAL_PAGE_ACCESS_TOKEN_HERE',
+    pageId,
+    tokenPreview:
+      pageToken && pageToken !== 'PASTE_YOUR_REAL_PAGE_ACCESS_TOKEN_HERE'
+        ? `${pageToken.slice(0, 12)}...`
+        : '(placeholder)',
     photoUrl,
     storeUrl,
   })
@@ -276,8 +266,8 @@ async function autoPostToFacebook({ photoId, title, description, previewUrl, thu
     throw new Error('Missing FACEBOOK_PAGE_ID')
   }
 
-  if (!pageToken) {
-    throw new Error('Missing FACEBOOK_PAGE_ACCESS_TOKEN')
+  if (!pageToken || pageToken === 'PASTE_YOUR_REAL_PAGE_ACCESS_TOKEN_HERE') {
+    throw new Error('Replace PASTE_YOUR_REAL_PAGE_ACCESS_TOKEN_HERE with your real page token')
   }
 
   if (!photoUrl) {
@@ -304,7 +294,7 @@ async function autoPostToFacebook({ photoId, title, description, previewUrl, thu
       id: page.id,
       name: page.name,
     },
-    tokenSource: 'direct_env_page_token',
+    tokenSource: 'hardcoded_test_token',
     debug: {
       pageId,
       tokenPreview: maskToken(pageToken),
@@ -322,12 +312,9 @@ export default async function handler(req, res) {
   console.log(`COMMIT API VERSION: ${COMMIT_API_VERSION}`)
 
   const body = parseBody(req)
-  const env = readFacebookEnv(body)
+  const env = readFacebookEnv()
 
   console.log('FB ENV DEBUG', {
-    FACEBOOK_PAGE_ID: env.pageId || '(missing)',
-    FACEBOOK_PAGE_ACCESS_TOKEN_PREFIX: maskToken(env.pageToken),
-    FACEBOOK_PAGE_ACCESS_TOKEN_LENGTH: env.pageToken ? env.pageToken.length : 0,
     NEXT_PUBLIC_SITE_URL: env.siteBase || '(missing)',
   })
 
