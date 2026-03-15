@@ -239,7 +239,7 @@ async function validatePageToken(pageId, token) {
 async function autoPostToFacebook({ photoId, title, description, previewUrl, thumbUrl }) {
   // LOCAL DIAGNOSTIC TEST ONLY
   const pageId = '956649424209102'
-  const pageToken = 'EAAS7TUnTZA7QBQ9wKiG9XiavDzbxFkvZBPDCaQ8WoK6HPQzfBCDYQjZADrG8RzX7dcyvmMiZBqyTZCnZBmIppSJb8AnMEuHz6ZBZBysDtQYuDfk92VnA8pCdTztrrWG6qECuJfIvROSqXNsZAmp7H83EuK9yWzB7nhhRbPniuZAZBZB3Fc0aWKloMyrfRRlvZAvZAKJcBCKlz32z4SWm4IbRfGBmxZAub474tDvgPqiyvrdEuJZCsMXJigZDZD'
+  const pageToken = 'EAAS7TUnTZA7QBQzZA3D4At3ZBy9Nvw3o6HGZAyW7qAKo8SS7xojBDrItFxXiT90FMFLkbhnz9SHtnHE7QQPtqNeqNhLwnkNv1XEboBW92BsXbM49DyQagdZBa3wRZBFsuwCXtpIv3VzdTRu0rEIrCwz8ZCCPQBeK552ZBZATY6ZBcYnvOCKKQqyeKq7mlhYa5VYuiqEBtsxbSs99SS3U9Ktu7vGHcQRu2eCZBrUGZBLSGkQRD6oZD'
 
   const siteBase =
     clean(process.env.NEXT_PUBLIC_SITE_URL) ||
