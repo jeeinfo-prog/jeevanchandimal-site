@@ -1,11 +1,11 @@
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
-const GRAPH_VERSION = clean(process.env.FACEBOOK_GRAPH_VERSION) || 'v25.0'
-const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
-
 function clean(v) {
   return String(v || '').trim()
 }
+
+const GRAPH_VERSION = clean(process.env.FACEBOOK_GRAPH_VERSION) || 'v25.0'
+const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
@@ -43,6 +43,7 @@ function fileNameToTitle(filename) {
   if (!raw) return 'Untitled Photo'
 
   return raw
+    .replace(/__.+$/, '')
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -59,6 +60,34 @@ function buildFacebookCaption({ title, description, storeUrl }) {
     '',
     '#SriLanka #Photography #VisualStorytelling #FineArtPhotography',
   ].join('\n')
+}
+
+function buildInstagramCaption({ title, description, storeUrl }) {
+  return [
+    title,
+    '',
+    description || 'A cinematic moment captured in Sri Lanka.',
+    '',
+    `Available here: ${storeUrl}`,
+    '',
+    '#SriLanka #Photography #VisualStorytelling #FineArtPhotography #TravelPhotography',
+  ].join('\n')
+}
+
+function buildPinterestDescription({ title, description, storeUrl }) {
+  return [
+    description || title,
+    '',
+    `Available for licensing and purchase: ${storeUrl}`,
+  ].join('\n')
+}
+
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    const x = clean(v)
+    if (x) return x
+  }
+  return ''
 }
 
 async function readJsonSafe(r) {
@@ -84,10 +113,7 @@ async function graphGet(path, params = {}) {
 
     if (!r.ok || data?.error) {
       const err = data?.error || {}
-      throw new Error(
-        err.message ||
-          `Facebook GET error (${r.status})`
-      )
+      throw new Error(err.message || `Facebook GET error (${r.status})`)
     }
 
     return data
@@ -114,10 +140,33 @@ async function graphPost(path, form = {}) {
 
     if (!r.ok || data?.error) {
       const err = data?.error || {}
-      throw new Error(
-        err.message ||
-          `Facebook POST error (${r.status})`
-      )
+      throw new Error(err.message || `Facebook POST error (${r.status})`)
+    }
+
+    return data
+  })
+}
+
+async function pinterestPost(path, bodyObj, token) {
+  return withRetry(async () => {
+    const r = await fetch(`https://api.pinterest.com/v5${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bodyObj),
+    })
+
+    const data = await readJsonSafe(r)
+
+    if (!r.ok || data?.code || data?.message) {
+      const msg =
+        data?.message ||
+        data?.details ||
+        data?.code ||
+        `Pinterest POST error (${r.status})`
+      throw new Error(msg)
     }
 
     return data
@@ -127,7 +176,7 @@ async function graphPost(path, form = {}) {
 /*
 Priority:
 1) direct page token from env
-2) derive page token from long-lived user token
+2) derive page token from user token
 */
 async function getPageToken() {
   const directPageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
@@ -136,14 +185,14 @@ async function getPageToken() {
   const userToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
   const pageId = clean(process.env.FACEBOOK_PAGE_ID)
 
-  if (!userToken) {
-    throw new Error(
-      'Missing FACEBOOK_LONG_LIVED_USER_TOKEN (or set FACEBOOK_PAGE_ACCESS_TOKEN directly)'
-    )
-  }
-
   if (!pageId) {
     throw new Error('Missing FACEBOOK_PAGE_ID')
+  }
+
+  if (!userToken) {
+    throw new Error(
+      'Missing FACEBOOK_PAGE_ACCESS_TOKEN and FACEBOOK_LONG_LIVED_USER_TOKEN'
+    )
   }
 
   const accounts = await graphGet('/me/accounts', {
@@ -165,18 +214,39 @@ async function getPageToken() {
   return pageToken
 }
 
+async function getInstagramBusinessAccountId(pageToken) {
+  const envIgId = clean(process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID)
+  if (envIgId) return envIgId
+
+  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
+  if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
+
+  const page = await graphGet(`/${pageId}`, {
+    fields: 'instagram_business_account',
+    access_token: pageToken,
+  })
+
+  const igId = clean(page?.instagram_business_account?.id)
+  if (!igId) {
+    throw new Error(
+      'No instagram_business_account linked to this Facebook page'
+    )
+  }
+
+  return igId
+}
+
 async function autoPostToFacebook({
   photoId,
   title,
   description,
   previewUrl,
   thumbUrl,
+  pageToken,
+  siteBase,
 }) {
   const pageId = clean(process.env.FACEBOOK_PAGE_ID)
   if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
-
-  const siteBase =
-    clean(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000'
 
   const storeUrl = absoluteUrl(siteBase, `/store/${photoId}`)
   const photoUrl = absoluteUrl(siteBase, previewUrl || thumbUrl)
@@ -191,8 +261,6 @@ async function autoPostToFacebook({
     storeUrl,
   })
 
-  const pageToken = await getPageToken()
-
   const result = await graphPost(`/${pageId}/photos`, {
     url: photoUrl,
     caption,
@@ -203,6 +271,133 @@ async function autoPostToFacebook({
     ok: true,
     postId: result?.post_id || result?.id || null,
   }
+}
+
+async function autoPostToInstagram({
+  photoId,
+  title,
+  description,
+  previewUrl,
+  thumbUrl,
+  pageToken,
+  siteBase,
+}) {
+  const igEnabled = clean(process.env.ENABLE_INSTAGRAM_AUTOPOST || 'true')
+  if (igEnabled === 'false' || igEnabled === '0') {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'Instagram autopost disabled by env',
+    }
+  }
+
+  const storeUrl = absoluteUrl(siteBase, `/store/${photoId}`)
+  const photoUrl = absoluteUrl(siteBase, previewUrl || thumbUrl)
+
+  if (!photoUrl) {
+    throw new Error('Missing photo URL for Instagram post')
+  }
+
+  const igUserId = await getInstagramBusinessAccountId(pageToken)
+  const caption = buildInstagramCaption({
+    title,
+    description,
+    storeUrl,
+  })
+
+  const media = await graphPost(`/${igUserId}/media`, {
+    image_url: photoUrl,
+    caption,
+    access_token: pageToken,
+  })
+
+  const creationId = clean(media?.id)
+  if (!creationId) {
+    throw new Error('Instagram media container creation failed')
+  }
+
+  const publish = await graphPost(`/${igUserId}/media_publish`, {
+    creation_id: creationId,
+    access_token: pageToken,
+  })
+
+  return {
+    ok: true,
+    creationId,
+    mediaId: publish?.id || null,
+  }
+}
+
+async function autoPostToPinterest({
+  photoId,
+  title,
+  description,
+  previewUrl,
+  thumbUrl,
+  siteBase,
+}) {
+  const enabled = clean(process.env.ENABLE_PINTEREST_AUTOPOST || 'true')
+  if (enabled === 'false' || enabled === '0') {
+    return {
+      ok: false,
+      skipped: true,
+      reason: 'Pinterest autopost disabled by env',
+    }
+  }
+
+  const token = clean(process.env.PINTEREST_ACCESS_TOKEN)
+  const boardId = clean(process.env.PINTEREST_BOARD_ID)
+
+  if (!token) {
+    throw new Error('Missing PINTEREST_ACCESS_TOKEN')
+  }
+  if (!boardId) {
+    throw new Error('Missing PINTEREST_BOARD_ID')
+  }
+
+  const storeUrl = absoluteUrl(siteBase, `/store/${photoId}`)
+  const photoUrl = absoluteUrl(siteBase, previewUrl || thumbUrl)
+
+  if (!photoUrl) {
+    throw new Error('Missing photo URL for Pinterest pin')
+  }
+
+  const payload = {
+    title: title || 'Jeevan Chandimal Photography',
+    description: buildPinterestDescription({
+      title,
+      description,
+      storeUrl,
+    }),
+    board_id: boardId,
+    media_source: {
+      source_type: 'image_url',
+      url: photoUrl,
+    },
+    link: storeUrl,
+  }
+
+  const result = await pinterestPost('/pins', payload, token)
+
+  return {
+    ok: true,
+    pinId: result?.id || null,
+  }
+}
+
+function normalizeDbTags(input) {
+  if (!Array.isArray(input)) return []
+  const out = []
+  const seen = new Set()
+
+  for (const raw of input) {
+    const t = clean(raw).toLowerCase()
+    if (!t || seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+
+  return out
 }
 
 export default async function handler(req, res) {
@@ -234,21 +429,46 @@ export default async function handler(req, res) {
       })
     }
 
-    const preview_url = `/api/photo/${photoId}/preview?variant=standard`
-    const thumb_url = `/api/photo/${photoId}/thumb`
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('photos')
+      .select('*')
+      .eq('id', photoId)
+      .single()
 
-    const title = fileNameToTitle(filename)
-    const description = `${title} – premium Sri Lanka photography by Jeevan Chandimal.`
+    if (existingError) {
+      throw new Error(existingError.message || 'Failed to load photo')
+    }
+
+    const preview_url =
+      firstNonEmpty(existing?.preview_url, existing?.previewUrl) ||
+      `/api/photo/${photoId}/preview?variant=standard`
+
+    const thumb_url =
+      firstNonEmpty(existing?.thumb_url, existing?.thumbUrl) ||
+      `/api/photo/${photoId}/thumb`
+
+    const title =
+      firstNonEmpty(existing?.title, body.title) || fileNameToTitle(filename)
+
+    const description =
+      firstNonEmpty(existing?.description, body.description) ||
+      `${title} – premium Sri Lanka photography by Jeevan Chandimal.`
+
+    const tags = normalizeDbTags(existing?.tags || body.tags || [])
+
+    const updatePayload = {
+      status: 'published',
+      title,
+      description,
+      preview_url,
+      thumb_url,
+    }
+
+    if (tags.length) updatePayload.tags = tags
 
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('photos')
-      .update({
-        status: 'published',
-        title,
-        description,
-        preview_url,
-        thumb_url,
-      })
+      .update(updatePayload)
       .eq('id', photoId)
       .select()
       .single()
@@ -257,31 +477,97 @@ export default async function handler(req, res) {
       throw new Error(updateError.message || 'Failed to update photo')
     }
 
+    const siteBase =
+      clean(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000'
+
+    let pageToken = null
+
     let facebook = {
       ok: false,
       skipped: true,
       reason: 'Facebook autopost not attempted',
     }
 
+    let instagram = {
+      ok: false,
+      skipped: true,
+      reason: 'Instagram autopost not attempted',
+    }
+
+    let pinterest = {
+      ok: false,
+      skipped: true,
+      reason: 'Pinterest autopost not attempted',
+    }
+
     try {
-      facebook = await autoPostToFacebook({
+      pageToken = await getPageToken()
+    } catch (err) {
+      const msg = clean(err?.message) || 'Failed to resolve Facebook page token'
+      facebook = { ok: false, error: msg }
+      instagram = { ok: false, error: msg }
+    }
+
+    if (pageToken) {
+      try {
+        facebook = await autoPostToFacebook({
+          photoId,
+          title,
+          description,
+          previewUrl: preview_url,
+          thumbUrl: thumb_url,
+          pageToken,
+          siteBase,
+        })
+      } catch (err) {
+        facebook = {
+          ok: false,
+          error: clean(err?.message) || 'Facebook post failed',
+        }
+      }
+
+      try {
+        instagram = await autoPostToInstagram({
+          photoId,
+          title,
+          description,
+          previewUrl: preview_url,
+          thumbUrl: thumb_url,
+          pageToken,
+          siteBase,
+        })
+      } catch (err) {
+        instagram = {
+          ok: false,
+          error: clean(err?.message) || 'Instagram post failed',
+        }
+      }
+    }
+
+    try {
+      pinterest = await autoPostToPinterest({
         photoId,
         title,
         description,
         previewUrl: preview_url,
         thumbUrl: thumb_url,
+        siteBase,
       })
     } catch (err) {
-      facebook = {
+      pinterest = {
         ok: false,
-        error: clean(err?.message) || 'Facebook post failed',
+        error: clean(err?.message) || 'Pinterest post failed',
       }
     }
 
     return res.status(200).json({
       ok: true,
       photo: updated,
+      thumbUrl: updated?.thumb_url || thumb_url,
+      previewUrl: updated?.preview_url || preview_url,
       facebook,
+      instagram,
+      pinterest,
     })
   } catch (e) {
     return res.status(500).json({

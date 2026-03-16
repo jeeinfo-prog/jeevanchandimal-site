@@ -1,12 +1,3 @@
-// pages/admin/upload.js
-// ✅ Final corrected version
-// - create-upload + commit send token in BOTH headers
-// - Facebook auto-post is handled inside /api/admin/photos/commit
-// - browser no longer uses any Facebook secret/token directly
-// - fixes auto-start after retry
-// - aborts active uploads on clear/sign-out/pause
-// - keeps current UI, queue, metadata, and progress flow
-
 import React from 'react'
 import Head from 'next/head'
 
@@ -782,7 +773,10 @@ export default function AdminUploadPage() {
           Authorization: `Bearer ${token}`,
           'x-supabase-access-token': token,
         },
-        body: JSON.stringify({ photoId }),
+        body: JSON.stringify({
+          photoId,
+          filename: file.name,
+        }),
       })
 
       const { json, text } = await safeJson(commitResp)
@@ -795,8 +789,8 @@ export default function AdminUploadPage() {
       }
 
       log('✅ Done: commit complete')
-      log(`thumbUrl: ${json?.thumbUrl || json?.thumb_url || json?.photo?.thumb_url || '(none)'}`)
-      log(`previewUrl: ${json?.previewUrl || json?.preview_url || json?.photo?.preview_url || '(none)'}`)
+      log(`thumbUrl: ${json?.photo?.thumb_url || json?.thumbUrl || json?.thumb_url || '(none)'}`)
+      log(`previewUrl: ${json?.photo?.preview_url || json?.previewUrl || json?.preview_url || '(none)'}`)
 
       if (json?.facebook?.ok) {
         log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
@@ -804,6 +798,22 @@ export default function AdminUploadPage() {
         log(`⚠️ Facebook skipped: ${json.facebook.reason || 'Skipped'}`)
       } else if (json?.facebook?.error) {
         log(`⚠️ Facebook post failed: ${json.facebook.error}`)
+      }
+
+      if (json?.instagram?.ok) {
+        log(`📸 Instagram posted: ${json.instagram.mediaId || json.instagram.creationId || 'OK'}`)
+      } else if (json?.instagram?.skipped) {
+        log(`⚠️ Instagram skipped: ${json.instagram.reason || 'Skipped'}`)
+      } else if (json?.instagram?.error) {
+        log(`⚠️ Instagram post failed: ${json.instagram.error}`)
+      }
+
+      if (json?.pinterest?.ok) {
+        log(`📌 Pinterest posted: ${json.pinterest.pinId || 'OK'}`)
+      } else if (json?.pinterest?.skipped) {
+        log(`⚠️ Pinterest skipped: ${json.pinterest.reason || 'Skipped'}`)
+      } else if (json?.pinterest?.error) {
+        log(`⚠️ Pinterest post failed: ${json.pinterest.error}`)
       }
     } catch (e) {
       throw Object.assign(new Error(e?.message || 'Commit failed'), {
