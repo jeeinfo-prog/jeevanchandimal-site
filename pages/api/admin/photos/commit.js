@@ -1,11 +1,13 @@
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
+/* ---------------- helpers ---------------- */
+
 function clean(v) {
   return String(v || '').trim()
 }
 
 function isDisabled(value, defaultValue = false) {
-  const raw = clean(value)
+  const raw = clean(value).toLowerCase()
   if (!raw) return defaultValue
   return raw === 'false' || raw === '0' || raw === 'off' || raw === 'no'
 }
@@ -16,6 +18,14 @@ function graphVersion() {
 
 function graphBase() {
   return `https://graph.facebook.com/${graphVersion()}`
+}
+
+function getFacebookPageId() {
+  return clean(process.env.FACEBOOK_PAGE_ID)
+}
+
+function getSiteBase() {
+  return clean(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000'
 }
 
 const FETCH_TIMEOUT_MS = 30000
@@ -30,6 +40,8 @@ function isRetryableError(message = '') {
     msg.includes('timeout') ||
     msg.includes('timed out') ||
     msg.includes('temporarily unavailable') ||
+    msg.includes('temporarily blocked') ||
+    msg.includes('please reduce the amount of data') ||
     msg.includes('try again') ||
     msg.includes('rate limit') ||
     msg.includes('connection reset') ||
@@ -233,13 +245,33 @@ async function pinterestPost(path, bodyObj, token) {
   })
 }
 
+/* ---------------- facebook post queue ----------------
+   In-process serialization to avoid Graph burst failures
+   when uploader concurrency is > 1.
+------------------------------------------------------ */
+
+let facebookPostQueue = Promise.resolve()
+
+async function enqueueFacebookPost(task) {
+  const run = facebookPostQueue.then(async () => {
+    await sleep(900) // small spacing between Facebook posts
+    return task()
+  })
+
+  facebookPostQueue = run.catch(() => {})
+  return run
+}
+
+/* ---------------- token helpers ---------------- */
+
 /*
 Priority:
 1) direct page token from env
 2) derive page token from long-lived user token
 */
 async function getPageToken() {
-  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
+  const pageId = getFacebookPageId()
+
   if (!pageId) {
     throw new Error('Missing FACEBOOK_PAGE_ID')
   }
@@ -277,7 +309,7 @@ async function getInstagramBusinessAccountId(pageToken) {
   const envIgId = clean(process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID)
   if (envIgId) return envIgId
 
-  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
+  const pageId = getFacebookPageId()
   if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
 
   const page = await graphGet(`/${pageId}`, {
@@ -293,6 +325,8 @@ async function getInstagramBusinessAccountId(pageToken) {
   return igId
 }
 
+/* ---------------- autopost actions ---------------- */
+
 async function autoPostToFacebook({
   photoId,
   title,
@@ -302,7 +336,7 @@ async function autoPostToFacebook({
   pageToken,
   siteBase,
 }) {
-  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
+  const pageId = getFacebookPageId()
   if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
 
   const storeUrl = absoluteUrl(siteBase, `/store/${photoId}`)
@@ -318,11 +352,13 @@ async function autoPostToFacebook({
     storeUrl,
   })
 
-  const result = await graphPost(`/${pageId}/photos`, {
-    url: photoUrl,
-    caption,
-    access_token: pageToken,
-  })
+  const result = await enqueueFacebookPost(() =>
+    graphPost(`/${pageId}/photos`, {
+      url: photoUrl,
+      caption,
+      access_token: pageToken,
+    })
+  )
 
   return {
     ok: true,
@@ -440,6 +476,8 @@ async function autoPostToPinterest({
   }
 }
 
+/* ---------------- data helpers ---------------- */
+
 function normalizeDbTags(input) {
   if (!Array.isArray(input)) return []
   const out = []
@@ -454,6 +492,8 @@ function normalizeDbTags(input) {
 
   return out
 }
+
+/* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -532,8 +572,7 @@ export default async function handler(req, res) {
       throw new Error(updateError.message || 'Failed to update photo')
     }
 
-    const siteBase =
-      clean(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000'
+    const siteBase = getSiteBase()
 
     let pageToken = null
 
