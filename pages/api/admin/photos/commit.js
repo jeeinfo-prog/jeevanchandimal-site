@@ -1,5 +1,11 @@
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+}
+
 const GRAPH_VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v25.0'
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
 
@@ -9,8 +15,46 @@ function clean(v) {
   return String(v || '').trim()
 }
 
-function getEnv(name) {
-  return clean(process.env[name])
+function getEnv(name, fallback = '') {
+  return clean(process.env[name]) || clean(fallback)
+}
+
+function getSiteBase() {
+  return getEnv('NEXT_PUBLIC_SITE_URL', 'http://localhost:3000')
+}
+
+function fileNameToTitle(filename) {
+  const raw = clean(filename).replace(/\.[^/.]+$/, '')
+  if (!raw) return 'Untitled Photo'
+
+  return raw
+    .replace(/__.+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    const x = clean(v)
+    if (x) return x
+  }
+  return ''
+}
+
+function normalizeDbTags(input) {
+  if (!Array.isArray(input)) return []
+  const out = []
+  const seen = new Set()
+
+  for (const raw of input) {
+    const t = clean(raw).toLowerCase()
+    if (!t || seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+
+  return out
 }
 
 async function safeJson(resp) {
@@ -43,11 +87,30 @@ function extractAccessToken(req) {
   )
 }
 
+function absoluteUrl(base, path) {
+  const b = clean(base).replace(/\/+$/, '')
+  const p = clean(path)
+
+  if (!p) return ''
+  if (/^https?:\/\//i.test(p)) return p
+  if (!b) return p
+
+  return `${b}${p.startsWith('/') ? '' : '/'}${p}`
+}
+
+function buildFacebookCaption({ title, description, storeUrl }) {
+  return [title, description, storeUrl].filter(Boolean).join('\n\n')
+}
+
 /* ---------------- facebook ---------------- */
 
 async function postToFacebook({ photoUrl, message }) {
   const pageId = getEnv('FACEBOOK_PAGE_ID')
   const token = getEnv('FACEBOOK_PAGE_ACCESS_TOKEN')
+
+  console.log('[commit.js] FACEBOOK_PAGE_ID raw:', process.env.FACEBOOK_PAGE_ID)
+  console.log('[commit.js] FACEBOOK_PAGE_ID cleaned:', pageId)
+  console.log('[commit.js] FACEBOOK_PAGE_ACCESS_TOKEN exists:', !!token)
 
   if (!pageId) {
     return { ok: false, error: 'Missing FACEBOOK_PAGE_ID' }
@@ -82,7 +145,7 @@ async function postToFacebook({ photoUrl, message }) {
 
   return {
     ok: true,
-    postId: json?.post_id || json?.id,
+    postId: json?.post_id || json?.id || null,
   }
 }
 
@@ -90,6 +153,7 @@ async function postToFacebook({ photoUrl, message }) {
 
 export default async function handler(req, res) {
   console.log('=== COMMIT API HIT ===')
+  console.log('[commit.js] file marker: FINAL-COMMIT-DEBUG-V1')
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -121,39 +185,92 @@ export default async function handler(req, res) {
       })
     }
 
-    /* ---------------- get photo ---------------- */
+    if (!filename) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Missing filename',
+      })
+    }
 
-    const { data: photo, error } = await supabaseAdmin
+    /* ---------------- load existing photo ---------------- */
+
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('photos')
       .select('*')
       .eq('id', photoId)
       .single()
 
-    if (error || !photo) {
+    if (existingError || !existing) {
       return res.status(404).json({
         ok: false,
-        error: 'Photo not found',
+        error: existingError?.message || 'Photo not found',
+      })
+    }
+
+    /* ---------------- finalize photo for store ---------------- */
+
+    const preview_url =
+      firstNonEmpty(existing?.preview_url, existing?.previewUrl) ||
+      `/api/photo/${photoId}/preview?variant=standard`
+
+    const thumb_url =
+      firstNonEmpty(existing?.thumb_url, existing?.thumbUrl) ||
+      `/api/photo/${photoId}/thumb`
+
+    const title =
+      firstNonEmpty(existing?.title, body.title) || fileNameToTitle(filename)
+
+    const description =
+      firstNonEmpty(existing?.description, body.description) ||
+      `${title} – premium Sri Lanka photography by Jeevan Chandimal.`
+
+    const tags = normalizeDbTags(existing?.tags || body.tags || [])
+
+    const updatePayload = {
+      status: 'published',
+      title,
+      description,
+      preview_url,
+      thumb_url,
+    }
+
+    if (tags.length) {
+      updatePayload.tags = tags
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('photos')
+      .update(updatePayload)
+      .eq('id', photoId)
+      .select()
+      .single()
+
+    if (updateError || !updated) {
+      return res.status(500).json({
+        ok: false,
+        error: updateError?.message || 'Failed to finalize photo',
       })
     }
 
     /* ---------------- urls ---------------- */
 
-    const siteBase =
-      process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+    const siteBase = getSiteBase()
+    const previewUrl = absoluteUrl(siteBase, updated?.preview_url || preview_url)
+    const storeUrl = absoluteUrl(siteBase, `/store/${photoId}`)
 
-    const previewUrl = `${siteBase}/api/photo/${photoId}/preview?variant=standard`
-    const storeUrl = `${siteBase}/store/${photoId}`
-
-    const title = photo.title || filename || 'Photo'
-    const description = photo.description || ''
-
-    const message = [title, description, storeUrl]
-      .filter(Boolean)
-      .join('\n\n')
+    const message = buildFacebookCaption({
+      title,
+      description,
+      storeUrl,
+    })
 
     /* ---------------- facebook ---------------- */
 
-    let facebook = { skipped: true, reason: 'Facebook autopost not attempted' }
+    let facebook = {
+      ok: false,
+      skipped: true,
+      reason: 'Facebook autopost not attempted',
+    }
 
     try {
       facebook = await postToFacebook({
@@ -171,23 +288,23 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       ok: true,
-      photo: {
-        id: photoId,
-        thumb_url: `/api/photo/${photoId}/thumb`,
-        preview_url: `/api/photo/${photoId}/preview?variant=standard`,
-      },
+      photo: updated,
+      thumbUrl: updated?.thumb_url || thumb_url,
+      previewUrl: updated?.preview_url || preview_url,
       facebook,
       instagram: {
+        ok: false,
         skipped: true,
         reason: 'Instagram autopost not attempted',
       },
       pinterest: {
+        ok: false,
         skipped: true,
         reason: 'Pinterest autopost not attempted',
       },
     })
   } catch (e) {
-    console.error('Commit error:', e)
+    console.error('[commit.js] Commit error:', e)
 
     return res.status(500).json({
       ok: false,
