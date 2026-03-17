@@ -754,8 +754,7 @@ export default function AdminUploadPage() {
       })
     }
 
-    try {
-      try {
+        try {
   log('Step 3/4: commit')
   log('Commit endpoint: /api/admin/photos/commit')
   log(`Commit photoId: ${photoId}`)
@@ -784,7 +783,9 @@ export default function AdminUploadPage() {
     }),
   })
 
-  const { json, text } = await safeJson(commitResp)
+  const parsed = await safeJson(commitResp)
+  const json = parsed?.json || {}
+  const text = parsed?.text || ''
 
   if (!commitResp.ok) {
     throw Object.assign(
@@ -794,8 +795,23 @@ export default function AdminUploadPage() {
   }
 
   log('✅ Done: commit complete')
-  log(`thumbUrl: ${json?.photo?.thumb_url || json?.thumbUrl || json?.thumb_url || '(none)'}`)
-  log(`previewUrl: ${json?.photo?.preview_url || json?.previewUrl || json?.preview_url || '(none)'}`)
+
+  const thumbUrl =
+    json?.photo?.thumb_url ||
+    json?.thumbUrl ||
+    json?.thumb_url ||
+    '(none)'
+
+  const previewUrl =
+    json?.photo?.preview_url ||
+    json?.previewUrl ||
+    json?.preview_url ||
+    '(none)'
+
+  log(`thumbUrl: ${thumbUrl}`)
+  log(`previewUrl: ${previewUrl}`)
+
+  /* Facebook */
 
   if (json?.facebook?.ok) {
     log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
@@ -805,13 +821,17 @@ export default function AdminUploadPage() {
     log(`⚠️ Facebook post failed: ${json.facebook.error}`)
   }
 
+  /* Instagram */
+
   if (json?.instagram?.ok) {
-    log(`📸 Instagram posted: ${json.instagram.mediaId || json.instagram.creationId || 'OK'}`)
+    log(`📸 Instagram posted: ${json.instagram.mediaId || 'OK'}`)
   } else if (json?.instagram?.skipped) {
     log(`⚠️ Instagram skipped: ${json.instagram.reason || 'Skipped'}`)
   } else if (json?.instagram?.error) {
     log(`⚠️ Instagram post failed: ${json.instagram.error}`)
   }
+
+  /* Pinterest */
 
   if (json?.pinterest?.ok) {
     log(`📌 Pinterest posted: ${json.pinterest.pinId || 'OK'}`)
@@ -820,44 +840,12 @@ export default function AdminUploadPage() {
   } else if (json?.pinterest?.error) {
     log(`⚠️ Pinterest post failed: ${json.pinterest.error}`)
   }
+
 } catch (e) {
   throw Object.assign(new Error(e?.message || 'Commit failed'), {
     _type: e?._type || 'COMMIT',
   })
 }
-
-      log('✅ Done: commit complete')
-      log(`thumbUrl: ${json?.photo?.thumb_url || json?.thumbUrl || json?.thumb_url || '(none)'}`)
-      log(`previewUrl: ${json?.photo?.preview_url || json?.previewUrl || json?.preview_url || '(none)'}`)
-
-      if (json?.facebook?.ok) {
-        log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
-      } else if (json?.facebook?.skipped) {
-        log(`⚠️ Facebook skipped: ${json.facebook.reason || 'Skipped'}`)
-      } else if (json?.facebook?.error) {
-        log(`⚠️ Facebook post failed: ${json.facebook.error}`)
-      }
-
-      if (json?.instagram?.ok) {
-        log(`📸 Instagram posted: ${json.instagram.mediaId || json.instagram.creationId || 'OK'}`)
-      } else if (json?.instagram?.skipped) {
-        log(`⚠️ Instagram skipped: ${json.instagram.reason || 'Skipped'}`)
-      } else if (json?.instagram?.error) {
-        log(`⚠️ Instagram post failed: ${json.instagram.error}`)
-      }
-
-      if (json?.pinterest?.ok) {
-        log(`📌 Pinterest posted: ${json.pinterest.pinId || 'OK'}`)
-      } else if (json?.pinterest?.skipped) {
-        log(`⚠️ Pinterest skipped: ${json.pinterest.reason || 'Skipped'}`)
-      } else if (json?.pinterest?.error) {
-        log(`⚠️ Pinterest post failed: ${json.pinterest.error}`)
-      }
-    } catch (e) {
-      throw Object.assign(new Error(e?.message || 'Commit failed'), {
-        _type: e?._type || 'COMMIT',
-      })
-    }
   }
 
   function pauseQueue() {

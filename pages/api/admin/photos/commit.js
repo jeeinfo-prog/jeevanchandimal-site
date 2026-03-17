@@ -279,11 +279,6 @@ async function enqueueFacebookPost(task) {
 
 /* ---------------- token helpers ---------------- */
 
-/*
-Priority:
-1) direct page token from env
-2) derive page token from long-lived user token
-*/
 async function getPageToken() {
   const pageId = getFacebookPageId()
 
