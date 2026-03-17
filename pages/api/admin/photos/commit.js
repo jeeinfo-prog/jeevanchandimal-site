@@ -4,14 +4,38 @@ function clean(v) {
   return String(v || '').trim()
 }
 
+function isDisabled(value, defaultValue = false) {
+  const raw = clean(value)
+  if (!raw) return defaultValue
+  return raw === 'false' || raw === '0' || raw === 'off' || raw === 'no'
+}
+
 const GRAPH_VERSION = clean(process.env.FACEBOOK_GRAPH_VERSION) || 'v25.0'
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
+const FETCH_TIMEOUT_MS = 30000
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
-async function withRetry(fn, { tries = 4, baseDelayMs = 400 } = {}) {
+function isRetryableError(message = '') {
+  const msg = clean(message).toLowerCase()
+  return (
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('temporarily unavailable') ||
+    msg.includes('try again') ||
+    msg.includes('rate limit') ||
+    msg.includes('connection reset') ||
+    msg.includes('network') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('fetch failed') ||
+    msg.includes('gateway') ||
+    msg.includes('service unavailable')
+  )
+}
+
+async function withRetry(fn, { tries = 4, baseDelayMs = 500 } = {}) {
   let lastErr
 
   for (let i = 0; i < tries; i++) {
@@ -20,6 +44,7 @@ async function withRetry(fn, { tries = 4, baseDelayMs = 400 } = {}) {
     } catch (err) {
       lastErr = err
       if (i === tries - 1) break
+      if (!isRetryableError(err?.message)) break
       await sleep(baseDelayMs * Math.pow(2, i))
     }
   }
@@ -98,6 +123,37 @@ async function readJsonSafe(r) {
   }
 }
 
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Request timed out')
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function extractGraphError(data, status) {
+  const err = data?.error || {}
+  const message = clean(err?.message) || `Facebook error (${status})`
+  const code = clean(err?.code)
+  const subcode = clean(err?.error_subcode)
+  const type = clean(err?.type)
+
+  return [message, type && `type=${type}`, code && `code=${code}`, subcode && `subcode=${subcode}`]
+    .filter(Boolean)
+    .join(' | ')
+}
+
 async function graphGet(path, params = {}) {
   const url = new URL(`${GRAPH_BASE}${path}`)
 
@@ -108,12 +164,11 @@ async function graphGet(path, params = {}) {
   })
 
   return withRetry(async () => {
-    const r = await fetch(url.toString(), { method: 'GET' })
+    const r = await fetchWithTimeout(url.toString(), { method: 'GET' })
     const data = await readJsonSafe(r)
 
     if (!r.ok || data?.error) {
-      const err = data?.error || {}
-      throw new Error(err.message || `Facebook GET error (${r.status})`)
+      throw new Error(extractGraphError(data, r.status))
     }
 
     return data
@@ -130,7 +185,7 @@ async function graphPost(path, form = {}) {
   })
 
   return withRetry(async () => {
-    const r = await fetch(`${GRAPH_BASE}${path}`, {
+    const r = await fetchWithTimeout(`${GRAPH_BASE}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
@@ -139,8 +194,7 @@ async function graphPost(path, form = {}) {
     const data = await readJsonSafe(r)
 
     if (!r.ok || data?.error) {
-      const err = data?.error || {}
-      throw new Error(err.message || `Facebook POST error (${r.status})`)
+      throw new Error(extractGraphError(data, r.status))
     }
 
     return data
@@ -149,7 +203,7 @@ async function graphPost(path, form = {}) {
 
 async function pinterestPost(path, bodyObj, token) {
   return withRetry(async () => {
-    const r = await fetch(`https://api.pinterest.com/v5${path}`, {
+    const r = await fetchWithTimeout(`https://api.pinterest.com/v5${path}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -176,19 +230,18 @@ async function pinterestPost(path, bodyObj, token) {
 /*
 Priority:
 1) direct page token from env
-2) derive page token from user token
+2) derive page token from long-lived user token
 */
 async function getPageToken() {
-  const directPageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
-  if (directPageToken) return directPageToken
-
-  const userToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
   const pageId = clean(process.env.FACEBOOK_PAGE_ID)
-
   if (!pageId) {
     throw new Error('Missing FACEBOOK_PAGE_ID')
   }
 
+  const directPageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
+  if (directPageToken) return directPageToken
+
+  const userToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
   if (!userToken) {
     throw new Error(
       'Missing FACEBOOK_PAGE_ACCESS_TOKEN and FACEBOOK_LONG_LIVED_USER_TOKEN'
@@ -228,9 +281,7 @@ async function getInstagramBusinessAccountId(pageToken) {
 
   const igId = clean(page?.instagram_business_account?.id)
   if (!igId) {
-    throw new Error(
-      'No instagram_business_account linked to this Facebook page'
-    )
+    throw new Error('No instagram_business_account linked to this Facebook page')
   }
 
   return igId
@@ -282,8 +333,7 @@ async function autoPostToInstagram({
   pageToken,
   siteBase,
 }) {
-  const igEnabled = clean(process.env.ENABLE_INSTAGRAM_AUTOPOST || 'true')
-  if (igEnabled === 'false' || igEnabled === '0') {
+  if (isDisabled(process.env.ENABLE_INSTAGRAM_AUTOPOST, false)) {
     return {
       ok: false,
       skipped: true,
@@ -336,8 +386,7 @@ async function autoPostToPinterest({
   thumbUrl,
   siteBase,
 }) {
-  const enabled = clean(process.env.ENABLE_PINTEREST_AUTOPOST || 'true')
-  if (enabled === 'false' || enabled === '0') {
+  if (isDisabled(process.env.ENABLE_PINTEREST_AUTOPOST, false)) {
     return {
       ok: false,
       skipped: true,
@@ -488,24 +537,39 @@ export default async function handler(req, res) {
       reason: 'Facebook autopost not attempted',
     }
 
-    let instagram = {
-      ok: false,
-      skipped: true,
-      reason: 'Instagram autopost not attempted',
-    }
+    let instagram = isDisabled(process.env.ENABLE_INSTAGRAM_AUTOPOST, false)
+      ? {
+          ok: false,
+          skipped: true,
+          reason: 'Instagram autopost disabled by env',
+        }
+      : {
+          ok: false,
+          skipped: true,
+          reason: 'Instagram autopost not attempted',
+        }
 
-    let pinterest = {
-      ok: false,
-      skipped: true,
-      reason: 'Pinterest autopost not attempted',
-    }
+    let pinterest = isDisabled(process.env.ENABLE_PINTEREST_AUTOPOST, false)
+      ? {
+          ok: false,
+          skipped: true,
+          reason: 'Pinterest autopost disabled by env',
+        }
+      : {
+          ok: false,
+          skipped: true,
+          reason: 'Pinterest autopost not attempted',
+        }
 
     try {
       pageToken = await getPageToken()
     } catch (err) {
       const msg = clean(err?.message) || 'Failed to resolve Facebook page token'
       facebook = { ok: false, error: msg }
-      instagram = { ok: false, error: msg }
+
+      if (!instagram.skipped) {
+        instagram = { ok: false, error: msg }
+      }
     }
 
     if (pageToken) {
@@ -526,37 +590,41 @@ export default async function handler(req, res) {
         }
       }
 
+      if (!instagram.skipped) {
+        try {
+          instagram = await autoPostToInstagram({
+            photoId,
+            title,
+            description,
+            previewUrl: preview_url,
+            thumbUrl: thumb_url,
+            pageToken,
+            siteBase,
+          })
+        } catch (err) {
+          instagram = {
+            ok: false,
+            error: clean(err?.message) || 'Instagram post failed',
+          }
+        }
+      }
+    }
+
+    if (!pinterest.skipped) {
       try {
-        instagram = await autoPostToInstagram({
+        pinterest = await autoPostToPinterest({
           photoId,
           title,
           description,
           previewUrl: preview_url,
           thumbUrl: thumb_url,
-          pageToken,
           siteBase,
         })
       } catch (err) {
-        instagram = {
+        pinterest = {
           ok: false,
-          error: clean(err?.message) || 'Instagram post failed',
+          error: clean(err?.message) || 'Pinterest post failed',
         }
-      }
-    }
-
-    try {
-      pinterest = await autoPostToPinterest({
-        photoId,
-        title,
-        description,
-        previewUrl: preview_url,
-        thumbUrl: thumb_url,
-        siteBase,
-      })
-    } catch (err) {
-      pinterest = {
-        ok: false,
-        error: clean(err?.message) || 'Pinterest post failed',
       }
     }
 
