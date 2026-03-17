@@ -10,8 +10,14 @@ function isDisabled(value, defaultValue = false) {
   return raw === 'false' || raw === '0' || raw === 'off' || raw === 'no'
 }
 
-const GRAPH_VERSION = clean(process.env.FACEBOOK_GRAPH_VERSION) || 'v25.0'
-const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
+function graphVersion() {
+  return clean(process.env.FACEBOOK_GRAPH_VERSION) || 'v25.0'
+}
+
+function graphBase() {
+  return `https://graph.facebook.com/${graphVersion()}`
+}
+
 const FETCH_TIMEOUT_MS = 30000
 
 function sleep(ms) {
@@ -155,7 +161,7 @@ function extractGraphError(data, status) {
 }
 
 async function graphGet(path, params = {}) {
-  const url = new URL(`${GRAPH_BASE}${path}`)
+  const url = new URL(`${graphBase()}${path}`)
 
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') {
@@ -185,7 +191,7 @@ async function graphPost(path, form = {}) {
   })
 
   return withRetry(async () => {
-    const r = await fetchWithTimeout(`${GRAPH_BASE}${path}`, {
+    const r = await fetchWithTimeout(`${graphBase()}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
