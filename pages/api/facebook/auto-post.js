@@ -1,14 +1,9 @@
 // pages/api/facebook/auto-post.js
 
-const GRAPH_VERSION = 'v25.0'
+const GRAPH_VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v25.0'
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
 
-function maskToken(token) {
-  const t = String(token || '')
-  if (!t) return ''
-  if (t.length <= 10) return '***'
-  return `${t.slice(0, 6)}...${t.slice(-4)}`
-}
+/* ---------------- helpers ---------------- */
 
 function clean(v) {
   return String(v || '').trim()
@@ -18,8 +13,16 @@ function json(res, status, body) {
   return res.status(status).json(body)
 }
 
+function maskToken(token) {
+  const t = clean(token)
+  if (!t) return ''
+  if (t.length <= 12) return '***'
+  return `${t.slice(0, 6)}...${t.slice(-4)}`
+}
+
 function parseBody(req) {
   if (!req?.body) return {}
+
   if (typeof req.body === 'string') {
     try {
       return JSON.parse(req.body)
@@ -27,8 +30,21 @@ function parseBody(req) {
       return {}
     }
   }
+
   return req.body
 }
+
+async function safeJson(resp) {
+  const text = await resp.text()
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return {}
+  }
+}
+
+/* ---------------- graph helpers ---------------- */
 
 async function graphGet(path, params = {}) {
   const url = new URL(`${GRAPH_BASE}${path}`)
@@ -39,17 +55,17 @@ async function graphGet(path, params = {}) {
     }
   })
 
-  const r = await fetch(url.toString(), { method: 'GET' })
-  const data = await r.json().catch(() => ({}))
+  const resp = await fetch(url.toString(), { method: 'GET' })
+  const data = await safeJson(resp)
 
-  if (!r.ok || data?.error) {
+  if (!resp.ok || data?.error) {
     const err = data?.error || {}
-    const message =
+    const msg =
       err.message ||
       err.error_user_msg ||
-      `Graph GET failed (${r.status})`
+      `Graph GET failed (${resp.status})`
 
-    throw new Error(message)
+    throw new Error(msg)
   }
 
   return data
@@ -64,7 +80,7 @@ async function graphPost(path, form = {}) {
     }
   })
 
-  const r = await fetch(`${GRAPH_BASE}${path}`, {
+  const resp = await fetch(`${GRAPH_BASE}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -72,40 +88,35 @@ async function graphPost(path, form = {}) {
     body,
   })
 
-  const data = await r.json().catch(() => ({}))
+  const data = await safeJson(resp)
 
-  if (!r.ok || data?.error) {
+  if (!resp.ok || data?.error) {
     const err = data?.error || {}
-    const message =
+    const msg =
       err.message ||
       err.error_user_msg ||
-      `Graph POST failed (${r.status})`
+      `Graph POST failed (${resp.status})`
 
-    throw new Error(message)
+    throw new Error(msg)
   }
 
   return data
 }
 
-/**
- * Token priority:
- * 1) FACEBOOK_PAGE_ACCESS_TOKEN
- * 2) derive page token using FACEBOOK_LONG_LIVED_USER_TOKEN + FACEBOOK_PAGE_ID
- */
+/* ---------------- resolve page token ---------------- */
+
 async function resolvePageAccessToken() {
   const pageId = clean(process.env.FACEBOOK_PAGE_ID)
-  const directPageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
-  const longLivedUserToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
+  const pageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
+  const userToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
 
-  if (directPageToken) {
-    if (!pageId) {
-      throw new Error('Missing FACEBOOK_PAGE_ID')
-    }
+  if (pageToken) {
+    if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
 
     return {
-      token: directPageToken,
-      source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
+      token: pageToken,
       pageId,
+      source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
     }
   }
 
@@ -113,40 +124,38 @@ async function resolvePageAccessToken() {
     throw new Error('Missing FACEBOOK_PAGE_ID')
   }
 
-  if (!longLivedUserToken) {
+  if (!userToken) {
     throw new Error(
       'Missing token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN'
     )
   }
 
   const accounts = await graphGet('/me/accounts', {
-    access_token: longLivedUserToken,
+    access_token: userToken,
   })
 
   const pages = Array.isArray(accounts?.data) ? accounts.data : []
-  const match = pages.find((p) => String(p?.id || '') === String(pageId))
 
-  if (!match) {
-    throw new Error(
-      `Page ${pageId} not found in /me/accounts for the provided user token`
-    )
+  const page = pages.find((p) => String(p?.id) === pageId)
+
+  if (!page) {
+    throw new Error(`Page ${pageId} not found in /me/accounts`)
   }
 
-  if (!match.access_token) {
-    throw new Error(`Missing token for page ${pageId}`)
+  if (!page.access_token) {
+    throw new Error(`No access token for page ${pageId}`)
   }
 
   return {
-    token: match.access_token,
-    source: 'derived_from_user_token',
+    token: page.access_token,
     pageId,
+    source: 'derived_from_user_token',
   }
 }
 
-async function validatePageToken(pageId, token) {
-  if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
-  if (!token) throw new Error('Missing token')
+/* ---------------- validate page ---------------- */
 
+async function validatePageToken(pageId, token) {
   const page = await graphGet(`/${pageId}`, {
     fields: 'id,name',
     access_token: token,
@@ -158,64 +167,56 @@ async function validatePageToken(pageId, token) {
   }
 }
 
+/* ---------------- handler ---------------- */
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return json(res, 405, { ok: false, error: 'Method not allowed' })
   }
 
   try {
-    const pageIdEnv = clean(process.env.FACEBOOK_PAGE_ID)
-
-    // keep both to avoid breaking existing env typo
-    const secret = clean(
-      process.env.FACEBOOK_AUTPOST_SECRET ||
-        process.env.FACEBOOK_AUTOPOST_SECRET
-    )
+    const secret =
+      clean(process.env.FACEBOOK_AUTPOST_SECRET) ||
+      clean(process.env.FACEBOOK_AUTOPOST_SECRET)
 
     const sentSecret = clean(req.headers['x-autopost-secret'])
-    const body = parseBody(req)
 
     if (secret && sentSecret !== secret) {
       return json(res, 401, { ok: false, error: 'Unauthorized' })
     }
 
-    const {
-      message,
-      link,
-      published = true,
-      photoUrl,
-      debug = false,
-    } = body || {}
+    const body = parseBody(req)
 
-    const cleanMessage = clean(message)
-    const cleanLink = clean(link)
-    const cleanPhotoUrl = clean(photoUrl)
+    const message = clean(body.message)
+    const link = clean(body.link)
+    const photoUrl = clean(body.photoUrl)
+    const published = body.published !== false
+    const debug = body.debug === true
 
-    if (!cleanMessage && !cleanLink && !cleanPhotoUrl) {
+    if (!message && !link && !photoUrl) {
       return json(res, 400, {
         ok: false,
-        error: 'Nothing to post. Provide message, link, or photoUrl.',
+        error: 'Nothing to post',
       })
     }
 
     const resolved = await resolvePageAccessToken()
-    const finalPageId = pageIdEnv || resolved.pageId
 
-    const page = await validatePageToken(finalPageId, resolved.token)
+    const page = await validatePageToken(resolved.pageId, resolved.token)
 
     let result
 
-    if (cleanPhotoUrl) {
-      result = await graphPost(`/${finalPageId}/photos`, {
-        url: cleanPhotoUrl,
-        caption: cleanMessage,
+    if (photoUrl) {
+      result = await graphPost(`/${resolved.pageId}/photos`, {
+        url: photoUrl,
+        caption: message,
         published: published ? 'true' : 'false',
         access_token: resolved.token,
       })
     } else {
-      result = await graphPost(`/${finalPageId}/feed`, {
-        message: cleanMessage,
-        link: cleanLink,
+      result = await graphPost(`/${resolved.pageId}/feed`, {
+        message,
+        link,
         published: published ? 'true' : 'false',
         access_token: resolved.token,
       })
@@ -224,21 +225,19 @@ export default async function handler(req, res) {
     return json(res, 200, {
       ok: true,
       postId: result?.post_id || result?.id || '',
-      page: {
-        id: page.id,
-        name: page.name,
-      },
+      page,
       tokenSource: resolved.source,
-      ...(debug
-        ? {
-            debug: {
-              pageId: finalPageId,
-              tokenPreview: maskToken(resolved.token),
-            },
-          }
-        : {}),
+      ...(debug && {
+        debug: {
+          pageId: resolved.pageId,
+          tokenPreview: maskToken(resolved.token),
+          graphVersion: GRAPH_VERSION,
+        },
+      }),
     })
   } catch (err) {
+    console.error('Facebook autopost error:', err)
+
     return json(res, 500, {
       ok: false,
       error: err?.message || 'Facebook auto-post failed',

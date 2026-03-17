@@ -795,6 +795,9 @@ export default function AdminUploadPage() {
   }
 
   log('✅ Done: commit complete')
+  log(`debug marker: ${json?.debug?.marker || '(none)'}`)
+  log(`debug pageIdSeen: ${String(json?.debug?.pageIdSeen)}`)
+  log(`debug tokenSeen: ${String(json?.debug?.tokenSeen)}`)
 
   const thumbUrl =
     json?.photo?.thumb_url ||
@@ -811,8 +814,6 @@ export default function AdminUploadPage() {
   log(`thumbUrl: ${thumbUrl}`)
   log(`previewUrl: ${previewUrl}`)
 
-  /* Facebook */
-
   if (json?.facebook?.ok) {
     log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
   } else if (json?.facebook?.skipped) {
@@ -820,8 +821,6 @@ export default function AdminUploadPage() {
   } else if (json?.facebook?.error) {
     log(`⚠️ Facebook post failed: ${json.facebook.error}`)
   }
-
-  /* Instagram */
 
   if (json?.instagram?.ok) {
     log(`📸 Instagram posted: ${json.instagram.mediaId || 'OK'}`)
@@ -831,8 +830,6 @@ export default function AdminUploadPage() {
     log(`⚠️ Instagram post failed: ${json.instagram.error}`)
   }
 
-  /* Pinterest */
-
   if (json?.pinterest?.ok) {
     log(`📌 Pinterest posted: ${json.pinterest.pinId || 'OK'}`)
   } else if (json?.pinterest?.skipped) {
@@ -840,7 +837,6 @@ export default function AdminUploadPage() {
   } else if (json?.pinterest?.error) {
     log(`⚠️ Pinterest post failed: ${json.pinterest.error}`)
   }
-
 } catch (e) {
   throw Object.assign(new Error(e?.message || 'Commit failed'), {
     _type: e?._type || 'COMMIT',
