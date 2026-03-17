@@ -1,5 +1,11 @@
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
 
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+}
+
 /* ---------------- helpers ---------------- */
 
 function clean(v) {
@@ -12,8 +18,12 @@ function isDisabled(value, defaultValue = false) {
   return raw === 'false' || raw === '0' || raw === 'off' || raw === 'no'
 }
 
+function getEnv(name, fallback = '') {
+  return clean(process.env[name]) || clean(fallback)
+}
+
 function graphVersion() {
-  return clean(process.env.FACEBOOK_GRAPH_VERSION) || 'v25.0'
+  return getEnv('FACEBOOK_GRAPH_VERSION', 'v25.0')
 }
 
 function graphBase() {
@@ -21,11 +31,19 @@ function graphBase() {
 }
 
 function getFacebookPageId() {
-  return clean(process.env.FACEBOOK_PAGE_ID)
+  return getEnv('FACEBOOK_PAGE_ID')
+}
+
+function getFacebookPageAccessToken() {
+  return getEnv('FACEBOOK_PAGE_ACCESS_TOKEN')
+}
+
+function getFacebookLongLivedUserToken() {
+  return getEnv('FACEBOOK_LONG_LIVED_USER_TOKEN')
 }
 
 function getSiteBase() {
-  return clean(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000'
+  return getEnv('NEXT_PUBLIC_SITE_URL', 'http://localhost:3000')
 }
 
 const FETCH_TIMEOUT_MS = 30000
@@ -245,16 +263,13 @@ async function pinterestPost(path, bodyObj, token) {
   })
 }
 
-/* ---------------- facebook post queue ----------------
-   In-process serialization to avoid Graph burst failures
-   when uploader concurrency is > 1.
------------------------------------------------------- */
+/* ---------------- facebook post queue ---------------- */
 
 let facebookPostQueue = Promise.resolve()
 
 async function enqueueFacebookPost(task) {
   const run = facebookPostQueue.then(async () => {
-    await sleep(900) // small spacing between Facebook posts
+    await sleep(900)
     return task()
   })
 
@@ -273,13 +288,15 @@ async function getPageToken() {
   const pageId = getFacebookPageId()
 
   if (!pageId) {
-    throw new Error('Missing FACEBOOK_PAGE_ID')
+    throw new Error(
+      'Missing FACEBOOK_PAGE_ID. Add FACEBOOK_PAGE_ID=your_page_id to .env.local and restart the Next.js server.'
+    )
   }
 
-  const directPageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
+  const directPageToken = getFacebookPageAccessToken()
   if (directPageToken) return directPageToken
 
-  const userToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
+  const userToken = getFacebookLongLivedUserToken()
   if (!userToken) {
     throw new Error(
       'Missing FACEBOOK_PAGE_ACCESS_TOKEN and FACEBOOK_LONG_LIVED_USER_TOKEN'
@@ -306,7 +323,7 @@ async function getPageToken() {
 }
 
 async function getInstagramBusinessAccountId(pageToken) {
-  const envIgId = clean(process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID)
+  const envIgId = getEnv('INSTAGRAM_BUSINESS_ACCOUNT_ID')
   if (envIgId) return envIgId
 
   const pageId = getFacebookPageId()
@@ -436,8 +453,8 @@ async function autoPostToPinterest({
     }
   }
 
-  const token = clean(process.env.PINTEREST_ACCESS_TOKEN)
-  const boardId = clean(process.env.PINTEREST_BOARD_ID)
+  const token = getEnv('PINTEREST_ACCESS_TOKEN')
+  const boardId = getEnv('PINTEREST_BOARD_ID')
 
   if (!token) {
     throw new Error('Missing PINTEREST_ACCESS_TOKEN')
@@ -493,6 +510,19 @@ function normalizeDbTags(input) {
   return out
 }
 
+function logEnvStatus() {
+  console.log('[commit.js] env check', {
+    FACEBOOK_PAGE_ID: !!getFacebookPageId(),
+    FACEBOOK_PAGE_ACCESS_TOKEN: !!getFacebookPageAccessToken(),
+    FACEBOOK_LONG_LIVED_USER_TOKEN: !!getFacebookLongLivedUserToken(),
+    INSTAGRAM_BUSINESS_ACCOUNT_ID: !!getEnv('INSTAGRAM_BUSINESS_ACCOUNT_ID'),
+    PINTEREST_ACCESS_TOKEN: !!getEnv('PINTEREST_ACCESS_TOKEN'),
+    PINTEREST_BOARD_ID: !!getEnv('PINTEREST_BOARD_ID'),
+    FACEBOOK_GRAPH_VERSION: graphVersion(),
+    NEXT_PUBLIC_SITE_URL: getSiteBase(),
+  })
+}
+
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
@@ -505,6 +535,8 @@ export default async function handler(req, res) {
   }
 
   try {
+    logEnvStatus()
+
     const body = req.body || {}
 
     const photoId = clean(body.photoId)

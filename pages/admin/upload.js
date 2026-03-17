@@ -756,6 +756,9 @@ export default function AdminUploadPage() {
 
     try {
       log('Step 3/4: commit')
+      log('Commit endpoint: /api/admin/photos/commit')
+      log(`Commit photoId: ${photoId}`)
+
       setItem(item.id, {
         status: 'COMMITTING',
         progress: 100,
@@ -764,6 +767,7 @@ export default function AdminUploadPage() {
         speedBps: 0,
         etaSec: 0,
       })
+
       log(`Commit: ${file.name}`)
 
       const commitResp = await fetch('/api/admin/photos/commit', {
@@ -829,10 +833,13 @@ export default function AdminUploadPage() {
   }
 
   function resumeQueue() {
+    if (runningRef.current) return
     setPaused(false)
     setStopAfterCurrent(false)
     log('▶️ Resuming queue…')
-    runQueue()
+    setTimeout(() => {
+      runQueue()
+    }, 0)
   }
 
   async function runQueue() {
