@@ -755,42 +755,76 @@ export default function AdminUploadPage() {
     }
 
     try {
-      log('Step 3/4: commit')
-      log('Commit endpoint: /api/admin/photos/commit')
-      log(`Commit photoId: ${photoId}`)
+      try {
+  log('Step 3/4: commit')
+  log('Commit endpoint: /api/admin/photos/commit')
+  log(`Commit photoId: ${photoId}`)
 
-      setItem(item.id, {
-        status: 'COMMITTING',
-        progress: 100,
-        loaded: file.size || 0,
-        total: file.size || 0,
-        speedBps: 0,
-        etaSec: 0,
-      })
+  setItem(item.id, {
+    status: 'COMMITTING',
+    progress: 100,
+    loaded: file.size || 0,
+    total: file.size || 0,
+    speedBps: 0,
+    etaSec: 0,
+  })
 
-      log(`Commit: ${file.name}`)
+  log(`Commit: ${file.name}`)
 
-      const commitResp = await fetch('/api/admin/photos/commit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          'x-supabase-access-token': token,
-        },
-        body: JSON.stringify({
-          photoId,
-          filename: file.name,
-        }),
-      })
+  const commitResp = await fetch('/api/admin/photos/commit', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      'x-supabase-access-token': token,
+    },
+    body: JSON.stringify({
+      photoId,
+      filename: file.name,
+    }),
+  })
 
-      const { json, text } = await safeJson(commitResp)
+  const { json, text } = await safeJson(commitResp)
 
-      if (!commitResp.ok) {
-        throw Object.assign(
-          new Error(json?.detail || json?.error || text || 'Commit failed'),
-          { _type: 'COMMIT' }
-        )
-      }
+  if (!commitResp.ok) {
+    throw Object.assign(
+      new Error(json?.detail || json?.error || text || 'Commit failed'),
+      { _type: 'COMMIT' }
+    )
+  }
+
+  log('✅ Done: commit complete')
+  log(`thumbUrl: ${json?.photo?.thumb_url || json?.thumbUrl || json?.thumb_url || '(none)'}`)
+  log(`previewUrl: ${json?.photo?.preview_url || json?.previewUrl || json?.preview_url || '(none)'}`)
+
+  if (json?.facebook?.ok) {
+    log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
+  } else if (json?.facebook?.skipped) {
+    log(`⚠️ Facebook skipped: ${json.facebook.reason || 'Skipped'}`)
+  } else if (json?.facebook?.error) {
+    log(`⚠️ Facebook post failed: ${json.facebook.error}`)
+  }
+
+  if (json?.instagram?.ok) {
+    log(`📸 Instagram posted: ${json.instagram.mediaId || json.instagram.creationId || 'OK'}`)
+  } else if (json?.instagram?.skipped) {
+    log(`⚠️ Instagram skipped: ${json.instagram.reason || 'Skipped'}`)
+  } else if (json?.instagram?.error) {
+    log(`⚠️ Instagram post failed: ${json.instagram.error}`)
+  }
+
+  if (json?.pinterest?.ok) {
+    log(`📌 Pinterest posted: ${json.pinterest.pinId || 'OK'}`)
+  } else if (json?.pinterest?.skipped) {
+    log(`⚠️ Pinterest skipped: ${json.pinterest.reason || 'Skipped'}`)
+  } else if (json?.pinterest?.error) {
+    log(`⚠️ Pinterest post failed: ${json.pinterest.error}`)
+  }
+} catch (e) {
+  throw Object.assign(new Error(e?.message || 'Commit failed'), {
+    _type: e?._type || 'COMMIT',
+  })
+}
 
       log('✅ Done: commit complete')
       log(`thumbUrl: ${json?.photo?.thumb_url || json?.thumbUrl || json?.thumb_url || '(none)'}`)

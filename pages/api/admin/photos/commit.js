@@ -526,6 +526,10 @@ function logEnvStatus() {
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
+  console.log('=== COMMIT API HIT ===')
+  console.log('[commit.js] FACEBOOK_PAGE_ID raw:', process.env.FACEBOOK_PAGE_ID)
+  console.log('[commit.js] file marker: FINAL-COMMIT-JS-V2')
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({
