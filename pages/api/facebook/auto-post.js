@@ -154,8 +154,8 @@ async function graphPost(path, form = {}) {
 
 /* ---------------- config + validation ---------------- */
 
-function normalizePhotoUrl(photoUrl) {
-  return clean(photoUrl)
+function normalizeUrl(v) {
+  return clean(v)
 }
 
 async function resolveSystemUserContext() {
@@ -215,9 +215,8 @@ export default async function handler(req, res) {
 
     const photoId = clean(body.photoId)
     const message = clean(body.message)
-    const link = clean(body.link)
-    const photoUrl = normalizePhotoUrl(body.photoUrl)
-    const published = body.published !== false
+    const link = normalizeUrl(body.link)
+    const photoUrl = normalizeUrl(body.photoUrl)
     const debug = body.debug === true
 
     if (!message && !link && !photoUrl) {
@@ -227,7 +226,6 @@ export default async function handler(req, res) {
       })
     }
 
-    // Duplicate protection: one published Facebook post per photo
     if (photoId) {
       const { data: existing, error: existingErr } = await supabaseAdmin
         .from('social_posts')
@@ -265,23 +263,20 @@ export default async function handler(req, res) {
     const resolved = await resolveSystemUserContext()
     const page = await validatePageAccess(resolved.pageId, resolved.token)
 
-    let result
+    const postLink = link || photoUrl
 
-    if (photoUrl) {
-      result = await graphPost(`/${resolved.pageId}/photos`, {
-        url: photoUrl,
-        caption: message,
-        published: published ? 'true' : 'false',
-        access_token: resolved.token,
-      })
-    } else {
-      result = await graphPost(`/${resolved.pageId}/feed`, {
-        message,
-        link,
-        published: published ? 'true' : 'false',
-        access_token: resolved.token,
+    if (!message && !postLink) {
+      return json(res, 400, {
+        ok: false,
+        error: 'Missing message/link payload for feed post',
       })
     }
+
+    const result = await graphPost(`/${resolved.pageId}/feed`, {
+      message,
+      link: postLink,
+      access_token: resolved.token,
+    })
 
     const postId = clean(result?.post_id || result?.id)
 
@@ -308,7 +303,8 @@ export default async function handler(req, res) {
               pageName: page?.name || '',
               systemUserTokenPresent: Boolean(getFacebookSystemUserToken()),
               tokenPreview: maskToken(resolved.token),
-              usedPhotoEndpoint: Boolean(photoUrl),
+              usedFeedEndpoint: true,
+              usedLink: postLink,
             },
           }
         : {}),
