@@ -42,9 +42,12 @@ function parseBody(req) {
 }
 
 function readHeaderValue(req, name) {
-  const lower = req?.headers?.[name]
-  const upper = req?.headers?.[name.toUpperCase()]
-  const value = lower || upper || ''
+  const value =
+    req?.headers?.[name] ||
+    req?.headers?.[name.toLowerCase()] ||
+    req?.headers?.[name.toUpperCase()] ||
+    ''
+
   if (Array.isArray(value)) return value[0] || ''
   return typeof value === 'string' ? value : ''
 }
@@ -74,17 +77,10 @@ function getFacebookPageId() {
   )
 }
 
-function getFacebookPageAccessToken() {
+function getFacebookSystemUserToken() {
   return clean(
-    process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
-      process.env.FB_PAGE_ACCESS_TOKEN
-  )
-}
-
-function getFacebookUserToken() {
-  return clean(
-    process.env.FACEBOOK_LONG_LIVED_USER_TOKEN ||
-      process.env.FB_LONG_LIVED_USER_TOKEN
+    process.env.FACEBOOK_SYSTEM_USER_ACCESS_TOKEN ||
+      process.env.FB_SYSTEM_USER_ACCESS_TOKEN
   )
 }
 
@@ -99,17 +95,23 @@ async function graphGet(path, params = {}) {
     }
   })
 
-  const resp = await fetch(url.toString(), { method: 'GET' })
+  const resp = await fetch(url.toString(), {
+    method: 'GET',
+  })
+
   const data = await safeJson(resp)
 
   if (!resp.ok || data?.error) {
     const err = data?.error || {}
     const msg =
-      err.message ||
-      err.error_user_msg ||
+      clean(err?.message) ||
+      clean(err?.error_user_msg) ||
       `Graph GET failed (${resp.status})`
 
-    throw new Error(msg)
+    const e = new Error(msg)
+    e.graph = data
+    e.status = resp.status
+    throw e
   }
 
   return data
@@ -137,66 +139,45 @@ async function graphPost(path, form = {}) {
   if (!resp.ok || data?.error) {
     const err = data?.error || {}
     const msg =
-      err.message ||
-      err.error_user_msg ||
+      clean(err?.message) ||
+      clean(err?.error_user_msg) ||
       `Graph POST failed (${resp.status})`
 
-    throw new Error(msg)
+    const e = new Error(msg)
+    e.graph = data
+    e.status = resp.status
+    throw e
   }
 
   return data
 }
 
-/* ---------------- resolve page token ---------------- */
+/* ---------------- config + validation ---------------- */
 
-async function resolvePageAccessToken() {
+function normalizePhotoUrl(photoUrl) {
+  return clean(photoUrl)
+}
+
+async function resolveSystemUserContext() {
   const pageId = getFacebookPageId()
-  const pageToken = getFacebookPageAccessToken()
-  const userToken = getFacebookUserToken()
+  const token = getFacebookSystemUserToken()
 
   if (!pageId) {
     throw new Error('Missing FACEBOOK_PAGE_ID')
   }
 
-  if (pageToken) {
-    return {
-      token: pageToken,
-      pageId,
-      source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
-    }
-  }
-
-  if (!userToken) {
-    throw new Error(
-      'Missing token: set FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_LONG_LIVED_USER_TOKEN'
-    )
-  }
-
-  const accounts = await graphGet('/me/accounts', {
-    access_token: userToken,
-  })
-
-  const pages = Array.isArray(accounts?.data) ? accounts.data : []
-  const page = pages.find((p) => String(p?.id || '') === String(pageId))
-
-  if (!page) {
-    throw new Error(`Page ${pageId} not found in /me/accounts`)
-  }
-
-  if (!page.access_token) {
-    throw new Error(`No access token returned for page ${pageId}`)
+  if (!token) {
+    throw new Error('Missing FACEBOOK_SYSTEM_USER_ACCESS_TOKEN')
   }
 
   return {
-    token: clean(page.access_token),
     pageId,
-    source: 'derived_from_user_token',
+    token,
+    source: 'FACEBOOK_SYSTEM_USER_ACCESS_TOKEN',
   }
 }
 
-/* ---------------- validate page ---------------- */
-
-async function validatePageToken(pageId, token) {
+async function validatePageAccess(pageId, token) {
   const page = await graphGet(`/${pageId}`, {
     fields: 'id,name',
     access_token: token,
@@ -208,18 +189,15 @@ async function validatePageToken(pageId, token) {
   }
 }
 
-/* ---------------- normalize url ---------------- */
-
-function normalizePhotoUrl(photoUrl) {
-  return clean(photoUrl)
-}
-
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
-    return json(res, 405, { ok: false, error: 'Method not allowed' })
+    return json(res, 405, {
+      ok: false,
+      error: 'Method not allowed',
+    })
   }
 
   try {
@@ -227,7 +205,10 @@ export default async function handler(req, res) {
     const sentSecret = clean(readHeaderValue(req, 'x-autopost-secret'))
 
     if (secret && sentSecret !== secret) {
-      return json(res, 401, { ok: false, error: 'Unauthorized' })
+      return json(res, 401, {
+        ok: false,
+        error: 'Unauthorized',
+      })
     }
 
     const body = parseBody(req)
@@ -246,7 +227,7 @@ export default async function handler(req, res) {
       })
     }
 
-    // Duplicate protection: one Facebook publish per photo
+    // Duplicate protection: one published Facebook post per photo
     if (photoId) {
       const { data: existing, error: existingErr } = await supabaseAdmin
         .from('social_posts')
@@ -267,12 +248,22 @@ export default async function handler(req, res) {
           skipped: true,
           reason: 'Already posted to Facebook',
           postId: clean(existing.post_id),
+          ...(debug
+            ? {
+                debug: {
+                  graphVersion: GRAPH_VERSION,
+                  pageId: getFacebookPageId(),
+                  systemUserTokenPresent: Boolean(getFacebookSystemUserToken()),
+                  tokenPreview: maskToken(getFacebookSystemUserToken()),
+                },
+              }
+            : {}),
         })
       }
     }
 
-    const resolved = await resolvePageAccessToken()
-    const page = await validatePageToken(resolved.pageId, resolved.token)
+    const resolved = await resolveSystemUserContext()
+    const page = await validatePageAccess(resolved.pageId, resolved.token)
 
     let result
 
@@ -312,13 +303,12 @@ export default async function handler(req, res) {
       ...(debug
         ? {
             debug: {
-              pageId: resolved.pageId,
-              pageIdPresent: Boolean(getFacebookPageId()),
-              pageTokenPresent: Boolean(getFacebookPageAccessToken()),
-              userTokenPresent: Boolean(getFacebookUserToken()),
-              tokenPreview: maskToken(resolved.token),
               graphVersion: GRAPH_VERSION,
+              pageId: resolved.pageId,
               pageName: page?.name || '',
+              systemUserTokenPresent: Boolean(getFacebookSystemUserToken()),
+              tokenPreview: maskToken(resolved.token),
+              usedPhotoEndpoint: Boolean(photoUrl),
             },
           }
         : {}),
@@ -329,6 +319,17 @@ export default async function handler(req, res) {
     return json(res, 500, {
       ok: false,
       error: err?.message || 'Facebook auto-post failed',
+      ...(req?.body?.debug === true
+        ? {
+            debug: {
+              graphVersion: GRAPH_VERSION,
+              pageId: getFacebookPageId(),
+              systemUserTokenPresent: Boolean(getFacebookSystemUserToken()),
+              tokenPreview: maskToken(getFacebookSystemUserToken()),
+              graphError: err?.graph || null,
+            },
+          }
+        : {}),
     })
   }
 }
