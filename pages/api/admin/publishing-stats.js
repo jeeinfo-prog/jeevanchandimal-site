@@ -6,6 +6,59 @@ function clean(v) {
   return String(v || '').trim()
 }
 
+function readHeader(req, name) {
+  const v = req.headers?.[name]
+  if (Array.isArray(v)) return v[0] || ''
+  return typeof v === 'string' ? v : ''
+}
+
+function extractAccessToken(req) {
+  const authHeader =
+    readHeader(req, 'authorization') ||
+    readHeader(req, 'Authorization') ||
+    ''
+
+  const m = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (m?.[1]) return m[1].trim()
+
+  const alt =
+    readHeader(req, 'x-supabase-access-token') ||
+    readHeader(req, 'X-Supabase-Access-Token') ||
+    readHeader(req, 'x-access-token') ||
+    ''
+
+  return clean(alt)
+}
+
+async function requireAdmin(req) {
+  const token = extractAccessToken(req)
+
+  if (!token) {
+    return { ok: false, status: 401, error: 'Missing token' }
+  }
+
+  const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token)
+  if (userErr || !userData?.user) {
+    return { ok: false, status: 401, error: 'Invalid token' }
+  }
+
+  const { data: profile, error: profErr } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single()
+
+  if (profErr || !profile) {
+    return { ok: false, status: 403, error: 'No profile' }
+  }
+
+  if (profile.role !== 'admin') {
+    return { ok: false, status: 403, error: 'Not admin' }
+  }
+
+  return { ok: true, user: userData.user }
+}
+
 function isUuid(v) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     clean(v)
@@ -34,15 +87,31 @@ function chunkArray(arr, size) {
   return out
 }
 
+function parseJsonObject(value) {
+  if (!value) return {}
+  if (typeof value === 'object' && !Array.isArray(value)) return value
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed
+      }
+    } catch {}
+  }
+
+  return {}
+}
+
 function getPayloadField(obj, key) {
   if (!obj || typeof obj !== 'object') return ''
-  const payload = obj.payload && typeof obj.payload === 'object' ? obj.payload : {}
+  const payload = parseJsonObject(obj.payload)
   return clean(obj[key] || payload[key])
 }
 
 function getResponseField(obj, key) {
   if (!obj || typeof obj !== 'object') return ''
-  const response = obj.response && typeof obj.response === 'object' ? obj.response : {}
+  const response = parseJsonObject(obj.response)
   return clean(obj[key] || response[key])
 }
 
@@ -85,6 +154,14 @@ export default async function handler(req, res) {
   }
 
   try {
+    const admin = await requireAdmin(req)
+    if (!admin.ok) {
+      return res.status(admin.status).json({
+        ok: false,
+        error: admin.error,
+      })
+    }
+
     const { data: scheduledRaw, error: scheduledErr } = await supabaseAdmin
       .from('scheduled_posts')
       .select('*')
@@ -210,12 +287,15 @@ export default async function handler(req, res) {
           clean(row?.post_id) ||
           getResponseField(row, 'postId') ||
           getResponseField(row, 'id') ||
+          getResponseField(row, 'mediaId') ||
+          getResponseField(row, 'creationId') ||
+          getResponseField(row, 'pinId') ||
           null,
         error: clean(row?.error) || null,
         createdAt: row?.created_at || null,
         title,
         thumbnail,
-        response: row?.response && typeof row.response === 'object' ? row.response : null,
+        response: parseJsonObject(row?.response),
       }
     })
 

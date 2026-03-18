@@ -159,6 +159,23 @@ function isUnknownColumn(err) {
   return err?.code === '42703' || msg.includes('does not exist') || msg.includes('schema cache')
 }
 
+function isAllowedImageFilename(name) {
+  const ext = String(name || '')
+    .split('.')
+    .pop()
+    ?.toLowerCase()
+
+  return ['jpg', 'jpeg', 'png', 'webp', 'tif', 'tiff'].includes(ext)
+}
+
+function normalizeCollection(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9_-]/g, '')
+}
+
 async function trySaveOriginalFilename(photoId, safeName) {
   if (!photoId || !safeName) return
 
@@ -170,6 +187,38 @@ async function trySaveOriginalFilename(photoId, safeName) {
   if (up.error && !isUnknownColumn(up.error)) {
     console.error('photos update original_filename error:', up.error)
   }
+}
+
+async function tryInsertPhotoAsset(photoId, objectKey) {
+  if (!photoId || !objectKey) return
+
+  const first = await supabaseAdmin
+    .from('photo_assets')
+    .insert([{ photo_id: photoId, original_key: objectKey }])
+
+  if (!first.error) return
+
+  if (isUnknownColumn(first.error)) return
+
+  const msg = String(first.error?.message || '').toLowerCase()
+  const isDup =
+    first.error?.code === '23505' ||
+    msg.includes('duplicate key') ||
+    msg.includes('unique constraint')
+
+  if (isDup) {
+    const up = await supabaseAdmin
+      .from('photo_assets')
+      .update({ original_key: objectKey })
+      .eq('photo_id', photoId)
+
+    if (up.error && !isUnknownColumn(up.error)) {
+      throw up.error
+    }
+    return
+  }
+
+  throw first.error
 }
 
 export default async function handler(req, res) {
@@ -185,17 +234,24 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {}
 
-    const filename = body.filename
+    const filename = String(body.filename || '').trim()
     if (!filename) {
       return res.status(400).json({ ok: false, error: 'filename required' })
+    }
+
+    if (!isAllowedImageFilename(filename)) {
+      return res.status(400).json({ ok: false, error: 'Unsupported file type' })
     }
 
     const safeName = sanitizeFilename(filename)
 
     const relativePath = body.relativePath ? sanitizePath(body.relativePath) : ''
-    const pathPart = relativePath && relativePath.includes('/') ? relativePath : safeName
+    const pathPart = relativePath || safeName
 
     const parsed = parsePhotoFilename(filename, relativePath)
+
+    const requestedCollection = normalizeCollection(body.collection)
+    const collection = requestedCollection || parsed.collection || ''
 
     const rawTitle = typeof body.title === 'string' ? body.title.trim() : ''
     const description = typeof body.description === 'string' ? body.description.trim() : ''
@@ -209,15 +265,22 @@ export default async function handler(req, res) {
 
     tags = normalizeTags(tags)
 
-    if (parsed.collection) {
+    if (collection) {
       const merged = new Set(tags)
-      merged.add(parsed.collection)
+      merged.add(collection)
       tags = Array.from(merged)
     }
 
-    const licensePreset = typeof body.licensePreset === 'string' ? body.licensePreset.trim() : ''
-    const priceLkr = body.priceLkr != null ? Number(body.priceLkr) : null
-    const priceUsd = body.priceUsd != null ? Number(body.priceUsd) : null
+    const allowedPresets = new Set(['personal', 'editorial', 'commercial'])
+    const rawLicensePreset =
+      typeof body.licensePreset === 'string' ? body.licensePreset.trim().toLowerCase() : ''
+    const licensePreset = allowedPresets.has(rawLicensePreset) ? rawLicensePreset : ''
+
+    const rawPriceLkr = body.priceLkr != null ? Number(body.priceLkr) : null
+    const rawPriceUsd = body.priceUsd != null ? Number(body.priceUsd) : null
+
+    const priceLkr = Number.isFinite(rawPriceLkr) && rawPriceLkr >= 0 ? rawPriceLkr : null
+    const priceUsd = Number.isFinite(rawPriceUsd) && rawPriceUsd >= 0 ? rawPriceUsd : null
 
     let photoId = null
     {
@@ -225,10 +288,10 @@ export default async function handler(req, res) {
 
       if (title) insertPayload.title = title
       if (description) insertPayload.description = description
-      if (tags.length) insertPayload.tags = tags
+      if (tags.length) insertPayload.tags = JSON.stringify(tags)
       if (licensePreset) insertPayload.license_preset = licensePreset
-      if (Number.isFinite(priceLkr)) insertPayload.price_lkr = priceLkr
-      if (Number.isFinite(priceUsd)) insertPayload.price_usd = priceUsd
+      if (priceLkr != null) insertPayload.price_lkr = priceLkr
+      if (priceUsd != null) insertPayload.price_usd = priceUsd
 
       const first = await supabaseAdmin
         .from('photos')
@@ -258,10 +321,10 @@ export default async function handler(req, res) {
         const updatePayload = {}
         if (title) updatePayload.title = title
         if (description) updatePayload.description = description
-        if (tags.length) updatePayload.tags = tags
+        if (tags.length) updatePayload.tags = JSON.stringify(tags)
         if (licensePreset) updatePayload.license_preset = licensePreset
-        if (Number.isFinite(priceLkr)) updatePayload.price_lkr = priceLkr
-        if (Number.isFinite(priceUsd)) updatePayload.price_usd = priceUsd
+        if (priceLkr != null) updatePayload.price_lkr = priceLkr
+        if (priceUsd != null) updatePayload.price_usd = priceUsd
 
         if (Object.keys(updatePayload).length) {
           const up = await supabaseAdmin
@@ -285,26 +348,25 @@ export default async function handler(req, res) {
     {
       const up = await supabaseAdmin
         .from('photos')
-        .update({ original_jpg_key: objectKey })
+        .update({
+          original_jpg_key: objectKey,
+          original_key: objectKey,
+        })
         .eq('id', photoId)
 
       if (up.error) {
-        console.error('photos update original_jpg_key error:', up.error)
+        console.error('photos update original key error:', up.error)
         return res.status(500).json({ ok: false, error: up.error.message })
       }
     }
 
     const uploadUrl = await getPresignedPutUrl({ key: objectKey })
 
-    {
-      const asset = await supabaseAdmin
-        .from('photo_assets')
-        .insert([{ photo_id: photoId, original_key: objectKey }])
-
-      if (asset.error && !isUnknownColumn(asset.error)) {
-        console.error('photo_assets insert error:', asset.error)
-        return res.status(500).json({ ok: false, error: asset.error.message })
-      }
+    try {
+      await tryInsertPhotoAsset(photoId, objectKey)
+    } catch (assetErr) {
+      console.error('photo_assets insert/update error:', assetErr)
+      return res.status(500).json({ ok: false, error: assetErr.message || 'photo_assets failed' })
     }
 
     return res.status(200).json({
@@ -313,7 +375,7 @@ export default async function handler(req, res) {
       objectKey,
       uploadUrl,
       parsed: {
-        collection: parsed.collection,
+        collection,
         title: parsed.title,
       },
     })
