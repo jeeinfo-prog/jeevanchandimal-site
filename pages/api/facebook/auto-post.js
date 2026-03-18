@@ -1,6 +1,13 @@
 // pages/api/facebook/auto-post.js
 
-const GRAPH_VERSION = process.env.FACEBOOK_GRAPH_VERSION || 'v25.0'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'
+import { logSocialPost } from '../../../lib/socialLogger'
+
+const GRAPH_VERSION =
+  process.env.FACEBOOK_GRAPH_VERSION ||
+  process.env.NEXT_PUBLIC_FACEBOOK_GRAPH_VERSION ||
+  'v25.0'
+
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
 
 /* ---------------- helpers ---------------- */
@@ -34,6 +41,14 @@ function parseBody(req) {
   return req.body
 }
 
+function readHeaderValue(req, name) {
+  const lower = req?.headers?.[name]
+  const upper = req?.headers?.[name.toUpperCase()]
+  const value = lower || upper || ''
+  if (Array.isArray(value)) return value[0] || ''
+  return typeof value === 'string' ? value : ''
+}
+
 async function safeJson(resp) {
   const text = await resp.text()
 
@@ -48,6 +63,28 @@ function getAutopostSecret() {
   return clean(
     process.env.FACEBOOK_AUTOPOST_SECRET ||
       process.env.FACEBOOK_AUTPOST_SECRET
+  )
+}
+
+function getFacebookPageId() {
+  return clean(
+    process.env.FACEBOOK_PAGE_ID ||
+      process.env.FB_PAGE_ID ||
+      process.env.FACEBOOK_TARGET_PAGE_ID
+  )
+}
+
+function getFacebookPageAccessToken() {
+  return clean(
+    process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
+      process.env.FB_PAGE_ACCESS_TOKEN
+  )
+}
+
+function getFacebookUserToken() {
+  return clean(
+    process.env.FACEBOOK_LONG_LIVED_USER_TOKEN ||
+      process.env.FB_LONG_LIVED_USER_TOKEN
   )
 }
 
@@ -113,9 +150,9 @@ async function graphPost(path, form = {}) {
 /* ---------------- resolve page token ---------------- */
 
 async function resolvePageAccessToken() {
-  const pageId = clean(process.env.FACEBOOK_PAGE_ID)
-  const pageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
-  const userToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
+  const pageId = getFacebookPageId()
+  const pageToken = getFacebookPageAccessToken()
+  const userToken = getFacebookUserToken()
 
   if (!pageId) {
     throw new Error('Missing FACEBOOK_PAGE_ID')
@@ -174,9 +211,7 @@ async function validatePageToken(pageId, token) {
 /* ---------------- normalize url ---------------- */
 
 function normalizePhotoUrl(photoUrl) {
-  const url = clean(photoUrl)
-  if (!url) return ''
-  return url
+  return clean(photoUrl)
 }
 
 /* ---------------- handler ---------------- */
@@ -189,9 +224,7 @@ export default async function handler(req, res) {
 
   try {
     const secret = getAutopostSecret()
-    const sentSecret = clean(
-      req.headers['x-autopost-secret'] || req.headers['X-Autopost-Secret']
-    )
+    const sentSecret = clean(readHeaderValue(req, 'x-autopost-secret'))
 
     if (secret && sentSecret !== secret) {
       return json(res, 401, { ok: false, error: 'Unauthorized' })
@@ -199,6 +232,7 @@ export default async function handler(req, res) {
 
     const body = parseBody(req)
 
+    const photoId = clean(body.photoId)
     const message = clean(body.message)
     const link = clean(body.link)
     const photoUrl = normalizePhotoUrl(body.photoUrl)
@@ -210,6 +244,31 @@ export default async function handler(req, res) {
         ok: false,
         error: 'Nothing to post',
       })
+    }
+
+    // Duplicate protection: one Facebook publish per photo
+    if (photoId) {
+      const { data: existing, error: existingErr } = await supabaseAdmin
+        .from('social_posts')
+        .select('id, post_id, status')
+        .eq('photo_id', photoId)
+        .eq('platform', 'facebook')
+        .eq('status', 'published')
+        .limit(1)
+        .maybeSingle()
+
+      if (existingErr) {
+        console.error('facebook duplicate check error:', existingErr)
+      }
+
+      if (existing) {
+        return json(res, 200, {
+          ok: true,
+          skipped: true,
+          reason: 'Already posted to Facebook',
+          postId: clean(existing.post_id),
+        })
+      }
     }
 
     const resolved = await resolvePageAccessToken()
@@ -233,15 +292,30 @@ export default async function handler(req, res) {
       })
     }
 
+    const postId = clean(result?.post_id || result?.id)
+
+    await logSocialPost({
+      photoId,
+      platform: 'facebook',
+      postId,
+      status: 'published',
+      error: null,
+      payload: body,
+      response: result,
+    })
+
     return json(res, 200, {
       ok: true,
-      postId: clean(result?.post_id || result?.id),
+      postId,
       page,
       tokenSource: resolved.source,
       ...(debug
         ? {
             debug: {
               pageId: resolved.pageId,
+              pageIdPresent: Boolean(getFacebookPageId()),
+              pageTokenPresent: Boolean(getFacebookPageAccessToken()),
+              userTokenPresent: Boolean(getFacebookUserToken()),
               tokenPreview: maskToken(resolved.token),
               graphVersion: GRAPH_VERSION,
               pageName: page?.name || '',
