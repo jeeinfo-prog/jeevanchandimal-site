@@ -1,7 +1,8 @@
 // pages/api/cron/publish-scheduled.js
 
 import { supabaseAdmin } from '../../../lib/supabaseAdmin'
-import { runAutoPublishing } from '../../../lib/autoPublish'
+import { generateCaption } from '../../../lib/aiCaptionGenerator'
+import { normalizeSocialResult } from '../../../lib/socialResult'
 
 const MAX_BATCH = 10
 const MAX_ATTEMPTS = 4
@@ -21,6 +22,13 @@ function getCronSecret() {
     process.env.CRON_SECRET ||
       process.env.SCHEDULED_PUBLISH_SECRET ||
       process.env.FACEBOOK_AUTOPOST_SECRET ||
+      process.env.FACEBOOK_AUTPOST_SECRET
+  )
+}
+
+function getAutopostSecret() {
+  return clean(
+    process.env.FACEBOOK_AUTOPOST_SECRET ||
       process.env.FACEBOOK_AUTPOST_SECRET
   )
 }
@@ -106,6 +114,138 @@ function getPayloadTags(post) {
   return normalizeTags(post?.tags || payload?.tags || [])
 }
 
+async function safeJson(resp) {
+  const text = await resp.text()
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return {}
+  }
+}
+
+async function postInternalJson(url, body) {
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+
+  const secret = getAutopostSecret()
+  if (secret) {
+    headers['x-autopost-secret'] = secret
+  }
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body || {}),
+  })
+
+  const data = await safeJson(resp)
+
+  if (!resp.ok) {
+    return {
+      ok: false,
+      error:
+        clean(data?.error) ||
+        clean(data?.message) ||
+        `Request failed (${resp.status})`,
+      status: resp.status,
+      raw: data,
+    }
+  }
+
+  return data
+}
+
+async function publishScheduledJob({
+  siteBase,
+  platform,
+  photoId,
+  previewUrl,
+  storeUrl,
+  title,
+  description,
+  tags,
+}) {
+  const caption = await generateCaption({
+    title,
+    description,
+    storeUrl,
+    tags,
+  })
+
+  if (platform === 'facebook') {
+    const payload = {
+      message: caption,
+      photoUrl: previewUrl,
+      link: storeUrl || previewUrl,
+      photoId,
+      title,
+      description,
+      storeUrl,
+      tags,
+    }
+
+    const raw = await postInternalJson(
+      `${siteBase}/api/facebook/auto-post`,
+      payload
+    )
+
+    return {
+      platform,
+      raw,
+      normalized: normalizeSocialResult(raw),
+    }
+  }
+
+  if (platform === 'instagram') {
+    const payload = {
+      imageUrl: previewUrl,
+      caption,
+      photoId,
+      title,
+      description,
+      storeUrl,
+      tags,
+    }
+
+    const raw = await postInternalJson(
+      `${siteBase}/api/instagram/auto-post`,
+      payload
+    )
+
+    return {
+      platform,
+      raw,
+      normalized: normalizeSocialResult(raw),
+    }
+  }
+
+  if (platform === 'pinterest') {
+    const payload = {
+      imageUrl: previewUrl,
+      title,
+      description: caption,
+      link: storeUrl,
+      photoId,
+      tags,
+    }
+
+    const raw = await postInternalJson(
+      `${siteBase}/api/pinterest/auto-post`,
+      payload
+    )
+
+    return {
+      platform,
+      raw,
+      normalized: normalizeSocialResult(raw),
+    }
+  }
+
+  throw new Error(`Unsupported platform: ${platform}`)
+}
+
 async function markJobRunning(jobId, attempts) {
   const nowIso = new Date().toISOString()
 
@@ -127,6 +267,8 @@ async function markJobRunning(jobId, attempts) {
 }
 
 async function markJobDone(jobId, attempts, result) {
+  const nowIso = new Date().toISOString()
+
   await supabaseAdmin
     .from('scheduled_posts')
     .update({
@@ -134,25 +276,26 @@ async function markJobDone(jobId, attempts, result) {
       attempts,
       result: result || null,
       last_error: null,
-      finished_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      finished_at: nowIso,
+      updated_at: nowIso,
     })
     .eq('id', jobId)
 }
 
 async function markJobRetry(jobId, attempts, errorMessage, nextRunAt, result = null) {
   const failed = attempts >= MAX_ATTEMPTS
+  const nowIso = new Date().toISOString()
 
   const updatePayload = {
     status: failed ? 'failed' : 'pending',
     attempts,
     result: result || null,
     last_error: clean(errorMessage) || 'Unknown error',
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso,
   }
 
   if (failed) {
-    updatePayload.finished_at = new Date().toISOString()
+    updatePayload.finished_at = nowIso
   } else {
     updatePayload.run_at = nextRunAt
   }
@@ -164,7 +307,10 @@ async function markJobRetry(jobId, attempts, errorMessage, nextRunAt, result = n
 }
 
 function nextRetryIso(attempts) {
-  const delayMinutes = Math.min(60, Math.max(1, Math.pow(2, Math.max(0, attempts - 1))))
+  const delayMinutes = Math.min(
+    60,
+    Math.max(1, Math.pow(2, Math.max(0, attempts - 1)))
+  )
   return new Date(Date.now() + delayMinutes * 60 * 1000).toISOString()
 }
 
@@ -240,6 +386,7 @@ export default async function handler(req, res) {
       summary.processed += 1
 
       try {
+        const platform = clean(job?.platform).toLowerCase()
         const photoId = getPayloadField(job, 'photo_id')
         const title = getPayloadField(job, 'title')
         const description = getPayloadField(job, 'description')
@@ -253,6 +400,10 @@ export default async function handler(req, res) {
           getPayloadField(job, 'store_url') ||
           (photoId ? `${siteBase}/store/${photoId}` : '')
 
+        if (!platform) {
+          throw new Error('Missing platform')
+        }
+
         if (!photoId) {
           throw new Error('Missing photo_id')
         }
@@ -261,8 +412,9 @@ export default async function handler(req, res) {
           throw new Error('Missing preview_url')
         }
 
-        const publishing = await runAutoPublishing({
+        const publishResult = await publishScheduledJob({
           siteBase,
+          platform,
           photoId,
           previewUrl,
           storeUrl,
@@ -271,35 +423,30 @@ export default async function handler(req, res) {
           tags,
         })
 
-        const hasAnySuccess =
-          publishing?.facebook?.ok ||
-          publishing?.instagram?.ok ||
-          publishing?.pinterest?.ok
+        const normalized = publishResult?.normalized || {
+          ok: false,
+          error: 'Scheduled publishing failed',
+        }
 
-        const hasOnlySkips =
-          publishing?.facebook?.skipped &&
-          publishing?.instagram?.skipped &&
-          publishing?.pinterest?.skipped
-
-        if (hasAnySuccess || hasOnlySkips) {
-          await markJobDone(job.id, attempts, publishing)
+        if (normalized.ok || normalized.skipped) {
+          await markJobDone(job.id, attempts, publishResult)
 
           summary.done += 1
           summary.jobs.push({
             id: job.id,
             ok: true,
-            result: publishing,
+            platform,
+            result: publishResult,
           })
         } else {
           const combinedError =
-            publishing?.facebook?.error ||
-            publishing?.instagram?.error ||
-            publishing?.pinterest?.error ||
+            normalized.error ||
+            clean(publishResult?.raw?.error) ||
             'Scheduled publishing failed'
 
           const nextRunAt = nextRetryIso(attempts)
 
-          await markJobRetry(job.id, attempts, combinedError, nextRunAt, publishing)
+          await markJobRetry(job.id, attempts, combinedError, nextRunAt, publishResult)
 
           if (attempts >= MAX_ATTEMPTS) {
             summary.failed += 1
@@ -310,10 +457,11 @@ export default async function handler(req, res) {
           summary.jobs.push({
             id: job.id,
             ok: false,
+            platform,
             error: combinedError,
             attempts,
             nextRunAt: attempts >= MAX_ATTEMPTS ? null : nextRunAt,
-            result: publishing,
+            result: publishResult,
           })
         }
       } catch (err) {
