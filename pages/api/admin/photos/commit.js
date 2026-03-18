@@ -1,4 +1,8 @@
+// pages/api/admin/photos/commit.js
+
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin'
+import { runAutoPublishing } from '../../../../lib/autoPublish'
+import { scheduleReposts } from '../../../../lib/scheduler'
 
 function clean(v) {
   return String(v || '').trim()
@@ -44,17 +48,9 @@ function extractAccessToken(req) {
   )
 }
 
-async function safeJson(resp) {
-  const text = await resp.text()
-  try {
-    return JSON.parse(text)
-  } catch {
-    return {}
-  }
-}
-
 function normalizeDbTags(input) {
   if (!Array.isArray(input)) return []
+
   const out = []
   const seen = new Set()
 
@@ -66,6 +62,22 @@ function normalizeDbTags(input) {
   }
 
   return out
+}
+
+function getSiteBase(req) {
+  const envBase = clean(process.env.NEXT_PUBLIC_SITE_URL)
+  if (envBase) return envBase
+
+  const host =
+    clean(readHeader(req, 'x-forwarded-host')) || clean(readHeader(req, 'host'))
+
+  const proto =
+    clean(readHeader(req, 'x-forwarded-proto')) ||
+    (host && !host.includes('localhost') ? 'https' : 'http')
+
+  if (host) return `${proto}://${host}`
+
+  return 'http://localhost:3000'
 }
 
 export default async function handler(req, res) {
@@ -143,7 +155,9 @@ export default async function handler(req, res) {
       thumb_url,
     }
 
-    if (tags.length) updatePayload.tags = tags
+    if (tags.length) {
+      updatePayload.tags = tags
+    }
 
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('photos')
@@ -159,42 +173,37 @@ export default async function handler(req, res) {
       })
     }
 
-    const siteBase =
-      clean(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000'
-
+    const siteBase = getSiteBase(req)
     const previewUrl = `${siteBase}/api/photo/${photoId}/preview?variant=standard`
     const storeUrl = `${siteBase}/store/${photoId}`
 
-    const message = [title, description, storeUrl].filter(Boolean).join('\n\n')
+    const publishing = await runAutoPublishing({
+      siteBase,
+      photoId,
+      previewUrl,
+      storeUrl,
+      title,
+      description,
+    })
 
-    let facebook = {
+    let scheduled = {
       ok: false,
-      skipped: true,
-      reason: 'Facebook autopost not attempted',
+      jobs: [],
     }
 
     try {
-      const fbResp = await fetch(`${siteBase}/api/facebook/auto-post`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-autopost-secret':
-            process.env.FACEBOOK_AUTOPOST_SECRET ||
-            process.env.FACEBOOK_AUTPOST_SECRET ||
-            '',
-        },
-        body: JSON.stringify({
-          message,
-          photoUrl: previewUrl,
-          debug: true,
-        }),
+      scheduled = await scheduleReposts(photoId, {
+        photo_id: photoId,
+        title,
+        description,
+        preview_url: previewUrl,
+        store_url: storeUrl,
       })
-
-      facebook = await safeJson(fbResp)
     } catch (e) {
-      facebook = {
+      scheduled = {
         ok: false,
-        error: e?.message || 'Facebook post failed',
+        error: e?.message || 'Failed to schedule reposts',
+        jobs: [],
       }
     }
 
@@ -203,16 +212,19 @@ export default async function handler(req, res) {
       photo: updated,
       thumbUrl: updated?.thumb_url || thumb_url,
       previewUrl: updated?.preview_url || preview_url,
-      facebook,
-      instagram: {
+      publishing,
+      scheduled,
+      facebook: publishing?.facebook || {
         ok: false,
-        skipped: true,
-        reason: 'Instagram autopost not implemented yet',
+        error: 'Facebook result missing',
       },
-      pinterest: {
+      instagram: publishing?.instagram || {
         ok: false,
-        skipped: true,
-        reason: 'Pinterest autopost not implemented yet',
+        error: 'Instagram result missing',
+      },
+      pinterest: publishing?.pinterest || {
+        ok: false,
+        error: 'Pinterest result missing',
       },
     })
   } catch (e) {

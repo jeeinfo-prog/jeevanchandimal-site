@@ -33,6 +33,25 @@ function formatShortDate(value) {
   })
 }
 
+function formatDateTime(value) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return String(value || '')
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function statusClass(status) {
+  const s = String(status || '').trim().toLowerCase()
+  if (s === 'published' || s === 'done') return 'ok'
+  if (s === 'pending' || s === 'running' || s === 'skipped') return 'warn'
+  if (s === 'failed') return 'bad'
+  return 'neutral'
+}
+
 export default function AdminDownloads() {
   const [stats, setStats] = React.useState(null)
   const [error, setError] = React.useState('')
@@ -40,57 +59,133 @@ export default function AdminDownloads() {
   const [orders, setOrders] = React.useState([])
   const [loading, setLoading] = React.useState(true)
 
-  React.useEffect(() => {
-    let alive = true
+  const [publishing, setPublishing] = React.useState(null)
+  const [publishingError, setPublishingError] = React.useState('')
+  const [retryingJobId, setRetryingJobId] = React.useState('')
 
-    async function load() {
-      try {
-        setLoading(true)
-        setError('')
+  const loadDashboard = React.useCallback(async (aliveRef) => {
+    setLoading(true)
+    setError('')
+    setPublishingError('')
 
-        const r = await fetch('/api/admin/download-stats', {
+    try {
+      const [analyticsResp, publishingResp] = await Promise.all([
+        fetch('/api/admin/download-stats', {
           credentials: 'same-origin',
-        })
-        const data = await r.json().catch(() => ({}))
+        }),
+        fetch('/api/admin/publishing-stats', {
+          credentials: 'same-origin',
+        }),
+      ])
 
-        if (!r.ok || data?.ok === false) {
-          throw new Error(data?.error || 'Failed to load analytics')
-        }
+      const analyticsData = await analyticsResp.json().catch(() => ({}))
+      const publishingData = await publishingResp.json().catch(() => ({}))
 
-        if (!alive) return
+      if (!analyticsResp.ok || analyticsData?.ok === false) {
+        throw new Error(analyticsData?.error || 'Failed to load analytics')
+      }
 
-        setStats(data)
-        setOrders(Array.isArray(data?.orders) ? data.orders : [])
+      if (aliveRef.current) {
+        setStats(analyticsData)
+        setOrders(Array.isArray(analyticsData?.orders) ? analyticsData.orders : [])
 
         const firstCurrency =
-          Array.isArray(data?.revenueByCurrency) && data.revenueByCurrency.length
-            ? data.revenueByCurrency[0].currency
+          Array.isArray(analyticsData?.revenueByCurrency) &&
+          analyticsData.revenueByCurrency.length
+            ? analyticsData.revenueByCurrency[0].currency
             : ''
 
         setActiveCurrency(firstCurrency)
-      } catch (e) {
-        if (!alive) return
-        setError(e?.message || 'Failed to load analytics')
+      }
+
+      if (!publishingResp.ok || publishingData?.ok === false) {
+        throw new Error(publishingData?.error || 'Failed to load publishing stats')
+      }
+
+      if (aliveRef.current) {
+        setPublishing(publishingData)
+      }
+    } catch (e) {
+      if (!aliveRef.current) return
+
+      const msg = e?.message || 'Failed to load dashboard'
+      if (!stats) {
+        setError(msg)
         setStats(null)
         setOrders([])
-      } finally {
-        if (alive) setLoading(false)
+      } else {
+        setPublishingError(msg)
       }
+    } finally {
+      if (aliveRef.current) setLoading(false)
     }
+  }, [stats])
 
-    load()
+  React.useEffect(() => {
+    const aliveRef = { current: true }
+
+    loadDashboard(aliveRef)
 
     return () => {
-      alive = false
+      aliveRef.current = false
     }
-  }, [])
+  }, [loadDashboard])
 
   function logout() {
-    window.location.href = '/api/admin/logout'
+    if (typeof window !== 'undefined') {
+      window.location.assign('/api/admin/logout')
+    }
   }
 
-  const revenueCards = stats?.revenueByCurrency || []
-  const revenueSeries = stats?.revenuePerDayByCurrency?.[activeCurrency] || []
+  async function retryScheduledJob(jobId) {
+    const id = String(jobId || '').trim()
+    if (!id || retryingJobId) return
+
+    try {
+      setRetryingJobId(id)
+      setPublishingError('')
+
+      const r = await fetch('/api/admin/retry-publishing-job', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ jobId: id }),
+      })
+
+      const data = await r.json().catch(() => ({}))
+
+      if (!r.ok || data?.ok === false) {
+        throw new Error(data?.error || 'Failed to retry publishing job')
+      }
+
+      const aliveRef = { current: true }
+      await loadDashboard(aliveRef)
+    } catch (e) {
+      setPublishingError(e?.message || 'Failed to retry publishing job')
+    } finally {
+      setRetryingJobId('')
+    }
+  }
+
+  const revenueCards = Array.isArray(stats?.revenueByCurrency)
+    ? stats.revenueByCurrency
+    : []
+
+  const revenueSeries =
+    stats?.revenuePerDayByCurrency &&
+    Array.isArray(stats.revenuePerDayByCurrency[activeCurrency])
+      ? stats.revenuePerDayByCurrency[activeCurrency]
+      : []
+
+  const scheduledPosts = Array.isArray(publishing?.scheduledPosts)
+    ? publishing.scheduledPosts
+    : []
+
+  const socialPosts = Array.isArray(publishing?.socialPosts)
+    ? publishing.socialPosts
+    : []
 
   return (
     <>
@@ -107,7 +202,7 @@ export default function AdminDownloads() {
           <div className="header">
             <div>
               <p className="eyebrow">Admin Dashboard</p>
-              <h1>Store Analytics</h1>
+              <h1>Store & Publishing Analytics</h1>
             </div>
 
             <button className="logout" onClick={logout} type="button">
@@ -116,10 +211,11 @@ export default function AdminDownloads() {
           </div>
 
           {error ? <div className="errorBox">{error}</div> : null}
+          {publishingError ? <div className="errorBox">{publishingError}</div> : null}
 
           {loading ? (
             <div className="card">
-              <p className="muted">Loading analytics...</p>
+              <p className="muted">Loading dashboard...</p>
             </div>
           ) : !stats ? (
             <div className="card">
@@ -152,6 +248,38 @@ export default function AdminDownloads() {
                   <strong className="statValue">{stats.totalDownloads}</strong>
                 </div>
               </section>
+
+              {publishing ? (
+                <section className="statsGrid">
+                  <div className="statCard plainCard">
+                    <span className="statLabel">Pending Jobs</span>
+                    <strong className="statValue">
+                      {publishing.summary?.scheduled?.pending || 0}
+                    </strong>
+                  </div>
+
+                  <div className="statCard plainCard">
+                    <span className="statLabel">Running Jobs</span>
+                    <strong className="statValue">
+                      {publishing.summary?.scheduled?.running || 0}
+                    </strong>
+                  </div>
+
+                  <div className="statCard plainCard">
+                    <span className="statLabel">Published Posts</span>
+                    <strong className="statValue">
+                      {publishing.summary?.social?.published || 0}
+                    </strong>
+                  </div>
+
+                  <div className="statCard plainCard">
+                    <span className="statLabel">Failed Posts</span>
+                    <strong className="statValue">
+                      {publishing.summary?.social?.failed || 0}
+                    </strong>
+                  </div>
+                </section>
+              ) : null}
 
               <section className="card">
                 <div className="sectionHead">
@@ -200,7 +328,7 @@ export default function AdminDownloads() {
                     <tbody>
                       {orders.length ? (
                         orders.map((o) => (
-                          <tr key={o.orderId}>
+                          <tr key={`${o.orderId || 'order'}-${o.photoId || 'photo'}`}>
                             <td>
                               {o.thumbnail ? (
                                 o.original ? (
@@ -215,6 +343,7 @@ export default function AdminDownloads() {
                                       src={o.thumbnail}
                                       className="thumb"
                                       alt={o.title || o.photoId || 'Order thumbnail'}
+                                      loading="lazy"
                                     />
                                   </a>
                                 ) : (
@@ -222,6 +351,7 @@ export default function AdminDownloads() {
                                     src={o.thumbnail}
                                     className="thumb"
                                     alt={o.title || o.photoId || 'Order thumbnail'}
+                                    loading="lazy"
                                   />
                                 )
                               ) : (
@@ -229,7 +359,9 @@ export default function AdminDownloads() {
                               )}
                             </td>
 
-                            <td className="titleCell">{o.title || 'Untitled'}</td>
+                            <td className="titleCell" title={o.title || 'Untitled'}>
+                              {o.title || 'Untitled'}
+                            </td>
                             <td className="mono">{o.orderId}</td>
                             <td className="mono">{o.photoId}</td>
                             <td>{formatMoney(o.amount, o.currency)}</td>
@@ -241,6 +373,166 @@ export default function AdminDownloads() {
                         <tr>
                           <td colSpan="7" className="emptyCell">
                             No recent orders found.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="card">
+                <div className="sectionHead">
+                  <h2>Publishing Queue</h2>
+                  <span className="pill">Scheduled Jobs</span>
+                </div>
+
+                <div className="tableWrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Photo</th>
+                        <th>Title</th>
+                        <th>Platform</th>
+                        <th>Status</th>
+                        <th>Run At</th>
+                        <th>Attempts</th>
+                        <th>Error</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {scheduledPosts.length ? (
+                        scheduledPosts.slice(0, 20).map((p) => (
+                          <tr key={p.id}>
+                            <td>
+                              {p.thumbnail ? (
+                                p.previewUrl ? (
+                                  <a
+                                    href={p.previewUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="thumbLink"
+                                    title="Open preview"
+                                  >
+                                    <img
+                                      src={p.thumbnail}
+                                      className="thumb"
+                                      alt={p.title || p.photoId || 'Scheduled post thumbnail'}
+                                      loading="lazy"
+                                    />
+                                  </a>
+                                ) : (
+                                  <img
+                                    src={p.thumbnail}
+                                    className="thumb"
+                                    alt={p.title || p.photoId || 'Scheduled post thumbnail'}
+                                    loading="lazy"
+                                  />
+                                )
+                              ) : (
+                                <div className="thumbFallback">No image</div>
+                              )}
+                            </td>
+                            <td className="titleCell" title={p.title || 'Untitled'}>
+                              {p.title || 'Untitled'}
+                            </td>
+                            <td className="caps">{p.platform || '-'}</td>
+                            <td>
+                              <span className={`status ${statusClass(p.status)}`}>
+                                {p.status || 'unknown'}
+                              </span>
+                            </td>
+                            <td>{formatDateTime(p.runAt)}</td>
+                            <td>{p.attempts || 0}</td>
+                            <td className="errorCell" title={p.error || ''}>
+                              {p.error || '—'}
+                            </td>
+                            <td>
+                              {String(p.status || '').toLowerCase() === 'failed' ? (
+                                <button
+                                  type="button"
+                                  className="retryBtn"
+                                  onClick={() => retryScheduledJob(p.id)}
+                                  disabled={retryingJobId === p.id}
+                                >
+                                  {retryingJobId === p.id ? 'Retrying...' : 'Retry'}
+                                </button>
+                              ) : (
+                                <span className="muted">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="8" className="emptyCell">
+                            No scheduled publishing jobs.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="card">
+                <div className="sectionHead">
+                  <h2>Recent Social Posts</h2>
+                  <span className="pill">Latest 20</span>
+                </div>
+
+                <div className="tableWrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Photo</th>
+                        <th>Title</th>
+                        <th>Platform</th>
+                        <th>Status</th>
+                        <th>Post ID</th>
+                        <th>Error</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {socialPosts.length ? (
+                        socialPosts.slice(0, 20).map((p) => (
+                          <tr key={p.id}>
+                            <td>
+                              {p.thumbnail ? (
+                                <img
+                                  src={p.thumbnail}
+                                  className="thumb"
+                                  alt={p.title || p.photoId || 'Social post thumbnail'}
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="thumbFallback">No image</div>
+                              )}
+                            </td>
+                            <td className="titleCell" title={p.title || 'Untitled'}>
+                              {p.title || 'Untitled'}
+                            </td>
+                            <td className="caps">{p.platform || '-'}</td>
+                            <td>
+                              <span className={`status ${statusClass(p.status)}`}>
+                                {p.status || 'unknown'}
+                              </span>
+                            </td>
+                            <td className="mono">{p.postId || '—'}</td>
+                            <td className="errorCell" title={p.error || ''}>
+                              {p.error || '—'}
+                            </td>
+                            <td>{formatDateTime(p.createdAt)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="7" className="emptyCell">
+                            No social posts yet.
                           </td>
                         </tr>
                       )}
@@ -293,7 +585,7 @@ export default function AdminDownloads() {
         .shell {
           position: relative;
           z-index: 2;
-          max-width: 1200px;
+          max-width: 1280px;
           margin: 0 auto;
         }
 
@@ -458,7 +750,7 @@ export default function AdminDownloads() {
         table {
           width: 100%;
           border-collapse: collapse;
-          min-width: 980px;
+          min-width: 1100px;
         }
 
         th,
@@ -510,6 +802,78 @@ export default function AdminDownloads() {
 
         .titleCell {
           min-width: 220px;
+          max-width: 320px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .caps {
+          text-transform: capitalize;
+        }
+
+        .status {
+          display: inline-flex;
+          align-items: center;
+          min-height: 30px;
+          padding: 0 10px;
+          border-radius: 999px;
+          font-size: 11px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .status.ok {
+          color: #9ef0b7;
+          background: rgba(34, 197, 94, 0.12);
+          border-color: rgba(34, 197, 94, 0.24);
+        }
+
+        .status.warn {
+          color: #ffe08a;
+          background: rgba(245, 158, 11, 0.12);
+          border-color: rgba(245, 158, 11, 0.24);
+        }
+
+        .status.bad {
+          color: #ffb4b4;
+          background: rgba(239, 68, 68, 0.12);
+          border-color: rgba(239, 68, 68, 0.24);
+        }
+
+        .status.neutral {
+          color: #d7d7d7;
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .retryBtn {
+          background: rgba(0, 194, 255, 0.14);
+          border: 1px solid rgba(0, 194, 255, 0.28);
+          color: #a6ebff;
+          padding: 8px 12px;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+
+        .retryBtn:hover:not(:disabled) {
+          background: rgba(0, 194, 255, 0.2);
+        }
+
+        .retryBtn:disabled {
+          opacity: 0.6;
+          cursor: wait;
+        }
+
+        .errorCell {
+          max-width: 280px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          opacity: 0.9;
         }
 
         .emptyCell,

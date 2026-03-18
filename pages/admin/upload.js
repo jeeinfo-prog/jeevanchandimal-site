@@ -671,178 +671,188 @@ export default function AdminUploadPage() {
   }
 
   async function uploadSingleItem(item, token) {
-    const file = item.file
-
-    setItem(item.id, {
-      status: 'UPLOADING',
-      error: '',
-      errorType: '',
-      progress: 0,
-      loaded: 0,
-      total: file.size || 0,
-      speedBps: 0,
-      etaSec: 0,
-    })
-
-    log(`Preparing upload: ${file.name}`)
-    log(`Auth token present: ${token ? 'YES' : 'NO'}`)
-
-    let photoId
-    let uploadUrl
-    let objectKey
-
-    try {
-      log('Step 1/4: create-upload')
-
-      const createResp = await fetch('/api/admin/photos/create-upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          'x-supabase-access-token': token,
-        },
-        body: JSON.stringify({
-          filename: file.name,
-          relativePath: item.relativePath || '',
-          title: item?.meta?.title || '',
-          description: item?.meta?.description || '',
-          tags: normalizeTags(item?.meta?.tags || []),
-          licensePreset: item?.meta?.licensePreset || '',
-          priceLkr: item?.meta?.priceLkr ?? null,
-          priceUsd: item?.meta?.priceUsd ?? null,
-        }),
-      })
-
-      const { json, text } = await safeJson(createResp)
-
-      if (!createResp.ok) {
-        throw Object.assign(new Error(json?.error || text || 'create-upload failed'), { _type: 'CREATE' })
-      }
-
-      photoId = json?.photoId
-      uploadUrl = json?.uploadUrl
-      objectKey = json?.objectKey
-
-      if (!photoId || !uploadUrl) {
-        throw Object.assign(new Error('create-upload response missing photoId or uploadUrl'), {
-          _type: 'CREATE',
-        })
-      }
-
-      log(`✅ create-upload OK — photoId=${photoId}`)
-      setItem(item.id, { photoId })
-    } catch (e) {
-      throw Object.assign(new Error(e?.message || 'create-upload failed'), {
-        _type: e?._type || 'CREATE',
-      })
-    }
-
-    try {
-      log('Step 2/4: R2 upload')
-      log(`Uploading to R2: ${file.name}`)
-
-      await putToR2WithProgress(item.id, uploadUrl, file, ({ pct, loaded, total, speedBps, etaSec }) => {
-        setItem(item.id, { progress: pct, loaded, total, speedBps, etaSec })
-      })
-
-      log(`✅ R2 PUT OK (${objectKey || 'key'})`)
-    } catch (e) {
-      if (String(e?.message || '').toLowerCase().includes('aborted')) throw e
-
-      throw Object.assign(new Error(e?.message || 'R2 upload failed'), {
-        _type: e?._type || 'R2',
-      })
-    }
-
-        try {
-  log('Step 3/4: commit')
-  log('Commit endpoint: /api/admin/photos/commit')
-  log(`Commit photoId: ${photoId}`)
+  const file = item.file
 
   setItem(item.id, {
-    status: 'COMMITTING',
-    progress: 100,
-    loaded: file.size || 0,
+    status: 'UPLOADING',
+    error: '',
+    errorType: '',
+    progress: 0,
+    loaded: 0,
     total: file.size || 0,
     speedBps: 0,
     etaSec: 0,
   })
 
-  log(`Commit: ${file.name}`)
+  log(`Preparing upload: ${file.name}`)
+  log(`Auth token present: ${token ? 'YES' : 'NO'}`)
 
-  const commitResp = await fetch('/api/admin/photos/commit', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      'x-supabase-access-token': token,
-    },
-    body: JSON.stringify({
-      photoId,
-      filename: file.name,
-    }),
-  })
+  let photoId
+  let uploadUrl
+  let objectKey
 
-  const parsed = await safeJson(commitResp)
-  const json = parsed?.json || {}
-  const text = parsed?.text || ''
+  try {
+    log('Step 1/4: create-upload')
 
-  if (!commitResp.ok) {
-    throw Object.assign(
-      new Error(json?.detail || json?.error || text || 'Commit failed'),
-      { _type: 'COMMIT' }
+    const parsed = parsePhotoFilename(file, item.relativePath)
+
+    const createResp = await fetch('/api/admin/photos/create-upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-supabase-access-token': token,
+      },
+      body: JSON.stringify({
+        filename: file.name,
+        relativePath: item.relativePath || '',
+        collection: parsed.collection || null,
+        title: item?.meta?.title || '',
+        description: item?.meta?.description || '',
+        tags: normalizeTags(item?.meta?.tags || []),
+        licensePreset: item?.meta?.licensePreset || '',
+        priceLkr: item?.meta?.priceLkr ?? null,
+        priceUsd: item?.meta?.priceUsd ?? null,
+      }),
+    })
+
+    const { json, text } = await safeJson(createResp)
+
+    if (!createResp.ok) {
+      throw Object.assign(
+        new Error(json?.error || text || 'create-upload failed'),
+        { _type: 'CREATE' }
+      )
+    }
+
+    photoId = json?.photoId
+    uploadUrl = json?.uploadUrl
+    objectKey = json?.objectKey
+
+    if (!photoId || !uploadUrl) {
+      throw Object.assign(
+        new Error('create-upload response missing photoId or uploadUrl'),
+        { _type: 'CREATE' }
+      )
+    }
+
+    log(`✅ create-upload OK — photoId=${photoId}`)
+    setItem(item.id, { photoId })
+  } catch (e) {
+    throw Object.assign(new Error(e?.message || 'create-upload failed'), {
+      _type: e?._type || 'CREATE',
+    })
+  }
+
+  try {
+    log('Step 2/4: R2 upload')
+    log(`Uploading to R2: ${file.name}`)
+
+    await putToR2WithProgress(
+      item.id,
+      uploadUrl,
+      file,
+      ({ pct, loaded, total, speedBps, etaSec }) => {
+        setItem(item.id, { progress: pct, loaded, total, speedBps, etaSec })
+      }
     )
+
+    log(`✅ R2 PUT OK (${objectKey || 'key'})`)
+  } catch (e) {
+    if (String(e?.message || '').toLowerCase().includes('aborted')) throw e
+
+    throw Object.assign(new Error(e?.message || 'R2 upload failed'), {
+      _type: e?._type || 'R2',
+    })
   }
 
-  log('✅ Done: commit complete')
-  log(`debug marker: ${json?.debug?.marker || '(none)'}`)
-  log(`debug pageIdSeen: ${String(json?.debug?.pageIdSeen)}`)
-  log(`debug tokenSeen: ${String(json?.debug?.tokenSeen)}`)
+  try {
+    log('Step 3/4: commit')
+    log('Commit endpoint: /api/admin/photos/commit')
+    log(`Commit photoId: ${photoId}`)
 
-  const thumbUrl =
-    json?.photo?.thumb_url ||
-    json?.thumbUrl ||
-    json?.thumb_url ||
-    '(none)'
+    setItem(item.id, {
+      status: 'COMMITTING',
+      progress: 100,
+      loaded: file.size || 0,
+      total: file.size || 0,
+      speedBps: 0,
+      etaSec: 0,
+    })
 
-  const previewUrl =
-    json?.photo?.preview_url ||
-    json?.previewUrl ||
-    json?.preview_url ||
-    '(none)'
+    log(`Commit: ${file.name}`)
 
-  log(`thumbUrl: ${thumbUrl}`)
-  log(`previewUrl: ${previewUrl}`)
+    const commitResp = await fetch('/api/admin/photos/commit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-supabase-access-token': token,
+      },
+      body: JSON.stringify({
+        photoId,
+        filename: file.name,
+        autopost: true,
+      }),
+    })
 
-  if (json?.facebook?.ok) {
-    log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
-  } else if (json?.facebook?.skipped) {
-    log(`⚠️ Facebook skipped: ${json.facebook.reason || 'Skipped'}`)
-  } else if (json?.facebook?.error) {
-    log(`⚠️ Facebook post failed: ${json.facebook.error}`)
+    const parsed = await safeJson(commitResp)
+    const json = parsed?.json || {}
+    const text = parsed?.text || ''
+
+    if (!commitResp.ok) {
+      throw Object.assign(
+        new Error(json?.detail || json?.error || text || 'Commit failed'),
+        { _type: 'COMMIT' }
+      )
+    }
+
+    log('✅ Done: commit complete')
+
+    const thumbUrl =
+      json?.photo?.thumb_url ||
+      json?.thumbUrl ||
+      json?.thumb_url ||
+      '(none)'
+
+    const previewUrl =
+      json?.photo?.preview_url ||
+      json?.previewUrl ||
+      json?.preview_url ||
+      '(none)'
+
+    log(`thumbUrl: ${thumbUrl}`)
+    log(`previewUrl: ${previewUrl}`)
+
+    if (json?.facebook?.ok) {
+      log(`📘 Facebook posted: ${json.facebook.postId || 'OK'}`)
+    } else if (json?.facebook?.skipped) {
+      log(`⚠️ Facebook skipped: ${json.facebook.reason || 'Skipped'}`)
+    } else if (json?.facebook?.error) {
+      log(`⚠️ Facebook post failed: ${json.facebook.error}`)
+    }
+
+    if (json?.instagram?.ok) {
+      log(`📸 Instagram posted: ${json.instagram.postId || 'OK'}`)
+    } else if (json?.instagram?.skipped) {
+      log(`⚠️ Instagram skipped: ${json.instagram.reason || 'Skipped'}`)
+    } else if (json?.instagram?.error) {
+      log(`⚠️ Instagram post failed: ${json.instagram.error}`)
+    }
+
+    if (json?.pinterest?.ok) {
+      log(`📌 Pinterest posted: ${json.pinterest.postId || 'OK'}`)
+    } else if (json?.pinterest?.skipped) {
+      log(`⚠️ Pinterest skipped: ${json.pinterest.reason || 'Skipped'}`)
+    } else if (json?.pinterest?.error) {
+      log(`⚠️ Pinterest post failed: ${json.pinterest.error}`)
+    }
+  } catch (e) {
+    throw Object.assign(new Error(e?.message || 'Commit failed'), {
+      _type: e?._type || 'COMMIT',
+    })
   }
-
-  if (json?.instagram?.ok) {
-    log(`📸 Instagram posted: ${json.instagram.mediaId || 'OK'}`)
-  } else if (json?.instagram?.skipped) {
-    log(`⚠️ Instagram skipped: ${json.instagram.reason || 'Skipped'}`)
-  } else if (json?.instagram?.error) {
-    log(`⚠️ Instagram post failed: ${json.instagram.error}`)
-  }
-
-  if (json?.pinterest?.ok) {
-    log(`📌 Pinterest posted: ${json.pinterest.pinId || 'OK'}`)
-  } else if (json?.pinterest?.skipped) {
-    log(`⚠️ Pinterest skipped: ${json.pinterest.reason || 'Skipped'}`)
-  } else if (json?.pinterest?.error) {
-    log(`⚠️ Pinterest post failed: ${json.pinterest.error}`)
-  }
-} catch (e) {
-  throw Object.assign(new Error(e?.message || 'Commit failed'), {
-    _type: e?._type || 'COMMIT',
-  })
 }
-  }
 
   function pauseQueue() {
     setPaused(true)

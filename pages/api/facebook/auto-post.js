@@ -44,6 +44,13 @@ async function safeJson(resp) {
   }
 }
 
+function getAutopostSecret() {
+  return clean(
+    process.env.FACEBOOK_AUTOPOST_SECRET ||
+      process.env.FACEBOOK_AUTPOST_SECRET
+  )
+}
+
 /* ---------------- graph helpers ---------------- */
 
 async function graphGet(path, params = {}) {
@@ -110,18 +117,16 @@ async function resolvePageAccessToken() {
   const pageToken = clean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
   const userToken = clean(process.env.FACEBOOK_LONG_LIVED_USER_TOKEN)
 
-  if (pageToken) {
-    if (!pageId) throw new Error('Missing FACEBOOK_PAGE_ID')
+  if (!pageId) {
+    throw new Error('Missing FACEBOOK_PAGE_ID')
+  }
 
+  if (pageToken) {
     return {
       token: pageToken,
       pageId,
       source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
     }
-  }
-
-  if (!pageId) {
-    throw new Error('Missing FACEBOOK_PAGE_ID')
   }
 
   if (!userToken) {
@@ -135,19 +140,18 @@ async function resolvePageAccessToken() {
   })
 
   const pages = Array.isArray(accounts?.data) ? accounts.data : []
-
-  const page = pages.find((p) => String(p?.id) === pageId)
+  const page = pages.find((p) => String(p?.id || '') === String(pageId))
 
   if (!page) {
     throw new Error(`Page ${pageId} not found in /me/accounts`)
   }
 
   if (!page.access_token) {
-    throw new Error(`No access token for page ${pageId}`)
+    throw new Error(`No access token returned for page ${pageId}`)
   }
 
   return {
-    token: page.access_token,
+    token: clean(page.access_token),
     pageId,
     source: 'derived_from_user_token',
   }
@@ -162,24 +166,32 @@ async function validatePageToken(pageId, token) {
   })
 
   return {
-    id: page?.id || '',
-    name: page?.name || '',
+    id: clean(page?.id),
+    name: clean(page?.name),
   }
+}
+
+/* ---------------- normalize url ---------------- */
+
+function normalizePhotoUrl(photoUrl) {
+  const url = clean(photoUrl)
+  if (!url) return ''
+  return url
 }
 
 /* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST')
     return json(res, 405, { ok: false, error: 'Method not allowed' })
   }
 
   try {
-    const secret =
-      clean(process.env.FACEBOOK_AUTPOST_SECRET) ||
-      clean(process.env.FACEBOOK_AUTOPOST_SECRET)
-
-    const sentSecret = clean(req.headers['x-autopost-secret'])
+    const secret = getAutopostSecret()
+    const sentSecret = clean(
+      req.headers['x-autopost-secret'] || req.headers['X-Autopost-Secret']
+    )
 
     if (secret && sentSecret !== secret) {
       return json(res, 401, { ok: false, error: 'Unauthorized' })
@@ -189,7 +201,7 @@ export default async function handler(req, res) {
 
     const message = clean(body.message)
     const link = clean(body.link)
-    const photoUrl = clean(body.photoUrl)
+    const photoUrl = normalizePhotoUrl(body.photoUrl)
     const published = body.published !== false
     const debug = body.debug === true
 
@@ -201,7 +213,6 @@ export default async function handler(req, res) {
     }
 
     const resolved = await resolvePageAccessToken()
-
     const page = await validatePageToken(resolved.pageId, resolved.token)
 
     let result
@@ -224,16 +235,19 @@ export default async function handler(req, res) {
 
     return json(res, 200, {
       ok: true,
-      postId: result?.post_id || result?.id || '',
+      postId: clean(result?.post_id || result?.id),
       page,
       tokenSource: resolved.source,
-      ...(debug && {
-        debug: {
-          pageId: resolved.pageId,
-          tokenPreview: maskToken(resolved.token),
-          graphVersion: GRAPH_VERSION,
-        },
-      }),
+      ...(debug
+        ? {
+            debug: {
+              pageId: resolved.pageId,
+              tokenPreview: maskToken(resolved.token),
+              graphVersion: GRAPH_VERSION,
+              pageName: page?.name || '',
+            },
+          }
+        : {}),
     })
   } catch (err) {
     console.error('Facebook autopost error:', err)
