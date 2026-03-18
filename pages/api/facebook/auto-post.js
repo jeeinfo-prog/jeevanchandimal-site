@@ -10,8 +10,6 @@ const GRAPH_VERSION =
 
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`
 
-/* ---------------- helpers ---------------- */
-
 function clean(v) {
   return String(v || '').trim()
 }
@@ -29,7 +27,6 @@ function maskToken(token) {
 
 function parseBody(req) {
   if (!req?.body) return {}
-
   if (typeof req.body === 'string') {
     try {
       return JSON.parse(req.body)
@@ -37,7 +34,6 @@ function parseBody(req) {
       return {}
     }
   }
-
   return req.body
 }
 
@@ -54,7 +50,6 @@ function readHeaderValue(req, name) {
 
 async function safeJson(resp) {
   const text = await resp.text()
-
   try {
     return JSON.parse(text)
   } catch {
@@ -77,14 +72,12 @@ function getFacebookPageId() {
   )
 }
 
-function getFacebookSystemUserToken() {
+function getFacebookPageAccessToken() {
   return clean(
-    process.env.FACEBOOK_SYSTEM_USER_ACCESS_TOKEN ||
-      process.env.FB_SYSTEM_USER_ACCESS_TOKEN
+    process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
+      process.env.FB_PAGE_ACCESS_TOKEN
   )
 }
-
-/* ---------------- graph helpers ---------------- */
 
 async function graphGet(path, params = {}) {
   const url = new URL(`${GRAPH_BASE}${path}`)
@@ -95,10 +88,7 @@ async function graphGet(path, params = {}) {
     }
   })
 
-  const resp = await fetch(url.toString(), {
-    method: 'GET',
-  })
-
+  const resp = await fetch(url.toString(), { method: 'GET' })
   const data = await safeJson(resp)
 
   if (!resp.ok || data?.error) {
@@ -152,28 +142,26 @@ async function graphPost(path, form = {}) {
   return data
 }
 
-/* ---------------- config + validation ---------------- */
-
 function normalizeUrl(v) {
   return clean(v)
 }
 
-async function resolveSystemUserContext() {
+async function resolvePageContext() {
   const pageId = getFacebookPageId()
-  const token = getFacebookSystemUserToken()
+  const token = getFacebookPageAccessToken()
 
   if (!pageId) {
     throw new Error('Missing FACEBOOK_PAGE_ID')
   }
 
   if (!token) {
-    throw new Error('Missing FACEBOOK_SYSTEM_USER_ACCESS_TOKEN')
+    throw new Error('Missing FACEBOOK_PAGE_ACCESS_TOKEN')
   }
 
   return {
     pageId,
     token,
-    source: 'FACEBOOK_SYSTEM_USER_ACCESS_TOKEN',
+    source: 'FACEBOOK_PAGE_ACCESS_TOKEN',
   }
 }
 
@@ -188,8 +176,6 @@ async function validatePageAccess(pageId, token) {
     name: clean(page?.name),
   }
 }
-
-/* ---------------- handler ---------------- */
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -251,8 +237,8 @@ export default async function handler(req, res) {
                 debug: {
                   graphVersion: GRAPH_VERSION,
                   pageId: getFacebookPageId(),
-                  systemUserTokenPresent: Boolean(getFacebookSystemUserToken()),
-                  tokenPreview: maskToken(getFacebookSystemUserToken()),
+                  pageTokenPresent: Boolean(getFacebookPageAccessToken()),
+                  tokenPreview: maskToken(getFacebookPageAccessToken()),
                 },
               }
             : {}),
@@ -260,7 +246,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const resolved = await resolveSystemUserContext()
+    const resolved = await resolvePageContext()
     const page = await validatePageAccess(resolved.pageId, resolved.token)
 
     const postLink = link || photoUrl
@@ -301,7 +287,7 @@ export default async function handler(req, res) {
               graphVersion: GRAPH_VERSION,
               pageId: resolved.pageId,
               pageName: page?.name || '',
-              systemUserTokenPresent: Boolean(getFacebookSystemUserToken()),
+              pageTokenPresent: Boolean(getFacebookPageAccessToken()),
               tokenPreview: maskToken(resolved.token),
               usedFeedEndpoint: true,
               usedLink: postLink,
@@ -320,8 +306,8 @@ export default async function handler(req, res) {
             debug: {
               graphVersion: GRAPH_VERSION,
               pageId: getFacebookPageId(),
-              systemUserTokenPresent: Boolean(getFacebookSystemUserToken()),
-              tokenPreview: maskToken(getFacebookSystemUserToken()),
+              pageTokenPresent: Boolean(getFacebookPageAccessToken()),
+              tokenPreview: maskToken(getFacebookPageAccessToken()),
               graphError: err?.graph || null,
             },
           }
