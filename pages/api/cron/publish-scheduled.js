@@ -27,10 +27,11 @@ function getCronSecret() {
 
 function getSiteBase(req) {
   const envBase = clean(process.env.NEXT_PUBLIC_SITE_URL)
-  if (envBase) return envBase
+  if (envBase) return envBase.replace(/\/+$/, '')
 
   const host =
-    clean(readHeader(req, 'x-forwarded-host')) || clean(readHeader(req, 'host'))
+    clean(readHeader(req, 'x-forwarded-host')) ||
+    clean(readHeader(req, 'host'))
 
   const proto =
     clean(readHeader(req, 'x-forwarded-proto')) ||
@@ -41,19 +42,80 @@ function getSiteBase(req) {
   return 'http://localhost:3000'
 }
 
+function parsePayload(raw) {
+  if (!raw) return {}
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw
+
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed
+      }
+    } catch {}
+  }
+
+  return {}
+}
+
+function normalizeTags(input) {
+  let arr = []
+
+  if (Array.isArray(input)) {
+    arr = input
+  } else if (typeof input === 'string') {
+    const raw = input.trim()
+
+    if (!raw) {
+      arr = []
+    } else {
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) arr = parsed
+        else arr = raw.split(',')
+      } catch {
+        arr = raw.split(',')
+      }
+    }
+  }
+
+  const out = []
+  const seen = new Set()
+
+  for (const raw of arr) {
+    let t = clean(raw).toLowerCase()
+    t = t.replace(/\s+/g, '-')
+    if (!t) continue
+    if (t === 'sri-anka') t = 'sri-lanka'
+    if (seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+    if (out.length >= 30) break
+  }
+
+  return out
+}
+
 function getPayloadField(post, key, fallback = '') {
-  const payload = post?.payload && typeof post.payload === 'object' ? post.payload : {}
+  const payload = parsePayload(post?.payload)
   return clean(post?.[key] || payload?.[key] || fallback)
 }
 
+function getPayloadTags(post) {
+  const payload = parsePayload(post?.payload)
+  return normalizeTags(post?.tags || payload?.tags || [])
+}
+
 async function markJobRunning(jobId, attempts) {
+  const nowIso = new Date().toISOString()
+
   const { data, error } = await supabaseAdmin
     .from('scheduled_posts')
     .update({
       status: 'running',
       attempts,
-      started_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      started_at: nowIso,
+      updated_at: nowIso,
     })
     .eq('id', jobId)
     .eq('status', 'pending')
@@ -64,12 +126,13 @@ async function markJobRunning(jobId, attempts) {
   return data
 }
 
-async function markJobDone(jobId, result) {
+async function markJobDone(jobId, attempts, result) {
   await supabaseAdmin
     .from('scheduled_posts')
     .update({
       status: 'done',
-      result,
+      attempts,
+      result: result || null,
       last_error: null,
       finished_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -77,15 +140,26 @@ async function markJobDone(jobId, result) {
     .eq('id', jobId)
 }
 
-async function markJobRetry(jobId, attempts, errorMessage, nextRunAt) {
+async function markJobRetry(jobId, attempts, errorMessage, nextRunAt, result = null) {
+  const failed = attempts >= MAX_ATTEMPTS
+
+  const updatePayload = {
+    status: failed ? 'failed' : 'pending',
+    attempts,
+    result: result || null,
+    last_error: clean(errorMessage) || 'Unknown error',
+    updated_at: new Date().toISOString(),
+  }
+
+  if (failed) {
+    updatePayload.finished_at = new Date().toISOString()
+  } else {
+    updatePayload.run_at = nextRunAt
+  }
+
   await supabaseAdmin
     .from('scheduled_posts')
-    .update({
-      status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending',
-      last_error: clean(errorMessage) || 'Unknown error',
-      run_at: nextRunAt,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', jobId)
 }
 
@@ -111,7 +185,7 @@ export default async function handler(req, res) {
         req.query?.secret
     )
 
-    if (expectedSecret && sentSecret !== expectedSecret) {
+    if (expectedSecret && (!sentSecret || sentSecret !== expectedSecret)) {
       return res.status(401).json({
         ok: false,
         error: 'Unauthorized',
@@ -169,9 +243,12 @@ export default async function handler(req, res) {
         const photoId = getPayloadField(job, 'photo_id')
         const title = getPayloadField(job, 'title')
         const description = getPayloadField(job, 'description')
+        const tags = getPayloadTags(job)
+
         const previewUrl =
           getPayloadField(job, 'preview_url') ||
           (photoId ? `${siteBase}/api/photo/${photoId}/preview?variant=standard` : '')
+
         const storeUrl =
           getPayloadField(job, 'store_url') ||
           (photoId ? `${siteBase}/store/${photoId}` : '')
@@ -191,6 +268,7 @@ export default async function handler(req, res) {
           storeUrl,
           title,
           description,
+          tags,
         })
 
         const hasAnySuccess =
@@ -204,7 +282,7 @@ export default async function handler(req, res) {
           publishing?.pinterest?.skipped
 
         if (hasAnySuccess || hasOnlySkips) {
-          await markJobDone(job.id, publishing)
+          await markJobDone(job.id, attempts, publishing)
 
           summary.done += 1
           summary.jobs.push({
@@ -220,7 +298,8 @@ export default async function handler(req, res) {
             'Scheduled publishing failed'
 
           const nextRunAt = nextRetryIso(attempts)
-          await markJobRetry(job.id, attempts, combinedError, nextRunAt)
+
+          await markJobRetry(job.id, attempts, combinedError, nextRunAt, publishing)
 
           if (attempts >= MAX_ATTEMPTS) {
             summary.failed += 1
@@ -233,18 +312,18 @@ export default async function handler(req, res) {
             ok: false,
             error: combinedError,
             attempts,
-            nextRunAt,
+            nextRunAt: attempts >= MAX_ATTEMPTS ? null : nextRunAt,
+            result: publishing,
           })
         }
       } catch (err) {
         const nextRunAt = nextRetryIso(attempts)
+        const errorMessage = err?.message || 'Scheduled publishing failed'
 
-        await markJobRetry(
-          job.id,
-          attempts,
-          err?.message || 'Scheduled publishing failed',
-          nextRunAt
-        )
+        await markJobRetry(job.id, attempts, errorMessage, nextRunAt, {
+          ok: false,
+          error: errorMessage,
+        })
 
         if (attempts >= MAX_ATTEMPTS) {
           summary.failed += 1
@@ -255,9 +334,9 @@ export default async function handler(req, res) {
         summary.jobs.push({
           id: job.id,
           ok: false,
-          error: err?.message || 'Scheduled publishing failed',
+          error: errorMessage,
           attempts,
-          nextRunAt,
+          nextRunAt: attempts >= MAX_ATTEMPTS ? null : nextRunAt,
         })
       }
     }
