@@ -1,35 +1,40 @@
 // pages/api/pinterest/connect.js
 
-function clean(v) {
-  return String(v || '').trim()
-}
-
-function requireEnv(name) {
-  const value = clean(process.env[name])
-  if (!value) throw new Error(`Missing required env var: ${name}`)
-  return value
-}
-
-export default async function handler(req, res) {
+export default function handler(req, res) {
   try {
-    const appId = requireEnv('PINTEREST_APP_ID')
-    const redirectUri = requireEnv('PINTEREST_REDIRECT_URI')
+    const clientId = process.env.PINTEREST_APP_ID
+    const redirectUri = process.env.PINTEREST_REDIRECT_URI
 
-    const scope = ['pins:read', 'pins:write', 'boards:read'].join(',')
-    const state = Math.random().toString(36).slice(2)
+    if (!clientId || !redirectUri) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Missing Pinterest env vars',
+      })
+    }
 
-    const url = new URL('https://www.pinterest.com/oauth/')
-    url.searchParams.set('response_type', 'code')
-    url.searchParams.set('redirect_uri', redirectUri)
-    url.searchParams.set('client_id', appId)
-    url.searchParams.set('scope', scope)
-    url.searchParams.set('state', state)
+    // ✅ REQUIRED SCOPES (FULL AUTPOST)
+    const scope = [
+      'pins:read',
+      'pins:write',
+      'boards:read',
+      'boards:write',
+      'user_accounts:read',
+    ].join(',')
 
-    return res.redirect(url.toString())
+    const authUrl =
+      `https://www.pinterest.com/oauth/` +
+      `?response_type=code` +
+      `&client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=${encodeURIComponent(scope)}`
+
+    return res.redirect(authUrl)
   } catch (err) {
+    console.error('Pinterest connect error:', err)
+
     return res.status(500).json({
       ok: false,
-      error: err?.message || 'Failed to start Pinterest OAuth',
+      error: 'Failed to initiate Pinterest OAuth',
     })
   }
 }
