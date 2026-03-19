@@ -1,113 +1,102 @@
-// pages/refund-policy.js
+// pages/terms-and-conditions.js
 import React from 'react'
 import Head from 'next/head'
 
-export default function RefundPolicy() {
-  const CANONICAL = 'https://jeevanchandimal.com/refund-policy'
+export default function TermsAndConditions() {
+  const CANONICAL = 'https://jeevanchandimal.com/terms-and-conditions'
 
   return (
     <>
       <Head>
-        <title>Refund Policy | Jeevan Chandimal</title>
+        <title>Terms & Conditions | Jeevan Chandimal</title>
         <meta
           name="description"
-          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com."
+          content="Terms and Conditions for using JeevanChandimal.com and purchasing digital photography and licensing."
         />
         <link rel="canonical" href={CANONICAL} />
 
         {/* Open Graph */}
-        <meta property="og:title" content="Refund Policy | Jeevan Chandimal" />
+        <meta property="og:title" content="Terms & Conditions | Jeevan Chandimal" />
         <meta
           property="og:description"
-          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com."
+          content="Terms and Conditions for using JeevanChandimal.com and purchasing digital photography and licensing."
         />
         <meta property="og:url" content={CANONICAL} />
         <meta property="og:type" content="website" />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content="Refund Policy | Jeevan Chandimal" />
+        <meta name="twitter:title" content="Terms & Conditions | Jeevan Chandimal" />
         <meta
           name="twitter:description"
-          content="Refund Policy for digital photography purchases and licensing at JeevanChandimal.com."
+          content="Terms and Conditions for using JeevanChandimal.com and purchasing digital photography and licensing."
         />
       </Head>
 
       <main className="wrap">
-        <h1>Refund Policy</h1>
+        <h1>Terms & Conditions</h1>
 
         <p>
-          Thank you for purchasing from <strong>JeevanChandimal.com</strong>. We provide
-          high-quality digital photography and licensing services. Because our products are
-          digital downloads, our refund policy is different from physical goods.
+          Welcome to <strong>JeevanChandimal.com</strong>. By accessing this website and purchasing
+          digital products, you agree to the following terms and conditions.
         </p>
 
-        <h2>Digital Product Refunds</h2>
+        <h2>Use of Website</h2>
         <p>
-          All purchases made on our website are for digital files and licensing rights. Once a
-          file has been successfully delivered or downloaded, the sale is considered final and
-          non-refundable.
+          You agree to use this website only for lawful purposes. You must not use this website in
+          any way that may damage, disable, or impair the website or interfere with other users.
         </p>
 
-        <p>We do not offer refunds for:</p>
+        <h2>Digital Products & Licensing</h2>
+        <p>
+          All products available on this website are digital downloads and are protected by
+          copyright laws.
+        </p>
+
         <ul>
-          <li>Change of mind after purchase</li>
-          <li>Accidental purchases</li>
-          <li>Incorrect license selection</li>
-          <li>Incompatibility with software or devices</li>
-          <li>Failure to read product details before purchase</li>
+          <li>You are granted a non-exclusive, non-transferable license</li>
+          <li>You may not resell, redistribute, or share the files</li>
+          <li>You must follow the license terms associated with each purchase</li>
         </ul>
 
-        <h2>Exceptions (Eligible for Refund or Replacement)</h2>
-        <p>A refund or replacement may be provided only if:</p>
-        <ul>
-          <li>The purchased file is corrupted or cannot be opened</li>
-          <li>You received the wrong file</li>
-          <li>The file fails to download due to a verified system error</li>
-        </ul>
-
+        <h2>Intellectual Property</h2>
         <p>
-          In such cases, you must contact us within <strong>3 days</strong> of purchase with:
-        </p>
-        <ul>
-          <li>Your order ID</li>
-          <li>A description of the issue</li>
-          <li>Screenshots (if applicable)</li>
-        </ul>
-
-        <p>
-          We will first attempt to re-deliver a correct working file. If the issue cannot be
-          resolved, a refund will be issued to the original payment method.
+          All content, including images, videos, and text, is the property of Jeevan Chandimal and
+          is protected by copyright and intellectual property laws.
         </p>
 
-        <h2>Duplicate Payments</h2>
+        <h2>Payments</h2>
         <p>
-          If you were charged more than once for the same order due to a payment error, the
-          duplicate amount will be refunded.
+          All payments are processed securely through third-party payment providers. By making a
+          purchase, you agree to provide accurate billing information.
         </p>
 
-        <h2>Processing Time</h2>
+        <h2>Refund Policy</h2>
         <p>
-          Approved refunds will be processed within <strong>5–10 business days</strong>. The time
-          taken for the refund to appear in your account depends on your payment provider.
+          Please refer to our Refund Policy page for detailed information regarding refunds and
+          replacements.
         </p>
 
-        <h2>License Usage</h2>
-        <p>Refunds will not be granted if the downloaded image has already been:</p>
-        <ul>
-          <li>Used in any published work</li>
-          <li>Shared publicly</li>
-          <li>Distributed to third parties</li>
-        </ul>
+        <h2>Limitation of Liability</h2>
+        <p>
+          We are not liable for any damages arising from the use or inability to use our digital
+          products, including but not limited to loss of data, business interruption, or financial
+          loss.
+        </p>
 
-        <p>As licensing rights are granted immediately upon delivery.</p>
+        <h2>Changes to Terms</h2>
+        <p>
+          We reserve the right to update or modify these terms at any time without prior notice.
+          Continued use of the website constitutes acceptance of the updated terms.
+        </p>
 
-        <h2>Contact Us</h2>
-        <p>If you experience any issues with your purchase, please contact:</p>
+        <h2>Contact</h2>
+        <p>
+          If you have any questions about these Terms & Conditions, please contact:
+        </p>
         <p>
           📧 <strong>info@jeevanchandimal.com</strong>
         </p>
-        <p>We will respond as quickly as possible to resolve your issue.</p>
       </main>
 
       <style jsx>{`
