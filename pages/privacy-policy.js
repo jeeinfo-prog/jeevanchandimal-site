@@ -107,6 +107,19 @@ export default function PrivacyPolicy() {
           contacting us at the email below.
         </p>
 
+        <h2>Related Policies</h2>
+        <p>
+          Please review our{' '}
+          <a href="/terms-and-conditions" className="link">
+            Terms & Conditions
+          </a>{' '}
+          and{' '}
+          <a href="/refund-policy" className="link">
+            Refund Policy
+          </a>{' '}
+          for additional information about purchases, licensing, and refunds.
+        </p>
+
         <h2>Changes to This Policy</h2>
         <p>
           We may update this Privacy Policy from time to time. Any changes will be posted
@@ -119,7 +132,17 @@ export default function PrivacyPolicy() {
           please contact:
         </p>
         <p>
-          📧 <strong>info@jeevanchandimal.com</strong>
+          📧{' '}
+          <a href="mailto:info@jeevanchandimal.com" className="link">
+            info@jeevanchandimal.com
+          </a>
+        </p>
+
+        <p>
+          or visit our{' '}
+          <a href="/contact" className="link">
+            Contact Page
+          </a>
         </p>
       </main>
 
@@ -147,6 +170,15 @@ export default function PrivacyPolicy() {
 
         li {
           margin-bottom: 6px;
+        }
+
+        .link {
+          text-decoration: underline;
+          opacity: 0.9;
+        }
+
+        .link:hover {
+          opacity: 1;
         }
       `}</style>
     </>
