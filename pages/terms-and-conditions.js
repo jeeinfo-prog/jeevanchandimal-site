@@ -73,8 +73,11 @@ export default function TermsAndConditions() {
 
         <h2>Refund Policy</h2>
         <p>
-          Please refer to our Refund Policy page for detailed information regarding refunds and
-          replacements.
+          Please refer to our{' '}
+          <a href="/refund-policy" className="link">
+            Refund Policy
+          </a>{' '}
+          page for detailed information regarding refunds and replacements.
         </p>
 
         <h2>Limitation of Liability</h2>
@@ -91,11 +94,20 @@ export default function TermsAndConditions() {
         </p>
 
         <h2>Contact</h2>
+        <p>If you have any questions about these Terms & Conditions, please contact:</p>
+
         <p>
-          If you have any questions about these Terms & Conditions, please contact:
+          📧{' '}
+          <a href="mailto:info@jeevanchandimal.com" className="link">
+            info@jeevanchandimal.com
+          </a>
         </p>
+
         <p>
-          📧 <strong>info@jeevanchandimal.com</strong>
+          or visit our{' '}
+          <a href="/contact" className="link">
+            Contact Page
+          </a>
         </p>
       </main>
 
@@ -123,6 +135,15 @@ export default function TermsAndConditions() {
 
         li {
           margin-bottom: 6px;
+        }
+
+        .link {
+          text-decoration: underline;
+          opacity: 0.9;
+        }
+
+        .link:hover {
+          opacity: 1;
         }
       `}</style>
     </>
