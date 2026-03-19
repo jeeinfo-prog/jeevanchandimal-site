@@ -39,14 +39,13 @@ export default function RefundPolicy() {
         <p>
           Thank you for purchasing from <strong>JeevanChandimal.com</strong>. We provide
           high-quality digital photography and licensing services. Because our products are
-          digital downloads, our refund policy is different from physical goods.
+          digital downloads, our refund policy differs from physical goods.
         </p>
 
         <h2>Digital Product Refunds</h2>
         <p>
-          All purchases made on our website are for digital files and licensing rights. Once a
-          file has been successfully delivered or downloaded, the sale is considered final and
-          non-refundable.
+          All purchases are for digital files and licensing rights. Once a file has been
+          successfully delivered or downloaded, the sale is considered final and non-refundable.
         </p>
 
         <p>We do not offer refunds for:</p>
@@ -89,7 +88,7 @@ export default function RefundPolicy() {
         <h2>Processing Time</h2>
         <p>
           Approved refunds will be processed within <strong>5–10 business days</strong>. The time
-          taken for the refund to appear in your account depends on your payment provider.
+          taken for the refund to appear depends on your payment provider.
         </p>
 
         <h2>License Usage</h2>
@@ -102,12 +101,31 @@ export default function RefundPolicy() {
 
         <p>As licensing rights are granted immediately upon delivery.</p>
 
+        <h2>Related Policies</h2>
+        <p>
+          Please review our{' '}
+          <a href="/terms-and-conditions" className="link">
+            Terms & Conditions
+          </a>{' '}
+          for additional information about usage and licensing.
+        </p>
+
         <h2>Contact Us</h2>
         <p>If you experience any issues with your purchase, please contact:</p>
+
         <p>
-          📧 <strong>info@jeevanchandimal.com</strong>
+          📧{' '}
+          <a href="mailto:info@jeevanchandimal.com" className="link">
+            info@jeevanchandimal.com
+          </a>
         </p>
-        <p>We will respond as quickly as possible to resolve your issue.</p>
+
+        <p>
+          or visit our{' '}
+          <a href="/contact" className="link">
+            Contact Page
+          </a>
+        </p>
       </main>
 
       <style jsx>{`
@@ -134,6 +152,15 @@ export default function RefundPolicy() {
 
         li {
           margin-bottom: 6px;
+        }
+
+        .link {
+          text-decoration: underline;
+          opacity: 0.9;
+        }
+
+        .link:hover {
+          opacity: 1;
         }
       `}</style>
     </>
