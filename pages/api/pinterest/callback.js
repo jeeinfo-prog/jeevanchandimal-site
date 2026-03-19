@@ -21,6 +21,20 @@ async function safeJson(resp) {
   }
 }
 
+function normalizeScope(scope) {
+  if (Array.isArray(scope)) {
+    return scope.map(clean).filter(Boolean)
+  }
+
+  const raw = clean(scope)
+  if (!raw) return []
+
+  return raw
+    .split(/[,\s]+/)
+    .map(clean)
+    .filter(Boolean)
+}
+
 export default async function handler(req, res) {
   try {
     const code = clean(req.query?.code)
@@ -66,7 +80,7 @@ export default async function handler(req, res) {
 
     const accessToken = clean(data?.access_token)
     const refreshToken = clean(data?.refresh_token)
-    const scope = data?.scope || null
+    const scope = normalizeScope(data?.scope)
     const expiresIn = Number(data?.expires_in || 0) || null
     const refreshTokenExpiresIn =
       Number(data?.refresh_token_expires_in || 0) || null
@@ -112,9 +126,13 @@ export default async function handler(req, res) {
       })
     }
 
-    return res
-      .status(200)
-      .send('Pinterest connected successfully. You can close this tab.')
+    return res.status(200).json({
+      ok: true,
+      message: 'Pinterest connected successfully',
+      savedScope: scope,
+      hasBoardsWrite: scope.includes('boards:write'),
+      hasPinsWrite: scope.includes('pins:write'),
+    })
   } catch (err) {
     return res.status(500).json({
       ok: false,
