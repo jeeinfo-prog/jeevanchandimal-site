@@ -1,5 +1,6 @@
 // pages/api/pinterest/auto-post.js
 
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 import { logSocialPost } from '../../../lib/socialLogger'
 
 function clean(v) {
@@ -34,11 +35,10 @@ function readHeaderValue(req, name) {
 }
 
 function getSecret() {
-  return clean(process.env.FACEBOOK_AUTOPOST_SECRET)
-}
-
-function getPinterestToken() {
-  return clean(process.env.PINTEREST_ACCESS_TOKEN)
+  return clean(
+    process.env.FACEBOOK_AUTOPOST_SECRET ||
+      process.env.FACEBOOK_AUTPOST_SECRET
+  )
 }
 
 function getBoardId() {
@@ -52,6 +52,20 @@ async function safeJson(resp) {
   } catch {
     return {}
   }
+}
+
+async function getPinterestAccessToken() {
+  const { data, error } = await supabaseAdmin
+    .from('app_secrets')
+    .select('value')
+    .eq('key', 'pinterest_oauth')
+    .single()
+
+  if (error || !data?.value?.access_token) {
+    throw new Error('Pinterest OAuth token not connected yet')
+  }
+
+  return clean(data.value.access_token)
 }
 
 export default async function handler(req, res) {
@@ -83,10 +97,9 @@ export default async function handler(req, res) {
       })
     }
 
-    const token = getPinterestToken()
+    const token = await getPinterestAccessToken()
     const boardId = getBoardId()
 
-    if (!token) throw new Error('Missing PINTEREST_ACCESS_TOKEN')
     if (!boardId) throw new Error('Missing PINTEREST_BOARD_ID')
 
     const resp = await fetch('https://api.pinterest.com/v5/pins', {
@@ -109,10 +122,10 @@ export default async function handler(req, res) {
 
     const data = await safeJson(resp)
 
-    if (!resp.ok || data?.code) {
-      throw new Error(
-        data?.message || `Pinterest API failed (${resp.status})`
-      )
+    if (!resp.ok || data?.code || data?.message) {
+      if (!resp.ok) {
+        throw new Error(data?.message || `Pinterest API failed (${resp.status})`)
+      }
     }
 
     const postId = clean(data?.id)
